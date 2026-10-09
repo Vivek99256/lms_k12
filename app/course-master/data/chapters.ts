@@ -2,6 +2,7 @@
 import { getRequestContext, getSyear } from '../page';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { buildSessionContext } from '@/lib/erp-client';
+import type { PrayogshalaActivity } from './prayogshala';
 
 export interface Chapter {
   id: string;
@@ -579,6 +580,13 @@ export interface ChapterContentAsset {
   h5p_type?: string;
   /** Route of the existing H5P editor this item opens in. */
   deep_link?: string;
+  /**
+   * Prayogshala items are merged in by the backend like H5P ones: a namespaced string id
+   * ("prayogshala:7"), content_category 'Prayogshala', and the whole activity under
+   * `prayogshala` so opening one needs no second request.
+   */
+  prayogshala?: PrayogshalaActivity;
+  topic_name?: string | null;
 }
 
 export interface ChapterContentResponse {
@@ -859,9 +867,15 @@ export async function fetchChapterContent(
     body.source = options.source;
   }
 
+  // The token is what scopes Prayogshala to the caller's institute on the server; the
+  // sub_institute_id in the body is only honoured for the older content types.
+  const { token } = buildSessionContext();
   const res = await fetch(`${API_BASE_URL}/api/lms-chapter-content`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(body),
   });
 

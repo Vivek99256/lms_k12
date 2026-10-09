@@ -7,10 +7,12 @@ import {
   ClipboardList,
   Eye,
   FileText,
+  FlaskConical,
   GraduationCap,
   Layers3,
   LifeBuoy,
   MonitorPlay,
+  PencilLine,
   Play,
   Presentation,
   Sparkles,
@@ -53,6 +55,10 @@ export interface ContentCardItem {
   contentCategory: string;
   /** From lms_concept. Null on all but ~25 rows, so it must degrade cleanly. */
   conceptName: string | null;
+  /** topic_master.name. Only Prayogshala items carry it today; omitted when absent. */
+  topicName?: string | null;
+  /** A line or two of description under the title. Omitted when absent. */
+  summary?: string | null;
   type: string;
   source: string;
   /** File extension or category, e.g. 'pdf', 'link', 'mp4'. */
@@ -150,6 +156,13 @@ const TYPE_STYLES: Record<
     ring: 'ring-cyan-200',
     icon: MonitorPlay,
   },
+  Prayogshala: {
+    band: 'from-fuchsia-100 via-fuchsia-50/60 to-transparent',
+    chip: 'bg-fuchsia-100 text-fuchsia-700',
+    text: 'text-fuchsia-600',
+    ring: 'ring-fuchsia-200',
+    icon: FlaskConical,
+  },
   'My course': {
     band: 'from-teal-100 via-teal-50/60 to-transparent',
     chip: 'bg-teal-100 text-teal-700',
@@ -222,6 +235,8 @@ export function ContentCard({ item, onOpen, hideChapter = false }: ContentCardPr
         <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-slate-500">
           {isGenerated(item.source) ? (
             <Sparkles size={12} className={style.text} />
+          ) : item.source === 'Authored' ? (
+            <PencilLine size={12} />
           ) : (
             <Upload size={12} />
           )}
@@ -242,7 +257,7 @@ export function ContentCard({ item, onOpen, hideChapter = false }: ContentCardPr
       </div>
 
       <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
-        {(!hideChapter || item.conceptName) && (
+        {(!hideChapter || item.conceptName || item.topicName) && (
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
             {!hideChapter && (
               <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
@@ -253,6 +268,14 @@ export function ContentCard({ item, onOpen, hideChapter = false }: ContentCardPr
             {/* Concept exists on very few rows. Shown when present, omitted
                 otherwise - never replaced by a placeholder like "General",
                 which reads as real data that happens to be wrong. */}
+            {item.topicName && (
+              <span
+                className={`inline-flex max-w-full items-center gap-1 truncate rounded-full px-2.5 py-1 text-[11px] font-medium ${style.chip}`}
+              >
+                <Layers3 size={11} className="shrink-0" />
+                {item.topicName}
+              </span>
+            )}
             {item.conceptName && (
               <span
                 className={`inline-flex max-w-full items-center gap-1 truncate rounded-full px-2.5 py-1 text-[11px] font-medium ${style.chip}`}
@@ -267,6 +290,10 @@ export function ContentCard({ item, onOpen, hideChapter = false }: ContentCardPr
         <h3 className="line-clamp-2 text-[17px] font-semibold leading-6 text-slate-950">
           {item.title}
         </h3>
+
+        {item.summary ? (
+          <p className="mt-1.5 line-clamp-3 text-[13px] leading-5 text-slate-600">{item.summary}</p>
+        ) : null}
 
         {/* The line that separates two cards sharing a title. file_type is set
             on 99% of rows and the date on all of them, so this is the reliable

@@ -96,6 +96,13 @@ import {
   type ArithmeticQuizEditorState,
 } from '@/app/h5p/h5p_arithmetic_quiz/components/editor';
 import { ContentCard } from './ContentCard';
+import {
+  PRAYOGSHALA_EMPTY_MESSAGE,
+  PrayogshalaDetailDialog,
+  PrayogshalaEditorDialog,
+} from './PrayogshalaDialogs';
+import { PrayogshalaLab } from './PrayogshalaLab';
+import { deletePrayogshalaActivity, type PrayogshalaActivity } from '../../data/prayogshala';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
 import { extractGeneratedBodyHtml, sanitizeGeneratedHtml } from '@/app/course-master/data/generated-html';
@@ -394,6 +401,9 @@ const CONTENT_LIBRARY_TABS = [
   'Lesson plan',
   'My course',
   'H5P Interactive',
+  // Merged into the chapter content list by the backend (like H5P), so it is counted
+  // and filtered like every other type and also appears under 'All content'.
+  'Prayogshala',
 ] as const;
 /**
  * Teacher Workspace tabs.
@@ -486,8 +496,9 @@ type ChapterContentType =
   | 'Worksheet'
   | 'Lesson plan'
   | 'My course'
-  | 'H5P Interactive';
-type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded';
+  | 'H5P Interactive'
+  | 'Prayogshala';
+type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded' | 'Authored';
 
 /**
  * content_master.source values written by the Generate Content flow. It has used
@@ -505,6 +516,8 @@ const GENERATED_CONTENT_SOURCES = ['gamma ai', 'aigenerated', 'claude ai'];
  */
 function resolveContentSource(source: string | null | undefined): ChapterContentSource {
   const normalized = (source ?? '').trim().toLowerCase();
+  // Prayogshala activities are written in the LMS: neither uploaded files nor generated.
+  if (normalized === 'authored') return 'Authored';
   if (!GENERATED_CONTENT_SOURCES.includes(normalized)) return 'Uploaded';
   // Name the provider that actually wrote the row. Anything generated but not
   // Claude keeps the historical 'Gamma AI' label, including the legacy
@@ -549,6 +562,12 @@ interface ChapterContentItem {
   bodyHtml: string | null;
   /** Route of the existing H5P editor this item opens in. Only set for H5P items. */
   deepLink?: string;
+  /** topic_master.name - set for Prayogshala items. */
+  topicName: string | null;
+  /** Short description shown on the card - set for Prayogshala items. */
+  summary: string | null;
+  /** The whole activity, for the detail view. Only set for Prayogshala items. */
+  prayogshala: PrayogshalaActivity | null;
   slides: {
     id: string;
     number: number;
@@ -572,6 +591,7 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   if (contentCategory === 'worksheet') return 'Worksheet';
   if (contentCategory === 'lesson plan') return 'Lesson plan';
   if (contentCategory === 'my course') return 'My course';
+  if (contentCategory === 'prayogshala') return 'Prayogshala';
   // 'Teacher Training' is the bulk category (2,450 rows) and is distinct from
   // 'Teacher training presentation' (4 rows). Matched here rather than inside the
   // presentation branch below, because most of these rows are PDFs, not decks,
@@ -623,7 +643,7 @@ function buildApiChapterContentItems(
         preview: getChapterContentPreview(type),
         actionLabel: type === 'Video' ? 'Play' : 'Open',
         slideCount: 0,
-        statValue: asset.file_type || category,
+        statValue: asset.prayogshala?.activity_type_label || asset.file_type || category,
         updatedDate,
         updatedAt: updatedDate === 'â€”' ? 'Date unavailable' : `updated ${updatedDate}`,
         contentUrl,
@@ -632,6 +652,9 @@ function buildApiChapterContentItems(
         // Where an H5P card opens. The existing /h5p/* editors keep all the CRUD,
         // which is what makes removing the top-level H5P button non-destructive.
         deepLink: asset.deep_link,
+        topicName: asset.topic_name?.trim() ? asset.topic_name.trim() : null,
+        summary: type === 'Prayogshala' ? (asset.prayogshala?.objective ?? asset.description ?? null) : null,
+        prayogshala: asset.prayogshala ?? null,
       };
     })
   );
@@ -873,7 +896,7 @@ function getChapterContentPreview(type: ChapterContentType): ChapterContentPrevi
   if (type === 'Video') return 'video';
   if (type === 'Revision notes') return 'notes';
   if (type === 'PDF') return 'pdf';
-  if (type === 'Classroom activity') return 'activity';
+  if (type === 'Classroom activity' || type === 'Prayogshala') return 'activity';
   // Worksheets and remedial packs are things a class works through, so they
   // preview as activities; a lesson plan is a document.
   if (type === 'Worksheet' || type === 'Remedial class') return 'activity';
@@ -982,6 +1005,9 @@ function buildChapterContentItems(
       // Demo rows have no stored document; only API-backed generated rows do.
       bodyHtml: null,
       slides: buildContentSlides(conceptTitle, chapter.title, type, slideCount),
+      topicName: null,
+      summary: null,
+      prayogshala: null,
     };
   });
 }
@@ -1034,6 +1060,8 @@ function contentMatchesTab(item: ChapterContentItem, tab: string): boolean {
       return item.type === 'Teacher training' || item.type === 'Teacher training presentation';
     case 'H5P Interactive':
       return item.type === 'H5P Interactive';
+    case 'Prayogshala':
+      return item.type === 'Prayogshala';
     default:
       return true;
   }
@@ -1277,6 +1305,14 @@ export default function ChapterListPage() {
   // tabs - 'Teacher training' exists only on the Teacher lane - so typing this
   // off the Classroom list alone makes the Teacher lane's own tabs unassignable.
   const [contentLibraryTab, setContentLibraryTab] = useState<ContentLibraryTab>('All content');
+  // Prayogshala: the activity open in the detail view, and the editor (null = closed;
+  // { activity: null } = adding a new one).
+  const [openPrayogshala, setOpenPrayogshala] = useState<PrayogshalaActivity | null>(null);
+  const [prayogshalaEditor, setPrayogshalaEditor] = useState<{ activity: PrayogshalaActivity | null } | null>(null);
+  const [prayogshalaActionError, setPrayogshalaActionError] = useState('');
+  // Bumped to force the chapter's content to be fetched again (retry, and after an
+  // activity is added, edited or removed).
+  const [contentReloadKey, setContentReloadKey] = useState(0);
   // Grouping follows the resource type: Classroom Resources is chapter-wise,
   // Teacher Workspace is concept-wise. Derived instead of stored, so the two can
   // never drift out of step and there is no toggle to leave in the wrong state.
@@ -1350,10 +1386,16 @@ export default function ChapterListPage() {
   // Widened to string[] on purpose: the two tab lists are different tuple types,
   // so includes() on the union narrows its argument to the shorter tuple's members
   // and rejects the very tabs this is meant to test for.
+  const prayogshalaRequested = searchParams?.get('tab') === 'prayogshala';
+  const requestedContentLibraryTab: string = prayogshalaRequested
+    ? 'Prayogshala'
+    : contentLibraryTab === 'Prayogshala'
+      ? 'All content'
+      : contentLibraryTab;
   const activeContentLibraryTab = (availableContentLibraryTabs as readonly string[]).includes(
-    contentLibraryTab
+    requestedContentLibraryTab
   )
-    ? contentLibraryTab
+    ? requestedContentLibraryTab
     : 'All content';
   const activeChapterId = searchParams?.get('chapterId') ?? '';
   const resourceChapter =
@@ -1418,6 +1460,18 @@ export default function ChapterListPage() {
     if (/^\d+$/.test(activeLibraryChapter.id)) return [];
     return buildChapterContentItems(course, activeLibraryChapter, activeLibraryChapterConcepts);
   }, [activeContentLibraryTab, activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, contentGroupBy, contentResourceType, course]);
+
+  // The lab named in the URL, if any, found in the chapter's own content list - so it can
+  // only ever open under the chapter (and institute) it belongs to.
+  const labActivityId = searchParams?.get('activityId') ?? '';
+  const labActivity = useMemo(
+    () => (labActivityId ? chapterContentItems.find((item) => item.prayogshala && String(item.prayogshala.id) === labActivityId)?.prayogshala ?? null : null),
+    [chapterContentItems, labActivityId]
+  );
+  const labContentLoaded =
+    !!activeLibraryChapter &&
+    !contentLoading &&
+    `${activeLibraryChapter.id}:${activeContentLibraryTab}:${contentGroupBy}:${contentResourceType}` in chapterContentCategories;
 
   /**
    * The chapter's content narrowed to the resource type currently on screen.
@@ -2152,7 +2206,7 @@ export default function ChapterListPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeContentLibraryTab, activeLibraryChapter, contentGroupBy, contentResourceType, view, chapterContentCategories]);
+  }, [activeContentLibraryTab, activeLibraryChapter, contentGroupBy, contentResourceType, view, chapterContentCategories, contentReloadKey]);
 
   /**
    * Everything the current search, source and lane allow - before the tab
@@ -2213,11 +2267,28 @@ export default function ChapterListPage() {
       availableContentLibraryTabs.filter(
         (tab) =>
           tab === 'All content' ||
+          tab === 'Prayogshala' ||
           tab === activeContentLibraryTab ||
           (contentLibraryTabCounts[tab] ?? 0) > 0
       ),
     [availableContentLibraryTabs, activeContentLibraryTab, contentLibraryTabCounts]
   );
+
+  /**
+   * Switching tab. Prayogshala is carried in the URL (`tab=prayogshala`) and pushed, so
+   * a refresh, a shared link and the Back button all return to the same tab. Every
+   * other tab keeps its existing in-memory behaviour; leaving Prayogshala drops the
+   * param, and the existing view / resourceType / chapterId params are never touched.
+   */
+  const selectContentLibraryTab = (tab: ContentLibraryTab) => {
+    setContentLibraryTab(tab);
+    const next = new URLSearchParams(searchParams?.toString());
+    if (tab === 'Prayogshala') next.set('tab', 'prayogshala');
+    else next.delete('tab');
+    if (next.toString() !== (searchParams?.toString() ?? '')) {
+      router.push(`/course-master/${courseId}/chapters?${next.toString()}`);
+    }
+  };
 
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const presentationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2701,6 +2772,24 @@ export default function ChapterListPage() {
   );
 
   const handleOpenContent = (item: ChapterContentItem) => {
+    // A Prayogshala activity is a structured document (objective, procedure, safety...),
+    // not a file or a route, so it opens in its own detail view. The activity came
+    // down with the list; nothing is fetched here.
+    if (item.prayogshala) {
+      setPrayogshalaActionError('');
+      // An interactive lab opens full-screen and is addressed by the URL (activityId), so
+      // a refresh, the Back button and a shared link all land on it. A plain activity
+      // opens in the detail dialog.
+      if (item.prayogshala.lab_config) {
+        const next = new URLSearchParams(searchParams?.toString());
+        next.set('activityId', String(item.prayogshala.id));
+        router.push(`/course-master/${courseId}/chapters?${next.toString()}`);
+      } else {
+        setOpenPrayogshala(item.prayogshala);
+      }
+      return;
+    }
+
     // An H5P item is not a file - it is a route. It opens in its existing editor
     // in-app, which is what keeps all the H5P CRUD reachable now that H5P is a
     // filter value rather than a top-level destination (tracker row 2).
@@ -2712,6 +2801,32 @@ export default function ChapterListPage() {
     if (!item.contentUrl) return;
 
     window.open(item.contentUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const closePrayogshalaLab = () => {
+    const next = new URLSearchParams(searchParams?.toString());
+    next.delete('activityId');
+    router.push(`/course-master/${courseId}/chapters?${next.toString()}`);
+  };
+
+  /** Forget the chapter's cached content and fetch it again. */
+  const reloadChapterContent = () => {
+    const chapterPrefix = `${activeLibraryChapter?.id ?? ''}:`;
+    setChapterContentCategories((current) =>
+      Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(chapterPrefix)))
+    );
+    setContentReloadKey((key) => key + 1);
+  };
+
+  const removePrayogshalaActivity = async (activity: PrayogshalaActivity) => {
+    if (!window.confirm(`Remove "${activity.title}" from this chapter's Prayogshala?`)) return;
+    try {
+      await deletePrayogshalaActivity(activity.id);
+      setOpenPrayogshala(null);
+      reloadChapterContent();
+    } catch (error: unknown) {
+      setPrayogshalaActionError(error instanceof Error ? error.message : 'Failed to remove the activity.');
+    }
   };
 
   const closeGenerateQuestionsModal = () => {
@@ -5861,7 +5976,7 @@ export default function ChapterListPage() {
                   <button
                     key={tab}
                     type="button"
-                    onClick={() => setContentLibraryTab(tab)}
+                    onClick={() => selectContentLibraryTab(tab)}
                     className={`inline-flex items-center gap-2 border-b-2 px-1 py-3 font-medium transition-colors ${
                       isActive
                         ? 'border-[#4f46e5] text-[#4f46e5]'
@@ -5915,9 +6030,39 @@ export default function ChapterListPage() {
             {contentLoading ? 'Loading contentâ€¦' : `${filteredChapterContentItems.length} items in ${activeChapterTitle}`}
           </p>
 
+          {activeContentLibraryTab === 'Prayogshala' && canCreateContent !== false && !contentLoading && !contentError ? (
+            <div className="mb-4 flex justify-end">
+              <Button
+                type="button"
+                onClick={() => setPrayogshalaEditor({ activity: null })}
+                className="h-10 rounded-full bg-[#4f46e5] px-5 text-sm font-semibold text-white hover:bg-[#4338ca]"
+              >
+                <Plus size={15} className="mr-2" />
+                Add activity
+              </Button>
+            </div>
+          ) : null}
+
+          {prayogshalaActionError ? (
+            <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {prayogshalaActionError}
+            </div>
+          ) : null}
+
           {contentError ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {contentError}
+            <div className="flex flex-col items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
+              <span>{contentError}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setContentError('');
+                  setContentReloadKey((key) => key + 1);
+                }}
+                className="h-9 rounded-full bg-white px-4 text-rose-700"
+              >
+                Try again
+              </Button>
             </div>
           ) : contentLoading ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -5927,7 +6072,9 @@ export default function ChapterListPage() {
             </div>
           ) : filteredChapterContentItems.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500">
-              No content is available for this chapter.
+              {activeContentLibraryTab === 'Prayogshala'
+                ? PRAYOGSHALA_EMPTY_MESSAGE
+                : 'No content is available for this chapter.'}
             </div>
           ) : contentGroupBy === 'Concept wise' ? (() => {
               const groups = new Map<string, { title: string; items: ChapterContentItem[] }>();
@@ -5984,6 +6131,46 @@ export default function ChapterListPage() {
                 ))}
               </div>
             )}
+
+          {labActivityId ? (
+            labActivity?.lab_config ? (
+              <PrayogshalaLab activity={labActivity} lab={labActivity.lab_config} onClose={closePrayogshalaLab} />
+            ) : (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gradient-to-br from-indigo-50 via-pink-50 to-cyan-50 px-6 text-center text-slate-800">
+                <div>
+                  <p className="text-lg font-semibold">
+                    {labContentLoaded ? 'This Prayogshala activity was not found in this chapter.' : 'Loading the lab…'}
+                  </p>
+                  {labContentLoaded || contentError ? (
+                    <button type="button" onClick={closePrayogshalaLab} className="mt-4 rounded-full bg-[#4f46e5] px-5 py-2 text-sm font-semibold text-white">
+                      Back to chapter
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            )
+          ) : null}
+          <PrayogshalaDetailDialog
+            activity={openPrayogshala}
+            canManage={canCreateContent !== false}
+            onClose={() => setOpenPrayogshala(null)}
+            onEdit={(activity) => {
+              setOpenPrayogshala(null);
+              setPrayogshalaEditor({ activity });
+            }}
+            onRemove={removePrayogshalaActivity}
+          />
+          {prayogshalaEditor && activeLibraryChapter && /^\d+$/.test(activeLibraryChapter.id) ? (
+            <PrayogshalaEditorDialog
+              chapterId={Number(activeLibraryChapter.id)}
+              activity={prayogshalaEditor.activity}
+              onClose={() => setPrayogshalaEditor(null)}
+              onSaved={() => {
+                setPrayogshalaEditor(null);
+                reloadChapterContent();
+              }}
+            />
+          ) : null}
 
           <div
             className={cn(
