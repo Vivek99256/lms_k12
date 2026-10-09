@@ -989,7 +989,7 @@
                 "type": "photo",
                 "alt": "Photograph: Magnifying glass and pen with grip. Tags: glass, magnifying.",
                 "caption": "Magnifying glass and pen with grip",
-                "url": "images/4b79719a2c134eb65f8c7e82d42018b556715d29.jpg",
+                "url": "study-deck-image:3",
                 "width": 768,
                 "height": 1024,
                 "query": "magnifying glass",
@@ -1219,7 +1219,7 @@
             },
             "image": {
                 "type": "diagram",
-                "url": "images/e26a6168bdf2293c988ff4b66f7dd22c7bcf799c.png",
+                "url": "study-deck-image:10",
                 "width": 1280,
                 "height": 720,
                 "sha1": "e26a6168bdf2293c988ff4b66f7dd22c7bcf799c",
@@ -1435,7 +1435,7 @@
             },
             "image": {
                 "type": "diagram",
-                "url": "images/c82f759285592e33fb78cd4ba0793cee4acc9e6b.png",
+                "url": "study-deck-image:9",
                 "width": 1280,
                 "height": 720,
                 "sha1": "c82f759285592e33fb78cd4ba0793cee4acc9e6b",
@@ -1552,7 +1552,7 @@
             },
             "image": {
                 "type": "diagram",
-                "url": "images/5663ff6cf30cb61d42c714177042193236be4929.png",
+                "url": "study-deck-image:5",
                 "width": 1280,
                 "height": 720,
                 "sha1": "5663ff6cf30cb61d42c714177042193236be4929",
@@ -1756,7 +1756,7 @@
             },
             "image": {
                 "type": "diagram",
-                "url": "images/12a62b4480fbc878ecca9d52f2ead1891dccb163.png",
+                "url": "study-deck-image:1",
                 "width": 1280,
                 "height": 720,
                 "sha1": "12a62b4480fbc878ecca9d52f2ead1891dccb163",
@@ -1867,7 +1867,7 @@
             },
             "image": {
                 "type": "diagram",
-                "url": "images/54b5e04bc0bff1de34631506a6761c40bb0bc25b.png",
+                "url": "study-deck-image:4",
                 "width": 1280,
                 "height": 720,
                 "sha1": "54b5e04bc0bff1de34631506a6761c40bb0bc25b",
@@ -2608,7 +2608,7 @@
             },
             "image": {
                 "type": "diagram",
-                "url": "images/3d4b95107022f01d3e112846601fe53de3f99237.png",
+                "url": "study-deck-image:2",
                 "width": 1280,
                 "height": 720,
                 "sha1": "3d4b95107022f01d3e112846601fe53de3f99237",
@@ -2818,7 +2818,7 @@
             },
             "image": {
                 "type": "diagram",
-                "url": "images/569df50f55b21cfbb8796437c08eb1b1384ec844.png",
+                "url": "study-deck-image:6",
                 "width": 1280,
                 "height": 720,
                 "sha1": "569df50f55b21cfbb8796437c08eb1b1384ec844",
@@ -3022,7 +3022,7 @@
             },
             "image": {
                 "type": "diagram",
-                "url": "images/b4bcd42e39712ce3f934a40acc10abc740d15c79.png",
+                "url": "study-deck-image:8",
                 "width": 1280,
                 "height": 720,
                 "sha1": "b4bcd42e39712ce3f934a40acc10abc740d15c79",
@@ -3499,7 +3499,7 @@
             },
             "image": {
                 "type": "diagram",
-                "url": "images/b1aed5e574c73e4315bacdbe81dd51c141842f85.png",
+                "url": "study-deck-image:7",
                 "width": 1280,
                 "height": 720,
                 "sha1": "b1aed5e574c73e4315bacdbe81dd51c141842f85",

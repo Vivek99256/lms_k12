@@ -54,20 +54,34 @@ export interface DeckActivity {
   question?: AuthoredQuestion;
 }
 
-/** A picture kept in the shared object store. The deck refers to it by this record, never by a local path. */
+/**
+ * A picture kept in the database (`study_deck_images`). The deck refers to it by this record, never by a path.
+ *
+ * A deck stored before pictures moved to the database lists object-store files instead (`sha1`, `path`, `url`,
+ * `filename`); those fields are optional here and the player does not read this map either way.
+ */
 export interface DeckAsset {
-  sha1: string;
-  /** The object's key in the store. */
-  path: string;
-  /** The canonical public URL. */
-  url: string;
+  image_id?: number;
+  /** The picture's stable reference, `study-deck-image:<id>`. */
+  ref?: string;
+  sha256?: string;
   mime: string;
-  filename: string;
+  format?: string;
   bytes: number;
+  width?: number;
+  height?: number;
+  sha1?: string;
+  path?: string;
+  url?: string;
+  filename?: string;
 }
 
 export interface DeckImage {
   type: 'photo' | 'diagram';
+  /**
+   * `study-deck-image:<id>` as stored. The API (and `resolveDeckImages` for a deck held locally) replace it with an
+   * address the browser can load before the player sees it. An older stored deck has an absolute address already.
+   */
   url: string;
   /** Key into the deck's `assets` map, present once the deck has been stored. */
   asset_id?: string;

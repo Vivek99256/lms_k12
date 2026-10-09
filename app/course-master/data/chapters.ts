@@ -586,6 +586,12 @@ export interface ChapterContentAsset {
   deep_link?: string;
   /** Canonical URL of a study deck's classroom PDF. Only present when the PDF is really stored. */
   pdf_url?: string;
+  /**
+   * Set by the server on a study document: revision notes, a remedial class or classroom activities written by the study
+   * pipeline, whose PDF is the primary file and which open in place with an online practice (see lib/study-document).
+   * Absent on every other row, and never guessed from a title or a category.
+   */
+  study_doc_kind?: 'revision_notes' | 'remedial' | 'activities' | null;
 }
 
 /**
