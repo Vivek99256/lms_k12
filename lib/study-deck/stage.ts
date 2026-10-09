@@ -18,6 +18,17 @@ import type { DeckSlide, StudyDeck } from './types';
 
 export type StepKind = 'teach' | 'example' | 'discuss';
 
+/**
+ * The slide a link asks to open (`?slide=12`, as printed in the PDF beside each activity), or null when the link names
+ * none or names a slide this deck does not have. Anything that is not a plain whole number is ignored.
+ */
+export function startSlideOf(raw: string | null | undefined, deck: Pick<StudyDeck, 'slides'>): number | null {
+  if (typeof raw !== 'string' || !/^\d{1,4}$/.test(raw.trim())) return null;
+  const n = Number(raw.trim());
+
+  return deck.slides.some((slide) => slide.n === n) ? n : null;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept so callers need not change; every slide is one screen
 export function stepsOf(_slide: DeckSlide): StepKind[] {
   return ['teach'];

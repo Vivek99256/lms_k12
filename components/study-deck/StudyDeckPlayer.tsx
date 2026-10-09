@@ -33,6 +33,8 @@ export interface StudyDeckPlayerProps {
   /** Identifies the learner so progress is kept per learner. */
   userKey: string;
   storage?: StorageLike | null;
+  /** Open on this slide instead of where the learner left off (a link from the PDF names one). Ignored if the deck has no such slide. */
+  startSlide?: number | null;
 }
 
 /**
@@ -46,11 +48,16 @@ export interface StudyDeckPlayerProps {
  * It does not open the PPTX. Nothing is written to the database by the lesson itself: progress lives in this browser
  * (see lib/study-deck/progress.ts), and the practice questions are the existing shared players.
  */
-export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null }: StudyDeckPlayerProps) {
+export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null, startSlide = null }: StudyDeckPlayerProps) {
   const router = useRouter();
   const chapterId = deck.chapter.id;
   const storeKey = progressKey(userKey, chapterId);
-  const [progress, dispatch] = useReducer(progressReducer, undefined, () => loadProgress(storage, storeKey, chapterId));
+  // A link that names a slide (the PDF links each activity to its slide) opens there instead of where the learner left off.
+  const [progress, dispatch] = useReducer(progressReducer, undefined, () => {
+    const saved = loadProgress(storage, storeKey, chapterId);
+
+    return startSlide !== null && deck.slides.some((s) => s.n === startSlide) ? progressReducer(saved, { type: 'goto', n: startSlide }) : saved;
+  });
   const [finished, setFinished] = useState(false);
   const [step, setStep] = useState(0);
   const [outlineOpen, setOutlineOpen] = useState(false);

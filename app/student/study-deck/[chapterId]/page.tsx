@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 import { StudyDeckPlayer } from '@/components/study-deck/StudyDeckPlayer';
+import { startSlideOf } from '@/lib/study-deck/stage';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import { learnerKey, loadBank, loadStudyDeck, PILOT_NOTE, type LoadedDeck } from '../data';
 
@@ -26,6 +27,8 @@ export default function StudyDeckPage() {
   // The Classroom Resource list opens a specific content item: /student/study-deck/<chapter>?content=<content_master.id>.
   const contentParam = Number(search?.get('content') ?? NaN);
   const contentId = Number.isFinite(contentParam) && contentParam > 0 ? contentParam : null;
+  // ...and `&slide=<n>` opens that slide (the PDF links each activity to its slide this way).
+  const slideParam = search?.get('slide') ?? null;
   const [state, setState] = useState<State>({ phase: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
@@ -99,6 +102,7 @@ export default function StudyDeckPage() {
         bank={state.bank}
         assetBase={state.loaded.assetBase}
         userKey={learnerKey()}
+        startSlide={startSlideOf(slideParam, state.loaded.deck)}
         storage={typeof window !== 'undefined' ? window.localStorage : null}
       />
     </>

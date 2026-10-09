@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { parseDeck } from './deck';
-import { allPositions, exampleRequired, layoutOf, nextPosition, pendingHint, previousPosition, stepsOf } from './stage';
+import { allPositions, exampleRequired, layoutOf, nextPosition, pendingHint, previousPosition, startSlideOf, stepsOf } from './stage';
 import type { DeckSlide, StudyDeck } from './types';
 
 const deck = (): StudyDeck => parseDeck(JSON.parse(readFileSync(new URL('./fixtures/study-deck-golden.json', import.meta.url), 'utf8')));
@@ -118,4 +118,18 @@ test('chapter 8592: every screen fits the rules - exactly one, and every layout 
   }
   for (const kind of kinds) assert.ok(['cover', 'scenario', 'visual-hotspots', 'explore', 'match', 'order', 'image-text', 'summary', 'intro', 'relationship', 'cards', 'statement'].includes(kind));
   assert.ok(kinds.size >= 5, `a varied lesson, not one layout: ${[...kinds].join(', ')}`);
+});
+
+test('a link can name the slide to open: a plain whole number the deck has, nothing else', () => {
+  const d = deck();
+  assert.equal(startSlideOf('3', d), 3);
+  assert.equal(startSlideOf(' 4 ', d), 4);
+  assert.equal(startSlideOf('999', d), null, 'a slide the deck does not have');
+  assert.equal(startSlideOf('0', d), null);
+  assert.equal(startSlideOf('-1', d), null);
+  assert.equal(startSlideOf('2.5', d), null);
+  assert.equal(startSlideOf('3;drop', d), null);
+  assert.equal(startSlideOf('', d), null);
+  assert.equal(startSlideOf(null, d), null);
+  assert.equal(startSlideOf(undefined, d), null);
 });
