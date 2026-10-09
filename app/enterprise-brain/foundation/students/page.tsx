@@ -20,7 +20,7 @@ const STUDENTS_WIDGETS = [
   { id: 'chart.record_completeness', label: 'Record completeness', group: 'chart' },
   { id: 'chart.by_admission_year', label: 'By admission year', group: 'chart' },
   { id: 'chart.by_gender', label: 'By gender', group: 'chart' },
-  { id: 'panel.signals', label: 'What the Brain has found about these students', group: 'panel' },
+  { id: 'panel.signals', label: 'What we’ve found about these students', group: 'panel' },
   { id: 'panel.student_roll', label: 'Student roll', group: 'panel' },
 ] as const satisfies readonly DashboardWidget[];
 
@@ -144,7 +144,7 @@ export default function StudentsPage() {
       {show('panel.signals') && data.signals.length > 0 && (
         <section className="mb-6">
           <h2 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">
-            What the Brain has found about these students
+            What we’ve found about these students
           </h2>
           <div className="space-y-3">
             {data.signals.map((signal) => (

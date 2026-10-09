@@ -46,7 +46,7 @@ export function ChapterDetailPanel({ chapterId, learningOutcomes }: Props) {
         setDetail(payload.data ?? null);
       } catch (error) {
         if ((error as Error)?.name !== 'AbortError') {
-          setLoadError(error instanceof Error ? error.message : 'Unable to load chapter detail.');
+          setLoadError(error instanceof Error ? error.message : 'Couldn’t load chapter detail.');
         }
       } finally {
         if (!controller.signal.aborted) setIsLoading(false);

@@ -56,7 +56,16 @@ export function sanitizeGeneratedHtml(html: string): string {
       ALLOWED_TAGS: GENERATED_HTML_TAGS,
       // `class` carries the whole visual design (the stylesheet lives in
       // globals.css), so no inline `style` is ever accepted.
-      ALLOWED_ATTR: ['class', 'src', 'alt', 'colspan', 'rowspan'],
+      // The five data-* attributes are the Content Design System's block
+      // metadata (docs/content-design-system/README.md §4.2). They are what
+      // lms:validate-content reads to prove a chapter's concepts were actually
+      // covered. Named explicitly rather than via ALLOW_DATA_ATTR, which would
+      // open every data-* attribute and drift from the backend's closed list in
+      // RendersGeneratedContent::$generatedContentDataAttributes.
+      ALLOWED_ATTR: [
+        'class', 'src', 'alt', 'colspan', 'rowspan',
+        'data-block', 'data-concept', 'data-bloom', 'data-dok', 'data-minutes',
+      ],
       ALLOW_DATA_ATTR: false,
       FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'a'],
       FORBID_ATTR: ['style', 'srcset', 'href', 'formaction', 'loading'],

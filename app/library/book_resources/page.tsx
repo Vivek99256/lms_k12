@@ -121,9 +121,9 @@ const MATERIAL_RESOURCE_TYPES = [
 
 const BOOK_STATUS_OPTIONS = [
   { value: '', label: 'All' },
-  { value: 'issued', label: 'Issued Books' },
-  { value: 'due', label: 'Due Books' },
-  { value: 'overdue', label: 'Over Due' },
+  { value: 'issued', label: 'Issued books' },
+  { value: 'due', label: 'Due books' },
+  { value: 'overdue', label: 'Over due' },
 ];
 
 // The 10 columns BookController::index()'s DataTables branch declares, in
@@ -302,7 +302,7 @@ function parseStoredCustomValue(field: CustomField, value: unknown): string | st
 
 function buildExportRows(rows: BookRow[]): Record<string, string>[] {
   return rows.map((row, index) => ({
-    'Sr No': String(index + 1),
+    'No.': String(index + 1),
     'Item Code': row.itemCodes || '-',
     Title: row.title || '-',
     Subject: row.subject || '-',
@@ -321,7 +321,7 @@ function printRows(rows: BookRow[]) {
   table { border-collapse: collapse; width: 100%; }
   th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
   th { background: #f1f5f9; }
-  </style></head><body><h2>Book Resources</h2><table><thead><tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr></thead><tbody>${exportRows.map((row) => `<tr>${headers.map((header) => `<td>${row[header] || '-'}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`;
+  </style></head><body><h2>Book resources</h2><table><thead><tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr></thead><tbody>${exportRows.map((row) => `<tr>${headers.map((header) => `<td>${row[header] || '-'}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`;
   const printWindow = window.open('', '_blank', 'width=1400,height=900');
   if (!printWindow) return;
   printWindow.document.open();
@@ -395,7 +395,7 @@ export default function BookResourcesPage() {
       setStatusOptions(parseStatusOptions(remarksPayload));
       setCustomFields(parseCustomFields(fieldsPayload));
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load form configuration.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load form configuration. Try again." });
     } finally {
       setLoadingFormConfig(false);
     }
@@ -416,7 +416,7 @@ export default function BookResourcesPage() {
       setSelectedIds([]);
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load Book Resources.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load book resources. Try again." });
     } finally {
       setLoading(false);
     }
@@ -479,7 +479,7 @@ export default function BookResourcesPage() {
       const detail = asRecord(toArray(payload.data)[0]);
 
       if (!detail.id) {
-        throw new Error('Unable to load this book for editing.');
+        throw new Error("Couldn't load this book for editing. Try again.");
       }
 
       const nextCustom = buildDefaultCustomValues(customFields);
@@ -523,7 +523,7 @@ export default function BookResourcesPage() {
       setTitleWarning('');
       setDrawerOpen(true);
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load this book for editing.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load this book for editing. Try again." });
     }
   };
 
@@ -644,14 +644,14 @@ export default function BookResourcesPage() {
       const payload = normalizePayload(await response.json());
 
       if (!response.ok || readStatus(payload) !== 1) {
-        throw new Error(readMessage(payload, editingId ? 'Unable to update this book.' : 'Unable to save this book.'));
+        throw new Error(readMessage(payload, editingId ? "Couldn't update this book. Try again." : "Couldn't save this book. Try again."));
       }
 
       setMessage({ type: 'success', text: readMessage(payload, editingId ? 'Book updated successfully.' : 'Book saved successfully.') });
       closeDrawer();
       await loadList();
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to save this book.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't save this book. Try again." });
     } finally {
       setSubmitting(false);
     }
@@ -677,13 +677,13 @@ export default function BookResourcesPage() {
       const payload = normalizePayload(await response.json());
 
       if (!response.ok) {
-        throw new Error(readMessage(payload, 'Unable to delete the selected book(s).'));
+        throw new Error(readMessage(payload, "Couldn't delete the selected book(s). Try again."));
       }
 
       setMessage({ type: 'success', text: readMessage(payload, 'Book(s) deleted successfully.') });
       await loadList();
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to delete the selected book(s).' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't delete the selected book(s). Try again." });
     } finally {
       setDeleting(false);
     }
@@ -699,7 +699,7 @@ export default function BookResourcesPage() {
     <>
       <PageFrame>
         <PageHeader
-          title="Book Resources"
+          title="Book resources"
           description="The library book catalogue — titles, physical item copies, and item-code generation, matching BookController exactly. Export reflects the current page of results."
           action={(
             <div className="flex flex-wrap gap-2">
@@ -740,7 +740,7 @@ export default function BookResourcesPage() {
 
         <SectionPanel title="Filters" description="Matches BookController::index()'s DataTables filters exactly.">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Field label="Search Item"><Input value={filters.searchItem} onChange={(event) => updateFilter({ searchItem: event.target.value })} placeholder="Enter item code" /></Field>
+            <Field label="Search item"><Input value={filters.searchItem} onChange={(event) => updateFilter({ searchItem: event.target.value })} placeholder="Enter item code" /></Field>
             <Field label="Status">
               <NativeSelect value={filters.bookStatus} onChange={(value) => updateFilter({ bookStatus: value })}>
                 {BOOK_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -752,19 +752,19 @@ export default function BookResourcesPage() {
                 {subjectOptions.map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
               </NativeSelect>
             </Field>
-            <Field label="Publisher Name">
+            <Field label="Publisher name">
               <NativeSelect value={filters.publisherName} onChange={(value) => updateFilter({ publisherName: value })} disabled={loadingFormConfig}>
                 <option value="">All</option>
                 {publisherOptions.map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
               </NativeSelect>
             </Field>
-            <Field label="Author Name">
+            <Field label="Author name">
               <NativeSelect value={filters.authorName} onChange={(value) => updateFilter({ authorName: value })} disabled={loadingFormConfig}>
                 <option value="">All</option>
                 {authorOptions.map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
               </NativeSelect>
             </Field>
-            <Field label="Search Classification Number"><Input value={filters.classificationNo} onChange={(event) => updateFilter({ classificationNo: event.target.value })} /></Field>
+            <Field label="Search classification number"><Input value={filters.classificationNo} onChange={(event) => updateFilter({ classificationNo: event.target.value })} /></Field>
             <Field label="Search ISBN/ISSN"><Input value={filters.isbnIssn} onChange={(event) => updateFilter({ isbnIssn: event.target.value })} /></Field>
           </div>
         </SectionPanel>
@@ -776,15 +776,15 @@ export default function BookResourcesPage() {
                 <TableHeader>
                   <TableRow className="bg-slate-100 hover:bg-slate-100">
                     <TableHead />
-                    <TableHead>Sr No</TableHead>
+                    <TableHead>No.</TableHead>
                     <TableHead>Image</TableHead>
-                    <TableHead>Item Code</TableHead>
+                    <TableHead>Item code</TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead>Subject</TableHead>
-                    <TableHead>Sub Title</TableHead>
-                    <TableHead>Publisher Name</TableHead>
-                    <TableHead>Publish Year</TableHead>
-                    <TableHead>Author Name</TableHead>
+                    <TableHead>Sub title</TableHead>
+                    <TableHead>Publisher name</TableHead>
+                    <TableHead>Publish year</TableHead>
+                    <TableHead>Author name</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -871,14 +871,14 @@ export default function BookResourcesPage() {
 
               <div className="flex-1 overflow-y-auto p-5">
                 <div className="space-y-5">
-                  <SectionPanel title="Core Fields">
+                  <SectionPanel title="Core fields">
                     <div className="grid gap-4 md:grid-cols-2">
                       <Field label="Title">
                         <Input value={formValues.title} onChange={(event) => updateField('title', event.target.value)} onBlur={() => void handleTitleBlur()} />
                         {titleWarning ? <p className="mt-1 text-xs text-amber-600">{titleWarning}</p> : null}
                       </Field>
-                      <Field label="Sub Title"><Input value={formValues.sub_title} onChange={(event) => updateField('sub_title', event.target.value)} /></Field>
-                      <Field label="Material Resource Type">
+                      <Field label="Sub title"><Input value={formValues.sub_title} onChange={(event) => updateField('sub_title', event.target.value)} /></Field>
+                      <Field label="Material resource type">
                         <NativeSelect value={formValues.material_resource_type} onChange={(value) => updateField('material_resource_type', value)}>
                           <option value="">--Select Resource Type--</option>
                           {MATERIAL_RESOURCE_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -890,7 +890,7 @@ export default function BookResourcesPage() {
                         <Input type="number" min={0} value={formValues.no_of_items} onChange={(event) => updateField('no_of_items', event.target.value)} />
                       </Field>
                       {isMmisInstitute ? (
-                        <Field label="Item Code">
+                        <Field label="Item code">
                           <div className="flex gap-4 pt-2 text-sm">
                             <label className="flex items-center gap-2">
                               <input type="radio" name="item_code_value" checked={formValues.item_code_value === 'A'} onChange={() => updateField('item_code_value', 'A')} />
@@ -903,11 +903,11 @@ export default function BookResourcesPage() {
                           </div>
                         </Field>
                       ) : (
-                        <Field label="Item Code">
+                        <Field label="Item code">
                           <Input value={editingId ? editingItemCodes : 'Generated automatically on save'} readOnly />
                         </Field>
                       )}
-                      <Field label="Item Status">
+                      <Field label="Item status">
                         <NativeSelect value={editingItemStatus.split('|')[0] || ''} onChange={() => undefined} disabled>
                           <option value="">Available</option>
                           {statusOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
@@ -916,24 +916,24 @@ export default function BookResourcesPage() {
                     </div>
                   </SectionPanel>
 
-                  <SectionPanel title="Catalogue Details">
+                  <SectionPanel title="Catalogue details">
                     <div className="grid gap-4 md:grid-cols-2">
                       <Field label="Author/Editor Name"><Input value={formValues.author_name} onChange={(event) => updateField('author_name', event.target.value)} /></Field>
                       <Field label="ISBN/ISSN"><Input value={formValues.isbn_issn} onChange={(event) => updateField('isbn_issn', event.target.value)} /></Field>
                       <Field label="Classification"><Input value={formValues.classification} onChange={(event) => updateField('classification', event.target.value)} /></Field>
-                      <Field label="Publisher Name"><Input value={formValues.publisher_name} onChange={(event) => updateField('publisher_name', event.target.value)} /></Field>
-                      <Field label="Publish Year"><Input type="number" value={formValues.publish_year} onChange={(event) => updateField('publish_year', event.target.value)} placeholder="YYYY" /></Field>
-                      <Field label="Publishing Place"><Input value={formValues.publish_place} onChange={(event) => updateField('publish_place', event.target.value)} /></Field>
+                      <Field label="Publisher name"><Input value={formValues.publisher_name} onChange={(event) => updateField('publisher_name', event.target.value)} /></Field>
+                      <Field label="Publish year"><Input type="number" value={formValues.publish_year} onChange={(event) => updateField('publish_year', event.target.value)} placeholder="YYYY" /></Field>
+                      <Field label="Publishing place"><Input value={formValues.publish_place} onChange={(event) => updateField('publish_place', event.target.value)} /></Field>
                       <Field label="Book Size/Number of Page"><Input type="number" value={formValues.pages} onChange={(event) => updateField('pages', event.target.value)} /></Field>
-                      <Field label="Series Title"><Input value={formValues.series_title} onChange={(event) => updateField('series_title', event.target.value)} /></Field>
-                      <Field label="Call Number"><Input value={formValues.call_number} onChange={(event) => updateField('call_number', event.target.value)} /></Field>
+                      <Field label="Series title"><Input value={formValues.series_title} onChange={(event) => updateField('series_title', event.target.value)} /></Field>
+                      <Field label="Call number"><Input value={formValues.call_number} onChange={(event) => updateField('call_number', event.target.value)} /></Field>
                       <Field label="Language"><Input value={formValues.language} onChange={(event) => updateField('language', event.target.value)} /></Field>
                       <Field label="Source"><Input value={formValues.source} onChange={(event) => updateField('source', event.target.value)} /></Field>
                       <Field label="Subject"><Input value={formValues.subject} onChange={(event) => updateField('subject', event.target.value)} /></Field>
                       <Field label="Price"><Input type="number" step="any" value={formValues.price} onChange={(event) => updateField('price', event.target.value)} /></Field>
-                      <Field label="Price Currency"><Input value={formValues.price_currency} onChange={(event) => updateField('price_currency', event.target.value)} /></Field>
-                      <Field label="Bill No"><Input value={formValues.bill_no} onChange={(event) => updateField('bill_no', event.target.value)} /></Field>
-                      <Field label="Bill Date"><Input type="date" value={formValues.bill_date} onChange={(event) => updateField('bill_date', event.target.value)} /></Field>
+                      <Field label="Price currency"><Input value={formValues.price_currency} onChange={(event) => updateField('price_currency', event.target.value)} /></Field>
+                      <Field label="Bill no"><Input value={formValues.bill_no} onChange={(event) => updateField('bill_no', event.target.value)} /></Field>
+                      <Field label="Bill date"><Input type="date" value={formValues.bill_date} onChange={(event) => updateField('bill_date', event.target.value)} /></Field>
                     </div>
                   </SectionPanel>
 
@@ -987,7 +987,7 @@ export default function BookResourcesPage() {
                           <input type="file" accept="image/*" className="hidden" onChange={(event) => setBookImage(event.target.files?.[0] ?? null)} />
                         </label>
                       </Field>
-                      <Field label="File Attachment">
+                      <Field label="File attachment">
                         <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-700">
                           <Upload className="h-4 w-4" />
                           <span className="truncate">{bookFileAtt?.name || 'Choose file (optional)'}</span>
@@ -998,7 +998,7 @@ export default function BookResourcesPage() {
                   </SectionPanel>
 
                   {customFields.length > 0 ? (
-                    <SectionPanel title="Custom Fields">
+                    <SectionPanel title="Custom fields">
                       <div className="grid gap-4 md:grid-cols-2">
                         {customFields.map((field) => {
                           const value = formValues.custom[field.field_name];

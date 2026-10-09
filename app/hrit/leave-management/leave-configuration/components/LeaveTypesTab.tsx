@@ -310,7 +310,7 @@ export default function LeaveTypesTab({ isLoading }: { isLoading: boolean }) {
   }
 
   if (error && leaveTypes.length === 0) {
-    return <ErrorState title="Unable to load leave types" description={error} retry={retry} />
+    return <ErrorState title="Couldn't load leave types. Try again." description={error} retry={retry} />
   }
 
   if (leaveTypes.length === 0) {

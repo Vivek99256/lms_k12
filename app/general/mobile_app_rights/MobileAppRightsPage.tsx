@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { AlertTriangle, ExternalLink, ImageIcon, LoaderCircle, Pencil, Plus, Save, Smartphone } from "lucide-react";
+import { AlertTriangle, ImageIcon, LoaderCircle, Pencil, Plus, Save, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +30,6 @@ import {
   type MobileConfigUpdateInput,
   type MobileRightsRow,
 } from "./api";
-import { loadPages, type MobilePageSummary } from "../mobile_page_builder/api";
 
 const sortOptions = Array.from({ length: 12 }, (_, index) => index + 1);
 
@@ -64,13 +62,12 @@ type ConfigFieldsProps = {
   idPrefix: string;
   input: MobileConfigUpdateInput;
   onChange: (updater: (current: MobileConfigUpdateInput) => MobileConfigUpdateInput) => void;
-  mobilePages: MobilePageSummary[];
   mainTitleOptions: string[];
 };
 
 // Shared by the Edit and Add Menu Item modals so a brand-new icon behaves
 // identically to an edited one from the moment it's created.
-function ConfigFields({ idPrefix, input, onChange, mobilePages, mainTitleOptions }: ConfigFieldsProps) {
+function ConfigFields({ idPrefix, input, onChange, mainTitleOptions }: ConfigFieldsProps) {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2">
@@ -208,77 +205,26 @@ function ConfigFields({ idPrefix, input, onChange, mobilePages, mainTitleOptions
             <option value="native_dynamic">Native Dynamic</option>
           </select>
           <p className="text-xs text-slate-500">
-            To show a page built in the Mobile Page Builder, choose <strong>WebView</strong>, then Page Source ={" "}
-            <strong>Custom Mobile Page</strong> below. Native Dynamic is a separate, unrelated system.
+            WebView opens an existing ERP web page. Native Dynamic is a separate, native-rendered system.
           </p>
         </div>
 
         {input.renderType === "webview" ? (
           <>
-            <div className="space-y-2">
-              <Label>Page Source</Label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="radio"
-                    name={`${idPrefix}_page_source`}
-                    checked={input.pageSource === "external"}
-                    onChange={() => onChange((current) => ({ ...current, pageSource: "external" }))}
-                  />
-                  Existing Web Page
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="radio"
-                    name={`${idPrefix}_page_source`}
-                    checked={input.pageSource === "custom"}
-                    onChange={() => onChange((current) => ({ ...current, pageSource: "custom" }))}
-                  />
-                  Custom Mobile Page
-                </label>
-              </div>
-            </div>
-
             {input.pageSource === "custom" ? (
-              <div className="space-y-2">
-                <Label htmlFor={`${idPrefix}_custom_page_id`}>Custom Page</Label>
-                <div className="flex gap-2">
-                  <select
-                    id={`${idPrefix}_custom_page_id`}
-                    className={erpSelectClass}
-                    value={input.customPageId ?? ""}
-                    onChange={(event) =>
-                      onChange((current) => ({ ...current, customPageId: event.target.value ? Number(event.target.value) : null }))
-                    }
-                  >
-                    <option value="">Select a page…</option>
-                    {mobilePages.map((page) => (
-                      <option key={page.id} value={page.id}>
-                        {page.name} ({page.status})
-                      </option>
-                    ))}
-                  </select>
-                  <Link href="/general/mobile_page_builder" target="_blank">
-                    <Button type="button" variant="outline" size="sm">
-                      <Plus className="size-3.5" />
-                      New
-                    </Button>
-                  </Link>
-                </div>
-                {input.customPageId ? (
-                  <Link
-                    href={`/general/mobile_page_builder/${input.customPageId}/editor`}
-                    target="_blank"
-                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
-                  >
-                    Edit Design <ExternalLink className="size-3" />
-                  </Link>
-                ) : null}
-                {input.customPageId && mobilePages.find((p) => p.id === input.customPageId)?.status !== "published" ? (
-                  <p className="text-xs text-amber-700">
-                    This page has not been published yet -- mobile users will see native fallback until it is.
-                  </p>
-                ) : null}
+              <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <p>
+                  This item uses a retired custom mobile page (page #{input.customPageId ?? "?"}). The Mobile Page Builder
+                  has been removed from the web app; the old native app may still render it, but it cannot be edited here.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onChange((current) => ({ ...current, pageSource: "external", customPageId: null }))}
+                >
+                  Use an existing web page instead
+                </Button>
               </div>
             ) : (
               <div className="space-y-2">
@@ -321,9 +267,8 @@ function ConfigFields({ idPrefix, input, onChange, mobilePages, mainTitleOptions
               placeholder="fees_collect_summary"
             />
             <p className="text-xs text-amber-700">
-              This must match an existing Native Dynamic Pages entry (a native-rendered schema, not a WebView). It is
-              unrelated to the Mobile Page Builder / Custom Mobile Page -- a page&apos;s slug will not work here and
-              will show &quot;This page is not configured&quot; on the phone.
+              This must match an existing Native Dynamic Pages entry (a native-rendered schema, not a WebView);
+              otherwise the phone shows &quot;This page is not configured&quot;.
             </p>
           </div>
         ) : null}
@@ -361,8 +306,6 @@ export function MobileAppRightsPage() {
   const [editInput, setEditInput] = useState<MobileConfigUpdateInput>(emptyConfigInput("Student"));
   const [editSaving, setEditSaving] = useState(false);
 
-  const [mobilePages, setMobilePages] = useState<MobilePageSummary[]>([]);
-
   const [creating, setCreating] = useState(false);
   const [createInput, setCreateInput] = useState<MobileConfigUpdateInput>(emptyConfigInput("Student"));
   const [createSaving, setCreateSaving] = useState(false);
@@ -380,7 +323,7 @@ export function MobileAppRightsPage() {
         setEditInput(emptyConfigInput(data.configProfiles[0]));
       }
     } catch (value: unknown) {
-      setError(errorMessage(value, "Mobile App Menu Rights could not be loaded."));
+      setError(errorMessage(value, "Couldn't load mobile app rights. Try again."));
     } finally {
       setLoading(false);
     }
@@ -391,14 +334,6 @@ export function MobileAppRightsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
-
-  useEffect(() => {
-    // Failing to load the picker list should not block the rest of this
-    // screen -- Custom Mobile Page just falls back to "no pages available".
-    loadPages()
-      .then(setMobilePages)
-      .catch(() => setMobilePages([]));
-  }, []);
 
   const loadRights = useCallback(async (profileId: number) => {
     if (!profileId) {
@@ -416,7 +351,7 @@ export function MobileAppRightsPage() {
         Object.fromEntries(data.selected.map((screenName) => [screenName, true]))
       );
     } catch (value: unknown) {
-      setError(errorMessage(value, "The mobile app rights matrix could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the mobile app rights. Try again."));
       setRightsRows([]);
       setSelectedRights({});
     } finally {
@@ -431,7 +366,7 @@ export function MobileAppRightsPage() {
     try {
       setConfigRows(await loadMobileConfig(configProfile, includeInactive));
     } catch (value: unknown) {
-      setError(errorMessage(value, "The mobile app menu configuration could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the mobile app menu configuration. Try again."));
       setConfigRows([]);
     } finally {
       setConfigLoading(false);
@@ -464,7 +399,7 @@ export function MobileAppRightsPage() {
       setNotice(await saveMobileRights(selectedRightsProfileId, selectedRights));
       await loadRights(selectedRightsProfileId);
     } catch (value: unknown) {
-      setError(errorMessage(value, "Mobile app rights could not be saved."));
+      setError(errorMessage(value, "Couldn't save mobile app rights. Try again."));
     } finally {
       setRightsSaving(false);
     }
@@ -501,7 +436,7 @@ export function MobileAppRightsPage() {
       setEditing(null);
       await searchConfig();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The mobile app menu record could not be updated."));
+      setError(errorMessage(value, "Couldn't update the mobile app menu record. Try again."));
     } finally {
       setEditSaving(false);
     }
@@ -524,7 +459,7 @@ export function MobileAppRightsPage() {
         await searchConfig();
       }
     } catch (value: unknown) {
-      setError(errorMessage(value, "The mobile app menu item could not be created."));
+      setError(errorMessage(value, "Couldn't create the mobile app menu item. Try again."));
     } finally {
       setCreateSaving(false);
     }
@@ -590,7 +525,7 @@ export function MobileAppRightsPage() {
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <ErpPageHeader
         title="Mobile App Menu Rights"
-        description="Configure mobile app home screen rights and visibility per profile using the legacy ERP rules."
+        description="Configure mobile app home screen rights and visibility per profile using the standard rules."
         onRefresh={() => void load()}
         refreshing={loading || rightsLoading || rightsSaving || configLoading || editSaving}
       />
@@ -653,7 +588,7 @@ export function MobileAppRightsPage() {
             ) : rightsRows.length === 0 ? (
               <ErpEmpty
                 title="No mobile app rights template was returned for this profile."
-                hint="The legacy module only supports Student, Admin, and Teacher profiles with default rows stored under sub_institute_id = 1."
+                hint="Only the Student, Admin and Teacher profiles are supported."
               />
             ) : (
               <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -705,7 +640,7 @@ export function MobileAppRightsPage() {
 
       <ErpSection
         title="Mobile App Menu Configuration"
-        description="Search the saved mobile app menu records by profile and update the menu metadata using the same Laravel behavior."
+        description="Search the saved mobile app menu records by profile and update the menu metadata using the same rules as mobile app rights."
         icon={<ImageIcon className="size-5" />}
       >
         {loading ? (
@@ -796,7 +731,7 @@ export function MobileAppRightsPage() {
           if (!editSaving) setEditing(null);
         }}
         title="Update Menu Sub-menu"
-        description="This updates the selected record and cascades grouped main-title fields the same way the old Laravel controller does."
+        description="Updates the selected record and all records in the same group."
         size="lg"
         footer={
           <>
@@ -814,7 +749,7 @@ export function MobileAppRightsPage() {
           idPrefix="edit"
           input={editInput}
           onChange={setEditInput}
-          mobilePages={mobilePages}
+         
           mainTitleOptions={mainTitleOptions}
         />
       </Modal>
@@ -865,7 +800,7 @@ export function MobileAppRightsPage() {
             idPrefix="create"
             input={createInput}
             onChange={setCreateInput}
-            mobilePages={mobilePages}
+           
             mainTitleOptions={mainTitleOptions}
           />
         </div>

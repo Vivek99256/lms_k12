@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { useEffect, useState } from 'react';
 import { FileUp, Loader2, Plus, Trash2 } from 'lucide-react';
 import { coursePresentationApi, type SlideElementInput, type SlideInput } from '../../data/h5p-content-types';
@@ -56,7 +58,7 @@ export function ElementForm({
     try {
       onChange({ media_path: await coursePresentationApi.uploadMedia(file, role) });
     } catch (err: unknown) {
-      onUploadError(err instanceof Error ? err.message : 'Failed to upload file');
+      onUploadError(friendlyError(err, 'We couldn’t upload the file. Please try again.'));
     } finally {
       setUploading(false);
     }
@@ -486,7 +488,7 @@ function EmbeddedDragDropField({
         if (!cancelled) setActivities(rows);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setFailed(err instanceof Error ? err.message : 'Could not list drag and drop activities');
+        if (!cancelled) setFailed(friendlyError(err, 'We couldn’t list drag and drop activities. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

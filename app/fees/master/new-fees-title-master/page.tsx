@@ -218,7 +218,7 @@ export default function NewFeesTitleMasterPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load fee titles (${response.status})`);
+        throw new Error("Couldn't load fee titles. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
@@ -228,7 +228,7 @@ export default function NewFeesTitleMasterPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load fee titles.'
+          : "Couldn't load fee titles. Try again."
       );
     } finally {
       setLoading(false);
@@ -249,7 +249,7 @@ export default function NewFeesTitleMasterPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load fee title options (${response.status})`);
+        throw new Error("Couldn't load fee title options. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
@@ -258,7 +258,7 @@ export default function NewFeesTitleMasterPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load fee title options.'
+          : "Couldn't load fee title options. Try again."
       );
     } finally {
       setOptionsLoading(false);
@@ -380,13 +380,13 @@ export default function NewFeesTitleMasterPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to save fee title (${response.status})`);
+        throw new Error("Couldn't save fee title. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to save fee title.');
+        throw new Error(payload.message || "Couldn't save fee title. Try again.");
       }
 
       setSuccessMessage(payload.message || 'Fee title saved successfully.');
@@ -396,7 +396,7 @@ export default function NewFeesTitleMasterPage() {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : 'Failed to save fee title.'
+          : "Couldn't save fee title. Try again."
       );
     } finally {
       setSubmitting(false);
@@ -429,13 +429,13 @@ export default function NewFeesTitleMasterPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to delete fee title (${response.status})`);
+        throw new Error("Couldn't delete fee title. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to delete fee title.');
+        throw new Error(payload.message || "Couldn't delete fee title. Try again.");
       }
 
       setSuccessMessage(payload.message || 'Fee title deleted successfully.');
@@ -444,7 +444,7 @@ export default function NewFeesTitleMasterPage() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : 'Failed to delete fee title.'
+          : "Couldn't delete fee title. Try again."
       );
     } finally {
       setDeletingId('');
@@ -506,16 +506,16 @@ export default function NewFeesTitleMasterPage() {
                   <TableHeader className="bg-slate-100/90">
                     <TableRow className="border-slate-200 hover:bg-transparent">
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Display Name
+                        Display name
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Sort Order
+                        Sort order
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Cumulative Name
+                        Cumulative name
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Append Name
+                        Append name
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                         Mandatory
@@ -524,7 +524,7 @@ export default function NewFeesTitleMasterPage() {
                         Syear
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Fee Type
+                        Fee type
                       </TableHead>
                       <TableHead className="h-9 w-[80px] px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                         Action

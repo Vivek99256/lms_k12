@@ -90,7 +90,7 @@ function parseNum(value: string, fallback: number): number {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return error instanceof Error ? error.message : "Couldn't complete that action. Try again.";
 }
 
 function escapeHtml(value: string): string {

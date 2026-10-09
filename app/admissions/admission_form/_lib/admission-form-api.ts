@@ -54,7 +54,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(fallback);
   }
 }
 
@@ -135,10 +135,10 @@ export async function addCustomField(stageId: string, fieldLabel: string): Promi
       [`${tableName}Fields`]: [fieldLabel],
     }),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to add the field.`);
-  const raw = toRecord(await readJson(res, 'Failed to add the field'));
+  if (!res.ok) throw new Error(`Couldn't add the field. Try again.`);
+  const raw = toRecord(await readJson(res, "Couldn't add the field. Try again."));
   if (readString(raw.status_code) !== '1') {
-    throw new Error(readString(raw.message) || 'Failed to add the field.');
+    throw new Error(readString(raw.message) || "Couldn't add the field. Try again.");
   }
 }
 
@@ -153,10 +153,10 @@ export async function fetchAdmissionFormTemplates(): Promise<AdmissionFormTempla
   const res = await fetch(url.toString(), {
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load admission forms.`);
-  const raw = toRecord(await readJson(res, 'Failed to load admission forms'));
+  if (!res.ok) throw new Error(`Couldn't load admission forms. Try again.`);
+  const raw = toRecord(await readJson(res, "Couldn't load admission forms. Try again."));
   if (readString(raw.status) === '2') {
-    throw new Error(readString(raw.message) || 'Failed to load admission forms.');
+    throw new Error(readString(raw.message) || "Couldn't load admission forms. Try again.");
   }
 
   const standards = toArray(raw.standard).map(toRecord);

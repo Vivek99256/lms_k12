@@ -173,7 +173,7 @@ export default function FeesCollectionStudentPage() {
               entityType: 'student',
               entityId: studentId,
               metrics: [
-                { key: 'pending_fees', label: 'Pending fees', value: student.pendingFees, unit: 'INR' },
+                { key: 'pending_fees', label: 'Outstanding fees', value: student.pendingFees, unit: 'INR' },
                 ...summaryRows.map((row) => ({
                   key: `remaining_${row.label.toLowerCase().replace(/\s+/g, '_')}`,
                   label: `${row.label} remaining`,
@@ -299,12 +299,12 @@ export default function FeesCollectionStudentPage() {
 
       const payload = (await response.json()) as CollectionResponse;
       if (!response.ok) {
-        throw new Error(payload.message || 'Unable to load fee collection data.');
+        throw new Error(payload.message || "Couldn't load fee collection data. Try again.");
       }
 
       applyCollectionData(payload);
     } catch (fetchError) {
-      clearCollectionData(fetchError instanceof Error ? fetchError.message : 'Unable to load fee collection data.');
+      clearCollectionData(fetchError instanceof Error ? fetchError.message : "Couldn't load fee collection data. Try again.");
     } finally {
       setLoading(false);
     }
@@ -529,7 +529,7 @@ export default function FeesCollectionStudentPage() {
       const responseText = await response.text();
       const payload = parseJsonResponse(responseText) as ReceiptResponse;
       if (!response.ok) {
-        throw new Error(payload.message || 'Unable to save fee collection.');
+        throw new Error(payload.message || "Couldn't save fee collection. Try again.");
       }
 
       // The money is taken and the receipt exists by this point. Recording is
@@ -569,7 +569,7 @@ export default function FeesCollectionStudentPage() {
 
       router.replace('/fees/collect');
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Unable to save fee collection.');
+      setError(saveError instanceof Error ? saveError.message : "Couldn't save fee collection. Try again.");
     } finally {
       setSaving(false);
     }
@@ -594,9 +594,9 @@ export default function FeesCollectionStudentPage() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to collect
           </Button>
-          <h1 className="text-lg font-bold text-slate-950">Unable to load fee collection</h1>
+          <h1 className="text-lg font-bold text-slate-950">Couldn't load fee collection</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            {error || 'Laravel did not return fee collection data for this student.'}
+            {error || "Couldn't load fee collection data for this student. Try again."}
           </p>
         </div>
       </div>
@@ -615,7 +615,7 @@ export default function FeesCollectionStudentPage() {
                 </Button>
                 <div className="min-w-0">
                   <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
-                    Fees Collection
+                    Fee collection
                   </div>
                   <h1 className="mt-3 truncate text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{student.studentName || 'Student fee collection'}</h1>
                   <p className="mt-2 text-sm text-slate-500">
@@ -625,7 +625,7 @@ export default function FeesCollectionStudentPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <SummaryStatCard label="Pending amount" value={currencyFormatter.format(student.pendingFees)} tone="rose" />
+                <SummaryStatCard label="Outstanding amount" value={currencyFormatter.format(student.pendingFees)} tone="rose" />
                 <SummaryStatCard label="Selected months" value={String(selectedMonthCount)} tone="sky" />
                 <SummaryStatCard label="Line items" value={String(selectedParticularCount)} tone="amber" />
                 <SummaryStatCard label="Current total" value={currencyFormatter.format(grandTotal)} tone="emerald" />
@@ -651,7 +651,7 @@ export default function FeesCollectionStudentPage() {
                   <MiniInfo label="Assigned" value={currencyFormatter.format(totalSummaryFees)} />
                   <MiniInfo label="Paid" value={currencyFormatter.format(totalSummaryPaid)} />
                   <MiniInfo label="Discount" value={currencyFormatter.format(totalSummaryDiscount)} />
-                  <MiniInfo label="Remaining" value={currencyFormatter.format(totalSummaryRemaining)} />
+                  <MiniInfo label="Outstanding" value={currencyFormatter.format(totalSummaryRemaining)} />
                 </div>
               </CardContent>
             </Card>
@@ -663,7 +663,7 @@ export default function FeesCollectionStudentPage() {
         {printableReceiptHtml && !printViewOpen && (
           <Card className="border-emerald-200 bg-white shadow-sm">
             <CardHeader className="flex flex-col gap-3 border-b border-emerald-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-base font-bold text-emerald-800">Receipt Preview</CardTitle>
+              <CardTitle className="text-base font-bold text-emerald-800">Receipt preview</CardTitle>
               <div className="text-sm text-emerald-700">Saved receipt preview</div>
             </CardHeader>
             <CardContent className="overflow-x-auto bg-slate-50 p-4">
@@ -676,21 +676,21 @@ export default function FeesCollectionStudentPage() {
           <CardHeader className="border-b border-slate-100 px-5 py-4">
             <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-800">
               <Banknote className="h-4 w-4 text-[#0D6EFD]" />
-              Student Information
+              Student information
             </CardTitle>
             <p className="text-sm text-slate-500">Core profile values returned by the fee collection API.</p>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-3 p-4 sm:p-5 md:grid-cols-2 xl:grid-cols-3">
             <Info label="Unique ID" value={student?.uniqueId} />
-            <Info label="Student Name" value={student?.studentName} />
-            <Info label="GR No." value={student?.grNo} />
-            <Info label="Admission Year" value={student?.admissionYear} />
+            <Info label="Student name" value={student?.studentName} />
+            <Info label="GR no." value={student?.grNo} />
+            <Info label="Admission year" value={student?.admissionYear} />
             <Info label="Standard / Division" value={student?.standardDivision} />
-            <Info label="Father Name" value={student?.fatherName} />
-            <Info label="Contact Number" value={student?.contactNumber} />
-            <Info label="Parent Email" value={student?.parentEmail} />
-            <Info label="Student Quota" value={student?.studentQuota} />
-            <Info label="Pending Fees" value={currencyFormatter.format(student?.pendingFees ?? 0)} valueClassName="font-bold text-rose-600" />
+            <Info label="Father name" value={student?.fatherName} />
+            <Info label="Contact number" value={student?.contactNumber} />
+            <Info label="Parent email" value={student?.parentEmail} />
+            <Info label="Student quota" value={student?.studentQuota} />
+            <Info label="Outstanding fees" value={currencyFormatter.format(student?.pendingFees ?? 0)} valueClassName="font-bold text-rose-600" />
           </CardContent>
         </Card>
 
@@ -698,12 +698,12 @@ export default function FeesCollectionStudentPage() {
           <div className="min-w-0 space-y-5">
             <Card className="border-slate-200/80 bg-white shadow-sm">
               <CardHeader className="border-b border-slate-100 px-5 py-4">
-                <CardTitle className="text-base font-bold text-slate-800">Fee Summary</CardTitle>
+                <CardTitle className="text-base font-bold text-slate-800">Fee summary</CardTitle>
                 <p className="text-sm text-slate-500">Month-wise totals already returned for this student record.</p>
               </CardHeader>
               <CardContent className="p-0">
                 <DataTable
-                  headers={['Month', 'Fees', 'Paid', 'Discount', 'Remaining']}
+                  headers={['Month', 'Fees', 'Paid', 'Discount', 'Outstanding']}
                   rows={summaryRows.map((row) => [
                     row.label,
                     currencyFormatter.format(row.fees),
@@ -716,7 +716,7 @@ export default function FeesCollectionStudentPage() {
                 <div className="border-t border-slate-100 px-5 py-4">
                   <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-white">
                     <History className="mr-2 h-4 w-4" />
-                    Paid History
+                    Paid history
                   </Button>
                 </div>
               </CardContent>
@@ -726,7 +726,7 @@ export default function FeesCollectionStudentPage() {
               <CardHeader className="border-b border-slate-100 px-5 py-4">
                 <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-800">
                   <CalendarDays className="h-4 w-4 text-[#0D6EFD]" />
-                  Month Selection
+                  Month selection
                 </CardTitle>
                 <p className="text-sm text-slate-500">Choose the fee months to include. Expanding a month shows the same line items and editable collection amounts.</p>
               </CardHeader>
@@ -767,7 +767,7 @@ export default function FeesCollectionStudentPage() {
           <div className="min-w-0 space-y-5">
             <Card className="border-slate-200/80 bg-white shadow-sm">
               <CardHeader className="border-b border-slate-100 px-5 py-4">
-                <CardTitle className="text-base font-bold text-slate-800">Fee Adjustment</CardTitle>
+                <CardTitle className="text-base font-bold text-slate-800">Fee adjustment</CardTitle>
                 <p className="text-sm text-slate-500">Optional adjustments applied before the final save request.</p>
               </CardHeader>
               <CardContent className="space-y-4 p-4 sm:p-5">
@@ -803,7 +803,7 @@ export default function FeesCollectionStudentPage() {
                     <Input type="number" min="0" value={fine} onChange={(event) => setFine(readNumber(event.target.value))} className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
                   </Field>
                 </div>
-                <Field label="Grand Total">
+                <Field label="Grand total">
                   <Input value={currencyFormatter.format(grandTotal)} readOnly className="h-10 rounded-lg border-emerald-200 bg-emerald-50 text-sm font-bold text-emerald-700" />
                 </Field>
               </CardContent>
@@ -811,11 +811,11 @@ export default function FeesCollectionStudentPage() {
 
             <Card className="border-slate-200/80 bg-white shadow-sm">
               <CardHeader className="border-b border-slate-100 px-5 py-4">
-                <CardTitle className="text-base font-bold text-slate-800">Payment Information</CardTitle>
-                <p className="text-sm text-slate-500">Receipt metadata and banking details sent with the same backend request.</p>
+                <CardTitle className="text-base font-bold text-slate-800">Payment information</CardTitle>
+                <p className="text-sm text-slate-500">Receipt metadata and banking details sent with the same request.</p>
               </CardHeader>
               <CardContent className="space-y-4 p-4 sm:p-5">
-                <Field label="Payment Mode">
+                <Field label="Payment mode">
                   <Select value={paymentMode} onValueChange={(value) => setPaymentMode(value ?? '')}>
                     <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
                       <SelectValue placeholder="Select payment mode" />
@@ -827,11 +827,11 @@ export default function FeesCollectionStudentPage() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Receipt Date">
+                <Field label="Receipt date">
                   <Input type="date" value={receiptDate} onChange={(event) => setReceiptDate(event.target.value)} className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
                 </Field>
                 {showChequeDate && (
-                  <Field label="Cheque/DD Date">
+                  <Field label="Cheque/DD date">
                     <Input type="date" value={chequeDate} onChange={(event) => setChequeDate(event.target.value)} className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
                   </Field>
                 )}
@@ -841,7 +841,7 @@ export default function FeesCollectionStudentPage() {
                   </Field>
                 )}
                 {showBankFields && (
-                  <Field label="Bank Name">
+                  <Field label="Bank name">
                     <Select value={selectedBankId} onValueChange={(value) => setSelectedBankId(value ?? '')}>
                       <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
                         <SelectValue placeholder="Select bank">
@@ -857,7 +857,7 @@ export default function FeesCollectionStudentPage() {
                   </Field>
                 )}
                 {showBranch && (
-                  <Field label="Bank Branch">
+                  <Field label="Bank branch">
                     <Input value={bankBranch} onChange={(event) => setBankBranch(event.target.value)} placeholder="Enter bank branch" className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
                   </Field>
                 )}
@@ -876,7 +876,7 @@ export default function FeesCollectionStudentPage() {
       <div data-print-exclude="true" className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto flex max-w-[1500px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500">Grand Total</p>
+            <p className="text-xs font-medium text-slate-500">Grand total</p>
             <p className="text-xl font-bold text-slate-900">{currencyFormatter.format(grandTotal)}</p>
           </div>
           <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-row">
@@ -956,7 +956,7 @@ function FeeParticularsTable({ month, onAmountChange }: { month: FeeMonth; onAmo
                 <p className="mt-1 text-xs text-slate-500">Amount: {currencyFormatter.format(particular.amount)}</p>
               </div>
             </div>
-            <Label className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Collection Amount</Label>
+            <Label className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Collection amount</Label>
             <Input
               type="number"
               min="0"
@@ -985,7 +985,7 @@ function FeeParticularsTable({ month, onAmountChange }: { month: FeeMonth; onAmo
           <tr className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
             <th className="px-3 py-2 font-semibold">Particular</th>
             <th className="px-3 py-2 font-semibold">Amount</th>
-            <th className="px-3 py-2 font-semibold">Collection Amount</th>
+            <th className="px-3 py-2 font-semibold">Collection amount</th>
           </tr>
         </thead>
         <tbody>

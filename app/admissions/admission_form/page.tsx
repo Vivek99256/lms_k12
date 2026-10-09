@@ -26,7 +26,7 @@ function AddCustomFieldModal({
       await onSubmit(fieldLabel.trim());
       onClose();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to add the field.');
+      setSubmitError(err instanceof Error ? err.message : "Couldn't add the field. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -113,7 +113,7 @@ export default function AdmissionFormsContent() {
         setSelectedFormId((current) => current || forms[0]?.id || '');
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load admission forms.');
+        if (!cancelled) setError(err instanceof Error ? err.message : "Couldn't load admission forms. Try again.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

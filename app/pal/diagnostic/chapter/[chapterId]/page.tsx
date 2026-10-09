@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { motion, useReducedMotion as useFramerReducedMotion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -10,7 +10,9 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
+  ListOrdered,
   Loader2,
+  Lock,
   Sparkles,
   ThumbsUp,
   TrendingUp,
@@ -26,23 +28,37 @@ import { QuestionPlayer } from '@/components/h5p/players';
 import type { QuestionResult } from '@/components/h5p/players/types';
 import { canPlay, selectedOptionId, toPlayerQuestion } from '@/lib/pal/diagnostic-answers';
 import {
+  fetchAdaptiveConcepts,
   startChapterDiagnostic,
   submitChapterDiagnostic,
   type ChapterDiagnosticPaper,
   type ChapterDiagnosticResult,
   type DiagnosticQuestionItem,
 } from '@/app/pal/data/pal-diagnostic';
+import { DiagnosticAlreadyAttemptedGate } from '@/app/pal/_components/DiagnosticAlreadyAttemptedGate';
 import {
   CompletedBadge,
   CompletedChapterPanel,
   ReadOnlyBadge,
   useChapterCompletion,
 } from '@/app/pal/_components/CompletionState';
-import { COMPLETED_THROUGH_CHECK, JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { COMPLETED_THROUGH_CHECK, JourneyRail, JourneyStepList } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 import { BandChip } from '@/app/pal/_components/BandMeter';
 import { FlagToggle, ProgressRing, QuestionNavigator } from '@/app/pal/_components/DiagnosticNavigator';
 import { Celebration, ConfettiRain, PrimaryAction, useCountUp } from '@/app/h5p/components/game';
+import {
+  H5PJourneyCollage,
+  JOURNEY_STEPS,
+  STEP_SEQUENCE,
+  DEFAULT_STAGE_IMAGES,
+  getStageImage,
+  isStepUnlocked,
+  type JourneyImageInfo,
+  type JourneyStepId,
+} from '@/app/pal/_components/H5PJourneyCollage';
+import { SelectedJourneyStepRail } from '@/app/pal/_components/SelectedJourneyStepRail';
+import { JourneyStepContent } from '@/app/pal/_components/JourneyStepContent';
 
 /**
  * Stage 1 - the chapter diagnostic.
@@ -119,6 +135,74 @@ function Centered({ children }: { children: React.ReactNode }) {
   );
 }
 
+function getJourneyStepTitle(step: JourneyStepId | null, chapterName: string): string {
+  if (!step) return `${chapterName} Learning Journey`;
+  const meta = JOURNEY_STEPS.find((s) => s.id === step);
+  return meta ? `Step ${meta.stepNumber}: ${meta.label}` : `${chapterName} Learning Journey`;
+}
+
+function getJourneyStepDescription(step: JourneyStepId | null): string {
+  if (!step) return 'A sequential 10-stage learning path. Complete each stage in order to master this chapter.';
+  const meta = JOURNEY_STEPS.find((s) => s.id === step);
+  return meta ? meta.detail : 'Sequential progress along your personalized curriculum.';
+}
+
+function MainJourneyOverview({
+  subjectName,
+  chapterName,
+  completedSteps,
+  onStartNextStep,
+}: {
+  subjectName: string;
+  chapterName: string;
+  completedSteps: Set<JourneyStepId>;
+  onStartNextStep: () => void;
+}) {
+  const nextStep = JOURNEY_STEPS.find(
+    (step) => isStepUnlocked(step.id, completedSteps) && !completedSteps.has(step.id)
+  ) || JOURNEY_STEPS[0];
+
+  const allCompleted = completedSteps.size >= JOURNEY_STEPS.length;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-purple-600">
+            Interactive Learning Journey
+          </span>
+          <h2 className="mt-0.5 text-lg font-bold text-slate-900 sm:text-xl">
+            {chapterName} Sequential Roadmap
+          </h2>
+          <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-xl">
+            Each stage unlocks as you complete the previous one. Click any unlocked stage image above or use the button to advance.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            size="lg"
+            onClick={onStartNextStep}
+            className="gap-2 bg-purple-700 px-5 text-sm font-semibold text-white shadow-md hover:bg-purple-800"
+          >
+            {allCompleted ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                <span>Review Chapter Diagnostic</span>
+              </>
+            ) : (
+              <>
+                <span>Continue: Step {nextStep.stepNumber} ({nextStep.label})</span>
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DiagnosticExam() {
   const params = useParams();
   const router = useRouter();
@@ -137,13 +221,132 @@ function DiagnosticExam() {
   // from the paper to the score-summary screen. Null the rest of the time.
   const [summary, setSummary] = useState<ChapterDiagnosticResult | null>(null);
 
+  // Image-based journey interactive states
+  const searchParams = useSearchParams();
+  const initialStage = (searchParams?.get('stage') as JourneyStepId) || null;
+  const [selectedStep, setSelectedStep] = useState<JourneyStepId | null>(() => {
+    if (initialStage === 'adaptive' || initialStage === 'plan') {
+      return null;
+    }
+    if (initialStage && JOURNEY_STEPS.some((s) => s.id === initialStage)) {
+      return initialStage;
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const stageParam = (searchParams?.get('stage') as JourneyStepId) || null;
+    if (stageParam === 'adaptive') {
+      router.replace(`/pal/adaptive/chapter/${chapterId}`);
+      return;
+    }
+    if (stageParam === 'plan') {
+      router.replace(`/pal/plan/chapter/${chapterId}`);
+      return;
+    }
+    if (stageParam && JOURNEY_STEPS.some((s) => s.id === stageParam)) {
+      setSelectedStep(stageParam);
+    }
+  }, [searchParams, chapterId, router]);
+
+  const [showClassicJourney, setShowClassicJourney] = useState(false);
+  const [subjectName, setSubjectName] = useState<string>('Mathematics');
+
+  // Track completed steps sequentially
+  const [completedSteps, setCompletedSteps] = useState<Set<JourneyStepId>>(() => {
+    try {
+      const saved = sessionStorage.getItem(`pal_completed_steps_${chapterId}`);
+      if (saved) {
+        return new Set<JourneyStepId>(JSON.parse(saved));
+      }
+    } catch {}
+    return new Set<JourneyStepId>();
+  });
+
+  // Cached images initialized with defaults so images ALWAYS exist immediately
+  const [journeyImages, setJourneyImages] = useState<Record<string, JourneyImageInfo>>(() => {
+    try {
+      const cacheKey = `pal_journey_images_math_${chapterId}`.toLowerCase().replace(/\s+/g, '_');
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return DEFAULT_STAGE_IMAGES;
+  });
+
   const {
     mastery,
     completion,
     loading: checkingCompletion,
   } = useChapterCompletion(chapterId);
 
-  const load = useCallback(() => {
+  const chapterName = mastery?.chapterName || 'Integers';
+
+  // Discover subject name dynamically from syllabus
+  useEffect(() => {
+    if (!chapterId) return;
+    const controller = new AbortController();
+
+    import('@/app/pal/data/pal')
+      .then(({ fetchPalLanding }) => fetchPalLanding({ signal: controller.signal }))
+      .then((landing) => {
+        for (const subj of landing.subjects) {
+          if (subj.chapters.some((c) => String(c.id) === String(chapterId))) {
+            setSubjectName(subj.name);
+            break;
+          }
+        }
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [chapterId]);
+
+  // Persist completed steps to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        `pal_completed_steps_${chapterId}`,
+        JSON.stringify(Array.from(completedSteps))
+      );
+    } catch {}
+  }, [completedSteps, chapterId]);
+
+  // Pre-unlock completed steps if backend shows diagnostic or practice already done
+  useEffect(() => {
+    if (!chapterId) return;
+    try {
+      sessionStorage.setItem('pal_active_chapter_id', chapterId);
+    } catch {}
+    fetchAdaptiveConcepts(chapterId)
+      .then((data) => {
+        if (data?.hasDiagnostic) {
+          setCompletedSteps((prev) => new Set([...prev, 'diagnostic']));
+        }
+        if (data?.concepts?.some((c) => c.practiceAttempts > 0)) {
+          setCompletedSteps((prev) => new Set([...prev, 'adaptive']));
+        }
+      })
+      .catch(() => undefined);
+  }, [chapterId]);
+
+  // Load and cache web-searched journey images for this subject & chapter
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/pal/journey-images?subject=${encodeURIComponent(subjectName)}&chapter=${encodeURIComponent(chapterName)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (active && data?.images) {
+          setJourneyImages(data.images);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [subjectName, chapterName]);
+
+  const load = useCallback((opts?: { retake?: boolean }) => {
     const controller = new AbortController();
     // Deferred so setState never fires synchronously inside the effect body -
     // the convention the rest of app/pal follows, and what
@@ -151,7 +354,7 @@ function DiagnosticExam() {
     queueMicrotask(() => {
       setLoading(true);
       setError(null);
-      startChapterDiagnostic(chapterId, controller.signal)
+      startChapterDiagnostic(chapterId, controller.signal, { retake: opts?.retake ?? false })
         .then((result) => {
           setPaper(result);
           // A resumed attempt comes back with the choices already made, so the
@@ -174,7 +377,7 @@ function DiagnosticExam() {
         })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'The chapter diagnostic could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'The chapter diagnostic couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -188,8 +391,15 @@ function DiagnosticExam() {
   // chapter must never reach it in the first place.
   useEffect(() => {
     if (checkingCompletion || completion.isComplete) return;
-    return load();
-  }, [load, checkingCompletion, completion.isComplete]);
+    // ?retake=1 arrives from the history page's "Retake chapter diagnostic"
+    // link - the learner already reviewed their result there and explicitly
+    // chose to retake, so this skips straight past the already-attempted
+    // gate instead of showing it a second time. Harmless if it fires twice
+    // (e.g. once completion resolves): resume() always wins over a forced
+    // retake server-side, so this can never strand or duplicate a paper.
+    const forceNewFromUrl = searchParams?.get('retake') === '1';
+    return load({ retake: forceNewFromUrl });
+  }, [load, checkingCompletion, completion.isComplete, searchParams]);
 
   const submit = useCallback(async () => {
     if (!paper?.attemptId || submitting) return;
@@ -202,13 +412,14 @@ function DiagnosticExam() {
       if (outcome.result) {
         setSummary(outcome.result);
         setSubmitting(false);
+        setCompletedSteps((prev) => new Set([...prev, 'diagnostic']));
       } else {
         // No score payload to summarise - go straight to the result page,
         // which re-fetches it itself, rather than show a summary with nothing in it.
         router.push(`/pal/diagnostic/result/${paper.attemptId}`);
       }
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : 'The chapter diagnostic could not be submitted.');
+      setError(reason instanceof Error ? reason.message : 'The chapter diagnostic couldn’t be submitted.');
       setSubmitting(false);
     }
   }, [paper, answers, submitting, router]);
@@ -258,6 +469,47 @@ function DiagnosticExam() {
   const current = questions[currentIndex] ?? null;
   const isLast = currentIndex >= total - 1;
   const isFirst = currentIndex <= 0;
+
+  const handleStepComplete = useCallback((stepId: JourneyStepId) => {
+    setCompletedSteps((prev) => {
+      const next = new Set(prev);
+      next.add(stepId);
+      return next;
+    });
+  }, []);
+
+  const handleNextStep = useCallback(
+    (nextStepId: JourneyStepId) => {
+      if (nextStepId === 'adaptive') {
+        router.push(`/pal/adaptive/chapter/${chapterId}`);
+        return;
+      }
+      if (nextStepId === 'plan') {
+        router.push(`/pal/plan/chapter/${chapterId}`);
+        return;
+      }
+      setSelectedStep(nextStepId);
+    },
+    [chapterId, router]
+  );
+
+  const handleSelectStep = useCallback(
+    (stepId: JourneyStepId) => {
+      if (!isStepUnlocked(stepId, completedSteps)) {
+        return;
+      }
+      if (stepId === 'adaptive') {
+        router.push(`/pal/adaptive/chapter/${chapterId}`);
+        return;
+      }
+      if (stepId === 'plan') {
+        router.push(`/pal/plan/chapter/${chapterId}`);
+        return;
+      }
+      setSelectedStep(stepId);
+    },
+    [completedSteps, chapterId, router]
+  );
 
   const goTo = useCallback(
     (index: number) => {
@@ -330,8 +582,10 @@ function DiagnosticExam() {
   }
 
   // A chapter without enough tagged questions. Said plainly - this is a gap in
-  // the question bank, not something the learner did.
-  if (paper && !paper.attemptId) {
+  // the question bank, not something the learner did. Excludes
+  // 'already_attempted', which also has a null attemptId (no NEW paper was
+  // drawn) but for a completely different, non-error reason handled below.
+  if (paper && !paper.attemptId && paper.attemptStatus !== 'already_attempted') {
     return (
       <Shell chapterId={chapterId}>
         <Card className="border-amber-200 bg-amber-50">
@@ -359,6 +613,21 @@ function DiagnosticExam() {
     );
   }
 
+  // A submitted attempt already exists and no in_progress one is being
+  // resumed - show the previous result and offer a retake instead of
+  // silently drafting a second attempt the learner never asked for. See
+  // DiagnosticService::previousAttempt() on the backend.
+  if (paper && paper.attemptStatus === 'already_attempted' && paper.previousAttempt) {
+    return (
+      <Shell chapterId={chapterId}>
+        <DiagnosticAlreadyAttemptedGate
+          previous={paper.previousAttempt}
+          onRetake={() => load({ retake: true })}
+        />
+      </Shell>
+    );
+  }
+
   // Submitted. A reveal dialog shows the score/tier moment, then sends the
   // learner straight into the readiness analysis on the result page - see
   // the module doc comment.
@@ -377,50 +646,78 @@ function DiagnosticExam() {
     answered: answers[question.questionId] != null,
   }));
 
-  // Progress, the clock, the ring and the flagged count are context, not the
-  // task, so on a wide screen they live in the rail where they stay visible
-  // without competing with the one question on screen.
-  const rail = (
-    <>
-      <PalRailSection title="Progress">
-        <div className="flex items-center gap-3">
-          <ProgressRing value={answered} max={total} />
-          <div>
-            <p className="text-sm font-semibold text-slate-900">{answered} of {total} answered</p>
-            {secondsLeft !== null && (
-              <p className={cn('text-xs font-medium tabular-nums', secondsLeft <= 120 ? 'text-rose-600' : 'text-slate-500')}>
-                {formatClock(secondsLeft)} left
-              </p>
-            )}
-          </div>
-        </div>
-        {answered < total && (
-          <p className="mt-2 text-xs text-slate-500">
-            You can submit before answering them all.
-          </p>
-        )}
-      </PalRailSection>
+  const currentStepTitle = getJourneyStepTitle(selectedStep, chapterName);
+  const currentStepDescription = getJourneyStepDescription(selectedStep);
 
-      <PalRailSection title="Your journey">
-        <JourneyRail current="diagnostic" orientation="vertical" />
-      </PalRailSection>
-
-      <p className="px-1 text-xs text-slate-400">
-        <Link
-          href={`/pal/diagnostic/chapter/${chapterId}/history`}
-          className="hover:text-slate-600 hover:underline"
-        >
-          Previous attempts
-        </Link>
-      </p>
-    </>
+  const headerActions = (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => setShowClassicJourney((v) => !v)}
+      className={cn(
+        'border-slate-200 transition-colors',
+        showClassicJourney && 'bg-slate-100 border-indigo-300 text-indigo-700'
+      )}
+    >
+      <ListOrdered className="mr-1.5 h-3.5 w-3.5" />
+      {showClassicJourney ? 'Hide journey list' : 'Show journey list'}
+    </Button>
   );
 
-  return (
-    <Shell chapterId={chapterId} rail={rail}>
+  const progressSection = (
+    <PalRailSection title="Progress">
+      <div className="flex items-center gap-3">
+        <ProgressRing value={answered} max={total} />
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{answered} of {total} answered</p>
+          {secondsLeft !== null && (
+            <p className={cn('text-xs font-medium tabular-nums', secondsLeft <= 120 ? 'text-rose-600' : 'text-slate-500')}>
+              {formatClock(secondsLeft)} left
+            </p>
+          )}
+        </div>
+      </div>
+      {answered < total && (
+        <p className="mt-2 text-xs text-slate-500">
+          You can submit before answering them all.
+        </p>
+      )}
+    </PalRailSection>
+  );
+
+  const classicJourneySection = (
+    <PalRailSection title="Journey steps">
+      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+        <JourneyStepList
+          current={selectedStep ?? 'diagnostic'}
+          completed={Array.from(completedSteps)}
+          orientation="vertical"
+        />
+      </div>
+    </PalRailSection>
+  );
+
+  const rail = selectedStep ? (
+    <>
+      <SelectedJourneyStepRail
+        selectedStep={selectedStep}
+        images={journeyImages}
+        subjectName={subjectName}
+        chapterName={chapterName}
+        completedSteps={completedSteps}
+        onSelectStep={handleSelectStep}
+        onBackToCollage={() => setSelectedStep(null)}
+      />
+
+      {selectedStep === 'diagnostic' && progressSection}
+
+      {showClassicJourney && classicJourneySection}
+    </>
+  ) : null;
+
+  const diagnosticExamQuestions = (
+    <>
       {paper?.resumed && (
-        // Restoring answers without saying so reads as a glitch, and the clock
-        // restarts on a resume, so both facts are stated plainly.
         <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
           <p className="text-sm font-medium text-indigo-900">
             Picking up where you left off
@@ -435,9 +732,7 @@ function DiagnosticExam() {
         </div>
       )}
 
-      {/* Small screens only. The rail carries the ring on desktop, but it sits
-          BELOW the question there, so a timer that lived only there would
-          scroll out of sight exactly when it matters. */}
+      {/* Small screens only */}
       <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-baseline gap-2">
@@ -538,6 +833,57 @@ function DiagnosticExam() {
           </Button>
         )}
       </div>
+    </>
+  );
+
+  return (
+    <Shell
+      chapterId={chapterId}
+      rail={rail}
+      actions={selectedStep !== null ? headerActions : undefined}
+      title={currentStepTitle}
+      description={currentStepDescription}
+      constrainMeasure={selectedStep !== null}
+    >
+      {selectedStep === null ? (
+        <div className="space-y-6">
+          <H5PJourneyCollage
+            subjectName={subjectName}
+            chapterName={chapterName}
+            activeStep={null}
+            completedSteps={completedSteps}
+            onSelectStep={handleSelectStep}
+            images={journeyImages}
+          />
+
+          <MainJourneyOverview
+            subjectName={subjectName}
+            chapterName={chapterName}
+            completedSteps={completedSteps}
+            onStartNextStep={() => {
+              for (const step of JOURNEY_STEPS) {
+                if (isStepUnlocked(step.id, completedSteps) && !completedSteps.has(step.id)) {
+                  handleSelectStep(step.id);
+                  return;
+                }
+              }
+              handleSelectStep('diagnostic');
+            }}
+          />
+        </div>
+      ) : (
+        <JourneyStepContent
+          stepId={selectedStep}
+          chapterId={chapterId}
+          chapterName={chapterName}
+          subjectName={subjectName}
+          diagnosticContent={diagnosticExamQuestions}
+          onStepComplete={handleStepComplete}
+          onNextStep={handleNextStep}
+          onBackToCollage={() => setSelectedStep(null)}
+          isCompleted={completedSteps.has(selectedStep)}
+        />
+      )}
     </Shell>
   );
 }
@@ -883,36 +1229,37 @@ const LEVEL_TONE: Record<string, { bg: string; icon: string; fg: string }> = {
 function Shell({
   chapterId,
   rail,
+  actions,
+  title = 'Chapter diagnostic',
+  description = 'Fifteen questions — five easy, five medium and five hard. This finds where to start; it is not a test you can fail.',
   children,
+  constrainMeasure = true,
 }: {
   chapterId: string;
   rail?: React.ReactNode;
+  actions?: React.ReactNode;
+  title?: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
+  constrainMeasure?: boolean;
 }) {
   return (
     <PalWorkspace
-      title="Chapter diagnostic"
-      description="Fifteen questions — five easy, five medium and five hard. This finds where to start; it is not a test you can fail."
+      title={title}
+      description={description}
       backHref="/pal"
       backLabel="Back to subjects"
+      actions={actions}
       rail={
-        rail ?? (
+        rail !== undefined ? rail : (
           <PalRailSection title="Your journey">
             <JourneyRail current="diagnostic" orientation="vertical" />
           </PalRailSection>
         )
       }
+      constrainMeasure={constrainMeasure}
     >
       {children}
-
-      <p className="text-xs text-slate-400 lg:hidden">
-        <Link
-          href={`/pal/diagnostic/chapter/${chapterId}/history`}
-          className="hover:text-slate-600 hover:underline"
-        >
-          Previous attempts
-        </Link>
-      </p>
     </PalWorkspace>
   );
 }

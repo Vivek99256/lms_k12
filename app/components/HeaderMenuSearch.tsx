@@ -11,7 +11,7 @@ import {
   type MenuSearchEntry,
 } from '@/app/data/menuSearch';
 
-const LEVEL_LABEL: Record<number, string> = { 1: 'Category', 2: 'Module', 3: 'Screen' };
+const LEVEL_LABEL: Record<number, string> = { 1: 'Menu', 2: 'Section', 3: 'Page' };
 
 /**
  * Top-bar search over this user's own menu tree: type a menu name, press enter,
@@ -147,7 +147,7 @@ export default function HeaderMenuSearch({
           aria-autocomplete="list"
           autoComplete="off"
           value={query}
-          placeholder="Search menus and screens..."
+          placeholder="Search menus and pages…"
           className="flex-1 bg-transparent text-sm outline-none"
           onChange={(event) => openWithQuery(event.target.value)}
           onFocus={() => {

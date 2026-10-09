@@ -28,8 +28,10 @@ import {
 
 const PER_PAGE = 20;
 
+import { friendlyError } from "@/lib/user-messages";
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return friendlyError(error, "We couldn’t load the leaderboard. Please try again.");
 }
 
 function initials(name: string): string {
@@ -270,7 +272,7 @@ export default function LeaderBoardPage() {
               <Trophy className="size-5" />
             </span>
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Leader board</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Leaderboard</h1>
               <p className="mt-0.5 text-sm text-slate-500">
                 Points earned across learning activities, and how the class is placed.
               </p>
@@ -557,10 +559,10 @@ export default function LeaderBoardPage() {
               </>
             ) : (
               <div className="px-4 py-12 text-center">
-                <p className="text-sm font-medium text-slate-700">No leader board data available</p>
+                <p className="text-sm font-medium text-slate-700">No leaderboard data available</p>
                 <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500">
                   Nothing has been credited for this class and academic year yet. Try another year, or ask an
-                  administrator to configure the leader board points.
+                  administrator to configure the leaderboard points.
                 </p>
               </div>
             )}

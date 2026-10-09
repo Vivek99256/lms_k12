@@ -58,7 +58,7 @@ export function useProjects() {
       setPagination(records.data.pagination)
       setOptions(lookup.data)
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load projects.'))
+      setError(toMessage(reason, "Couldn't load projects. Try again."))
     } finally {
       setLoading(false)
     }
@@ -80,7 +80,7 @@ export function useProjects() {
       setMessage(response.message)
       refresh()
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to archive project.'))
+      setError(toMessage(reason, "Couldn't archive project. Try again."))
     }
   }, [refresh])
 
@@ -119,7 +119,7 @@ export function useProjectDetail(projectId: string | null, open: boolean, onChan
       setMembers(response.data.members?.map((member) => String(member.id)) ?? [])
       setTaskIds(response.data.task_ids ?? [])
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load project.'))
+      setError(toMessage(reason, "Couldn't load project. Try again."))
     } finally {
       setLoading(false)
     }
@@ -146,7 +146,7 @@ export function useProjectDetail(projectId: string | null, open: boolean, onChan
       await load()
       onChanged()
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to update team.'))
+      setError(toMessage(reason, "Couldn't update team. Try again."))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project, members, load, onChanged])
@@ -161,7 +161,7 @@ export function useProjectDetail(projectId: string | null, open: boolean, onChan
       await load()
       onChanged()
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to link tasks.'))
+      setError(toMessage(reason, "Couldn't link tasks. Try again."))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project, taskIds, load, onChanged])
@@ -181,7 +181,7 @@ export function useProjectDetail(projectId: string | null, open: boolean, onChan
       await load()
       onChanged()
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to save workstream.'))
+      setError(toMessage(reason, "Couldn't save workstream. Try again."))
       throw reason
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,7 +197,7 @@ export function useProjectDetail(projectId: string | null, open: boolean, onChan
       await load()
       onChanged()
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to delete workstream.'))
+      setError(toMessage(reason, "Couldn't delete workstream. Try again."))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project, load, onChanged])

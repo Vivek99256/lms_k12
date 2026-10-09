@@ -1156,7 +1156,7 @@ export default function LessonPlanPage() {
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: Failed to load divisions`);
+          throw new Error(`We couldn’t load the classes. Please try again.`);
         }
 
         const payload = (await response.json()) as Record<string, unknown>;
@@ -1186,7 +1186,7 @@ export default function LessonPlanPage() {
         console.error('Failed to fetch divisions:', error);
         if (!cancelled) {
           setDivisions([]);
-          setDivisionError('Failed to load divisions.');
+          setDivisionError('Couldn’t load divisions.');
         }
       } finally {
         if (!cancelled) {
@@ -1345,7 +1345,7 @@ export default function LessonPlanPage() {
       } catch (error) {
         if ((error as Error)?.name === 'AbortError') return;
         setLessonPlanError(
-          error instanceof Error ? error.message : 'Unable to fetch lesson plan calendar.'
+          error instanceof Error ? error.message : 'Couldn’t fetch lesson plan calendar.'
         );
         setApiPeriods([]);
         setLessonPlanLoading(false);
@@ -1460,7 +1460,7 @@ export default function LessonPlanPage() {
         setPedagogyErrors((current) => ({
           ...current,
           [pedagogyChapterId]:
-            error instanceof Error ? error.message : 'Failed to load teaching pedagogy.',
+            error instanceof Error ? error.message : 'Couldn’t load teaching pedagogy.',
         }));
       })
       .finally(() => {
@@ -1631,7 +1631,7 @@ export default function LessonPlanPage() {
       <div className="flex min-h-screen items-center justify-center bg-slate-50/50">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-slate-900 mb-2">Course not found</h2>
-          <p className="text-slate-500">The requested course could not be found.</p>
+          <p className="text-slate-500">The requested course couldn’t be found.</p>
         </div>
       </div>
     );
@@ -1799,7 +1799,7 @@ export default function LessonPlanPage() {
 
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload?.status === false) {
-          throw new Error(payload?.message || `Failed to save the lesson plan (${response.status}).`);
+          throw new Error(payload?.message || `Couldn’t save the lesson plan (${response.status}).`);
         }
       }
 
@@ -1811,7 +1811,7 @@ export default function LessonPlanPage() {
       resetLessonPlanDraft();
     } catch (error) {
       setLessonPlanSaveError(
-        error instanceof Error ? error.message : 'Unable to save the lesson plan.'
+        error instanceof Error ? error.message : 'Couldn’t save the lesson plan.'
       );
     } finally {
       setIsSavingLessonPlan(false);
@@ -2291,7 +2291,7 @@ export default function LessonPlanPage() {
               <div className="flex flex-wrap items-center gap-6 text-sm">
                 <div className="flex items-center gap-2">
                   <Users size={16} className="text-slate-400" />
-                  <span className="text-slate-600">Instructor:</span>
+                  <span className="text-slate-600">Teacher:</span>
                   <span className="font-medium text-slate-800">{course.instructor}</span>
                 </div>
                 <div className="flex items-center gap-2">

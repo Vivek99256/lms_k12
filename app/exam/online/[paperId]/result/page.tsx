@@ -85,7 +85,7 @@ function OnlineExamResultContent() {
         setResultError(
           resultOutcome.reason instanceof Error
             ? resultOutcome.reason.message
-            : 'Unable to load the result.'
+            : "Couldn't load the result. Try again."
         );
       }
       if (breakdownOutcome.status === 'fulfilled') {
@@ -94,7 +94,7 @@ function OnlineExamResultContent() {
         setBreakdownError(
           breakdownOutcome.reason instanceof Error
             ? breakdownOutcome.reason.message
-            : 'Unable to load the breakdown.'
+            : "Couldn't load the breakdown. Try again."
         );
       }
       setLoading(false);

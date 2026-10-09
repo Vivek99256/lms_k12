@@ -48,7 +48,7 @@ function normalize(value: unknown): InventoryData {
 export function getInventorySession(): SessionContext {
   const session = buildSessionContext();
   if (!session.token || !session.subInstituteId || !session.syear || !session.userId) {
-    throw new Error("Your login session is missing Inventory credentials.");
+    throw new Error("Your session has expired. Sign in again.");
   }
   return session;
 }
@@ -67,10 +67,10 @@ async function request(module: string, session: SessionContext, suffix = "", ini
   const payload = (await response.json().catch(() => ({}))) as unknown;
   if (!response.ok) {
     if (response.status === 404) throw new Error("Backend API required for this Inventory menu.");
-    throw new Error(message(payload, `Request failed (${response.status}).`));
+    throw new Error(message(payload, "Couldn't complete the request. Try again."));
   }
   if (isRecord(payload) && normalizeApiStatus(payload as ApiEnvelope) === "2") {
-    throw new Error(message(payload, "Authentication failed."));
+    throw new Error(message(payload, "Your session has expired. Sign in again."));
   }
   return payload;
 }
@@ -133,10 +133,10 @@ export async function loadReceivablePoItems(poNumber: string): Promise<Receivabl
   const payload = (await response.json().catch(() => ({}))) as unknown;
   if (!response.ok) {
     if (response.status === 404) throw new Error("Backend API required for this Inventory menu.");
-    throw new Error(message(payload, `Request failed (${response.status}).`));
+    throw new Error(message(payload, "Couldn't complete the request. Try again."));
   }
   if (isRecord(payload) && normalizeApiStatus(payload as ApiEnvelope) === "2") {
-    throw new Error(message(payload, "Authentication failed."));
+    throw new Error(message(payload, "Your session has expired. Sign in again."));
   }
   const data = isRecord(payload) && isRecord(payload.data) ? payload.data : isRecord(payload) ? payload : {};
   const items = rows(data ?? payload);

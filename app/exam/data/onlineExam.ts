@@ -61,7 +61,7 @@ async function readJson(res: Response, fallback: string): Promise<Record<string,
       ? (parsed as Record<string, unknown>)
       : { data: parsed };
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(fallback);
   }
 }
 function csvIds(value: unknown): string[] {
@@ -172,8 +172,8 @@ export async function listOnlineExams(
   if (filter.subjectId) url.searchParams.set('subject_id', filter.subjectId);
 
   const res = await fetch(url.toString(), { headers: createAuthHeaders(session), signal });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load exams.`);
-  const raw = await readJson(res, 'Failed to load exams');
+  if (!res.ok) throw new Error(`Couldn't load exams. Try again.`);
+  const raw = await readJson(res, "Couldn't load exams. Try again.");
   return toArray(raw.data)
     .map((entry) => {
       const r = toRecord(entry);
@@ -210,8 +210,8 @@ export async function fetchOnlineExam(paperId: string, signal?: AbortSignal): Pr
   url.searchParams.set('questionpaper_id', paperId);
 
   const res = await fetch(url.toString(), { headers: ajaxHeaders(session), signal });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the exam.`);
-  const raw = await readJson(res, 'Failed to load the exam');
+  if (!res.ok) throw new Error(`Couldn't load the exam. Try again.`);
+  const raw = await readJson(res, "Couldn't load the exam. Try again.");
 
   const paper = toRecord(raw.questionpaper_data);
   const answers = toRecord(raw.answer_arr);
@@ -287,13 +287,13 @@ export async function submitOnlineExam(input: SubmitInput): Promise<SubmitResult
     headers: ajaxHeaders(session, 'application/x-www-form-urlencoded'),
     body: form.toString(),
   });
-  const raw = await readJson(res, 'Failed to submit the exam');
+  const raw = await readJson(res, "Couldn't submit the exam. Try again.");
   const status = String(raw.status_code ?? raw.status ?? '');
   const onlineExamId = readString(raw.online_exam_id);
   if (!res.ok || (status !== '1' && status.toUpperCase() !== 'SUCCESS') || !onlineExamId) {
     throw new Error(
       (raw.message as string) ||
-        'Unable to submit — the online-exam backend update may not be deployed yet.'
+        "Couldn't submit the exam. Try again."
     );
   }
   return {
@@ -322,8 +322,8 @@ export async function fetchExamResult(
   url.searchParams.set('online_exam_id', onlineExamId);
 
   const res = await fetch(url.toString(), { headers: ajaxHeaders(session), signal });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the result.`);
-  const raw = await readJson(res, 'Failed to load the result');
+  if (!res.ok) throw new Error(`Couldn't load the result. Try again.`);
+  const raw = await readJson(res, "Couldn't load the result. Try again.");
 
   const paper = toRecord(raw.questionpaper_data);
   const oe = toRecord(raw.online_exam_data);
@@ -380,8 +380,8 @@ export async function fetchAttemptBreakdown(
   url.searchParams.set('student_id', studentId);
 
   const res = await fetch(url.toString(), { headers: ajaxHeaders(session), signal });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the breakdown.`);
-  const raw = await readJson(res, 'Failed to load the breakdown');
+  if (!res.ok) throw new Error(`Couldn't load the breakdown. Try again.`);
+  const raw = await readJson(res, "Couldn't load the breakdown. Try again.");
 
   const attempted = toArray(raw.attempted_data).map(toRecord);
   const finalData = toRecord(raw.final_progressbar_data);

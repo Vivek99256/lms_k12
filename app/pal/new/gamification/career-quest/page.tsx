@@ -53,7 +53,7 @@ export default function CareerQuestPage() {
       await chooseCareerPathway(pathway, scope.scope);
       reload();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not set the pathway.');
+      setActionError(err instanceof Error ? err.message : 'Couldn’t set the pathway.');
     } finally {
       setBusy(false);
     }
@@ -66,7 +66,7 @@ export default function CareerQuestPage() {
       await generateCareerReport(scope.scope);
       reload();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not generate the report.');
+      setActionError(err instanceof Error ? err.message : 'Couldn’t generate the report.');
     } finally {
       setBusy(false);
     }
@@ -94,7 +94,7 @@ export default function CareerQuestPage() {
         <StatusPanel
           kind="error"
           title="Career quest is not available"
-          message={error || 'The backend did not return a career quest payload.'}
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={reload}
           retrying={refreshing}
         />
@@ -184,7 +184,7 @@ export default function CareerQuestPage() {
         {/* --- RIASEC profile ---------------------------------------- */}
         <SectionCard
           title="Career personality profile"
-          description="Built from RIASEC signals accumulated across this learner's real work — never from a questionnaire they filled in once."
+          description="Built from the student's work over time, not one questionnaire."
         >
           {!data.stage.showsRiasec ? (
             <EmptyState
@@ -278,7 +278,7 @@ export default function CareerQuestPage() {
                   </p>
                   <p className="mt-1.5 text-xs leading-5 text-slate-500">
                     {data.skillProgress.targetSource === 'linked_concepts'
-                      ? 'The target is the number of concepts actually linked to this path in your estate.'
+                      ? 'The target is the number of concepts actually linked to this path in your school.'
                       : data.skillProgress.targetSource === 'institute'
                         ? 'The target was set by your institute.'
                         : 'No concepts are mapped to this path yet, so the default target is used.'}

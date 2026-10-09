@@ -67,7 +67,7 @@ function RecallView() {
         .then(setQueue)
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Your reviews could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'Your reviews couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -123,6 +123,7 @@ function RecallView() {
               completed={COMPLETED_THROUGH_MASTERY}
               bypassed={['intervention']}
               orientation="vertical"
+              chapterId={chapterId}
             />
           </PalRailSection>
         </>

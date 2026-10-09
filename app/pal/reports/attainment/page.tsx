@@ -1,14 +1,14 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BookOpen, Loader2, Target } from 'lucide-react';
+import { AlertTriangle, BookOpen, Loader2, Sparkles, Target } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { buildSessionContext } from '@/lib/erp-client';
 import { fetchClassStudents } from '@/app/pal/data/pal-lookups';
-import { fetchAttainmentReport, type AttainmentReport } from '@/app/pal/data/pal-eso';
+import { fetchAttainmentNarrative, fetchAttainmentReport, type AttainmentReport } from '@/app/pal/data/pal-eso';
 
 /**
  * Curriculum Coverage and Student Attainment — two reports, side by side.
@@ -47,6 +47,9 @@ function AttainmentReportView() {
   const [report, setReport] = useState<AttainmentReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [narrative, setNarrative] = useState('');
+  const [narrativeLoading, setNarrativeLoading] = useState(false);
+  const [narrativeError, setNarrativeError] = useState('');
 
   const syear = useMemo(() => buildSessionContext().syear, []);
 
@@ -82,7 +85,7 @@ function AttainmentReportView() {
         setReport(await fetchAttainmentReport(standardId, syear, undefined, signal));
       } catch (caught) {
         if ((caught as Error)?.name === 'AbortError') return;
-        setError(caught instanceof Error ? caught.message : 'Could not load the report.');
+        setError(caught instanceof Error ? caught.message : 'Couldn’t load the report.');
         setReport(null);
       } finally {
         setLoading(false);
@@ -101,6 +104,33 @@ function AttainmentReportView() {
     });
     return () => controller.abort();
   }, [load]);
+
+  // Fetches only once the report itself has data — narrating an empty/errored
+  // scope would either call the model for nothing or echo the same failure
+  // twice. A separate effect (not folded into load()) so the cards/table
+  // render immediately and don't wait on the slower model call.
+  useEffect(() => {
+    if (!report || report.coverage.conceptsTotal === 0 || !standardId || !syear) {
+      setNarrative('');
+      setNarrativeError('');
+      return;
+    }
+
+    const controller = new AbortController();
+    setNarrativeLoading(true);
+    setNarrativeError('');
+    fetchAttainmentNarrative(standardId, syear, undefined, controller.signal)
+      .then((text) => setNarrative(text))
+      .catch((caught) => {
+        if ((caught as Error)?.name === 'AbortError') return;
+        setNarrativeError(caught instanceof Error ? caught.message : 'Couldn’t generate a summary.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setNarrativeLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [report, standardId, syear]);
 
   if (!syear) {
     return (
@@ -170,8 +200,44 @@ function AttainmentReportView() {
         <p className="text-sm text-slate-500">Choose a class to see its coverage and attainment.</p>
       )}
 
-      {!loading && !error && standardId && report && <ReportBody report={report} />}
+      {!loading && !error && standardId && report && (
+        <>
+          <NarrativeCard loading={narrativeLoading} error={narrativeError} text={narrative} />
+          <ReportBody report={report} />
+        </>
+      )}
     </div>
+  );
+}
+
+/**
+ * Graph-RAG-style narration over this same report's own numbers — grounded
+ * only in what forCohort() returned, never a separate guess. Silent when
+ * there's nothing to show yet, rather than an empty card flashing in first.
+ */
+function NarrativeCard({ loading, error, text }: { loading: boolean; error: string; text: string }) {
+  if (!loading && !error && !text) return null;
+
+  return (
+    <Card className="border-indigo-200 bg-indigo-50/40">
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-indigo-600" />
+          <CardDescription className="text-indigo-900">Summary</CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="text-sm text-slate-700">
+        {loading ? (
+          <span className="inline-flex items-center gap-2 text-slate-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Summarising…
+          </span>
+        ) : error ? (
+          <span className="text-amber-700">{error}</span>
+        ) : (
+          <p className="whitespace-pre-line">{text}</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

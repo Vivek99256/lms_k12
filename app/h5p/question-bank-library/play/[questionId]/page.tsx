@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -87,7 +89,7 @@ function RuntimePlayerPageContent() {
         })
         .catch((err: unknown) => {
           if (!controller.signal.aborted) {
-            setError(err instanceof Error ? err.message : 'Could not load this question.');
+            setError(friendlyError(err, 'We couldn’t load this question.. Please try again.'));
           }
         })
         .finally(() => {
@@ -132,7 +134,7 @@ function RuntimePlayerPageContent() {
             <RuntimePlayer question={question} chapter={chapter} embedded={false} />
           </div>
         ) : (
-          <EmptyState title="Nothing to play" hint="This question could not be turned into an activity." />
+          <EmptyState title="Nothing to play" hint="This question couldn’t be turned into an activity." />
         )}
       </div>
     </div>

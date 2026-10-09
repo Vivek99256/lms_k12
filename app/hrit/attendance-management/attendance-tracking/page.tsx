@@ -81,7 +81,7 @@ const SHIFT_END = '06:00 PM'
 const SHIFT_TOTAL_MINUTES = 510
 
 function formatCurrentDateLabel(date: Date) {
-  return `Today, ${date.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}`
+  return `Today, ${date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`
 }
 
 const statusLabelMap: Record<AttendanceStatus, string> = {

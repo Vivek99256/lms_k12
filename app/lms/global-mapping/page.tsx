@@ -23,8 +23,10 @@ import {
 } from '@/app/lms/global-mapping/api';
 import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
+import { friendlyError } from "@/lib/user-messages";
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return friendlyError(error, "We couldn’t load the mapping. Please try again.");
 }
 
 const inputClass =

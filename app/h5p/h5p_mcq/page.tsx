@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -661,7 +663,7 @@ function McqContent() {
         if (!cancelled) setLevels(payload.mcq_levels);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load MCQ levels');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load MCQ levels. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLevelsLoading(false);
@@ -694,7 +696,7 @@ function McqContent() {
           setView('quiz');
         })
         .catch((err: unknown) => {
-          setError(err instanceof Error ? err.message : 'Failed to load quiz questions');
+          setError(friendlyError(err, 'We couldn’t load quiz questions. Please try again.'));
         })
         .finally(() => {
           setStartingLevelId(null);

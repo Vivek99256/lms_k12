@@ -26,7 +26,7 @@ export function HostelGapPage({
           <div>
             <h1 className="text-2xl font-bold text-slate-950">{title}</h1>
             <p className="mt-1 text-sm text-slate-500">
-              This page was compared against the Laravel ERP, but the required backend API surface is not available in a token-safe form yet.
+              This page isn't available yet. Contact your administrator.
             </p>
           </div>
           <Link href="/hostel" className="inline-flex">
@@ -47,7 +47,7 @@ export function HostelGapPage({
               <span>{laravelSource}</span>
             </div>
             <div>
-              <p className="mb-2 font-medium text-slate-900">Laravel fields verified</p>
+              <p className="mb-2 font-medium text-slate-900">Fields</p>
               <div className="flex flex-wrap gap-2">
                 {fields.map((field) => (
                   <Badge key={field} variant="outline">{field}</Badge>
@@ -55,7 +55,7 @@ export function HostelGapPage({
               </div>
             </div>
             <div>
-              <p className="mb-2 font-medium text-slate-900">Required backend work</p>
+              <p className="mb-2 font-medium text-slate-900">Still to be set up</p>
               <ul className="space-y-1 text-slate-600">
                 {backendGaps.map((gap) => (
                   <li key={gap}>• {gap}</li>
@@ -67,11 +67,11 @@ export function HostelGapPage({
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><FileSearch className="size-4 text-blue-600" /> Comparison Status</CardTitle>
+            <CardTitle className="flex items-center gap-2"><FileSearch className="size-4 text-blue-600" /> Status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-slate-600">
-            <p>Old Laravel ERP: inspected routes, controller logic, form fields, table columns, filters, and workflow behavior for this module.</p>
-            <p>New Next.js ERP: no safe token-backed endpoint exists yet for full CRUD or report behavior, so the frontend cannot reproduce the Laravel behavior without backend work.</p>
+            <p>This page has been reviewed against the existing ERP.</p>
+            <p>It needs more setup before it can be used.</p>
           </CardContent>
         </Card>
       </div>

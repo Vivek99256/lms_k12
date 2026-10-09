@@ -49,7 +49,7 @@ const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
 const SECTION_BADGES = ['Section A', 'Section A', 'Section B', 'Section B'] as const;
 const LEARNING_TABS = [
   { key: 'learn', label: 'Learn', icon: BookOpen },
-  { key: 'test', label: 'Test', icon: ClipboardList },
+  { key: 'test', label: 'Exams', icon: ClipboardList },
 ] as const;
 
 const SUBJECT_ICON_MAP: Record<Course['icon'], LucideIcon> = {

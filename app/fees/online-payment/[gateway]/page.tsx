@@ -54,7 +54,7 @@ export default function OnlinePaymentPage() {
 
     const openCheckout = () => {
       if (!window.Razorpay) {
-        setMessage({ type: 'error', text: 'Razorpay Checkout could not be loaded. Please try Pay now again.' });
+        setMessage({ type: 'error', text: "Couldn't load Razorpay Checkout. Try Pay now again." });
         return;
       }
 
@@ -83,7 +83,7 @@ export default function OnlinePaymentPage() {
     script.async = true;
     script.dataset.razorpayCheckout = 'true';
     script.addEventListener('load', openCheckout, { once: true });
-    script.addEventListener('error', () => setMessage({ type: 'error', text: 'Razorpay Checkout could not be loaded.' }), { once: true });
+    script.addEventListener('error', () => setMessage({ type: 'error', text: "Couldn't load Razorpay Checkout. Try again." }), { once: true });
     document.body.appendChild(script);
   }, [paymentOrder, payAmount, studentId]);
 
@@ -116,10 +116,10 @@ export default function OnlinePaymentPage() {
         const payload = await fetchLaravelJson<unknown>(session, `/api/proxy?${params.toString()}`);
         const record = asRecord(payload);
         const status = String(record.status ?? record.status_code ?? '1');
-        if (status !== '1') throw new Error(readString(record.message) || 'Unable to load fee details.');
+        if (status !== '1') throw new Error(readString(record.message) || "Couldn't load fee details. Try again.");
         setPreview(toFeePreview(record.data));
       } catch (error) {
-        setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load fee details.' });
+        setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load fee details. Try again." });
       } finally {
         setIsLoading(false);
       }
@@ -160,17 +160,17 @@ export default function OnlinePaymentPage() {
       .then(async (response) => {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || String(payload.status ?? '1') !== '1') {
-          throw new Error(payload.message || 'Unable to start the payment.');
+          throw new Error(payload.message || "Couldn't start the payment. Try again.");
         }
         setPaymentOrder(payload.data || payload);
       })
-      .catch((error) => setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to start the payment.' }));
+      .catch((error) => setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't start the payment. Try again." }));
   };
 
   return <PageFrame>
     <PageHeader title={`Online payment · ${gatewayLabel}`} description="Review the available online fee collection before continuing to the configured payment gateway." />
     {message && <InlineMessage type={message.type} text={message.text} />}
-    <SectionPanel title={showPaymentDetails ? `Fees Collect - ${gatewayLabel}` : 'Payment details'}>
+    <SectionPanel title={showPaymentDetails ? `Fee collection - ${gatewayLabel}` : 'Payment details'}>
       {isLoading ? <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-slate-600"><Loader2 className="h-4 w-4" />Loading fee details</div> : preview && !showPaymentDetails ? <div className="space-y-4"><div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3"><Detail label="Student ID" value={studentId} /><Detail label="Collection type" value={preview.feesType || '-'} /><Detail label="Academic year" value={preview.currentYear || '-'} /></div>{preview.error && <InlineMessage type="info" text={preview.error} />}<Button type="button" onClick={continueToPayment}><CreditCard className="h-4 w-4" />Continue to payment details</Button></div> : null}
       {preview && showPaymentDetails ? <PaymentDetails preview={preview} selectedMonths={selectedMonths} setSelectedMonths={(months) => { setSelectedMonths(months); setPayAmount(String(calculateMonthAmount(preview, months))); }} payAmount={payAmount} setPayAmount={setPayAmount} onSubmit={submitPayment} paymentOrder={paymentOrder} /> : null}
     </SectionPanel>
@@ -224,13 +224,13 @@ function PaymentDetails({
       <div className="lg:col-span-2">
         <h3 className="mb-2 text-sm font-semibold text-slate-900">Fees structure</h3>
         <div className="overflow-hidden rounded-lg border border-slate-200">
-          <table className="w-full text-sm"><thead className="bg-slate-50"><tr><th className="px-3 py-2 text-left">Month</th><th className="px-3 py-2 text-right">Fees</th><th className="px-3 py-2 text-right">Paid</th><th className="px-3 py-2 text-right">Remaining</th></tr></thead><tbody>{preview.totalFees.map((row) => <tr key={row.month} className="border-t border-slate-100"><td className="px-3 py-2">{row.month}</td><td className="px-3 py-2 text-right">{row.bk}</td><td className="px-3 py-2 text-right">{row.paid}</td><td className="px-3 py-2 text-right">{row.remain}</td></tr>)}</tbody></table>
+          <table className="w-full text-sm"><thead className="bg-slate-50"><tr><th className="px-3 py-2 text-left">Month</th><th className="px-3 py-2 text-right">Fees</th><th className="px-3 py-2 text-right">Paid</th><th className="px-3 py-2 text-right">Outstanding</th></tr></thead><tbody>{preview.totalFees.map((row) => <tr key={row.month} className="border-t border-slate-100"><td className="px-3 py-2">{row.month}</td><td className="px-3 py-2 text-right">{row.bk}</td><td className="px-3 py-2 text-right">{row.paid}</td><td className="px-3 py-2 text-right">{row.remain}</td></tr>)}</tbody></table>
         </div>
       </div>
       <div className="lg:col-span-3">
         <h3 className="mb-2 text-sm font-semibold text-slate-900">Fees collection</h3>
         <div className="grid gap-2 rounded-lg border border-slate-200 p-3 text-sm sm:grid-cols-2">
-          <Detail label="Unique ID" value={readString(student.student_id)} /><Detail label="Student name" value={readString(student.name)} /><Detail label="Admission year" value={readString(student.admission)} /><Detail label="Parent email" value={readString(student.email)} /><Detail label="GR No." value={readString(student.enrollment)} /><Detail label="Std/Div" value={readString(student.stddiv)} /><Detail label="Contact No" value={readString(student.mobile)} /><Detail label="Pending fees" value={readString(student.pending)} />
+          <Detail label="Unique ID" value={readString(student.student_id)} /><Detail label="Student name" value={readString(student.name)} /><Detail label="Admission year" value={readString(student.admission)} /><Detail label="Parent email" value={readString(student.email)} /><Detail label="GR no." value={readString(student.enrollment)} /><Detail label="Std/Div" value={readString(student.stddiv)} /><Detail label="Contact no." value={readString(student.mobile)} /><Detail label="Outstanding fees" value={readString(student.pending)} />
         </div>
       </div>
     </div>

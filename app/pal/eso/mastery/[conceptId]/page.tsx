@@ -109,7 +109,7 @@ function MasteryDetailsPageContent() {
       run()
         .catch((reason: unknown) => {
           if (signal?.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Unable to load mastery details.');
+          setError(reason instanceof Error ? reason.message : 'Couldn’t load mastery details.');
         })
         .finally(() => {
           if (!signal?.aborted) setLoading(false);

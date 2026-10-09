@@ -61,7 +61,7 @@ export default function ExpertAdvicePage() {
       setExperts((data.data ?? []) as Expert[]);
     } catch (err) {
       setExperts([]);
-      setError(err instanceof Error ? err.message : 'Unable to load experts.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load experts.');
     } finally {
       setLoading(false);
     }
@@ -111,7 +111,7 @@ export default function ExpertAdvicePage() {
           )}
 
           {!loading && error && (
-            <ErrorState title="Unable to load experts" description={error} retry={() => void refresh()} />
+            <ErrorState title="Couldn’t load experts" description={error} retry={() => void refresh()} />
           )}
 
           {!loading && !error && visible.length === 0 && (

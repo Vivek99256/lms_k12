@@ -121,7 +121,7 @@ export function useCompetencyStudio(structureSearch = ''): UseCompetencyStudioSt
       setFrameworks(frameworksRes.data ?? []);
       setRoles(rolesRes.data ?? []);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the studio.'));
+      setError(toMessage(loadError, 'Couldn’t load the studio.'));
     } finally {
       setLoading(false);
     }
@@ -147,7 +147,7 @@ export function useCompetencyStudio(structureSearch = ''): UseCompetencyStudioSt
       });
       setMatrix(res.data ?? null);
     } catch (err) {
-      setMatrixError(toMessage(err, 'Failed to load the matrix.'));
+      setMatrixError(toMessage(err, 'Couldn’t load the matrix.'));
       setMatrix(null);
     } finally {
       setMatrixLoading(false);
@@ -162,7 +162,7 @@ export function useCompetencyStudio(structureSearch = ''): UseCompetencyStudioSt
       setReviews(res.data ?? []);
       setReviewCounts(res.counts ?? EMPTY_COUNTS);
     } catch (err) {
-      setReviewsError(toMessage(err, 'Failed to load reviews.'));
+      setReviewsError(toMessage(err, 'Couldn’t load reviews.'));
       setReviews([]);
     } finally {
       setReviewsLoading(false);
@@ -196,13 +196,13 @@ export function useCompetencyStudio(structureSearch = ''): UseCompetencyStudioSt
 
   const saveCell = useCallback(
     (jobrole: string, skill: string, level: string) =>
-      runMutation(() => competencyStudioService.saveCell(buildSessionContext(), jobrole, skill, level), 'Failed to save the mapping.'),
+      runMutation(() => competencyStudioService.saveCell(buildSessionContext(), jobrole, skill, level), 'Couldn’t save the mapping.'),
     [runMutation],
   );
 
   const clearCell = useCallback(
     (jobrole: string, skill: string) =>
-      runMutation(() => competencyStudioService.clearCell(buildSessionContext(), jobrole, skill), 'Failed to clear the mapping.'),
+      runMutation(() => competencyStudioService.clearCell(buildSessionContext(), jobrole, skill), 'Couldn’t clear the mapping.'),
     [runMutation],
   );
 
@@ -210,7 +210,7 @@ export function useCompetencyStudio(structureSearch = ''): UseCompetencyStudioSt
     (rows: WeightRow[]) =>
       runMutation(
         () => competencyStudioService.saveWeights(buildSessionContext(), rows),
-        'Failed to save weighting.',
+        'Couldn’t save weighting.',
         () => setWeights(rows),
       ),
     [runMutation],
@@ -218,66 +218,66 @@ export function useCompetencyStudio(structureSearch = ''): UseCompetencyStudioSt
 
   const createFramework = useCallback(
     (payload: FrameworkPayload) =>
-      runMutation(() => competencyStudioService.createFramework(buildSessionContext(), payload), 'Failed to create the framework.', load),
+      runMutation(() => competencyStudioService.createFramework(buildSessionContext(), payload), 'Couldn’t create the framework.', load),
     [runMutation, load],
   );
 
   const updateFramework = useCallback(
     (id: number, payload: FrameworkPayload) =>
-      runMutation(() => competencyStudioService.updateFramework(buildSessionContext(), id, payload), 'Failed to update the framework.', load),
+      runMutation(() => competencyStudioService.updateFramework(buildSessionContext(), id, payload), 'Couldn’t update the framework.', load),
     [runMutation, load],
   );
 
   const cloneFramework = useCallback(
     (id: number, name?: string) =>
-      runMutation(() => competencyStudioService.cloneFramework(buildSessionContext(), id, name), 'Failed to clone the framework.', load),
+      runMutation(() => competencyStudioService.cloneFramework(buildSessionContext(), id, name), 'Couldn’t clone the framework.', load),
     [runMutation, load],
   );
 
   const deleteFramework = useCallback(
     (id: number) =>
-      runMutation(() => competencyStudioService.deleteFramework(buildSessionContext(), id), 'Failed to delete the framework.', load),
+      runMutation(() => competencyStudioService.deleteFramework(buildSessionContext(), id), 'Couldn’t delete the framework.', load),
     [runMutation, load],
   );
 
   const approveReview = useCallback(
     (id: number, note?: string) =>
-      runMutation(() => competencyStudioService.reviewAction(buildSessionContext(), id, 'approve', note), 'Failed to approve the review.'),
+      runMutation(() => competencyStudioService.reviewAction(buildSessionContext(), id, 'approve', note), 'Couldn’t approve the review.'),
     [runMutation],
   );
 
   const rejectReview = useCallback(
     (id: number, note?: string) =>
-      runMutation(() => competencyStudioService.reviewAction(buildSessionContext(), id, 'reject', note), 'Failed to reject the review.'),
+      runMutation(() => competencyStudioService.reviewAction(buildSessionContext(), id, 'reject', note), 'Couldn’t reject the review.'),
     [runMutation],
   );
 
   const bulkApproveReviews = useCallback(
-    (ids?: number[]) => runMutation(() => competencyStudioService.bulkApprove(buildSessionContext(), ids), 'Failed to bulk approve.'),
+    (ids?: number[]) => runMutation(() => competencyStudioService.bulkApprove(buildSessionContext(), ids), 'Couldn’t bulk approve.'),
     [runMutation],
   );
 
   const submitReview = useCallback(
     (payload: { jobrole: string; department?: string; framework_id?: number; changes_count?: number; changes?: string }) =>
-      runMutation(() => competencyStudioService.submitReview(buildSessionContext(), payload), 'Failed to submit for review.'),
+      runMutation(() => competencyStudioService.submitReview(buildSessionContext(), payload), 'Couldn’t submit for review.'),
     [runMutation],
   );
 
   const createLevel = useCallback(
     (payload: ProficiencyLevelPayload) =>
-      runMutation(() => competencyStudioService.createLevel(buildSessionContext(), payload), 'Failed to add the level.', load),
+      runMutation(() => competencyStudioService.createLevel(buildSessionContext(), payload), 'Couldn’t add the level.', load),
     [runMutation, load],
   );
 
   const updateLevel = useCallback(
     (id: number, payload: ProficiencyLevelPayload) =>
-      runMutation(() => competencyStudioService.updateLevel(buildSessionContext(), id, payload), 'Failed to update the level.', load),
+      runMutation(() => competencyStudioService.updateLevel(buildSessionContext(), id, payload), 'Couldn’t update the level.', load),
     [runMutation, load],
   );
 
   const deleteLevel = useCallback(
     (id: number) =>
-      runMutation(() => competencyStudioService.deleteLevel(buildSessionContext(), id), 'Failed to delete the level.', load),
+      runMutation(() => competencyStudioService.deleteLevel(buildSessionContext(), id), 'Couldn’t delete the level.', load),
     [runMutation, load],
   );
 

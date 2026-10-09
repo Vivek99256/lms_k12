@@ -143,7 +143,7 @@ export default function EngagementScore({
               );
             })}
             {signals.length === 0 ? (
-              <li className="px-5 py-6 text-sm text-slate-500">No engagement signals are configured in the backend yet.</li>
+              <li className="px-5 py-6 text-sm text-slate-500">No engagement signals are set up yet.</li>
             ) : null}
           </ul>
         </div>
@@ -187,7 +187,7 @@ export default function EngagementScore({
               );
             })}
             {interpretation.length === 0 ? (
-              <li className="text-sm text-slate-500">No interpretation bands are configured in the backend yet.</li>
+              <li className="text-sm text-slate-500">No interpretation bands are set up yet.</li>
             ) : null}
           </ul>
         </div>

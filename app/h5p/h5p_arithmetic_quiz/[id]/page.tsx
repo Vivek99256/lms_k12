@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Clock } from 'lucide-react';
@@ -147,7 +149,7 @@ function ArithmeticQuizPlayerContent() {
         if (!cancelled) setQuiz(data);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load quiz');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load quiz. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

@@ -77,6 +77,56 @@ export interface BankQuestion {
   assertion?: string | null;
   reason?: string | null;
   sub_part_labels?: string[];
+  /**
+   * Structured match-the-following pairs, in answer-key order. Present on rows the
+   * format-driven generator wrote; null / absent on every older row, which
+   * `matchPairs()` then reads out of the model answer or the options as before.
+   */
+  pairs?: Array<{ left: string; right: string }> | null;
+  /**
+   * Drag-the-words word bank: the words that belong in no gap. Present on rows the
+   * format-driven generator wrote for `drag_text`; null / absent on every other row.
+   */
+  distractors?: string[] | null;
+  /**
+   * The image-based Drag & Drop payload: a picture, the labelled places on it and which
+   * label belongs where. Present on rows the format-driven generator wrote for
+   * `drag_drop`; null / absent on every other row. Geometry is percent of the image.
+   */
+  drag_drop?: DragDropData | null;
+}
+
+/** A place on the picture a label can be dropped. x / y / width / height are percent of the image. */
+export interface DragDropZoneData {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** A draggable label and the zone(s) it is correct in. */
+export interface DragDropElementData {
+  id: string;
+  text: string;
+  zone_ids: string[];
+}
+
+export interface DragDropData {
+  image: {
+    url: string;
+    width_px: number;
+    height_px: number;
+    alt?: string | null;
+    licence?: string | null;
+    creator?: string | null;
+    attribution?: string | null;
+    source_url?: string | null;
+  };
+  image_fit?: string | null;
+  zones: DragDropZoneData[];
+  elements: DragDropElementData[];
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +143,8 @@ export type H5pTargetKind =
   | 'memory_game'
   | 'flashcards'
   | 'course_presentation'
-  | 'essay';
+  | 'essay'
+  | 'drag_drop';
 
 export interface H5pTarget {
   kind: H5pTargetKind;
@@ -144,6 +195,18 @@ export const H5P_TARGETS: Record<H5pTargetKind, H5pTarget> = {
     route: 'h5p_mark_the_words',
     library: 'H5P.MarkTheWords',
     label: 'Mark the words',
+  },
+
+  /**
+   * Image-based drag and drop. The standalone route is the manual editor's, which keeps
+   * its own table; a question-bank row of this form is projected into the same player
+   * surface at read time and creates nothing there.
+   */
+  drag_drop: {
+    kind: 'drag_drop',
+    route: 'h5p_drag_drop',
+    library: 'H5P.DragQuestion',
+    label: 'Drag and drop',
   },
 
   memory_game: {
@@ -267,6 +330,19 @@ export const MAPPINGS: TypeMapping[] = [
 
   mapping('true_false', 'True / false', ['H5P.TrueFalse'], 'true_false', true, '',
     ['single_choice_set', 'course_presentation', 'flashcards']),
+
+  // Drag the words and Mark the words are the same two players fill_blank already reaches
+  // (see its alsoPlaysAs). They get their own entries so a row GENERATED as one of them is
+  // recognised as that form instead of falling through to the coarse MCQ type its catalogue
+  // row carries.
+  mapping('drag_text', 'Drag text', ['H5P.DragText'], 'drag_text', true, '',
+    ['fill_in_the_blanks', 'flashcards', 'course_presentation']),
+  mapping('mark_the_words', 'Mark the words', ['H5P.MarkTheWords'], 'mark_the_words', true, '',
+    ['flashcards', 'course_presentation']),
+
+  // A picture with places on it. The row carries the picture and every place (see
+  // BankQuestion.drag_drop), which is what the bank was previously missing.
+  mapping('drag_drop', 'Drag and drop', ['H5P.DragQuestion'], 'drag_drop', true, ''),
 
   // The three text-passage types are one table and one player apart from the
   // `content_type` discriminator, so a row that fills a blank also drags the
@@ -530,6 +606,10 @@ export function convertibilityAs(question: BankQuestion, kind: H5pTargetKind): C
         : flashcardSides(question).front === ''
           ? { ok: false, reason: 'The question text is empty, so the card would have a blank front.' }
           : READY;
+    case 'drag_drop':
+      return readDragDrop(question.drag_drop) === null
+        ? { ok: false, reason: 'The picture, its drop zones or the answer key are missing or do not fit the picture, so the activity could not be played or marked.' }
+        : READY;
     case 'memory_game':
       return matchPairs(question).length < 2
         ? { ok: false, reason: 'Fewer than two pairs could be read from the question, so there is nothing to match.' }
@@ -637,6 +717,35 @@ function escapeAsterisks(text: string): string {
   return text.replace(/\*/g, '\\*');
 }
 
+/** A word, by the rule the backend's MarkTheWordsFormat validates with. */
+const WORD_TOKEN = /[\p{L}\p{N}_'\u2019-]+/gu;
+
+/**
+ * Mark the words: wrap every whole-word occurrence of each answer where it already stands.
+ *
+ * A mark-the-words row has no drawn gap -- its answers are words IN the passage -- so the
+ * append-to-the-end path below would turn "find the word" into "the word is the last
+ * word" and `mark_the_words` would refuse it. Returns null (so the caller falls back to
+ * that path) unless every answer is a single plain word and at least one is found.
+ */
+function markWordsInPlace(stem: string, answers: string[]): { passage: string; slots: number } | null {
+  const single = answers.every((answer) => {
+    const tokens = answer.match(WORD_TOKEN);
+    return !!tokens && tokens.length === 1 && tokens[0].toLowerCase() === answer.toLowerCase();
+  });
+  if (!single) return null;
+
+  const wanted = new Set(answers.map((answer) => answer.toLowerCase()));
+  let marked = 0;
+  const passage = escapeAsterisks(stem).replace(WORD_TOKEN, (token) => {
+    if (!wanted.has(token.toLowerCase())) return token;
+    marked += 1;
+    return `*${token}*`;
+  });
+
+  return marked > 0 ? { passage, slots: marked } : null;
+}
+
 export interface BlanksPassage {
   passage: string;
   /** How many answers the passage marks. Zero means nothing to convert. */
@@ -687,6 +796,11 @@ export function blanksPassage(question: BankQuestion): BlanksPassage {
   const blankPattern = /(_{3,}|\.{3,}|-{3,})/g;
   const drawn = stem.match(blankPattern)?.length ?? 0;
 
+  if (drawn === 0 && mappingForQuestion(question)?.code === 'mark_the_words') {
+    const inPlace = markWordsInPlace(stem, answers);
+    if (inPlace) return { ...inPlace, inline: true };
+  }
+
   if (drawn === 0) {
     const tail = answers.map((answer) => `*${escapeAsterisks(answer)}*`).join(' ');
     return { passage: `${escapeAsterisks(stem)} ${tail}`.trim(), slots: answers.length, inline: false };
@@ -704,9 +818,233 @@ export function blanksPassage(question: BankQuestion): BlanksPassage {
   return { passage, slots: Math.min(drawn, answers.length), inline: true };
 }
 
+/**
+ * A word bank off an untyped API payload, or null when there is none. Entries that are not
+ * non-empty strings are dropped, as readPairs drops a pair with an empty half.
+ */
+export function readDistractors(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+
+  const words = value
+    .filter((word): word is string => typeof word === 'string' && word.trim() !== '')
+    .map((word) => word.trim());
+
+  return words.length > 0 ? words : null;
+}
+
+const DD_LIMITS = { minZones: 3, maxZones: 8, minPct: 4, maxPct: 60, maxOverlap: 0.2, minW: 400, minH: 300 };
+
+/**
+ * A stored Drag & Drop payload off an untyped API response, or null when it is not a
+ * playable one. The same rules the generator enforced when it wrote the row (picture
+ * size, every zone inside the picture and of a usable size, zones that do not sit on
+ * each other, unique ids, every label mapped to a real zone and every zone answerable),
+ * so a damaged row is reported as unplayable rather than drawn wrongly.
+ */
+export function readDragDrop(value: unknown): DragDropData | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+
+  const image = v.image as Record<string, unknown> | undefined;
+  if (!image || typeof image.url !== 'string' || !/^https?:\/\//i.test(image.url)) return null;
+  const w = image.width_px;
+  const h = image.height_px;
+  if (typeof w !== 'number' || typeof h !== 'number' || w < DD_LIMITS.minW || h < DD_LIMITS.minH) return null;
+
+  if (!Array.isArray(v.zones) || !Array.isArray(v.elements)) return null;
+  if (v.zones.length < DD_LIMITS.minZones || v.zones.length > DD_LIMITS.maxZones) return null;
+
+  const zones: DragDropZoneData[] = [];
+  const zoneIds = new Set<string>();
+  const labels = new Set<string>();
+  for (const raw of v.zones) {
+    const z = raw as Record<string, unknown> | null;
+    if (!z || typeof z.id !== 'string' || z.id === '' || typeof z.label !== 'string' || z.label.trim() === '') return null;
+    const { x, y, width, height } = z as Record<string, unknown>;
+    if (![x, y, width, height].every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
+    const [zx, zy, zw, zh] = [x, y, width, height] as number[];
+    if (zx < 0 || zy < 0 || zx + zw > 100.0001 || zy + zh > 100.0001) return null;
+    if (zw < DD_LIMITS.minPct || zh < DD_LIMITS.minPct || zw > DD_LIMITS.maxPct || zh > DD_LIMITS.maxPct) return null;
+    const key = z.label.trim().toLowerCase();
+    if (zoneIds.has(z.id) || labels.has(key)) return null;
+    zoneIds.add(z.id);
+    labels.add(key);
+    zones.push({ id: z.id, label: z.label, x: zx, y: zy, width: zw, height: zh });
+  }
+
+  for (let a = 0; a < zones.length; a += 1) {
+    for (let b = a + 1; b < zones.length; b += 1) {
+      const A = zones[a];
+      const B = zones[b];
+      const ow = Math.min(A.x + A.width, B.x + B.width) - Math.max(A.x, B.x);
+      const oh = Math.min(A.y + A.height, B.y + B.height) - Math.max(A.y, B.y);
+      if (ow > 0 && oh > 0 && (ow * oh) / Math.min(A.width * A.height, B.width * B.height) > DD_LIMITS.maxOverlap) return null;
+    }
+  }
+
+  const elements: DragDropElementData[] = [];
+  const elementIds = new Set<string>();
+  const covered = new Set<string>();
+  for (const raw of v.elements) {
+    const e = raw as Record<string, unknown> | null;
+    if (!e || typeof e.id !== 'string' || e.id === '' || elementIds.has(e.id)) return null;
+    if (typeof e.text !== 'string' || e.text.trim() === '') return null;
+    if (!Array.isArray(e.zone_ids) || e.zone_ids.length === 0) return null;
+    for (const id of e.zone_ids) {
+      if (typeof id !== 'string' || !zoneIds.has(id)) return null;
+      covered.add(id);
+    }
+    elementIds.add(e.id);
+    elements.push({ id: e.id, text: e.text, zone_ids: e.zone_ids as string[] });
+  }
+  if (covered.size !== zones.length) return null;
+
+  return {
+    image: {
+      url: image.url,
+      width_px: w,
+      height_px: h,
+      alt: typeof image.alt === 'string' ? image.alt : null,
+      licence: typeof image.licence === 'string' ? image.licence : null,
+      creator: typeof image.creator === 'string' ? image.creator : null,
+      attribution: typeof image.attribution === 'string' ? image.attribution : null,
+      source_url: typeof image.source_url === 'string' ? image.source_url : null,
+    },
+    image_fit: typeof v.image_fit === 'string' ? v.image_fit : 'contain',
+    zones,
+    elements,
+  };
+}
+
+/**
+ * What the Drag & Drop player is given: the picture, and zones and draggables in the
+ * numeric-id shape the existing scoring and canvas code already use.
+ *
+ * Two choices are deliberate. A draggable may be dropped on ANY zone (`drop_zone_ids`
+ * empty): the manual player refuses a drop outside an element's list, and doing that here
+ * would let a learner find every answer by trying each label until one is accepted. And
+ * zone labels are carried for the answer key and the solution view but are never shown on
+ * the picture, because they are the answers.
+ */
+export interface DragDropPlayerPayload {
+  title: string;
+  description: string;
+  task_description: string;
+  background_image: string;
+  image_alt: string;
+  image_fit: string;
+  canvas_width: number;
+  canvas_height: number;
+  zones: Array<{
+    id: number;
+    label: string;
+    position_x: number;
+    position_y: number;
+    width: number;
+    height: number;
+    correct_element_ids: number[];
+    single: boolean;
+    show_label: boolean;
+    tip: string | null;
+  }>;
+  elements: Array<{
+    id: number;
+    element_type: 'text';
+    text: string;
+    image_path: string | null;
+    image_alt: string | null;
+    multiple: boolean;
+    drop_zone_ids: number[];
+  }>;
+  attribution: string | null;
+  pass_percentage: number;
+  apply_penalties: boolean;
+  single_point: boolean;
+  enable_check: boolean;
+  enable_retry: boolean;
+  enable_show_solution: boolean;
+}
+
+export function toDragDropPayload(question: BankQuestion, context?: string): DragDropPlayerPayload | null {
+  const data = readDragDrop(question.drag_drop);
+  if (!data) return null;
+
+  const zoneNumber = new Map(data.zones.map((zone, index) => [zone.id, index + 1]));
+  const elementNumber = new Map(data.elements.map((element, index) => [element.id, index + 1]));
+
+  const attribution =
+    data.image.attribution ??
+    ([data.image.creator, data.image.licence].filter(Boolean).join(' — ') || null);
+
+  return {
+    title: activityTitle(question, `Label the diagram ${question.id}`),
+    description: sourceDescription([question.id], context),
+    task_description: 'Drag each label onto the matching part of the picture.',
+    background_image: data.image.url,
+    image_alt: data.image.alt ?? '',
+    image_fit: data.image_fit ?? 'contain',
+    canvas_width: data.image.width_px,
+    canvas_height: data.image.height_px,
+    zones: data.zones.map((zone) => ({
+      id: zoneNumber.get(zone.id) as number,
+      label: zone.label,
+      position_x: zone.x,
+      position_y: zone.y,
+      width: zone.width,
+      height: zone.height,
+      correct_element_ids: data.elements
+        .filter((element) => element.zone_ids.includes(zone.id))
+        .map((element) => elementNumber.get(element.id) as number),
+      single: true,
+      show_label: false,
+      tip: null,
+    })),
+    elements: data.elements.map((element) => ({
+      id: elementNumber.get(element.id) as number,
+      element_type: 'text' as const,
+      text: element.text,
+      image_path: null,
+      image_alt: null,
+      multiple: false,
+      drop_zone_ids: [],
+    })),
+    attribution,
+    pass_percentage: 100,
+    apply_penalties: false,
+    single_point: false,
+    enable_check: true,
+    enable_retry: true,
+    enable_show_solution: true,
+  };
+}
+
 export interface MatchPair {
   left: string;
   right: string;
+}
+
+/**
+ * Structured pairs off an untyped API payload, or null when there are none.
+ *
+ * The bank, PAL and the diagnostic each copy the fields they need by hand; this is
+ * the one place the `pairs` field is read, so they all accept and reject the same
+ * shapes. A pair with an empty half is dropped; no usable pairs at all is null, so
+ * `matchPairs()` falls back to the text forms exactly as it does for older rows.
+ */
+export function readPairs(value: unknown): MatchPair[] | null {
+  if (!Array.isArray(value)) return null;
+
+  const pairs = value
+    .map((entry) => {
+      const record = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
+      return {
+        left: typeof record.left === 'string' ? record.left.trim() : '',
+        right: typeof record.right === 'string' ? record.right.trim() : '',
+      };
+    })
+    .filter((pair) => pair.left !== '' && pair.right !== '');
+
+  return pairs.length > 0 ? pairs : null;
 }
 
 /**
@@ -717,6 +1055,16 @@ export interface MatchPair {
  * or options that carry both halves as `left - right`.
  */
 export function matchPairs(question: BankQuestion): MatchPair[] {
+  // 0. Structured pairs, when the row has them. These are the source of truth: the
+  // text forms below are split on "-", ":", "=" and the dashes, so a half such as
+  // "x-axis" or "a:b" cannot survive them. A row with fewer than two usable pairs
+  // is treated as having none, and falls through to the text forms.
+  const structured = (question.pairs ?? [])
+    .map((pair) => ({ left: plainText(pair?.left), right: plainText(pair?.right) }))
+    .filter((pair) => pair.left !== '' && pair.right !== '' && pair.left !== pair.right);
+
+  if (structured.length >= 2) return structured;
+
   const options = question.options ?? [];
   const byLabel = new Map(
     options.map((option) => [plainText(option.label).toUpperCase(), plainText(option.text)])
@@ -859,10 +1207,17 @@ export function composedStem(question: BankQuestion): string {
 
   if (assertion === '' && reason === '') return stem;
 
+  // A row whose stem already carries a half (the generator writes "Assertion (A): ...
+  // Reason (R): ..." into the stem so stem-only consumers have the whole item, and
+  // extracted rows do the same) must not have it appended a second time.
+  const stemText = plainText(stem).toLowerCase();
+  const addAssertion = assertion !== '' && !stemText.includes(assertion.toLowerCase());
+  const addReason = reason !== '' && !stemText.includes(reason.toLowerCase());
+
   return [
     stem,
-    assertion ? `<p><strong>Assertion:</strong> ${assertion}</p>` : '',
-    reason ? `<p><strong>Reason:</strong> ${reason}</p>` : '',
+    addAssertion ? `<p><strong>Assertion:</strong> ${assertion}</p>` : '',
+    addReason ? `<p><strong>Reason:</strong> ${reason}</p>` : '',
   ]
     .filter((part) => part !== '')
     .join('');
@@ -1011,7 +1366,9 @@ export function toBlanksPayload(question: BankQuestion, context?: string): Blank
     description: sourceDescription([question.id], context),
     task_description: 'Fill in the missing words.',
     passage: blanksPassage(question).passage,
-    distractors: '',
+    // Drag the words' word bank, in the comma-separated list the player parses. Empty for
+    // every other row, which has none.
+    distractors: (question.distractors ?? []).join(', '),
     media_image: null,
     media_alt: null,
     enable_retry: true,

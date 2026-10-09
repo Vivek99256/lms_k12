@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Clock, Lock, Pencil, RotateCcw, Save, X } from 'lucide-react';
 
 import { usePermissions } from '@/app/hooks/usePermission';
-import { fetchScheduledTasks, PlatformApiError, saveScheduledTask } from '@/lib/platform/client';
+import { fetchScheduledTasks, PlatformApiError, runScheduledTaskNow, saveScheduledTask } from '@/lib/platform/client';
 import { CRON_FIELDS, describeSchedule, scheduleProblem, scheduleToString } from '@/lib/platform/cron';
 import type { CronSchedule, ScheduledTaskRow, SchedulerPayload } from '@/lib/platform/types';
 
@@ -81,9 +81,22 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
   const [note, setNote] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
   const mayEdit = rights.permissions?.[RBAC_KEY]?.update ?? false;
-  const rightsReason = rights.authenticated
-    ? 'Your role cannot change scheduled tasks for this institute.'
-    : 'Sign in again — your permissions could not be checked.';
+  /**
+   * Whether the server actually answered for `platform.scheduler`.
+   *
+   * `usePermission` collapses "denied" and "not asked" into `false`, and the two
+   * must not be confused here: telling an administrator "your role cannot change
+   * scheduled tasks" is a claim about THEIR role, and if the server had no entry
+   * for the key it has made no such claim. The controls stay disabled either way —
+   * refusing is still the safe answer, it just stops asserting a reason that was
+   * never given.
+   */
+  const rightsAnswered = !rights.unknownModules.includes(RBAC_KEY);
+  const rightsReason = !rights.authenticated
+    ? "Sign in again. We couldn't check your permissions."
+    : !rightsAnswered
+      ? 'This ERP does not report permissions for scheduled tasks yet, so they are read-only here. An administrator can enable changes in Group-wise Rights.'
+      : 'Your role cannot change scheduled tasks for this institute.';
 
   const load = useCallback(
     (isRefresh = false) => {
@@ -93,7 +106,7 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
       fetchScheduledTasks({ module: moduleKey ?? undefined, component: componentKey ?? undefined })
         .then(setPayload)
         .catch((cause: unknown) => {
-          setError(cause instanceof PlatformApiError ? cause.message : 'The scheduled tasks could not be loaded.');
+          setError(cause instanceof PlatformApiError ? cause.message : "Couldn't load the scheduled tasks. Try again.");
         })
         .finally(() => setLoading(false));
     },
@@ -124,7 +137,7 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
       } catch (cause) {
         setNote({
           tone: 'error',
-          text: cause instanceof PlatformApiError ? cause.message : 'The task could not be saved.',
+          text: cause instanceof PlatformApiError ? cause.message : "Couldn't save the task. Try again.",
         });
         return false;
       }
@@ -186,8 +199,15 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
     >
       {note && <Note tone={note.tone} text={note.text} onDismiss={() => setNote(null)} />}
 
-      {!mayEdit && !rights.loading && (
+      {!mayEdit && rightsAnswered && !rights.loading && (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <Lock size={14} className="mr-1.5 inline align-text-bottom" />
+          You can see these schedules but not change them. {rightsReason}
+        </div>
+      )}
+
+      {!mayEdit && !rightsAnswered && !rights.loading && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <Lock size={14} className="mr-1.5 inline align-text-bottom" />
           You can see these schedules but not change them. {rightsReason}
         </div>
@@ -292,6 +312,23 @@ function TaskRow({
   const problem = editing ? scheduleProblem(schedule) : null;
   const sentence = editing ? (problem ? null : describeSchedule(schedule)) : task.describes;
 
+  const [runResult, setRunResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Runs the task once through the same dispatcher the minute tick uses. A task
+  // with no registered job says so rather than reporting success.
+  const runNow = async () => {
+    setBusy(true);
+    setRunResult(null);
+    try {
+      const result = await runScheduledTaskNow(task.key);
+      setRunResult({ ok: true, text: result.message });
+    } catch (reason) {
+      setRunResult({ ok: false, text: reason instanceof Error ? reason.message : 'The task could not be run.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const toggleDisabled = async (next: boolean) => {
     setBusy(true);
     await onSave(task, { disabled: !next }, `${task.label} is now ${next ? 'running' : 'switched off'}.`);
@@ -343,6 +380,18 @@ function TaskRow({
             <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
               <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">{task.expression}</span>
               {sentence && <span>{sentence}</span>}
+              <button
+                type="button"
+                disabled={!mayEdit || busy}
+                title={mayEdit ? 'Run this task once, now' : rightsReason}
+                onClick={runNow}
+                className="rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Run now
+              </button>
+              {runResult && (
+                <span className={runResult.ok ? 'text-emerald-700' : 'text-amber-700'}>{runResult.text}</span>
+              )}
             </div>
           )}
 

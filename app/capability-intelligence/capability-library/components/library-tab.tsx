@@ -439,7 +439,7 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
       await competencyLibrariesService.cloneInvisible(buildSessionContext(), row.id)
       retry()
     } catch (error) {
-      setCloneError(error instanceof Error ? error.message : 'Failed to copy the entry.')
+      setCloneError(error instanceof Error ? error.message : 'Couldn’t copy the entry.')
     } finally {
       setCloning(false)
     }
@@ -531,7 +531,7 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
           : `Exported ${rows.length.toLocaleString()} ${rows.length === 1 ? 'row' : 'rows'}.`,
       )
     } catch (exportError) {
-      setExportNote(exportError instanceof Error ? exportError.message : 'Failed to export this library.')
+      setExportNote(exportError instanceof Error ? exportError.message : 'Couldn’t export this library.')
     } finally {
       setExporting(false)
     }
@@ -1125,7 +1125,7 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
               {impactState === 'loading' && <span className="block pt-2">Checking what depends on it…</span>}
               {impactState === 'error' && (
                 <span className="block pt-2">
-                  What depends on it could not be checked. This is a connection problem, not a count of zero.
+                  What depends on it couldn’t be checked. This is a connection problem, not a count of zero.
                 </span>
               )}
               {impactState === 'idle' && impact && (

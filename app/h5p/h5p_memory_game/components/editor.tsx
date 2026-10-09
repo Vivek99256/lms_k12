@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { useMemo, useState } from 'react';
 import { Copy, ImagePlus, Loader2, Plus, Trash2 } from 'lucide-react';
 import {
@@ -185,7 +187,7 @@ function FaceEditor({
       const url = await memoryGameApi.uploadMedia(file, 'card');
       onChange({ [`${side}_image`]: url } as Partial<MemoryCardInput>);
     } catch (err: unknown) {
-      onUploadError(err instanceof Error ? err.message : 'Failed to upload image');
+      onUploadError(friendlyError(err, 'We couldn’t upload the image. Please try again.'));
     } finally {
       setUploading(false);
     }
@@ -318,7 +320,7 @@ export function MemoryGameEditor({
           value={state.description}
           onChange={(v) => set('description', v)}
           disabled={disabled}
-          hint="For teachers, in the content list. Learners do not see this."
+          hint="For teachers, in the content list. Students do not see this."
           rows={2}
         />
         <TextField

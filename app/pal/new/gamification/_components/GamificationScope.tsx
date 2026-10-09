@@ -112,7 +112,7 @@ export function LearnerRequiredPanel({
           isStaff
             ? message ||
               'Gamification follows one learner\'s own journey, so it needs a student. Choose one below — you will keep viewing that learner across PAL.'
-            : 'Unable to load your gamification data right now.'
+            : 'Couldn’t load your gamification data right now.'
         }
       >
         {isStaff && (

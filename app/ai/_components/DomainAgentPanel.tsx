@@ -95,7 +95,7 @@ export function DomainAgentPanel() {
         ) as AgentManifestRow | undefined;
         setManifest(found ?? null);
       } else {
-        setError(agentList.reason instanceof Error ? agentList.reason.message : 'The agent registry could not be read.');
+        setError(agentList.reason instanceof Error ? agentList.reason.message : 'The agent registry couldn’t be read.');
       }
 
       setRuns(runList.status === 'fulfilled' ? (runList.value.runs ?? []) : []);

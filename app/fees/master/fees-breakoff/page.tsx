@@ -185,7 +185,7 @@ export default function FeesBreakoffPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load fees breakoff (${response.status})`);
+        throw new Error("Couldn't load fee breakoff. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
@@ -197,7 +197,7 @@ export default function FeesBreakoffPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load fees breakoff.'
+          : "Couldn't load fee breakoff. Try again."
       );
     } finally {
       setLoading(false);
@@ -304,7 +304,7 @@ export default function FeesBreakoffPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load fee months (${response.status})`);
+        throw new Error("Couldn't load fee months. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
@@ -332,7 +332,7 @@ export default function FeesBreakoffPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load fee months.'
+          : "Couldn't load fee months. Try again."
       );
     }
   }, [session]);
@@ -399,7 +399,7 @@ export default function FeesBreakoffPage() {
         throw new Error(
           readApiErrorMessage(
             result,
-            `Failed to prepare fees breakoff matrix (${response.status})`
+            `Couldn't prepare fee breakoff. Try again.`
           )
         );
       }
@@ -455,7 +455,7 @@ export default function FeesBreakoffPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to prepare fees breakoff matrix.'
+          : "Couldn't prepare fee breakoff. Try again."
       );
     } finally {
       setFormLoading(false);
@@ -522,7 +522,7 @@ export default function FeesBreakoffPage() {
         throw new Error(
           readApiErrorMessage(
             result,
-            `Failed to save fees breakoff (${response.status})`
+            "Couldn't save fee breakoff. Try again."
           )
         );
       }
@@ -533,7 +533,7 @@ export default function FeesBreakoffPage() {
       }
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to save fees breakoff.');
+        throw new Error(payload.message || "Couldn't save fee breakoff. Try again.");
       }
 
       setSuccessMessage(payload.message || 'Fees structure saved successfully.');
@@ -550,7 +550,7 @@ export default function FeesBreakoffPage() {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : 'Failed to save fees breakoff.'
+          : "Couldn't save fee breakoff. Try again."
       );
     } finally {
       setSaving(false);
@@ -566,7 +566,7 @@ export default function FeesBreakoffPage() {
               Fees breakoff
             </CardTitle>
             <CardDescription className="text-[12px] leading-5 text-slate-600">
-              Create the class-wise fees structure exactly like the legacy ERP flow
+              Create the class-wise fee structure
             </CardDescription>
           </CardHeader>
 
@@ -834,7 +834,7 @@ export default function FeesBreakoffPage() {
                 Existing fees structure
               </CardTitle>
               <CardDescription className="text-[12px] leading-5 text-slate-600">
-                Current breakoff rows from the Laravel ERP
+                Current breakoff rows
               </CardDescription>
             </div>
 
@@ -857,7 +857,7 @@ export default function FeesBreakoffPage() {
                       Syear
                     </TableHead>
                     <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                      Fee Head
+                      Fee head
                     </TableHead>
                     <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                       Admission

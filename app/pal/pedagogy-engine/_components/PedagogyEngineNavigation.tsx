@@ -49,7 +49,7 @@ export default function PedagogyEngineNavigation({
   onSelect: (id: string) => void;
 }) {
   return (
-    <nav aria-label="Pedagogy Engine submodules" className="lg:sticky lg:top-4">
+    <nav aria-label="Teaching methods sections" className="lg:sticky lg:top-4">
       <div className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 bg-[linear-gradient(180deg,#f5f3ff_0%,#ffffff_100%)] px-5 py-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600">Submodules</p>

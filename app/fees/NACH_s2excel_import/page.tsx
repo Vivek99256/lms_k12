@@ -59,7 +59,7 @@ export default function NachS2ExcelImportPage() {
       setMessage({ type: 'success', text: payload.message || 'S2 file imported successfully.' });
       setFile(null);
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to import S2 file.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't import S2 file. Try again." });
     } finally {
       setUploading(false);
     }
@@ -69,7 +69,7 @@ export default function NachS2ExcelImportPage() {
     <PageFrame>
       <PageHeader
         title="S2-NACH excel import"
-        description="Upload the bank-returned S2 mandate file. Laravel imports UMRN data and marks student bank details as registered."
+        description="Upload the bank-returned S2 mandate file. UMRN data is imported and marks student bank details as registered."
         action={
           <a
             href={joinUrl(getApiBaseUrl(session), 'sample_sheet/SAMPLE_NACH_S2_Import.xlsx')}

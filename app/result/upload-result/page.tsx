@@ -131,7 +131,7 @@ export default function UploadResultPage() {
           .filter((student) => student.id),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
+      setError(err instanceof Error ? err.message : "Couldn't load students. Try again.");
       setRows([]);
     } finally {
       setLoading(false);
@@ -176,7 +176,7 @@ export default function UploadResultPage() {
     if (!criteria) return;
     const checkedRows = rows.filter((row) => checked.has(row.id));
     if (checkedRows.length === 0) {
-      toast.error('Nothing selected', 'Check at least one student and attach their result file.');
+      toast.error('No students selected', 'Check at least one student and attach their result file.');
       return;
     }
     const missing = checkedRows.filter((row) => !files[row.id]);
@@ -203,12 +203,12 @@ export default function UploadResultPage() {
       form.append('term_id', criteria.term);
 
       const payload = await resultPost('api/result/upload-result', form, { multipart: true });
-      const message = assertOk(payload, 'Laravel did not confirm the upload.');
+      const message = assertOk(payload, "Couldn't upload the results. Try again.");
       toast.success('Results uploaded', message || `${checkedRows.length} file(s) uploaded.`);
       setFiles({});
       setChecked(new Set());
     } catch (err) {
-      toast.error('Could not upload results', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't upload results. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }
@@ -284,7 +284,7 @@ export default function UploadResultPage() {
                           <Checkbox checked={allChecked} indeterminate={someChecked} onChange={toggleAll} />
                         </th>
                         <th className="px-5 py-3 font-semibold">Student name</th>
-                        <th className="px-5 py-3 font-semibold">Enrollment no</th>
+                        <th className="px-5 py-3 font-semibold">GR no.</th>
                         <th className="px-5 py-3 font-semibold">Std / Div</th>
                         <th className="px-5 py-3 font-semibold">Mobile</th>
                         <th className="px-5 py-3 font-semibold">Term</th>

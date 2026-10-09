@@ -11,10 +11,12 @@ import {
   Plus,
   Search,
   Trash2,
+  FileDown,
 } from 'lucide-react';
 
 import { ErpAlert, ErpEmpty, ErpLoading, ErpPageHeader, erpCardClass } from '@/components/erp/erp-ui';
 import { Button } from '@/components/ui/button';
+import { downloadTemplatePdf, PlatformApiError } from '@/lib/platform/client';
 import {
   deleteTemplate,
   duplicateTemplate,
@@ -52,7 +54,7 @@ const primaryButtonClass =
   'bg-[#0D6EFD] text-white hover:bg-blue-600 shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30';
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return error instanceof Error ? error.message : "Couldn't complete that action. Try again.";
 }
 
 function DocumentTemplatesGallery() {
@@ -133,6 +135,20 @@ function DocumentTemplatesGallery() {
       setSuccessText(`“${template.name}” was deleted.`);
     } catch (error) {
       setErrorText(errorMessage(error));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Renders the saved template to PDF on the server. Merge fields are left blank
+  // here: they are filled per record where a document is actually issued.
+  const handlePdf = async (template: TemplateSummary) => {
+    setBusyId(template.id);
+    setSuccessText('');
+    try {
+      await downloadTemplatePdf(template.id, {}, template.name);
+    } catch (error) {
+      setErrorText(error instanceof PlatformApiError ? error.message : errorMessage(error));
     } finally {
       setBusyId(null);
     }
@@ -271,6 +287,16 @@ function DocumentTemplatesGallery() {
                 >
                   <Pencil className="size-4" />
                   Open
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  title="Download PDF"
+                  aria-label="Download PDF"
+                  disabled={busyId === template.id}
+                  onClick={() => void handlePdf(template)}
+                >
+                  <FileDown className="size-4" />
                 </Button>
                 <Button
                   variant="outline"

@@ -15,9 +15,9 @@ export default async function UluDetailPage({
       slug={slug}
       searchParams={await searchParams}
       meta={ULU_META}
-      emptyTitle="Unified Learning Units intelligence is not available"
-      eyebrow="Unified Learning Units"
-      description="This Unified Learning Units detail page is assembled from live semantic_intelligence data for the selected concept."
+      emptyTitle="Learning units aren’t available"
+      eyebrow="Learning units"
+      description="This view is built from the selected concept’s concepts and skills."
       basePath="/pal/ulu"
       variant="ulu"
       selectModules={(model) => model.uluModules}

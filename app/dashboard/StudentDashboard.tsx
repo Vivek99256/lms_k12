@@ -10,6 +10,7 @@ import { buildSessionContext } from '@/lib/erp-client';
 import { DashboardError, EmptyState } from '@/app/dashboard/_components/DashboardPrimitives';
 import { defaultLearnerId, fetchAutoStudentDashboard, type ChapterDashboard } from '@/app/pal/data/pal-eso';
 import ChapterDashboardView from '@/app/pal/eso/_components/ChapterDashboardView';
+import { friendlyError } from '@/lib/user-messages';
 
 /**
  * The student's main /dashboard landing page — the PAL "Hello, {name}"
@@ -44,7 +45,7 @@ export default function StudentDashboard() {
       })
       .catch((reason: unknown) => {
         if (signal?.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load your PAL dashboard.');
+        setError(friendlyError(reason, "We couldn't load your learning dashboard. Please try again."));
       })
       .finally(() => {
         if (!signal?.aborted) setLoading(false);
@@ -70,8 +71,8 @@ export default function StudentDashboard() {
           this estate (remote database) is long enough to look like a failure. */}
       {loading && (
         <>
-          <h1 className="text-2xl font-bold text-slate-900">Hello, {user?.name || 'Student'}</h1>
-          <p className="mt-1 text-sm text-slate-500">This page shows where you are, and all students start from the same concept.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user?.name || 'Student'}</h1>
+          <p className="mt-1 text-sm text-slate-500">See where you are. Every student starts from the same concept.</p>
           <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="h-24 animate-pulse rounded-lg border border-slate-200 bg-slate-50" />
@@ -88,10 +89,10 @@ export default function StudentDashboard() {
 
       {!loading && !error && noContent && (
         <>
-          <h1 className="text-2xl font-bold text-slate-900">Hello, {user?.name || 'Student'}</h1>
-          <p className="mt-1 text-sm text-slate-500">This page shows where you are, and all students start from the same concept.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user?.name || 'Student'}</h1>
+          <p className="mt-1 text-sm text-slate-500">See where you are. Every student starts from the same concept.</p>
           <div className="mt-6">
-            <EmptyState message="Concept diagnostic content isn't available for your subjects yet. Check back soon." />
+            <EmptyState message="Diagnostic questions aren't available for your subjects yet. Please check back soon." />
           </div>
         </>
       )}

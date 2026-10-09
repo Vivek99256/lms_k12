@@ -49,8 +49,10 @@ const LMS_PROGRESS_WIDGETS = [
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
 }
+import { friendlyError } from "@/lib/user-messages";
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return friendlyError(error, "We couldn’t load the dashboard. Please try again.");
 }
 
 function currentUserProfile(): string {

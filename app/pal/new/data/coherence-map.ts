@@ -103,7 +103,7 @@ async function callApi(
     }
     throw new Error(
       serverMessage ||
-        `HTTP ${response.status}: the Coherence Map API is unavailable. It ships with the PAL coherence module — the backend may not be deployed yet.`
+        `This feature is not available right now. Please try again later.`
     );
   }
 
@@ -225,6 +225,15 @@ export interface NextAction {
   concept: { id: number; name: string; code: string | null; chapter: string | null } | null;
   rule: string;
   because: string;
+}
+
+export interface ConceptExplanation {
+  learnerId: number;
+  conceptId: number;
+  conceptName: string;
+  /** True when the graph found at least one unmastered root blocker. */
+  blocked: boolean;
+  explanation: string;
 }
 
 // --- mappers ---------------------------------------------------------------
@@ -453,6 +462,32 @@ export async function fetchNextAction(
       : null,
     rule: readString(why.rule),
     because: readString(why.because),
+  };
+}
+
+/**
+ * Graph RAG: why this learner is stuck on this concept, in plain language.
+ * Retrieval (root blockers, assessing questions, teaching content,
+ * misconceptions) and generation are separate steps server-side — a graph
+ * outage and an LLM failure come back as distinct, readable error messages
+ * via `callApi`'s existing fallback branch, not a generic failure.
+ */
+export async function fetchCoherenceExplanation(
+  learnerId: number,
+  conceptId: number,
+  signal?: AbortSignal
+): Promise<ConceptExplanation> {
+  const r = toRecord(
+    await callApi(`api/pal/coherence/explain/${learnerId}/${conceptId}`, { signal })
+  );
+  const context = toRecord(r.context);
+
+  return {
+    learnerId: readNumber(r.learner_id),
+    conceptId: readNumber(r.concept_id),
+    conceptName: readString(r.concept_name),
+    blocked: readBoolean(context.blocked),
+    explanation: readString(r.explanation),
   };
 }
 

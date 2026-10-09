@@ -92,7 +92,7 @@ export function AttendanceCalendarDrawer({ open, onOpenChange }: AttendanceCalen
         setSummary(readSummary(response))
       } catch (loadError) {
         if (cancelled) return
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load monthly attendance.')
+        setError(loadError instanceof Error ? loadError.message : "Couldn't load monthly attendance. Try again.")
         setCalendarDays([])
         setSummary(null)
       } finally {

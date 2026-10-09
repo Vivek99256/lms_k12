@@ -36,7 +36,7 @@ export default function ItemReceivablePage() {
       }
     }).catch((reason) => {
       if (!cancelled) {
-        setError(reason instanceof Error ? reason.message : "Inventory data could not be loaded.");
+        setError(reason instanceof Error ? reason.message : "Couldn't load inventory data. Try again.");
         setLoading(false);
       }
     });
@@ -56,7 +56,7 @@ export default function ItemReceivablePage() {
       const poItems = await loadReceivablePoItems(value);
       setItems(poItems);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "PO items could not be loaded.");
+      setError(reason instanceof Error ? reason.message : "Couldn't load PO items. Try again.");
       setItems([]);
     } finally {
       setBusy(false);
@@ -83,7 +83,7 @@ export default function ItemReceivablePage() {
       const msg = await saveReceivableItems(poNumber, items);
       setNotice(msg);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Items could not be saved.");
+      setError(reason instanceof Error ? reason.message : "Couldn't save items. Try again.");
     } finally {
       setBusy(false);
     }
@@ -93,7 +93,7 @@ export default function ItemReceivablePage() {
     <main className="min-h-screen p-4 sm:p-6">
       <div className="mx-auto max-w-[1500px] space-y-5">
         <div>
-          <h1 className="text-2xl font-bold">Item Receivable</h1>
+          <h1 className="text-2xl font-bold">Item receivable</h1>
           <p className="mt-1 text-sm text-slate-500">Manage the item receivable workflow.</p>
         </div>
         {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -134,16 +134,16 @@ export default function ItemReceivablePage() {
                     <TableRow>
                       <TableHead>Item</TableHead>
                       <TableHead>PO Qty</TableHead>
-                      <TableHead>Previous Received</TableHead>
-                      <TableHead>Actual Received Qty</TableHead>
-                      <TableHead>Pending Qty</TableHead>
+                      <TableHead>Previous received</TableHead>
+                      <TableHead>Actual received qty</TableHead>
+                      <TableHead>Pending qty</TableHead>
                       <TableHead>Remarks</TableHead>
-                      <TableHead>Warranty Start</TableHead>
-                      <TableHead>Warranty End</TableHead>
+                      <TableHead>Warranty start</TableHead>
+                      <TableHead>Warranty end</TableHead>
                       <TableHead>Bill No.</TableHead>
-                      <TableHead>Bill Date</TableHead>
+                      <TableHead>Bill date</TableHead>
                       <TableHead>Challan No.</TableHead>
-                      <TableHead>Challan Date</TableHead>
+                      <TableHead>Challan date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

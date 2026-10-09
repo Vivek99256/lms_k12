@@ -45,7 +45,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(`${fallback}.`);
   }
 }
 
@@ -220,8 +220,8 @@ export async function fetchLmsDashboard(
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the dashboard.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the dashboard'));
+  if (!res.ok) throw new Error(`Couldn’t load the dashboard. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t load the dashboard'));
 
   const studentRecord = toRecord(raw.studentData);
   const profile: DashboardProfile = {

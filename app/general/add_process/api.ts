@@ -52,7 +52,7 @@ export async function loadAddProcessRecords(): Promise<AddProcessRecord[]> {
     const payload = await legacyRequest(BASE_PATH);
     return readPayloadList(payload, "TrizProcess").map(mapRecord);
   } catch (value: unknown) {
-    throw new Error(errorMessage(value, "Add Process data could not be loaded."));
+    throw new Error(errorMessage(value, "Couldn't load add Process data. Try again."));
   }
 }
 
@@ -76,7 +76,7 @@ export async function loadAddProcessRecords(): Promise<AddProcessRecord[]> {
  * browser call is cross-origin, `fetchLaravelJson` sends
  * `credentials: 'include'`, and the ERP sets `supports_credentials => false` —
  * so the preflight comes back without Access-Control-Allow-Credentials and the
- * browser discards the response as "Failed to fetch". The proxy fetches from
+ * browser discards the response as "Couldn't fetch. Try again.". The proxy fetches from
  * the server, where none of that applies.
  */
 export async function loadInstituteSops(): Promise<StoredSop[]> {
@@ -84,7 +84,7 @@ export async function loadInstituteSops(): Promise<StoredSop[]> {
     const payload = await legacyRequest(SOP_PATH, { query: { status: "Active" } });
     return readStoredSops(payload);
   } catch (value: unknown) {
-    throw new Error(errorMessage(value, "The institute SOP library could not be loaded."));
+    throw new Error(errorMessage(value, "Couldn't load the institute SOP library. Try again."));
   }
 }
 
@@ -132,7 +132,7 @@ export async function loadAddProcessById(id: number): Promise<AddProcessRecord> 
   const payload = await legacyRequest(`${BASE_PATH}/${id}/edit`);
   const record = payload.editData;
   if (!isRecord(record)) {
-    throw new Error("The selected process could not be loaded.");
+    throw new Error("Couldn't load the selected process. Try again.");
   }
 
   return mapRecord(record);

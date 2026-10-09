@@ -173,7 +173,7 @@ export function HelpGuideGrid() {
         setState('ready');
       } catch (caught) {
         if (controller.signal.aborted) return;
-        setError(caught instanceof Error ? caught.message : 'Unable to load the help guide.');
+        setError(caught instanceof Error ? caught.message : "Couldn't load the help guide. Try again.");
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setState('error');
       }
@@ -206,7 +206,7 @@ export function HelpGuideGrid() {
       {state === 'error' && items.length === 0 ? (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{error || 'Unable to load the help guide.'}</span>
+          <span>{error || "Couldn't load the help guide. Try again."}</span>
         </div>
       ) : null}
 

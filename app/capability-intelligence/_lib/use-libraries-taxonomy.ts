@@ -102,7 +102,7 @@ export function useLibraryMeta() {
           setError(null);
         }
       } catch (metaError) {
-        if (!cancelled) setError(toMessage(metaError, 'Failed to load library options.'));
+        if (!cancelled) setError(toMessage(metaError, 'Couldn’t load library options.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -172,7 +172,7 @@ export function useLibraryList<T extends LibraryRow = LibraryRow>(
       setItems(response.data ?? []);
       setPagination(response.pagination ?? null);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load this library.'));
+      setError(toMessage(loadError, 'Couldn’t load this library.'));
       setItems([]);
       setPagination(null);
     } finally {
@@ -216,7 +216,7 @@ export function useLibraryList<T extends LibraryRow = LibraryRow>(
         const response = await competencyLibrariesService.create(buildSessionContext(), tab, payload);
         createdId = response?.data?.id ?? null;
         return { message: response.message };
-      }, 'Failed to create the entry.');
+      }, 'Couldn’t create the entry.');
       return { ...result, createdId };
     },
     [runMutation, tab],
@@ -226,7 +226,7 @@ export function useLibraryList<T extends LibraryRow = LibraryRow>(
     (id: number, payload: LibraryPayload) =>
       runMutation(
         () => competencyLibrariesService.update(buildSessionContext(), tab, id, payload),
-        'Failed to update the entry.',
+        'Couldn’t update the entry.',
       ),
     [runMutation, tab],
   );
@@ -235,7 +235,7 @@ export function useLibraryList<T extends LibraryRow = LibraryRow>(
     (id: number) =>
       runMutation(
         () => competencyLibrariesService.remove(buildSessionContext(), tab, id),
-        'Failed to delete the entry.',
+        'Couldn’t delete the entry.',
       ),
     [runMutation, tab],
   );
@@ -283,7 +283,7 @@ export function useLibraryDetail<T = GenericDetail>(tab: LibraryTabId, id: numbe
         if (!cancelled) setDetail(response.data);
       } catch (detailError) {
         if (!cancelled) {
-          setError(toMessage(detailError, 'Failed to load the details.'));
+          setError(toMessage(detailError, 'Couldn’t load the details.'));
           setDetail(null);
         }
       } finally {
@@ -335,7 +335,7 @@ export function useTaxonomy(tab: LibraryTabId, enabled = true): UseTaxonomyState
       const response = await competencyLibrariesService.taxonomy(buildSessionContext(), tab);
       setTree(response.data);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the taxonomy.'));
+      setError(toMessage(loadError, 'Couldn’t load the taxonomy.'));
       setTree(null);
     } finally {
       setLoading(false);
@@ -389,13 +389,13 @@ export function useTaxonomy(tab: LibraryTabId, enabled = true): UseTaxonomyState
     subCategoriesOf,
     retry: load,
     addNode: (payload) =>
-      runMutation(() => competencyLibrariesService.createTaxonomy(buildSessionContext(), tab, payload), 'Failed to add the category.'),
+      runMutation(() => competencyLibrariesService.createTaxonomy(buildSessionContext(), tab, payload), 'Couldn’t add the category.'),
     renameNode: (payload) =>
-      runMutation(() => competencyLibrariesService.renameTaxonomy(buildSessionContext(), tab, payload), 'Failed to rename the category.'),
+      runMutation(() => competencyLibrariesService.renameTaxonomy(buildSessionContext(), tab, payload), 'Couldn’t rename the category.'),
     deleteNode: (category, subCategory) =>
       runMutation(
         () => competencyLibrariesService.deleteTaxonomy(buildSessionContext(), tab, category, subCategory),
-        'Failed to remove the category.',
+        'Couldn’t remove the category.',
       ),
     clearMessages: () => {
       setActionMessage(null);
@@ -453,7 +453,7 @@ export function useLevelsOfResponsibility(enabled = true) {
           setError(null);
         }
       } catch (loadError) {
-        if (!cancelled) setError(toMessage(loadError, 'Failed to load the responsibility levels.'));
+        if (!cancelled) setError(toMessage(loadError, 'Couldn’t load the responsibility levels.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -484,7 +484,7 @@ export function useSkillTaxonomy(params: { search?: string; category?: string; d
       const response = await competencyLibrariesService.skillTaxonomyTree(buildSessionContext(), JSON.parse(paramsKey));
       setTaxonomy(response.data);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the skill taxonomy.'));
+      setError(toMessage(loadError, 'Couldn’t load the skill taxonomy.'));
       setTaxonomy(null);
     } finally {
       setLoading(false);

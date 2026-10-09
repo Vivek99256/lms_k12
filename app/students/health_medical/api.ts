@@ -13,7 +13,7 @@ import type { FlaggedStudent } from './page';
 type ApiEnvelope = { status?: string | number; message?: string; data?: unknown };
 
 function assertSuccess(payload: ApiEnvelope) {
-  if (Number(payload.status) !== 1) throw new Error(payload.message || 'Unable to load health records.');
+  if (Number(payload.status) !== 1) throw new Error(payload.message || "Couldn't load health records. Try again.");
 }
 
 function sessionParams() {

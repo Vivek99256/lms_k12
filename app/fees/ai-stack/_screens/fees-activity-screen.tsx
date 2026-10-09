@@ -361,7 +361,7 @@ function EntryDetail({ entry, onClose }: { entry: AiModuleActivityEntry; onClose
                     title={entry.used.prompt.name}
                     lines={[
                       `${entry.used.prompt.key} · v${entry.used.prompt.version} · ${entry.used.prompt.status}`,
-                      'resolved from ai_templates by the backend',
+                      'Managed in AI templates',
                     ]}
                   />
                 )}
@@ -371,7 +371,7 @@ function EntryDetail({ entry, onClose }: { entry: AiModuleActivityEntry; onClose
                     title={entry.used.template.name}
                     lines={[
                       `${entry.used.template.key} · v${entry.used.template.version} · ${entry.used.template.status}`,
-                      'resolved from ai_templates by the backend',
+                      'Managed in AI templates',
                     ]}
                   />
                 )}

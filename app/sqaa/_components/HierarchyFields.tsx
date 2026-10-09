@@ -63,7 +63,7 @@ export default function HierarchyFields({
     try {
       save(await loadSqaaLevels(parentId, level));
     } catch (error) {
-      onError(error instanceof Error ? error.message : `Unable to load SQAA level ${level}.`);
+      onError(error instanceof Error ? error.message : `Couldn’t load SQAA level ${level}.`);
     } finally {
       setLoadingKey(null);
     }

@@ -25,7 +25,7 @@ export const reportConfigs: ReportConfig[] = [
   {
     id: 'inquiry_followup',
     slug: 'inquiry-followup',
-    title: 'Inquiry Follow-up Report',
+    title: 'Enquiry follow-up report',
     subtitle: 'Review enquiry follow-up history with date and status filtering.',
     icon: History,
     endpoint: '/admission/admission_enquiry_followup_report',
@@ -36,7 +36,7 @@ export const reportConfigs: ReportConfig[] = [
   {
     id: 'admission_inquiry',
     slug: 'admission-inquiry',
-    title: 'Admission Inquiry Report',
+    title: 'Admission enquiry report',
     subtitle: 'Inspect enquiry records generated in the selected date range.',
     icon: Search,
     endpoint: '/admission/admission_enquiry_report',

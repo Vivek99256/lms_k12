@@ -161,7 +161,7 @@ function buildColumns(reportType: string, rows: Record<string, unknown>[]): Colu
       const leading = ['roll_no', 'student_name', 'enrollment_no', 'std_div', 'term'];
       return [
         col('roll_no', 'Roll no'), col('student_name', 'Student name'),
-        col('enrollment_no', 'Enrollment no', { mono: true }), col('std_div', 'Std/Div'), col('term', 'Term'),
+        col('enrollment_no', 'GR no.', { mono: true }), col('std_div', 'Std/Div'), col('term', 'Term'),
         ...dynamic(leading),
       ];
     }
@@ -186,7 +186,7 @@ export default function ResultReportPage() {
       setRows(extractRows(payload));
     } catch (err) {
       setRows([]);
-      setError(err instanceof Error ? err.message : 'Failed to load report. Please try again.');
+      setError(err instanceof Error ? err.message : "Couldn't load report. Try again.");
     } finally {
       setLoading(false);
       setSearched(true);
@@ -245,7 +245,7 @@ export default function ResultReportPage() {
                 exportName="result-report"
                 exportTitle={reportLabel}
                 emptyTitle="No report data"
-                emptyMessage="No records were returned for the selected criteria."
+                emptyMessage="No records match your filters."
                 toolbar={
                   reportType === 'overall_report' ? (
                     <Button variant="outline" size="sm" onClick={() => void handleServerExcel()} title="Request server-side Excel export">

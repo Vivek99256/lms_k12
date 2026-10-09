@@ -8,6 +8,7 @@ import type { H5pTextActivity } from './h5p';
 import {
   mapQuestionToPlayerPayload,
   type RuntimeActivity,
+  type RuntimeDragDrop,
   type RuntimeEssay,
   type RuntimeFlashcards,
   type RuntimeScope,
@@ -120,9 +121,9 @@ async function postBank(body: Record<string, unknown>, signal?: AbortSignal): Pr
     body: JSON.stringify(instituteId ? { sub_institute_id: instituteId, ...body } : body),
   });
 
-  const raw = await readApiJson(res, 'Failed to load the question bank');
+  const raw = await readApiJson(res, 'Couldn’t load the question bank');
   if (!res.ok || raw.status === false) {
-    throw new Error((raw.message as string) || 'Failed to load the question bank');
+    throw new Error((raw.message as string) || 'Couldn’t load the question bank');
   }
 
   return raw;
@@ -319,6 +320,9 @@ export type PlayableActivity =
   | { kind: 'drag_text'; item: H5pTextActivity }
   | { kind: 'mark_the_words'; item: H5pTextActivity }
   | { kind: 'memory_game'; item: H5pMemoryGame }
+  // Like Essay, the runtime shape IS the shape: a generated question has no
+  // `h5p_drag_drop` row, so there is no table type to narrow it to.
+  | { kind: 'drag_drop'; item: RuntimeDragDrop }
   | { kind: 'flashcards'; item: RuntimeFlashcards }
   | { kind: 'course_presentation'; item: H5pCoursePresentation }
   // The one member with no table behind it: H5P.Essay is not built here, so
@@ -376,6 +380,8 @@ function narrow(activity: RuntimeActivity): PlayableActivity {
     case 'mark_the_words':
       return { kind: activity.kind, item: activity.item as unknown as H5pTextActivity };
     case 'flashcards':
+      return { kind: activity.kind, item: activity.item };
+    case 'drag_drop':
       return { kind: activity.kind, item: activity.item };
     case 'memory_game':
       return { kind: activity.kind, item: activity.item as unknown as H5pMemoryGame };

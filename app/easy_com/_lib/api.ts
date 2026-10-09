@@ -119,7 +119,7 @@ async function request<T = unknown>(
 
   if (!response.ok || body.success === false) {
     throw new ApiError(
-      message || `Request failed with HTTP ${response.status}.`,
+      message || "Couldn't complete the request. Try again.",
       flattenErrors(body.errors),
       response.status,
       body.errors ?? null,

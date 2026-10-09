@@ -217,7 +217,7 @@ export default function FeesLateMasterPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load late fees (${response.status})`);
+        throw new Error("Couldn't load late fees. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
@@ -225,7 +225,7 @@ export default function FeesLateMasterPage() {
       setRecords(rows.map(mapRow));
     } catch (fetchError) {
       setError(
-        fetchError instanceof Error ? fetchError.message : 'Failed to load late fees.'
+        fetchError instanceof Error ? fetchError.message : "Couldn't load late fees. Try again."
       );
     } finally {
       setLoading(false);
@@ -250,7 +250,7 @@ export default function FeesLateMasterPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load late fee options (${response.status})`);
+        throw new Error("Couldn't load late fee options. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
@@ -278,7 +278,7 @@ export default function FeesLateMasterPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load late fee options.'
+          : "Couldn't load late fee options. Try again."
       );
     } finally {
       setOptionsLoading(false);
@@ -366,7 +366,7 @@ export default function FeesLateMasterPage() {
       nextErrors.late_date = 'Late fees start date is required';
     }
     if (!form.fine_type) {
-      nextErrors.fine_type = 'Fine counting type is required';
+      nextErrors.fine_type = 'Select a fine calculation type.';
     }
 
     setFormErrors(nextErrors);
@@ -408,14 +408,14 @@ export default function FeesLateMasterPage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to ${editingRecord ? 'update' : 'save'} late fee (${response.status})`
+          `Couldn't ${editingRecord ? 'update' : 'save'} late fee. Try again.`
         );
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to save late fee.');
+        throw new Error(payload.message || "Couldn't save late fee. Try again.");
       }
 
       setSuccessMessage(
@@ -427,7 +427,7 @@ export default function FeesLateMasterPage() {
       await loadRecords();
     } catch (submitError) {
       setError(
-        submitError instanceof Error ? submitError.message : 'Failed to save late fee.'
+        submitError instanceof Error ? submitError.message : "Couldn't save late fee. Try again."
       );
     } finally {
       setSubmitting(false);
@@ -463,20 +463,20 @@ export default function FeesLateMasterPage() {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to delete late fee (${response.status})`);
+        throw new Error("Couldn't delete late fee. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to delete late fee.');
+        throw new Error(payload.message || "Couldn't delete late fee. Try again.");
       }
 
       setSuccessMessage(payload.message || 'Late fee deleted successfully.');
       await loadRecords();
     } catch (deleteError) {
       setError(
-        deleteError instanceof Error ? deleteError.message : 'Failed to delete late fee.'
+        deleteError instanceof Error ? deleteError.message : "Couldn't delete late fee. Try again."
       );
     } finally {
       setDeletingId('');
@@ -496,7 +496,7 @@ export default function FeesLateMasterPage() {
             <CardHeader className="gap-4 border-b border-slate-200/80 px-4 py-4 sm:px-5">
               <div>
                 <CardTitle className="text-[16px] font-semibold text-slate-950">
-                  Fees Late Master
+                  Fee late master
                 </CardTitle>
                 <CardDescription className="text-[12px] leading-5 text-slate-600">
                   Late fee start dates and fine rules by standard and fees month
@@ -543,28 +543,28 @@ export default function FeesLateMasterPage() {
                   <TableHeader className="bg-slate-100/90">
                     <TableRow className="border-slate-200 hover:bg-transparent">
                       <TableHead className="h-9 w-[64px] px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Sr No.
+                        No.
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                         Standard
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Late Fees Date
+                        Late fees date
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                         Month
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Fine Type
+                        Fine type
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                         Status
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Created By
+                        Created by
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Created On
+                        Created on
                       </TableHead>
                       <TableHead className="h-9 w-[110px] px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                         Action

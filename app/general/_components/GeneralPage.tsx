@@ -48,7 +48,7 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try { setData(await loadGeneral(config.module, getGeneralSession())); }
-    catch (loadError: unknown) { setError(loadError instanceof Error ? loadError.message : "General data could not be loaded."); }
+    catch (loadError: unknown) { setError(loadError instanceof Error ? loadError.message : "Couldn't load general data. Try again."); }
     finally { setLoading(false); }
   }, [config.module]);
   useEffect(() => {
@@ -147,14 +147,14 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
     try {
       setNotice(await saveGeneral(config.module, getGeneralSession(), form, editing?.id));
       reset(); await load();
-    } catch (saveError: unknown) { setError(saveError instanceof Error ? saveError.message : "Record could not be saved."); }
+    } catch (saveError: unknown) { setError(saveError instanceof Error ? saveError.message : "Couldn't save record. Try again."); }
     finally { setBusy(false); }
   }
   async function remove(record: GeneralRecord) {
     if (!window.confirm(`Delete this ${config.singular.toLowerCase()}?`)) return;
     setBusy(true); setError("");
     try { setNotice(await deleteGeneral(config.module, getGeneralSession(), record.id)); await load(); }
-    catch (deleteError: unknown) { setError(deleteError instanceof Error ? deleteError.message : "Record could not be deleted."); }
+    catch (deleteError: unknown) { setError(deleteError instanceof Error ? deleteError.message : "Couldn't delete record. Try again."); }
     finally { setBusy(false); }
   }
 
@@ -171,7 +171,7 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
       reset();
       await load();
     } catch (saveError: unknown) {
-      setError(saveError instanceof Error ? saveError.message : "Record could not be saved.");
+      setError(saveError instanceof Error ? saveError.message : "Couldn't save record. Try again.");
     } finally {
       setBusy(false);
     }

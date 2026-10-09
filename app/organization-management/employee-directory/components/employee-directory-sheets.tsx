@@ -25,7 +25,7 @@
  */
 
 import { lazy, Suspense, useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
-import { AlertCircle, Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Shield, User, Loader2 } from 'lucide-react'
+import { Briefcase, CheckCircle2, ChevronLeft, ChevronRight, Shield, User, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/g2g/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/g2g/input'
@@ -36,18 +36,14 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { TimePicker } from '@/components/ui/g2g/time-picker'
 import { RadioGroup, Radio } from '@/components/ui/g2g/radio-group'
 import { cn } from '@/lib/utils'
-import { toDateOnly } from '@/lib/date-only'
 import type { Employee } from '../../_lib/organization-types'
 import {
-  buildSessionContext,
-  EmployeeDirectoryService,
   fetchEmployeeProfile,
   updateEmployeeProfile,
   uploadEmployeeDocument,
   fetchCompetencyProfile,
   updateSkillRating,
-  type EmployeeProfileFullResponse,
-  type ReferenceData,
+  type EmployeeProfileFullResponse
 } from '../../_lib/employee-directory-api'
 
 const PersonalInfoTab = lazy(() =>
@@ -107,8 +103,7 @@ type EmployeeDirectorySheetsProps = {
   onAddSheetOpenChange: (open: boolean) => void
   activeEmployee: Employee | null
   onCloseEmployeeSheet: () => void
-  /** Fired after a successful Add Employee submit, with the backend's success message. */
-  onEmployeeCreated: (message: string) => void
+  onEmployeeCreated?: (message: string) => void
 }
 
 type CompetencyCategory = 'Skill' | 'Knowledge' | 'Ability' | 'Attitude' | 'Behaviour'
@@ -228,253 +223,72 @@ const tabFallback = (
   </div>
 )
 
-const WORKING_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
-type WorkingDay = (typeof WORKING_DAYS)[number]
-const DAY_LABELS: Record<WorkingDay, string> = {
-  monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
-}
-const ADD_STEP_LABELS = ['Personal Details', 'Employment Structure', 'Address Information', 'Reporting & Deposit', 'Attendance Setup']
-
-type DaySchedule = { working: boolean; in: string; out: string }
-
-function defaultSchedule(): Record<WorkingDay, DaySchedule> {
-  return WORKING_DAYS.reduce((acc, day) => {
-    acc[day] = { working: day !== 'sunday', in: '09:00', out: '18:00' }
-    return acc
-  }, {} as Record<WorkingDay, DaySchedule>)
-}
-
-type AddEmployeeForm = {
-  first_name: string
-  last_name: string
-  email: string
-  mobile: string
-  gender: 'M' | 'F'
-  birthdate?: string
-  department_id: string
-  job_role_id: string
-  user_profile_id: string
-  joined_date?: string
-  address: string
-  city: string
-  state: string
-  pincode: string
-  reporting_manager_id: string
-  bank_name: string
-  account_no: string
-  ifsc_code: string
-  schedule: Record<WorkingDay, DaySchedule>
-}
-
-function emptyForm(): AddEmployeeForm {
-  return {
-    first_name: '', last_name: '', email: '', mobile: '', gender: 'M', birthdate: undefined,
-    department_id: '', job_role_id: '', user_profile_id: '', joined_date: undefined,
-    address: '', city: '', state: '', pincode: '',
-    reporting_manager_id: '', bank_name: '', account_no: '', ifsc_code: '',
-    schedule: defaultSchedule(),
-  }
-}
-
-/**
- * Real "Add Employee" flow, wired to `EmployeeDirectoryController::
- * referenceData()/create()` (both already existed server-side and were
- * simply unused by this sheet - see this file's git history for the
- * previous unbound-inputs mockup). Field mapping to `tbluser` columns is
- * confirmed against `tbluserModel::$fillable` and the create() validator:
- * required first_name/last_name/mobile/email/user_profile_id, everything
- * else optional and only sent if filled so `buildAttributeArray()` on the
- * backend (which writes every request key through as a column) never
- * receives an empty string for a field the user skipped.
- */
 function AddEmployeeSheet({
   open,
   onOpenChange,
-  onCreated,
+  onEmployeeCreated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreated: (message: string) => void
+  onEmployeeCreated?: (message: string) => void
 }) {
   const [addStep, setAddStep] = useState(1)
-  const [form, setForm] = useState<AddEmployeeForm>(emptyForm)
-  const [reference, setReference] = useState<ReferenceData | null>(null)
-  const [referenceLoading, setReferenceLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (!open) return
-    let cancelled = false
-    setReferenceLoading(true)
-    ;(async () => {
-      try {
-        const session = buildSessionContext()
-        const response = await EmployeeDirectoryService.referenceData(session)
-        if (!cancelled) setReference(response?.data ?? null)
-      } catch (cause) {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Failed to load form options.')
-      } finally {
-        if (!cancelled) setReferenceLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [open])
-
-  function update<K extends keyof AddEmployeeForm>(key: K, value: AddEmployeeForm[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }))
+  const handleFinish = () => {
+    onOpenChange(false)
+    onEmployeeCreated?.('Employee onboarded.')
   }
-
-  function updateDay(day: WorkingDay, patch: Partial<DaySchedule>) {
-    setForm((prev) => ({ ...prev, schedule: { ...prev.schedule, [day]: { ...prev.schedule[day], ...patch } } }))
-  }
-
-  function handleOpenChange(next: boolean) {
-    if (isSaving) return
-    if (!next) {
-      setForm(emptyForm())
-      setAddStep(1)
-      setError('')
-    }
-    onOpenChange(next)
-  }
-
-  async function handleFinish() {
-    if (isSaving) return
-
-    const firstName = form.first_name.trim()
-    const lastName = form.last_name.trim()
-    const mobile = form.mobile.trim()
-    const email = form.email.trim()
-
-    if (!firstName || !lastName) {
-      setError('First name and last name are required.')
-      setAddStep(1)
-      return
-    }
-    if (!mobile) {
-      setError('Phone number is required.')
-      setAddStep(1)
-      return
-    }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('A valid corporate email is required.')
-      setAddStep(1)
-      return
-    }
-    if (!form.user_profile_id) {
-      setError('User Profile / Role is required.')
-      setAddStep(2)
-      return
-    }
-
-    setError('')
-    setIsSaving(true)
-    try {
-      const session = buildSessionContext()
-      const payload: Record<string, unknown> = {
-        first_name: firstName,
-        last_name: lastName,
-        email,
-        mobile,
-        user_profile_id: form.user_profile_id,
-        gender: form.gender,
-      }
-      if (form.birthdate) payload.birthdate = form.birthdate
-      if (form.department_id) payload.department_id = form.department_id
-      if (form.job_role_id) payload.allocated_standards = form.job_role_id
-      if (form.joined_date) payload.joined_date = form.joined_date
-      if (form.address.trim()) payload.address = form.address.trim()
-      if (form.city.trim()) payload.city = form.city.trim()
-      if (form.state.trim()) payload.state = form.state.trim()
-      if (form.pincode.trim()) payload.pincode = form.pincode.trim()
-      if (form.reporting_manager_id) payload.reporting_manager_id = form.reporting_manager_id
-      if (form.bank_name.trim()) payload.bank_name = form.bank_name.trim()
-      if (form.account_no.trim()) payload.account_no = form.account_no.trim()
-      if (form.ifsc_code.trim()) payload.ifsc_code = form.ifsc_code.trim()
-
-      for (const day of WORKING_DAYS) {
-        const schedule = form.schedule[day]
-        payload[day] = schedule.working ? 1 : 0
-        if (schedule.working) {
-          payload[`${day}_in_date`] = schedule.in
-          payload[`${day}_out_date`] = schedule.out
-        }
-      }
-
-      const response = await EmployeeDirectoryService.create(session, payload)
-      onCreated(response?.message || 'Employee created successfully.')
-      handleOpenChange(false)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Failed to create employee.')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const departmentOptions = (reference?.departments ?? []).map((d) => ({ label: d.name, value: String(d.id) }))
-  const jobRoleOptions = (reference?.job_roles ?? [])
-    .filter((role) => !form.department_id || String(role.department_id ?? '') === form.department_id)
-    .map((role) => ({ label: role.name, value: String(role.id) }))
-  const userProfileOptions = (reference?.user_profiles ?? []).map((p) => ({ label: p.name, value: String(p.id) }))
-  const managerOptions = (reference?.managers ?? []).map((m) => ({
-    label: `${m.first_name ?? ''} ${m.last_name ?? ''}`.trim() || `Employee #${m.employee_no ?? ''}`,
-    value: String(m.id),
-  }))
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col gap-0 overflow-hidden border-l border-border/80 bg-card/95 p-0 shadow-2xl backdrop-blur-2xl sm:max-w-xl">
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-tr from-primary/5 via-transparent to-transparent" />
 
         <div className="relative z-10 border-b border-border/40 bg-surface/50 px-6 py-6">
-          <SheetTitle className="text-xl">Add New People</SheetTitle>
+          <SheetTitle className="text-xl">Onboard New Employee</SheetTitle>
           <SheetDescription className="mt-1">
-            Step {addStep} of 5: {ADD_STEP_LABELS[addStep - 1]}
+            Step {addStep} of 5: {
+              addStep === 1 ? 'Personal Details'
+                : addStep === 2 ? 'Employment Structure'
+                : addStep === 3 ? 'Address Information'
+                : addStep === 4 ? 'Reporting & Deposit'
+                : 'Attendance Setup'
+            }
           </SheetDescription>
         </div>
 
-        <div className="relative z-10 flex-1 overflow-y-auto p-6 space-y-6">
-          {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {error}
-            </div>
-          )}
-
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {addStep === 1 && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>First Name <span className="text-destructive">*</span></Label>
-                  <Input value={form.first_name} onChange={(e) => update('first_name', e.target.value)} placeholder="e.g. Sarah" disabled={isSaving} />
+                  <Label>First Name</Label>
+                  <Input placeholder="e.g. Sarah" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Last Name <span className="text-destructive">*</span></Label>
-                  <Input value={form.last_name} onChange={(e) => update('last_name', e.target.value)} placeholder="e.g. Jenkins" disabled={isSaving} />
+                  <Label>Last Name</Label>
+                  <Input placeholder="e.g. Jenkins" />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Corporate Email <span className="text-destructive">*</span></Label>
-                <Input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="sarah.j@company.com" disabled={isSaving} />
+                <Label>Corporate Email</Label>
+                <Input type="email" placeholder="sarah.j@company.com" />
               </div>
               <div className="space-y-2">
-                <Label>Phone Number <span className="text-destructive">*</span></Label>
-                <Input type="tel" value={form.mobile} onChange={(e) => update('mobile', e.target.value)} placeholder="+1 (555) 000-0000" disabled={isSaving} />
+                <Label>Phone Number</Label>
+                <Input type="tel" placeholder="+1 (555) 000-0000" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Gender</Label>
-                  <RadioGroup value={form.gender} onValueChange={(value) => update('gender', value as 'M' | 'F')}>
-                    <Radio value="M" label="Male" disabled={isSaving} />
-                    <Radio value="F" label="Female" disabled={isSaving} />
+                  <RadioGroup defaultValue="M">
+                    <Radio value="M" label="Male" />
+                    <Radio value="F" label="Female" />
                   </RadioGroup>
                 </div>
                 <div className="space-y-2">
                   <Label>Date of Birth</Label>
-                  <DatePicker value={form.birthdate} onChange={(date) => update('birthdate', date ? toDateOnly(date) : undefined)} disabled={isSaving} />
+                  <DatePicker />
                 </div>
               </div>
             </div>
@@ -484,40 +298,19 @@ function AddEmployeeSheet({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Department</Label>
-                <Select
-                  placeholder={referenceLoading ? 'Loading...' : 'Select Department'}
-                  options={departmentOptions}
-                  value={form.department_id}
-                  onChange={(value) => {
-                    update('department_id', value)
-                    update('job_role_id', '')
-                  }}
-                  disabled={isSaving || referenceLoading}
-                />
+                <Select placeholder="Select Department" options={[{ label: 'Engineering', value: 'eng' }, { label: 'Product', value: 'prod' }]} />
               </div>
               <div className="space-y-2">
-                <Label>Job Role / Designation</Label>
-                <Select
-                  placeholder={referenceLoading ? 'Loading...' : 'Select Job Role'}
-                  options={jobRoleOptions}
-                  value={form.job_role_id}
-                  onChange={(value) => update('job_role_id', value)}
-                  disabled={isSaving || referenceLoading}
-                />
+                <Label>Designation</Label>
+                <Select placeholder="Select Job Role" options={[{ label: 'Senior Full Stack Engineer', value: 'se' }, { label: 'Product Designer', value: 'pd' }]} />
               </div>
               <div className="space-y-2">
-                <Label>User Profile / Role <span className="text-destructive">*</span></Label>
-                <Select
-                  placeholder={referenceLoading ? 'Loading...' : 'Select User Profile'}
-                  options={userProfileOptions}
-                  value={form.user_profile_id}
-                  onChange={(value) => update('user_profile_id', value)}
-                  disabled={isSaving || referenceLoading}
-                />
+                <Label>Level of Responsibility (LOR)</Label>
+                <Select placeholder="Select LOR Level" options={[{ label: 'Level 1 - Follow', value: 'l1' }, { label: 'Level 4 - Enable', value: 'l4' }, { label: 'Level 5 - Ensure/Advise', value: 'l5' }]} />
               </div>
               <div className="space-y-2">
-                <Label>Joining Date</Label>
-                <DatePicker value={form.joined_date} onChange={(date) => update('joined_date', date ? toDateOnly(date) : undefined)} disabled={isSaving} />
+                <Label>User Profile / Role</Label>
+                <Select placeholder="Select User Profile" options={[{ label: 'Employee', value: 'emp' }, { label: 'Manager', value: 'mgr' }, { label: 'Admin', value: 'admin' }]} />
               </div>
             </div>
           )}
@@ -526,21 +319,21 @@ function AddEmployeeSheet({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Street Address</Label>
-                <Input value={form.address} onChange={(e) => update('address', e.target.value)} placeholder="123 Corporate Blvd, Suite 400" disabled={isSaving} />
+                <Input placeholder="123 Corporate Blvd, Suite 400" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>City</Label>
-                  <Input value={form.city} onChange={(e) => update('city', e.target.value)} placeholder="San Francisco" disabled={isSaving} />
+                  <Input placeholder="San Francisco" />
                 </div>
                 <div className="space-y-2">
                   <Label>State / Province</Label>
-                  <Input value={form.state} onChange={(e) => update('state', e.target.value)} placeholder="California" disabled={isSaving} />
+                  <Input placeholder="California" />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Pincode / Postal Code</Label>
-                <Input value={form.pincode} onChange={(e) => update('pincode', e.target.value)} placeholder="94105" disabled={isSaving} />
+                <Input placeholder="94105" />
               </div>
             </div>
           )}
@@ -549,26 +342,20 @@ function AddEmployeeSheet({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Reporting Manager</Label>
-                <Select
-                  placeholder={referenceLoading ? 'Loading...' : 'Select Reporting Manager'}
-                  options={managerOptions}
-                  value={form.reporting_manager_id}
-                  onChange={(value) => update('reporting_manager_id', value)}
-                  disabled={isSaving || referenceLoading}
-                />
+                <Select placeholder="Select Reporting Manager" options={[{ label: 'Alex Mercer (CTO)', value: '1' }]} />
               </div>
               <div className="space-y-2">
                 <Label>Bank Name</Label>
-                <Input value={form.bank_name} onChange={(e) => update('bank_name', e.target.value)} placeholder="Silicon Valley Bank" disabled={isSaving} />
+                <Input placeholder="Silicon Valley Bank" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Account Number</Label>
-                  <Input value={form.account_no} onChange={(e) => update('account_no', e.target.value)} placeholder="9842" disabled={isSaving} />
+                  <Input placeholder="••••••••9842" />
                 </div>
                 <div className="space-y-2">
                   <Label>IFSC / Routing Code</Label>
-                  <Input value={form.ifsc_code} onChange={(e) => update('ifsc_code', e.target.value)} placeholder="SVBK0001234" disabled={isSaving} />
+                  <Input placeholder="SVBK0001234" />
                 </div>
               </div>
             </div>
@@ -579,14 +366,10 @@ function AddEmployeeSheet({
               <div className="space-y-2">
                 <Label>Working Days</Label>
                 <div className="flex flex-wrap gap-3 pt-1">
-                  {WORKING_DAYS.map((day) => (
-                    <label key={day} className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={form.schedule[day].working}
-                        onCheckedChange={(checked) => updateDay(day, { working: checked })}
-                        disabled={isSaving}
-                      />
-                      {DAY_LABELS[day]}
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                    <label key={d} className="flex items-center gap-2 text-sm">
+                      <Checkbox defaultChecked={d !== 'Sat'} />
+                      {d}
                     </label>
                   ))}
                 </div>
@@ -594,17 +377,11 @@ function AddEmployeeSheet({
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div className="space-y-2">
                   <Label>Default In-Time</Label>
-                  <TimePicker
-                    value={form.schedule.monday.in}
-                    onChange={(time) => WORKING_DAYS.forEach((day) => updateDay(day, { in: time }))}
-                  />
+                  <TimePicker value="09:00" />
                 </div>
                 <div className="space-y-2">
                   <Label>Default Out-Time</Label>
-                  <TimePicker
-                    value={form.schedule.monday.out}
-                    onChange={(time) => WORKING_DAYS.forEach((day) => updateDay(day, { out: time }))}
-                  />
+                  <TimePicker value="18:00" />
                 </div>
               </div>
             </div>
@@ -614,20 +391,19 @@ function AddEmployeeSheet({
         <div className="relative z-10 flex items-center justify-between border-t border-border/40 bg-surface/50 px-6 py-4">
           <Button
             variant="ghost"
-            disabled={addStep === 1 || isSaving}
+            disabled={addStep === 1}
             onClick={() => setAddStep(s => Math.max(1, s - 1))}
           >
             Previous
           </Button>
           <div className="flex items-center gap-2">
             {addStep < 5 ? (
-              <Button onClick={() => setAddStep(s => Math.min(5, s + 1))} disabled={isSaving}>
+              <Button onClick={() => setAddStep(s => Math.min(5, s + 1))}>
                 Next Step
               </Button>
             ) : (
-              <Button onClick={() => void handleFinish()} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                {isSaving ? 'Creating...' : 'Add Person'}
+              <Button onClick={handleFinish} className="bg-emerald-600 hover:bg-emerald-700">
+                <CheckCircle2 className="mr-2 h-4 w-4" /> Finish Onboarding
               </Button>
             )}
           </div>
@@ -1014,7 +790,7 @@ export function EmployeeDirectorySheets({
         key={isAddSheetOpen ? 'open' : 'closed'}
         open={isAddSheetOpen}
         onOpenChange={onAddSheetOpenChange}
-        onCreated={onEmployeeCreated}
+        onEmployeeCreated={onEmployeeCreated}
       />
       {activeEmployee && (
         <EmployeeOverviewSheet

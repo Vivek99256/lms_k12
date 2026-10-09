@@ -187,7 +187,7 @@ function SettingsCard({
     try {
       onSaved(await saveProjectSettings(adapter.projectId, draft));
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : 'The settings could not be saved.');
+      onError(cause instanceof Error ? cause.message : 'The settings couldn’t be saved.');
     } finally {
       setSaving(false);
     }
@@ -329,7 +329,7 @@ function ServiceTokens({
       setRevealed({ projectId: row.adapter.projectId, plaintext: result.plaintext });
       onRotated();
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : 'The token could not be rotated.');
+      onError(cause instanceof Error ? cause.message : 'The token couldn’t be rotated.');
     } finally {
       setBusy(null);
     }

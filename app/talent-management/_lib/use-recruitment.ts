@@ -342,7 +342,7 @@ export function useRecruitment() {
       const next = await fetchRecruitmentData(session)
       setData(next)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load recruitment data.'))
+      setError(toMessage(loadError, "Couldn't load recruitment data. Try again."))
     } finally {
       setLoading(false)
     }
@@ -409,7 +409,7 @@ export function useCandidateScreeningResult(candidateId: string | null) {
           if (!cancelled) setData(result)
         })
         .catch((cause: unknown) => {
-          if (!cancelled) setError(cause instanceof Error ? cause : new Error('Failed to load the candidate profile.'))
+          if (!cancelled) setError(cause instanceof Error ? cause : new Error("Couldn't load the candidate profile. Try again."))
         })
         .finally(() => {
           if (!cancelled) setIsPending(false)

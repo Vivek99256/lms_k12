@@ -32,7 +32,7 @@ export function ItemDirectPurchasePage() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try { setData(await loadInventory("direct-purchases", {})); }
-    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Direct purchases could not be loaded."); }
+    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't load direct purchases. Try again."); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => {
@@ -67,25 +67,25 @@ export function ItemDirectPurchasePage() {
         items: rows.map((row) => ({ category_id: row.categoryId || null, sub_category_id: row.subCategoryId || null, item_id: row.itemId, item_qty: row.quantity, price: row.price, amount: Number(row.quantity) * Number(row.price) })),
       }, editing?.id));
       reset(); await load();
-    } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Direct purchase could not be saved."); }
+    } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't save direct purchase. Try again."); }
     finally { setBusy(false); }
   }
   async function remove(record: InventoryRecord) {
     if (!window.confirm("Delete this direct purchase?")) return;
     setBusy(true);
     try { setNotice(await deleteInventory("direct-purchases", record.id)); await load(); }
-    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Direct purchase could not be deleted."); }
+    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't delete direct purchase. Try again."); }
     finally { setBusy(false); }
   }
 
   return <main className="min-h-screen p-4 sm:p-6"><div className="mx-auto max-w-[1700px] space-y-5">
-    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h1 className="text-2xl font-bold">Items Direct Purchase</h1><p className="mt-1 text-sm text-slate-500">Record items purchased directly from vendors.</p></div><Button onClick={startAdd}><Plus className="size-4" /> Add Items Direct Purchase</Button></div>
+    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h1 className="text-2xl font-bold">Items direct purchase</h1><p className="mt-1 text-sm text-slate-500">Record items purchased directly from vendors.</p></div><Button onClick={startAdd}><Plus className="size-4" /> Add Items Direct Purchase</Button></div>
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
     {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
     {showForm && <Card><CardHeader className="border-b"><div className="flex items-center justify-between"><CardTitle>{editing ? "Edit Item Direct Purchase" : "Add Item Direct Purchase"}</CardTitle><Button variant="ghost" size="icon" onClick={reset}><X className="size-4" /></Button></div></CardHeader><CardContent>
       {!setting && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Inventory Master Setup is required before adding a direct purchase.</div>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <div><Label>Vendor Name *</Label><select className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={header.vendorId} onChange={(event) => updateHeader({ vendorId: event.target.value })}><option value="">Select Vendor</option>{data.options.vendors?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
+        <div><Label>Vendor Name *</Label><select className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={header.vendorId} onChange={(event) => updateHeader({ vendorId: event.target.value })}><option value="">Select vendor</option>{data.options.vendors?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
         <div><Label>Challan No. *</Label><Input className="mt-1" value={header.challanNo} onChange={(event) => updateHeader({ challanNo: event.target.value })} /></div>
         <div><Label>Challan Date *</Label><Input className="mt-1" type="date" value={header.challanDate} onChange={(event) => updateHeader({ challanDate: event.target.value })} /></div>
         <div><Label>Bill No. *</Label><Input className="mt-1" value={header.billNo} onChange={(event) => updateHeader({ billNo: event.target.value })} /></div>
@@ -93,9 +93,9 @@ export function ItemDirectPurchasePage() {
         <div><Label>Remarks *</Label><Textarea className="mt-1" rows={1} value={header.remarks} onChange={(event) => updateHeader({ remarks: event.target.value })} /></div>
       </div>
       <div className="mt-5 space-y-3">{rows.map((row, index) => <div key={index} className="grid gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-7">
-        {setting === "items_with_chain" && <><div><Label>Item Category</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.categoryId} onChange={(event) => updateRow(index, { categoryId: event.target.value, subCategoryId: "", itemId: "" })}><option value="">Select Category</option>{data.options.requisition_categories?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
-          <div><Label>Item Sub Category</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.subCategoryId} onChange={(event) => updateRow(index, { subCategoryId: event.target.value, itemId: "" })}><option value="">Select Sub Category</option>{data.options.requisition_sub_categories?.filter((option) => option.parentId === Number(row.categoryId)).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div></>}
-        <div><Label>Item *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.itemId} onChange={(event) => updateRow(index, { itemId: event.target.value })}><option value="">Select Item</option>{data.options.requisition_items?.filter((option) => setting !== "items_with_chain" || option.parentId === Number(row.subCategoryId)).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
+        {setting === "items_with_chain" && <><div><Label>Item category</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.categoryId} onChange={(event) => updateRow(index, { categoryId: event.target.value, subCategoryId: "", itemId: "" })}><option value="">Select category</option>{data.options.requisition_categories?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
+          <div><Label>Item sub category</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.subCategoryId} onChange={(event) => updateRow(index, { subCategoryId: event.target.value, itemId: "" })}><option value="">Select sub category</option>{data.options.requisition_sub_categories?.filter((option) => option.parentId === Number(row.categoryId)).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div></>}
+        <div><Label>Item *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.itemId} onChange={(event) => updateRow(index, { itemId: event.target.value })}><option value="">Select item</option>{data.options.requisition_items?.filter((option) => setting !== "items_with_chain" || option.parentId === Number(row.subCategoryId)).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
         <div><Label>Qty *</Label><Input className="mt-1" type="number" min={0.01} step="any" value={row.quantity} onChange={(event) => updateRow(index, { quantity: event.target.value })} /></div>
         <div><Label>Price *</Label><Input className="mt-1" type="number" min={0} step="any" value={row.price} onChange={(event) => updateRow(index, { price: event.target.value })} /></div>
         <div><Label>Amount</Label><Input className="mt-1" readOnly value={(Number(row.quantity || 0) * Number(row.price || 0)).toFixed(2)} /></div>

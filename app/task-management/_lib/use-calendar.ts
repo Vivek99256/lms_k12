@@ -50,7 +50,7 @@ export function useCalendar(month: Date) {
       })
       setTasks(response.data.tasks)
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load calendar tasks.'))
+      setError(toMessage(reason, "Couldn't load calendar tasks. Try again."))
     } finally {
       setLoading(false)
     }
@@ -79,7 +79,7 @@ export function useCalendar(month: Date) {
         await load()
         return response.data.schedule.due_date
       } catch (reason) {
-        setError(toMessage(reason, 'Unable to reschedule this task.'))
+        setError(toMessage(reason, "Couldn't reschedule this task. Try again."))
         return null
       } finally {
         setRescheduling(false)

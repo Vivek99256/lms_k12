@@ -827,7 +827,7 @@ function ClassIntelligenceSection({
     return (
       <section className="mb-8" id="class-intelligence">
         <Card className="border-red-100 bg-red-50/50 p-4 text-sm text-red-700">
-          Could not load class intelligence: {error}
+          Couldn’t load class intelligence: {error}
         </Card>
       </section>
     );

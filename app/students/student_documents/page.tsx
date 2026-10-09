@@ -70,7 +70,7 @@ export default function StudentDocumentsPage() {
       .then(setSampleStudents)
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === 'AbortError') return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load student documents.');
+        setError(reason instanceof Error ? reason.message : "Couldn't load student documents. Try again.");
       })
       .finally(() => {
         if (!controller.signal.aborted) setIsLoading(false);

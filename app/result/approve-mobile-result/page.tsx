@@ -95,7 +95,7 @@ export default function ApproveMobileResultPage() {
       setOriginallyAllowed(nextAllowed);
       setChecked(new Set(nextAllowed));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
+      setError(err instanceof Error ? err.message : "Couldn't load students. Try again.");
       setRows([]);
       setOriginallyAllowed(new Set());
       setChecked(new Set());
@@ -119,7 +119,7 @@ export default function ApproveMobileResultPage() {
 
   const handlePublish = async () => {
     if (!criteria || rows.length === 0) {
-      toast.error('Nothing to publish', 'Search for students before publishing a selection.');
+      toast.error('No results to publish', 'Search for students before publishing a selection.');
       return;
     }
     setSaving(true);
@@ -139,12 +139,12 @@ export default function ApproveMobileResultPage() {
       data.term_id = criteria.term_id;
 
       const payload = await resultPost('api/result/approve-mobile-result', data);
-      const message = assertOk(payload, 'Laravel did not confirm the mobile visibility update.');
+      const message = assertOk(payload, "Couldn't update mobile visibility. Try again.");
       setOriginallyAllowed(new Set(checked));
       setRows((current) => current.map((row) => ({ ...row, allowed: checked.has(row.id) })));
       toast.success('Selection published', message || 'Mobile app visibility has been updated.');
     } catch (err) {
-      toast.error('Could not publish selection', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't publish selection. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }

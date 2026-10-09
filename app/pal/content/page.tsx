@@ -120,7 +120,7 @@ export default function PalContentDashboardPage() {
       setState({ coverage, vocabulary, sample });
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
-      setError((err as Error).message || 'Could not load Content Intelligence data.');
+      setError((err as Error).message || 'Couldn’t load Content Intelligence data.');
     } finally {
       setLoading(false);
     }
@@ -237,7 +237,7 @@ export default function PalContentDashboardPage() {
 
               <StatTile
                 icon={<AlertTriangle className="h-4 w-4" />}
-                label="Misconception library"
+                label="Common mistakes library"
                 value={formatNumber(health?.total ?? 0)}
                 hint={`${health?.approved ?? 0} approved · ${health?.servableWithCorrective ?? 0} servable`}
                 tone={health?.c6Pass ? 'good' : 'bad'}
@@ -347,13 +347,7 @@ export default function PalContentDashboardPage() {
                   Tagging is a batch job — it processes tens of thousands of rows, so it runs on the
                   server rather than from this screen. Everything it writes arrives here as a draft.
                 </p>
-                <pre className="mt-4 overflow-x-auto rounded-xl bg-slate-900 px-4 py-3 text-[12px] leading-relaxed text-slate-100">
-                  {`php artisan pal:content-coverage --concepts
-php artisan pal:tag-content --order-by-usage
-php artisan pal:derive-irt
-php artisan pal:seed-misconceptions
-php artisan pal:vocab-check`}
-                </pre>
+                <p className="mt-4 text-sm text-slate-600">Ask your administrator to run the content coverage, tagging, difficulty and vocabulary checks.</p>
                 {state.vocabulary ? (
                   <p className="mt-3 text-xs text-slate-500">
                     Vocabulary loaded: {state.vocabulary.bloomLevels.length} Bloom levels ·{' '}

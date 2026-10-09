@@ -60,7 +60,7 @@ function MisconceptionLibraryContent() {
         setLibrary(await fetchMisconceptionLibrary(semanticId, {}, signal));
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
-        setError((err as Error).message || 'Could not load the misconception library.');
+        setError((err as Error).message || 'Couldn’t load the misconception library.');
       } finally {
         setLoading(false);
       }
@@ -106,7 +106,7 @@ function MisconceptionLibraryContent() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-[22px] font-semibold text-[#1F2A44]">Misconception library</h1>
+              <h1 className="text-[22px] font-semibold text-[#1F2A44]">Common mistakes library</h1>
               <p className="mt-0.5 text-sm text-slate-500">
                 Every known error for this chapter, what causes it, and the corrective content that
                 answers it.

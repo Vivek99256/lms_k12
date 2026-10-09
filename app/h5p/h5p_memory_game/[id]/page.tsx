@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Clock } from 'lucide-react';
@@ -166,7 +168,7 @@ function MemoryGamePlayerContent({ preloaded }: { preloaded?: PreloadedMemoryGam
         setNow(at);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load game');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load game. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

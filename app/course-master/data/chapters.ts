@@ -3,6 +3,10 @@ import { getRequestContext, getSyear } from '../page';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { buildSessionContext } from '@/lib/erp-client';
 import type { PrayogshalaActivity } from './prayogshala';
+import {
+  normaliseGeneratableFormats,
+  type GeneratableFormat,
+} from '@/lib/question-generation/generatable-formats';
 
 export interface Chapter {
   id: string;
@@ -652,8 +656,24 @@ export interface GenerateIntelligenceQuestionsRequest {
   subject_id: number;
   standard_id: number;
   chapter_id: number;
-  question_type_id: number;
-  question_type: IntelligenceQuestionType;
+  /**
+   * The `question_type_catalog.code` to generate, from the formats endpoint
+   * (fetchGeneratableQuestionFormats). The teacher picks it; the model never does.
+   *
+   * There is deliberately no `question_type_id` here: the server resolves it from
+   * the catalogue, and ignores one if it is sent. `question_type` ('mcq' |
+   * 'narrative') still works as a legacy alias for callers that predate formats.
+   */
+  question_format_code?: string;
+  /**
+   * Several catalogue codes in one request. The server validates each against the
+   * same registry + catalogue rules, splits `total_questions` evenly across them
+   * (registry order, remainder to the first formats) and generates each share through
+   * the ordinary single-format path. One entry behaves exactly like `question_format_code`.
+   * Wins over `question_format_code` when both are sent.
+   */
+  question_format_codes?: string[];
+  question_type?: IntelligenceQuestionType;
   total_questions: number;
   grade_id?: number;
   quota?: IntelligenceQuestionQuotaRow[];
@@ -661,7 +681,8 @@ export interface GenerateIntelligenceQuestionsRequest {
 
 export interface GeneratedQuestionPreview {
   id: number;
-  question_type: IntelligenceQuestionType;
+  /** The catalogue code the question was generated as ('mcq', 'true_false', ...). */
+  question_type: string;
   question_title: string;
   description?: string;
   subconcept?: string;
@@ -689,7 +710,37 @@ export interface GeneratedQuestionPreview {
       knowledge_ref?: string;
       mark?: number;
     }>;
+    /** fill_blank: one answer per gap, in order. */
+    answers?: string[];
+    /** match_following: the structured pairs, in answer-key order. */
+    pairs?: Array<{ left: string; right: string }>;
+    /** assertion_reason: the two halves, kept apart. */
+    assertion?: string;
+    reason?: string;
+    /** numerical: the unit and the working. */
+    unit?: string | null;
+    solution_steps?: string[];
+    /** case_study: the context and its lettered parts. */
+    stimulus?: string | null;
+    sub_parts?: Array<{ label?: string; text?: string; marks?: number; model_answer?: string }>;
+    /** true_false: the verdict as a boolean. */
+    statement_truth?: boolean;
   };
+}
+
+/** One format's outcome inside a multi-format generation run. */
+export interface GeneratedFormatResult {
+  question_format_code: string;
+  label: string;
+  question_type_id?: number | null;
+  /** False when this format produced nothing (the others may still have succeeded). */
+  status: boolean;
+  message: string;
+  requested: number;
+  generated: number;
+  inserted: number;
+  skipped_duplicate: number;
+  skipped_invalid: number;
 }
 
 export interface GenerateIntelligenceQuestionsResponse {
@@ -703,6 +754,14 @@ export interface GenerateIntelligenceQuestionsResponse {
     skipped_invalid?: number;
     question_ids?: number[];
     questions?: GeneratedQuestionPreview[];
+    /** The catalogue code the run generated, echoed by the server. Null for the legacy narrative alias, and for a multi-format run. */
+    question_format_code?: string | null;
+    /** Every format the run covered, in the order the server ran them. */
+    question_format_codes?: string[];
+    /** One entry per format of a multi-format run: what each was asked for and what it produced. */
+    formats?: GeneratedFormatResult[];
+    /** Resolved server-side from the catalogue, never taken from the request. */
+    question_type_id?: number;
     missing_slice?: boolean;
     [key: string]: unknown;
   };
@@ -825,16 +884,16 @@ export async function uploadChapterContent(
 
   const PERSIST_ENABLED = true;
   if (!PERSIST_ENABLED) {
-    return { status: true, message: 'Saved locally (backend endpoint not wired yet).' };
+    return { status: true, message: 'Saved on this device only.' };
   }
 
   const res = await fetch(`${API_BASE_URL}${CHAPTER_CONTENT_STORE_ENDPOINT}`, {
     method: 'POST',
     body: form,
   });
-  const raw = await readApiJson(res, 'Failed to save content');
+  const raw = await readApiJson(res, 'Couldn’t save content');
   if (!res.ok || Number(raw.status_code) !== 1) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to save content'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t save content'));
   }
   return {
     status: true,
@@ -929,7 +988,7 @@ export async function generateIntelligenceQuestions(
     body: JSON.stringify(request),
   });
 
-  const raw = await readApiJson(res, 'Failed to generate questions');
+  const raw = await readApiJson(res, 'Couldn’t generate questions');
   if (res.status === 401) {
     throw new Error('Your session has expired. Please sign in again.');
   }
@@ -944,7 +1003,7 @@ export async function generateIntelligenceQuestions(
     );
   }
   if (!res.ok || raw.status === false) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to generate questions'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t generate questions'));
   }
 
   return {
@@ -952,6 +1011,47 @@ export async function generateIntelligenceQuestions(
     message: (raw.message as string) || 'Questions generated successfully.',
     data: raw.data as GenerateIntelligenceQuestionsResponse['data'],
   };
+}
+
+/**
+ * The question formats a teacher can generate.
+ *
+ * Served by the backend as the formats that are BOTH in `question_type_catalog` and
+ * implemented by the generator, so the modal lists exactly what will work and
+ * nothing is hardcoded here. Behind the same bearer-token gate as generation, but
+ * not rate limited: it spends nothing.
+ */
+export async function fetchGeneratableQuestionFormats(): Promise<GeneratableFormat[]> {
+  const session = buildSessionContext();
+
+  if (!session.token) {
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/intelligence/questions/formats`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${session.token}`,
+    },
+  });
+
+  const raw = await readApiJson(res, 'Failed to load the question formats');
+  if (res.status === 401) {
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+  if (res.status === 403) {
+    throw new Error(
+      getApiErrorMessage(raw, 'You are not authorised to generate questions.')
+    );
+  }
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to load the question formats'));
+  }
+
+  // Defensive: an entry that is not a usable format is dropped, never rendered as a
+  // card the teacher could pick and then watch fail.
+  return normaliseGeneratableFormats(raw.data);
 }
 
 export async function fetchSemanticIntelligenceChapters(): Promise<SemanticIntelligenceChapter[]> {
@@ -1071,6 +1171,12 @@ export interface QuestionBankApiQuestion {
   assertion?: string | null;
   reason?: string | null;
   sub_part_labels?: string[];
+  /** Structured match-the-following pairs; null on every row written before the format-driven generator. */
+  pairs?: Array<{ left: string; right: string }> | null;
+  /** Drag-the-words word bank; null on every row that has none. */
+  distractors?: string[] | null;
+  /** Image-based Drag & Drop payload; null on every row that has none. Checked again by readDragDrop(). */
+  drag_drop?: import('@/lib/h5p/question-bank-h5p-map').DragDropData | null;
   correct_option?: string | null;
 }
 
@@ -1249,9 +1355,9 @@ export async function createQuestionBankQuestion(
     body: JSON.stringify(payload),
   });
 
-  const raw = await readApiJson(res, 'Failed to add the question');
+  const raw = await readApiJson(res, 'Couldn’t add the question');
   if (!res.ok || raw.status === false) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to add the question'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t add the question'));
   }
 
   const data = raw.data as { id?: number } | undefined;
@@ -1290,9 +1396,9 @@ export async function updateQuestionBankQuestion(
     body: JSON.stringify(payload),
   });
 
-  const raw = await readApiJson(res, 'Failed to save the question');
+  const raw = await readApiJson(res, 'Couldn’t save the question');
   if (!res.ok || raw.status === false) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to save the question'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t save the question'));
   }
 }
 
@@ -1320,9 +1426,9 @@ export async function reviewQuestionBankQuestion(
     body: JSON.stringify(payload),
   });
 
-  const raw = await readApiJson(res, 'Failed to update the question');
+  const raw = await readApiJson(res, 'Couldn’t update the question');
   if (!res.ok || raw.status === false) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to update the question'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t update the question'));
   }
 }
 
@@ -1345,9 +1451,9 @@ export async function deleteQuestionBankQuestion(
     body: JSON.stringify(payload),
   });
 
-  const raw = await readApiJson(res, 'Failed to delete the question');
+  const raw = await readApiJson(res, 'Couldn’t delete the question');
   if (!res.ok || raw.status === false) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to delete the question'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t delete the question'));
   }
 }
 

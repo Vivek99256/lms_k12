@@ -61,7 +61,7 @@ export default function TeamChallengesPage() {
       await endTeamChallenge(challenge.id, reason);
       reload();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not end the challenge.');
+      setActionError(err instanceof Error ? err.message : 'Couldn’t end the challenge.');
     } finally {
       setBusy(false);
     }
@@ -89,7 +89,7 @@ export default function TeamChallengesPage() {
         <StatusPanel
           kind="error"
           title="Team challenges are not available"
-          message={error || 'The backend did not return a challenge payload.'}
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={reload}
           retrying={refreshing}
         />
@@ -175,8 +175,7 @@ export default function TeamChallengesPage() {
       ) : null}
 
       <SectionCard
-        title="The four challenge types"
-        description="Served by the API from the specification — the type list here is never hard-coded in the UI."
+        title="The four challenge types"
       >
         <div className="grid gap-3 sm:grid-cols-2">
           {data.types.map((type) => (
@@ -396,7 +395,7 @@ function ChallengeComposer({
       });
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create the challenge.');
+      setError(err instanceof Error ? err.message : 'Couldn’t create the challenge.');
     } finally {
       setSaving(false);
     }

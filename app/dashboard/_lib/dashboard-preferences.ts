@@ -77,7 +77,7 @@ async function requestDashboardPreferences(
   }
 
   if (!response.ok) {
-    throw new Error(readString(payload.message) || `HTTP ${response.status}: Unable to ${method === 'GET' ? 'load' : 'save'} your dashboard layout.`);
+    throw new Error(readString(payload.message) || "We couldn't update your dashboard layout. Please try again.");
   }
 
   const hidden = payload.hidden_widgets;

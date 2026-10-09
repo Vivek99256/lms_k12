@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 
@@ -86,7 +88,7 @@ export function AssignDialog({
       );
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not assign this homework.');
+      setError(friendlyError(err, 'We couldn’t assign this homework.. Please try again.'));
     } finally {
       setSaving(false);
     }

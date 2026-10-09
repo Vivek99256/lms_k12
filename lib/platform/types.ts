@@ -307,3 +307,76 @@ export function componentOf(itemKey: ItemKey): ComponentKey {
   const parts = itemKey.split('.');
   return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : itemKey;
 }
+
+// ── Paging ──────────────────────────────────────────────────────────────────
+
+export interface PageMeta {
+  page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
+// ── Audit (GET /api/platform/audit) ─────────────────────────────────────────
+
+export interface AuditEntry {
+  id: number;
+  module: string;
+  component: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | number | null;
+  actor_user_id: number | string | null;
+  actor_name: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  ip: string | null;
+  is_sample: boolean;
+  created_at: string | null;
+}
+
+export interface AuditSummary {
+  total: number;
+  by_module: Record<string, number>;
+  by_action: Record<string, number>;
+  sample_rows: number;
+}
+
+// ── Integrations (GET /api/platform/integrations) ───────────────────────────
+
+export type IntegrationCategory = 'sms' | 'email' | 'whatsapp' | 'push' | 'payment' | 'biometric' | 'bank';
+
+export interface PlatformIntegration {
+  id: number;
+  provider_key: string;
+  display_name: string;
+  category: IntegrationCategory | string;
+  description: string | null;
+  status: 'active' | 'inactive' | 'error';
+  /** Secrets arrive as `********`; sending that back keeps the stored value. */
+  config: Record<string, string | number | boolean | null>;
+  required_fields: string[];
+  last_tested_at: string | null;
+  last_tested_by: string | null;
+  updated_by: string | null;
+  is_sample: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface IntegrationInput {
+  provider_key: string;
+  display_name: string;
+  category: string;
+  description?: string | null;
+  status?: 'active' | 'inactive' | 'error';
+  config: Record<string, string | number | boolean | null>;
+}
+
+export interface IntegrationTestResult {
+  ok: boolean;
+  /** `connectivity` reached something; `validation` only checked the fields. */
+  mode: 'connectivity' | 'validation' | string;
+  message: string;
+  integration: PlatformIntegration;
+}

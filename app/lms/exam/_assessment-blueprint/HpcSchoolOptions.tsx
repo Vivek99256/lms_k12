@@ -89,7 +89,7 @@ export default function HpcSchoolOptionsPanel({ onClose, onSaved }: Props) {
         )
       );
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Unable to load your HPC settings.');
+      setError(loadError instanceof Error ? loadError.message : 'Couldn’t load your HPC settings.');
     } finally {
       setLoading(false);
     }
@@ -133,7 +133,7 @@ export default function HpcSchoolOptionsPanel({ onClose, onSaved }: Props) {
         setNotice('Saved for your school. Other schools are unaffected.');
         onSaved();
       } catch (saveError) {
-        setError(saveError instanceof Error ? saveError.message : 'Unable to save these options.');
+        setError(saveError instanceof Error ? saveError.message : 'Couldn’t save these options.');
       } finally {
         setBusyType('');
       }
@@ -170,7 +170,7 @@ export default function HpcSchoolOptionsPanel({ onClose, onSaved }: Props) {
         setNotice('Back to the standard list.');
         onSaved();
       } catch (resetError) {
-        setError(resetError instanceof Error ? resetError.message : 'Unable to reset these options.');
+        setError(resetError instanceof Error ? resetError.message : 'Couldn’t reset these options.');
       } finally {
         setBusyType('');
       }

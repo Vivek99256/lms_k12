@@ -74,7 +74,7 @@ function DiagnosticResultView() {
         .then(setResult)
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'The result could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'The result couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -93,7 +93,7 @@ function DiagnosticResultView() {
       <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
-            <p className="text-sm text-rose-800">{error ?? 'This result could not be found.'}</p>
+            <p className="text-sm text-rose-800">{error ?? 'This result couldn’t be found.'}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={load}>Try again</Button>
               <Link href="/pal" className={buttonVariants({ size: 'sm' })}>Back to subjects</Link>
@@ -147,7 +147,12 @@ function DiagnosticResultView() {
           )}
 
           <PalRailSection title="Your journey">
-            <JourneyRail current="adaptive" completed={stagesBefore('adaptive')} orientation="vertical" />
+            <JourneyRail
+              current="adaptive"
+              completed={stagesBefore('adaptive')}
+              orientation="vertical"
+              chapterId={result.chapterId}
+            />
           </PalRailSection>
         </>
       }

@@ -510,7 +510,7 @@ function RecommendationCard({
     try {
       await onDecide(recommendation.id, verdict, rationale);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'The decision could not be recorded.');
+      setError(err instanceof Error ? err.message : 'The decision couldn’t be recorded.');
     } finally {
       setPending(null);
     }

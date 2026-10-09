@@ -138,7 +138,7 @@ export function CreateTaskModal({ isOpen, onClose, onCreated }: Props) {
           name: [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' '),
           departmentId: String(employee.department_id ?? ''),
         })))
-      }).catch((reason: unknown) => setError(toMessage(reason, 'Unable to load assignment options.')))
+      }).catch((reason: unknown) => setError(toMessage(reason, "Couldn't load assignment options. Try again.")))
         .finally(() => setLoading(false))
 
       myTasksApi.getProjectRecords(session, { perPage: 100 })
@@ -164,7 +164,7 @@ export function CreateTaskModal({ isOpen, onClose, onCreated }: Props) {
         setProjectTasks(tasks.data.tasks.filter((task) => inProject.has(String(task.id))).map((task) => ({ value: String(task.id), label: task.title })))
       }
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load this project.'))
+      setError(toMessage(reason, "Couldn't load this project. Try again."))
     } finally { setProjectLoading(false) }
   }
 
@@ -199,7 +199,7 @@ export function CreateTaskModal({ isOpen, onClose, onCreated }: Props) {
       // making the user find the toggle.
       setTitleSource(tasks.length ? 'catalogue' : 'custom')
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load tasks for this job role.'))
+      setError(toMessage(reason, "Couldn't load tasks for this job role. Try again."))
     } finally { setTaskTitlesLoading(false) }
   }
 
@@ -242,7 +242,7 @@ export function CreateTaskModal({ isOpen, onClose, onCreated }: Props) {
       setJobRoleSuggestions(Array.from(new Set(roleBased)))
       if (taskRequestId === employeeTasksRequestRef.current) setEmployeeTasksLoading(false)
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load employee details.'))
+      setError(toMessage(reason, "Couldn't load employee details. Try again."))
     } finally {
       setObserverLoading(false)
       if (taskRequestId === employeeTasksRequestRef.current) setEmployeeTasksLoading(false)
@@ -304,7 +304,7 @@ export function CreateTaskModal({ isOpen, onClose, onCreated }: Props) {
     try {
       await myTasksApi.saveJobRoleTaskToLibrary(getTaskSession(), { task: title.trim(), jobrole: roleName, task_type: priority })
     } catch {
-      setError('The task was created, but it could not be added to the Job Role Task library.')
+      setError("The task was created, but it couldn't be added to the designation task library.")
     }
   }
 
@@ -336,7 +336,7 @@ export function CreateTaskModal({ isOpen, onClose, onCreated }: Props) {
       if (titleSource === 'custom' && saveToLibrary && jobRole) await saveTitleToLibrary()
 
       onCreated?.(followUp ? `${response.message} ${followUp}` : response.message); close()
-    } catch (reason) { setError(toMessage(reason, 'Unable to create task.')) }
+    } catch (reason) { setError(toMessage(reason, "Couldn't create task. Try again.")) }
     finally { setSaving(false) }
   }
 
@@ -447,7 +447,7 @@ export function CreateTaskModal({ isOpen, onClose, onCreated }: Props) {
       setKra(generated.kras ?? kra); setKpa(generated.kpis ?? kpa)
       setPriority(generated.task_type ?? priority)
       setSkillIds((generated.skill_required ?? []).map((name) => skills.find((skill) => skill.name === name)?.id).filter((id): id is string => Boolean(id)).slice(0, 3))
-    } catch (reason) { setError(toMessage(reason, 'Unable to generate task details.')) }
+    } catch (reason) { setError(toMessage(reason, "Couldn't generate task details. Try again.")) }
     finally { setGenerating(false) }
   }
 

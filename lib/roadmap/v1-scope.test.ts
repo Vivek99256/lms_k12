@@ -12,7 +12,32 @@ import { isVisibleMenuLink } from '../../app/data/menuMappers';
  */
 
 test('modules outside V1 are hidden, including their sub-routes', () => {
-  for (const route of ['/pal', '/pal/eso/chapter/1014', '/h5p/h5p_mcq', '/ai', '/enterprise-brain/governance', '/hrit/attendance', '/career-explorer']) {
+  for (const route of ['/pal', '/h5p/h5p_mcq', '/ai', '/hrit/attendance', '/career-explorer']) {
+    assert.equal(isDeferredModuleRoute(route), true, route);
+  }
+});
+
+test('New PAL (tblmenumaster parent 531) is not V1-deferred, despite sharing the /pal prefix', () => {
+  for (const route of [
+    '/pal/new',
+    '/pal/new/content-model',
+    '/pal/new/administration',
+    '/pal/new/gamification',
+    '/pal/new/ai-stack',
+    '/pal/ulu',
+    '/pal/eso',
+    '/pal/eso/chapter/1014',
+    '/pal/pedagogy-engine',
+    '/pal/reports/attainment',
+  ]) {
+    assert.equal(isDeferredModuleRoute(route), false, route);
+  }
+});
+
+test('legacy /pal/* screens that are NOT New PAL children stay V1-deferred', () => {
+  // These are real pages but are not under tblmenumaster parent 531 (New PAL) —
+  // /pal/frameworks in particular hangs off parent 327 (Curriculum) instead.
+  for (const route of ['/pal/adaptive/chapter/1', '/pal/diagnostic/chapter/1', '/pal/mastery/concept/1', '/pal/frameworks/algebra']) {
     assert.equal(isDeferredModuleRoute(route), true, route);
   }
 });
@@ -20,6 +45,13 @@ test('modules outside V1 are hidden, including their sub-routes', () => {
 test('the V1 core is never hidden', () => {
   for (const route of ['/fees', '/fees/collect', '/students', '/student', '/admissions/admission_enquiry', '/attendance/attendance_dashboard', '/result/master', '/exam', '/lms', '/subjects', '/dashboard', '/settings', '/general/groupwise_rights', '/user', '/reports']) {
     assert.equal(isDeferredModuleRoute(route), false, route);
+  }
+});
+
+test('rights-granted Enterprise Brain menus remain visible without enabling deferred modules', () => {
+  for (const route of ['/enterprise-brain', '/enterprise-brain/automation', '/enterprise-brain/automation/agents', '/enterprise-brain/governance']) {
+    assert.equal(isDeferredModuleRoute(route), false, route);
+    assert.equal(isVisibleMenuLink(route), true, route);
   }
 });
 

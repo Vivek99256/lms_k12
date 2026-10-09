@@ -31,7 +31,7 @@ export function FeesNotificationSettings() {
         setDraft(new Map());
       })
       .catch((cause: unknown) => {
-        setError(cause instanceof PlatformApiError ? cause.message : 'The Fees notification settings could not be loaded.');
+        setError(cause instanceof PlatformApiError ? cause.message : "Couldn't load the Fees notification settings. Try again.");
       })
       .finally(() => setLoading(false));
   }, []);
@@ -103,7 +103,7 @@ export function FeesNotificationSettings() {
     } catch (cause) {
       setNote({
         tone: 'error',
-        text: cause instanceof PlatformApiError ? cause.message : 'The changes could not be saved.',
+        text: cause instanceof PlatformApiError ? cause.message : "Couldn't save the changes. Try again.",
       });
     } finally {
       setSaving(false);

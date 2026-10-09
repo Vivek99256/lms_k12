@@ -13,6 +13,7 @@ import {
   type WorkspaceSuggestion,
 } from '@/lib/intelligence/workspace';
 
+import { CreateOptions } from './CreateOptions';
 import {
   GeneratedTag,
   SuggestionButton,
@@ -77,7 +78,13 @@ export function CreateTab({
 
     try {
       if (suggestion.action_type === 'report') {
-        const built = await generateReportForContext(session, { route });
+        // A report picked from the module's list names its layout; the default button
+        // names none and gets the module's default, exactly as before.
+        const templateId = Number((suggestion.payload as { template_id?: unknown } | undefined)?.template_id);
+        const built = await generateReportForContext(session, {
+          route,
+          ...(Number.isInteger(templateId) && templateId > 0 ? { template_id: templateId } : {}),
+        });
         setReport({ suggestion, report: built });
 
         return;
@@ -89,16 +96,21 @@ export function CreateTab({
         return;
       }
 
+      // Inputs typed into a template's own form travel with the suggestion, so
+      // Regenerate asks again with the same values.
+      const typed = (suggestion.payload as { variables?: Record<string, unknown> } | undefined)?.variables;
+
       const outcome = await generateForContext(session, {
         route,
         template_key: suggestion.action_ref,
         entity_type: context?.entity_type ?? null,
         entity_id: context?.entity_id ?? null,
+        ...(typed ? { variables: typed } : {}),
       });
 
       setResult({ suggestion, outcome });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The content could not be generated.');
+      setError(caught instanceof Error ? caught.message : 'The content couldn’t be generated.');
     } finally {
       setBusyKey(null);
     }
@@ -170,6 +182,14 @@ export function CreateTab({
           ))}
         </div>
       </TabSection>
+
+      <CreateOptions
+        session={session}
+        route={route}
+        offeredKeys={new Set(suggestions.map((item) => item.action_ref).filter((key): key is string => !!key))}
+        busyKey={busyKey}
+        onRun={(suggestion) => void run(suggestion)}
+      />
 
       {error ? <TabError message={error} /> : null}
 

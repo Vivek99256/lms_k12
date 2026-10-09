@@ -70,7 +70,7 @@ const CATEGORY_STYLES: Record<PalContentCategory, { label: string; badge: string
   remediation: { label: 'Remediation', badge: 'bg-rose-50 text-rose-700 border-rose-200' },
   practice: { label: 'Practice', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
   enrichment: { label: 'Extension Activity', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  misconception: { label: 'Misconception', badge: 'bg-sky-50 text-sky-700 border-sky-200' },
+  misconception: { label: 'Common mistake', badge: 'bg-sky-50 text-sky-700 border-sky-200' },
 };
 
 type AudienceMode = 'Teacher' | 'Student';
@@ -180,7 +180,7 @@ function PalEntryPageContent() {
         setOpenSubjects(toOpen ? { [toOpen.id]: true } : {});
       } catch (reason) {
         if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load PAL subjects.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load PAL subjects.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -301,8 +301,8 @@ function PalEntryPageContent() {
             <p>
               This is a <span className="font-semibold">class preview</span> — you can browse subjects,
               chapters and take quizzes as a student would. Personalized insights (the{' '}
-              <span className="font-semibold">Pedagogy Engine</span> and{' '}
-              <span className="font-semibold">Misconceptions</span>) are per-student, so switch to{' '}
+              <span className="font-semibold">Teaching methods</span> and{' '}
+              <span className="font-semibold">Common mistakes</span>) are per-student, so switch to{' '}
               <button
                 type="button"
                 onClick={exitStudentView}
@@ -546,6 +546,17 @@ function ChapterRow({
             {hasAttempts && (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                 {chapter.quizCount} quiz{chapter.quizCount === 1 ? '' : 'zes'}
+              </span>
+            )}
+            {/* The chapter diagnostic (pal_diagnostic_attempt) - a separate
+                feature/table from the quiz badge above. Shows the latest
+                submitted attempt so "already attempted" is visible without
+                opening the diagnostic first. */}
+            {chapter.hasDiagnostic && (
+              <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                Already attempted
+                {chapter.diagnosticLevel ? ` · ${chapter.diagnosticLevel}` : ''}
+                {chapter.diagnosticPercentage != null ? ` · ${Math.round(chapter.diagnosticPercentage)}%` : ''}
               </span>
             )}
           </div>
@@ -795,7 +806,7 @@ function PedagogyModal({ modal, onClose }: { modal: ActiveModal; onClose: () => 
         );
       } catch (reason) {
         if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load suggested content.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load suggested content.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -818,7 +829,7 @@ function PedagogyModal({ modal, onClose }: { modal: ActiveModal; onClose: () => 
 
   return (
     <ModalShell
-      title="Pedagogy Engine"
+      title="Teaching methods"
       subtitle={`${modal.subjectName} · ${modal.chapterName}`}
       icon={<Sparkles className="h-5 w-5" />}
       onClose={onClose}
@@ -1068,7 +1079,7 @@ function MisconceptionModal({ modal, onClose }: { modal: ActiveModal; onClose: (
         setQuestions(await fetchMisconceptions(modal.context.chapterId, signal, modal.learnerId));
       } catch (reason) {
         if (signal?.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load misconceptions.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load common mistakes.');
       } finally {
         if (!signal?.aborted) setLoading(false);
       }
@@ -1095,7 +1106,7 @@ function MisconceptionModal({ modal, onClose }: { modal: ActiveModal; onClose: (
       );
       await load();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to generate content.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t generate content.');
     } finally {
       setGenerating(false);
     }
@@ -1103,7 +1114,7 @@ function MisconceptionModal({ modal, onClose }: { modal: ActiveModal; onClose: (
 
   return (
     <ModalShell
-      title="Misconceptions"
+      title="Common mistakes"
       subtitle={`${modal.subjectName} · ${modal.chapterName}`}
       icon={<AlertTriangle className="h-5 w-5" />}
       onClose={onClose}

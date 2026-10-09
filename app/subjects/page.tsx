@@ -36,7 +36,7 @@ export default function SubjectsPage() {
         if (!cancelled) setRawSubjects(rows);
       } catch (fetchError) {
         if (!cancelled) {
-          setError(fetchError instanceof Error ? fetchError.message : 'Unable to load subjects.');
+          setError(fetchError instanceof Error ? fetchError.message : "Couldn't load subjects. Try again.");
         }
       } finally {
         if (!cancelled) setLoading(false);

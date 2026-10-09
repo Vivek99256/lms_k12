@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
+import { JourneyRail, stagesBefore, type JourneyStageKey } from '@/app/pal/_components/JourneyRail';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -82,6 +83,9 @@ function EsoConceptFlow() {
   const viewAsStudent = useViewAsStudent();
 
   const conceptId = Number(searchParams.get('conceptId') || '0');
+  const chapterId =
+    searchParams.get('chapterId') ||
+    (typeof window !== 'undefined' ? sessionStorage.getItem('pal_active_chapter_id') : null);
   // The real student entry point (AdaptiveLearningButton) never puts
   // learnerId in this URL — it always resolves to defaultLearnerId(), the
   // authenticated session's own id. `?learnerId=` is read here only for
@@ -167,7 +171,7 @@ function EsoConceptFlow() {
       const next = await fetchNextAction(learnerId, conceptId);
       applyAction(next);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to load the next learning step.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t load the next learning step.');
     } finally {
       resolving.current = false;
       setLoading(false);
@@ -207,15 +211,29 @@ function EsoConceptFlow() {
     );
   }
 
-  // The stage list, and - while practising - how far through the phase they
+  const resolveEsoStage = (): JourneyStageKey => {
+    if (planPending) return 'plan';
+    const act = action?.action ?? '';
+    if (act === 'teach' || act === 'reteach') return 'learn';
+    if (act === 'practice' || act === 'continue_practice') return 'practice';
+    if (act === 'check_understanding') return 'check';
+    if (act === 'mastered_stop_practice') return 'mastery';
+    if (act === 'retrieval_due' || act === 'retained' || act === 'reloop_node') return 'recall';
+    return 'practice';
+  };
+  const esoStage = resolveEsoStage();
+
+  // The journey rail and - while practising - how far through the phase they
   // are. Both were inline above the step before; in the rail they stay visible
   // without pushing the question itself down the page.
   const rail = (
     <>
-      <PalRailSection title="Your progress">
-        <LearningFlowRail
-          action={action?.action ?? ''}
-          stageKey={planPending ? 'plan' : undefined}
+      <PalRailSection title="Your journey">
+        <JourneyRail
+          current={esoStage}
+          completed={stagesBefore(esoStage)}
+          chapterId={chapterId}
+          conceptId={conceptId}
           orientation="vertical"
         />
       </PalRailSection>
@@ -1204,7 +1222,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
         if (!cancelled) setPayload(data);
       })
       .catch((reason) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load the diagnostic.');
+        if (!cancelled) setError(reason instanceof Error ? reason.message : 'Couldn’t load the diagnostic.');
       });
     return () => {
       cancelled = true;
@@ -1246,7 +1264,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
       );
       onAdvance();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit the diagnostic.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit the diagnostic.');
     } finally {
       setSubmitting(false);
     }
@@ -1409,7 +1427,7 @@ function PrerequisiteProbeStep({
       // resolved next action, so it is adopted rather than re-requested.
       onResolved(await recordAttempt(learnerId, action.nodeId, { conceptId, answerMasterId: selected }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit your answer.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit your answer.');
     } finally {
       setSubmitting(false);
     }
@@ -1758,7 +1776,7 @@ function CheckUnderstandingStep({
         )
       );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit your answers.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit your answers.');
     } finally {
       setSubmitting(false);
     }
@@ -1967,7 +1985,7 @@ function TeachOrPracticeStep({
         })
       );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit your answer.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit your answer.');
     } finally {
       setSubmitting(false);
     }
@@ -2156,7 +2174,7 @@ function ContrastPairStep({
       // resolved next action, so it is adopted rather than re-requested.
       onResolved(await recordAttempt(learnerId, action.nodeId, { conceptId, answerMasterId: selected }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit your answer.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit your answer.');
     } finally {
       setSubmitting(false);
     }
@@ -2493,7 +2511,7 @@ function RetrievalDueStep({
     if (!action.nodeId) return;
     fetchRetrievalItems(learnerId, action.nodeId)
       .then(setItems)
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Unable to load the review.'));
+      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Couldn’t load the review.'));
   }, [learnerId, action.nodeId]);
 
   const submit = async () => {
@@ -2505,7 +2523,7 @@ function RetrievalDueStep({
       const outcome = await submitRetrievalCheck(learnerId, action.nodeId, conceptId, responses);
       setResult(outcome);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit the review.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit the review.');
     } finally {
       setSubmitting(false);
     }

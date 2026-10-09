@@ -255,7 +255,7 @@ export async function generateQuestionPaperPdf({
     const sheet = host.querySelector<HTMLElement>('.question-paper-sheet');
 
     if (!sheet) {
-      throw new Error('The question paper could not be laid out for export.');
+      throw new Error('The question paper couldn’t be laid out for export.');
     }
 
     const pages = findPageCuts(sheet, pageHeightPx);

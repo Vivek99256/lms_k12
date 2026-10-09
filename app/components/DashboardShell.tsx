@@ -5,6 +5,7 @@ import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
 import { StuckUserAssistant } from '@/components/ai/StuckUserAssistant';
+import { StuckNudgePopup } from '@/components/ai/StuckNudgePopup';
 import type { StuckPromptContext } from '@/lib/ai/stuck-assist-types';
 import { PageAiContextProvider } from '@/contexts/PageAiContext';
 import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
@@ -19,6 +20,7 @@ import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
 import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/navigation';
+import { isBrainMenu } from '@/lib/brain/menu-navigation';
 import { canSeeInternalItems, showDeferredModules } from '@/lib/roadmap';
 import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
@@ -140,19 +142,29 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
   // still claim `/pal/frameworks` for New PAL below, and the page would wear
   // New PAL's tab bar while living under Curriculum — see the migration
   // 2026_09_08_100000_move_framework_menu_under_curriculum.php in next_lms_erp.
+  //
+  // Reports (new_pal.reports, 2026_09_08_140000_add_new_pal_reports_submodule_
+  // menu) is also absent, but not deliberately: that migration has not run
+  // against this DB yet, so no tblmenumaster row exists for it and it could
+  // never pass the rights check below. Add it here once that migration runs.
   {
     id: 'pal-content-model',
-    label: 'Content Model',
+    label: 'Content structure',
     href: '/pal/new/content-model',
   },
   {
     id: 'pal-ulu',
-    label: 'Unified Learning Units',
+    label: 'Learning units',
     href: '/pal/ulu',
   },
   {
+    id: 'pal-coherence-map',
+    label: 'Coherence Map',
+    href: '/pal/new/coherence-map',
+  },
+  {
     id: 'pal-pedagogy-engine',
-    label: 'Pedagogy Engine',
+    label: 'Teaching methods',
     href: '/pal/pedagogy-engine',
   },
   {
@@ -166,11 +178,38 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
     href: '/pal/new/gamification',
   },
   {
+    id: 'pal-eso',
+    label: 'ESO',
+    href: '/pal/eso',
+  },
+  {
     id: 'pal-ai-stack',
-    label: 'AI Stack',
+    label: 'AI tools',
     href: '/pal/new/ai-stack',
   },
 ];
+
+/**
+ * `NEW_PAL_LEVEL3_ITEMS[].label` is the UX-facing tab name, and several of
+ * them read nothing like their tblmenumaster `name` ("Content structure" vs.
+ * "Content Model", "Learning units" vs. "Unified Learning Units", "Teaching
+ * methods" vs. "Pedagogy Engine", "AI tools" vs. "AI Stack"). The rights
+ * check below matches by name against the menu tree, so matching on `label`
+ * directly made every one of those items fail the check regardless of
+ * rights — only Administration, Gamification and ESO happened to read the
+ * same both ways. This maps each item back to the exact `tblmenumaster.name`
+ * (parent id 531) it must match instead.
+ */
+const NEW_PAL_LEVEL3_DB_NAMES: Record<string, string> = {
+  'pal-content-model': 'Content Model',
+  'pal-ulu': 'Unified Learning Units',
+  'pal-coherence-map': 'Coherence Map',
+  'pal-pedagogy-engine': 'Pedagogy Engine',
+  'pal-administration': 'Administration',
+  'pal-gamification': 'Gamification',
+  'pal-eso': 'ESO',
+  'pal-ai-stack': 'AI Stack',
+};
 
 /** `href` itself, or a page nested under it — never a sibling that merely shares a prefix. */
 function isUnderRoute(pathname: string, href: string): boolean {
@@ -223,7 +262,9 @@ function newPalLevel3Items(pathname: string, menuItems: MenuItem[]): Level3Item[
   const newPalNode = findNewPalMenuNode(menuItems);
   const allowedLabels = new Set((newPalNode?.submenus ?? []).map((submenu) => normalizeMenuLabel(submenu.label)));
 
-  const items = NEW_PAL_LEVEL3_ITEMS.filter((item) => allowedLabels.has(normalizeMenuLabel(item.label)));
+  const items = NEW_PAL_LEVEL3_ITEMS.filter((item) =>
+    allowedLabels.has(normalizeMenuLabel(NEW_PAL_LEVEL3_DB_NAMES[`${item.id}`] ?? item.label)),
+  );
   return items.length ? items : null;
 }
 
@@ -327,7 +368,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, []);
 
   const displayedMenuItems = useMemo<MenuItem[]>(() => {
-    if (!hasBrainAccess || !showDeferredModules()) return menuItems; // Enterprise Brain is not part of V1
+    // Keep rights-granted database menus. Only the synthetic fallback is deferred.
+    if (!hasBrainAccess || !showDeferredModules()) return menuItems;
     const alreadyPresent = menuItems.some((item) => normalizeMenuLabel(item.label) === 'enterprise brain');
     if (alreadyPresent) return menuItems;
 
@@ -448,7 +490,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       const res = await fetch(url.toString());
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || 'Failed to fetch master menu rights');
+      if (!res.ok) throw new Error(data.message || "We couldn't load your menu. Please try again.");
 
       const rawData = Array.isArray(data.data) ? data.data : [];
       let mapped: SubmenuItem[] = [];
@@ -564,11 +606,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, [displayedMenuItems, selectedBranch, pathname, router, isKnownMenuPath]);
 
   const toggleChatbot = () => {
-    setIsChatbotOpen((prev) => {
-      const next = !prev;
-      setIsRightToolbarOpen(!next);
-      return next;
-    });
+    // Opening the assistant by hand answers the nudge, so don't leave it pending.
+    setShowStuckNudge(false);
+    setIsChatbotOpen((prev) => !prev);
   };
 
   // Set by the idle watcher the moment it fires, and consumed exactly once by
@@ -577,11 +617,22 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   // isChatbotOpen" in one place.
   const [pendingStuckPrompt, setPendingStuckPrompt] = useState<StuckPromptContext | null>(null);
 
-  const handleStuck = (context: StuckPromptContext) => {
-    setPendingStuckPrompt(context);
+  // The idle trigger no longer opens the panel itself: it shows a small popup at the
+  // bottom-right. "Yes" opens the panel the ordinary way (empty chat with the
+  // page-context suggested prompts); "No" just dismisses the popup.
+  const [showStuckNudge, setShowStuckNudge] = useState(false);
+
+  const handleStuck = () => {
+    setShowStuckNudge(true);
+  };
+
+  const handleNudgeYes = () => {
+    setShowStuckNudge(false);
     setIsChatbotOpen(true);
     setIsRightToolbarOpen(false);
   };
+
+  const handleNudgeNo = useCallback(() => setShowStuckNudge(false), []);
 
   const handleLevel1Select = (item: MenuItem) => {
     setSelectedBranch((current) => {
@@ -600,7 +651,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // Each Enterprise Brain section has a landing page of its own listing its
     // screens with live counts, so a section click lands there rather than
     // jumping past it into the first screen. It also has no LMS master menu.
-    if (String(parent.id ?? '') === 'enterprise-brain') {
+    if (isBrainMenu(parent)) {
       if (submenu.href && submenu.href !== '#') router.push(submenu.href);
       return;
     }
@@ -685,7 +736,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (!selectedBranch?.level2Key || !selectedL1 || masterMenuFetchedFor) return;
     // Enterprise Brain screens are not backed by the LMS master-menu rights
     // table, so asking for their master menu only produces a failed request.
-    if (String(selectedL1.id ?? '') === 'enterprise-brain') return;
+    if (isBrainMenu(selectedL1)) return;
 
       const selectedLevel2 = selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key);
       if (selectedLevel2) {
@@ -830,7 +881,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 className={`group relative -mx-1 hidden w-2 flex-none cursor-col-resize items-center justify-center rounded outline-none md:flex ${
                   assistantPanel.isDragging ? 'bg-[#0D6EFD]/10' : 'hover:bg-[#0D6EFD]/5'
                 } focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40`}
-                title="Drag to resize · arrow keys to nudge"
+                title="Drag or use the arrow keys to resize"
               >
                 <span
                   className={`h-10 w-0.5 rounded-full transition-colors ${
@@ -854,7 +905,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               </div>
             </>
           )}
-          <StuckUserAssistant chatbotOpen={isChatbotOpen} onStuck={handleStuck} />
+          <StuckUserAssistant chatbotOpen={isChatbotOpen || showStuckNudge} onStuck={handleStuck} />
+          {showStuckNudge && !isChatbotOpen && (
+            <StuckNudgePopup onYes={handleNudgeYes} onNo={handleNudgeNo} />
+          )}
         </div>
         <RightFloatingToolbar
           isChatbotOpen={isChatbotOpen}

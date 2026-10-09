@@ -321,7 +321,7 @@ export function MobilityCenter() {
         }
       }
     } catch (err: any) {
-      setError(err?.message || 'Failed to fetch mobility data.')
+      setError(err?.message || "Couldn't load mobility data. Try again.")
     } finally {
       setLoading(false)
     }
@@ -373,7 +373,7 @@ export function MobilityCenter() {
         })
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to create job posting.')
+      alert(err.message || "Couldn't create job posting. Try again.")
     }
   }
 
@@ -413,7 +413,7 @@ export function MobilityCenter() {
         setSelectedJob(res.data)
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to update job posting.')
+      alert(err.message || "Couldn't update job posting. Try again.")
     }
   }
 
@@ -430,7 +430,7 @@ export function MobilityCenter() {
         }
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to close job.')
+      alert(err.message || "Couldn't close job. Try again.")
     }
   }
 
@@ -451,7 +451,7 @@ export function MobilityCenter() {
         alert('Application submitted successfully!')
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to submit application.')
+      alert(err.message || "Couldn't submit application. Try again.")
     }
   }
 
@@ -467,7 +467,7 @@ export function MobilityCenter() {
         }
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to update status.')
+      alert(err.message || "Couldn't update status. Try again.")
     }
   }
 
@@ -495,7 +495,7 @@ export function MobilityCenter() {
         })
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to nominate successor.')
+      alert(err.message || "Couldn't nominate successor. Try again.")
     }
   }
 
@@ -509,7 +509,7 @@ export function MobilityCenter() {
         loadFiltersAndOverview()
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to delete nomination.')
+      alert(err.message || "Couldn't delete nomination. Try again.")
     }
   }
 
@@ -543,7 +543,7 @@ export function MobilityCenter() {
         })
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to record transfer.')
+      alert(err.message || "Couldn't record transfer. Try again.")
     }
   }
 
@@ -555,7 +555,7 @@ export function MobilityCenter() {
         loadFiltersAndOverview()
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to update transfer status.')
+      alert(err.message || "Couldn't update transfer status. Try again.")
     }
   }
 
@@ -589,7 +589,7 @@ export function MobilityCenter() {
         })
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to record promotion.')
+      alert(err.message || "Couldn't record promotion. Try again.")
     }
   }
 
@@ -601,7 +601,7 @@ export function MobilityCenter() {
         loadFiltersAndOverview()
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to update promotion status.')
+      alert(err.message || "Couldn't update promotion status. Try again.")
     }
   }
 
@@ -616,7 +616,7 @@ export function MobilityCenter() {
         setPoolForm({ name: '', description: '', status: 'Active' })
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to create talent pool.')
+      alert(err.message || "Couldn't create talent pool. Try again.")
     }
   }
 
@@ -649,7 +649,7 @@ export function MobilityCenter() {
         fetchListData()
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to add member to pool.')
+      alert(err.message || "Couldn't add member to pool. Try again.")
     }
   }
 
@@ -667,7 +667,7 @@ export function MobilityCenter() {
         fetchListData()
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to remove pool member.')
+      alert(err.message || "Couldn't remove pool member. Try again.")
     }
   }
 
@@ -791,7 +791,7 @@ export function MobilityCenter() {
 
         {error && (
           <ErrorState
-            title="Unable to load mobility data"
+            title="Couldn't load mobility data. Try again."
             description={error}
             retry={fetchListData}
             className="mb-6"
@@ -886,7 +886,7 @@ export function MobilityCenter() {
                   onChange={(val: string) => setFilterDept(val)}
                   options={[
                     { label: 'Department: All', value: 'All' },
-                    ...(filters?.departments.map(d => ({ label: `Dept: ${d.label}`, value: d.value })) || [])
+                    ...(filters?.departments.map(d => ({ label: `Department: ${d.label}`, value: d.value })) || [])
                   ]}
                   size="sm"
                   className="border-none bg-transparent hover:bg-muted/50 h-9 font-semibold text-xs text-foreground/90"
@@ -2213,7 +2213,7 @@ export function MobilityCenter() {
                   value={transferForm.from_department_id}
                   onChange={(val: string) => setTransferForm({ ...transferForm, from_department_id: val })}
                   options={filters?.departments || []}
-                  placeholder="Select Dept"
+                  placeholder="Select department"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -2222,7 +2222,7 @@ export function MobilityCenter() {
                   value={transferForm.to_department_id}
                   onChange={(val: string) => setTransferForm({ ...transferForm, to_department_id: val })}
                   options={filters?.departments || []}
-                  placeholder="Select Dept"
+                  placeholder="Select department"
                 />
               </div>
             </div>

@@ -102,7 +102,7 @@ export default function FeesStructureReportPage() {
     } catch (error) {
       setRows([]);
       setMonths([]);
-      const errorMessage = error instanceof Error ? error.message : 'Unable to fetch fees structure report.';
+      const errorMessage = error instanceof Error ? error.message : "Couldn't load fee structure report. Try again.";
       setMessage({
         type: 'error',
         text: /session token is missing|sign in again/i.test(errorMessage)
@@ -128,14 +128,14 @@ export default function FeesStructureReportPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Fees Structure Report"
+        title="Fee structure report"
         description="Compare class-quota fee structures for new and old students across the mapped academic months."
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'fees-structure-report.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-structure-report.xls', title: 'Fees Structure Report', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-structure-report.pdf', title: 'Fees Structure Report', subtitle: 'Legacy parity export', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Fees Structure Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-structure-report.xls', title: 'Fee structure report', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-structure-report.pdf', title: 'Fee structure report', subtitle: 'Export', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Fee structure report', subtitle: 'Print view', columns: exportColumns, rows: exportRows })}
           />
         }
       />

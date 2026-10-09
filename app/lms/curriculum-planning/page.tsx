@@ -34,14 +34,16 @@ import { AllUpcomingLessonsView } from './UpcomingLessonsView';
 import { SubjectProgressDetailsView } from './SubjectProgressView';
 import { OVERVIEW_WIDGETS, OverviewTab, type OverviewStat } from './OverviewTab';
 import { CurriculumTab } from './CurriculumTab';
+import { OutcomesTab } from './OutcomesTab';
 import { CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
 import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
 
-type TabKey = 'overview' | 'curriculum';
+type TabKey = 'overview' | 'curriculum' | 'outcomes';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'overview', label: 'Overview' },
   { key: 'curriculum', label: 'Curriculum' },
+  { key: 'outcomes', label: 'Outcomes & Delivery' },
 ];
 
 export default function CurriculumPlanningPage() {
@@ -99,7 +101,7 @@ export default function CurriculumPlanningPage() {
         setApiData(Array.isArray(payload.data) ? null : payload.data ?? null);
       } catch (error) {
         if ((error as Error)?.name === 'AbortError') return;
-        setLoadError(error instanceof Error ? error.message : 'Unable to load curriculum plan.');
+        setLoadError(error instanceof Error ? error.message : 'Couldn’t load curriculum plan.');
         setApiData(null);
       } finally {
         if (!controller.signal.aborted) setIsLoading(false);
@@ -234,9 +236,16 @@ export default function CurriculumPlanningPage() {
       ? 'Loading curriculum...'
       : loadError || 'No curriculum data found yet.';
 
-  const headerSubtitle = activeTab === 'overview' ? overviewSubtitle : curriculumSubtitle;
+  const outcomesSubtitle = `${curricula.length} curricula available - pick a Standard, Subject and Curriculum below`;
+
+  const headerSubtitle =
+    activeTab === 'overview' ? overviewSubtitle : activeTab === 'curriculum' ? curriculumSubtitle : outcomesSubtitle;
   const headerTitle =
-    activeTab === 'overview' ? `${gradeLabel} - Yearly syllabus overview` : `${gradeLabel} - Curriculum`;
+    activeTab === 'overview'
+      ? `${gradeLabel} - Yearly syllabus overview`
+      : activeTab === 'curriculum'
+        ? `${gradeLabel} - Curriculum`
+        : `${gradeLabel} - Curriculum Outcomes & Delivery`;
 
   const dialogs = (
     <>
@@ -349,13 +358,15 @@ export default function CurriculumPlanningPage() {
           show={prefs.isVisible}
           hasVisible={prefs.hasVisible}
         />
-      ) : (
+      ) : activeTab === 'curriculum' ? (
         <CurriculumTab
           curricula={curricula}
           unmapped={unmappedChapters}
           isLoading={isLoading}
           loadError={loadError}
         />
+      ) : (
+        <OutcomesTab curricula={curricula} />
       )}
     </div>
     </RequireStaff>

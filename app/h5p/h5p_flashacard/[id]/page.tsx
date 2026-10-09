@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import {
   Suspense,
@@ -199,7 +201,7 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
         setShowResult(false);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load flashcards');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load flashcards. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

@@ -102,7 +102,7 @@ export default function HomeworkReviewDetailPage() {
 
   const load = useCallback(async () => {
     if (!submissionId || Number.isNaN(submissionId)) {
-      setError("Invalid submission reference.");
+      setError("This homework link isn’t valid. Go back and try again.");
       setLoading(false);
       return;
     }
@@ -124,7 +124,7 @@ export default function HomeworkReviewDetailPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "This submission could not be loaded for review."
+          : "This submission couldn’t be loaded for review."
       );
     } finally {
       setLoading(false);
@@ -164,7 +164,7 @@ export default function HomeworkReviewDetailPage() {
       setSaveError(
         submitError instanceof Error
           ? submitError.message
-          : "The review could not be saved."
+          : "The review couldn’t be saved."
       );
     } finally {
       setSaving(false);
@@ -187,7 +187,7 @@ export default function HomeworkReviewDetailPage() {
       setSaveError(
         rerunError instanceof Error
           ? rerunError.message
-          : "The evaluation could not be re-run."
+          : "The evaluation couldn’t be re-run."
       );
     } finally {
       setRerunning(false);
@@ -508,7 +508,7 @@ export default function HomeworkReviewDetailPage() {
         ) : !error ? (
           <section className="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
             <FileText className="mx-auto mb-2 size-8 text-slate-300" />
-            This submission could not be found.
+            This submission couldn’t be found.
           </section>
         ) : null}
       </main>

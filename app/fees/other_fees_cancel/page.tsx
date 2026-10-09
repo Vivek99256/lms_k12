@@ -123,7 +123,7 @@ export default function OtherFeesCancelPage() {
         setMessage({ type: 'info', text: `No active other fees titles found for academic year ${nextSession.academicYearId}.` });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load other fees heads.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load other fees heads. Try again." });
     } finally {
       setLoadingTitles(false);
     }
@@ -176,7 +176,7 @@ export default function OtherFeesCancelPage() {
       setInputs(Object.fromEntries(nextRows.map((row) => [row.id, { date: todayIsoDate(), reason: '' }])));
       setMessage({ type: 'success', text: payload.message || `Loaded ${nextRows.length} paid other-fee receipt${nextRows.length === 1 ? '' : 's'}.` });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to search other fees receipts.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't search other fees receipts. Try again." });
     } finally {
       setLoading(false);
     }
@@ -258,7 +258,7 @@ export default function OtherFeesCancelPage() {
       setSelectedIds([]);
       setMessage({ type: 'success', text: payload.message || 'Other fees cancelled successfully.' });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to cancel other fees.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't cancel other fees. Try again." });
     } finally {
       setSubmitting(false);
     }
@@ -268,7 +268,7 @@ export default function OtherFeesCancelPage() {
     <PageFrame>
       <PageHeader
         title="Other fees cancel"
-        description="Search collected other-fee receipts, preview receipts, and cancel selected rows through Laravel."
+        description="Search collected other-fee receipts, preview receipts, and cancel selected rows."
         action={
           <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-right">
             <p className="text-xs font-medium text-red-700">Selected value</p>
@@ -388,7 +388,7 @@ export default function OtherFeesCancelPage() {
               <TableHead>Quota</TableHead>
               <TableHead>Other fees head</TableHead>
               <TableHead className="text-right">Paid amount</TableHead>
-              <TableHead>Receipt no</TableHead>
+              <TableHead>Receipt no.</TableHead>
               <TableHead>Date of cancel</TableHead>
               <TableHead>Reason of cancel</TableHead>
             </TableRow>

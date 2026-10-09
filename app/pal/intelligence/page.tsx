@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   Gauge,
+  HelpCircle,
   Loader2,
   Network,
   Search,
@@ -41,6 +42,7 @@ import {
 } from '@/app/pal/data/pal-v4';
 import { getViewAsStudent, setViewAsStudent, useViewAsStudent } from '@/app/pal/data/pal-view-as';
 import { fetchClassStudents, isStudentSession, type PalClassStudent } from '@/app/pal/data/pal-lookups';
+import { fetchCoherenceExplanation, type ConceptExplanation } from '@/app/pal/new/data/coherence-map';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 
 interface LearnerBundle {
@@ -134,7 +136,7 @@ export default function PalIntelligencePage() {
         setError(
           state.reason instanceof Error
             ? state.reason.message
-            : 'The PAL V4 API is unavailable. Ensure the backend is deployed.'
+            : 'PAL isn’t available right now.'
         );
       }
       setLoading(false);
@@ -185,7 +187,7 @@ export default function PalIntelligencePage() {
       } catch (reason) {
         if (controller.signal.aborted) return;
         setRosterError(
-          reason instanceof Error ? reason.message : 'Unable to load your students.'
+          reason instanceof Error ? reason.message : 'Couldn’t load your students.'
         );
       } finally {
         if (!controller.signal.aborted) setRosterLoading(false);
@@ -225,9 +227,9 @@ export default function PalIntelligencePage() {
             <Brain className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">PAL Intelligence</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Student insights</h1>
             <p className="text-sm text-slate-500">
-              PAL V4 learner intelligence, velocity, risk prediction and misconception analysis.
+              How each student is progressing, who may need support, and common mistakes.
             </p>
           </div>
         </div>
@@ -280,17 +282,17 @@ export default function PalIntelligencePage() {
 
             {!isStudent && (
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-slate-500">Learner id</span>
+                <span className="text-xs font-medium text-slate-500">Student ID</span>
                 <Input
                   value={learnerId}
                   onChange={(event) => setLearnerId(event.target.value)}
-                  placeholder="Learner id"
+                  placeholder="Student ID"
                   className="h-9 w-40"
                 />
               </label>
             )}
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-500">Velocity period</span>
+              <span className="text-xs font-medium text-slate-500">Pace period</span>
               <select
                 value={period}
                 onChange={(event) => setPeriod(event.target.value)}
@@ -365,7 +367,7 @@ export default function PalIntelligencePage() {
                   icon={<Users className="h-4 w-4" />}
                   dimensions={bundle.state.social}
                   hasData={bundle.state.socialHasData}
-                  emptyNote="No peer-collaboration, classroom-participation or discussion capture is wired up for this estate yet, so these cannot be measured."
+                  emptyNote="No peer-collaboration, classroom-participation or discussion capture is wired up for your school yet, so these cannot be measured."
                 />
                 <DimensionPanel
                   title="Metacognition"
@@ -453,12 +455,12 @@ function CompetencyPanel({ state }: { state: V4LearnerState }) {
             ) : null
           }
         />
-        <Metric label="Learning velocity" value={fmtValue(competency.learningVelocity)} />
+        <Metric label="Learning pace" value={fmtValue(competency.learningVelocity)} />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4 text-xs">
         <Chip label="Knowledge gaps" value={String(competency.knowledgeGaps)} />
-        <Chip label="Active misconceptions" value={String(competency.activeMisconceptions.length)} />
+        <Chip label="Current common mistakes" value={String(competency.activeMisconceptions.length)} />
         <Chip label="Prerequisites flagged" value={String(competency.conceptDependencies)} />
         <Chip label="Device" value={contextual.preferredDevice.join(', ') || NOT_TRACKED} />
         <Chip label="Bandwidth" value={contextual.bandwidthQuality ?? NOT_TRACKED} />
@@ -556,7 +558,7 @@ function VelocityCard({ velocity }: { velocity: V4Velocity }) {
     <Panel>
       <PanelTitle
         icon={<TrendingUp className="h-4 w-4" />}
-        title="Learning velocity"
+        title="Learning pace"
         badge={
           <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold capitalize text-slate-600">
             {velocity.classification ?? NOT_TRACKED}
@@ -577,7 +579,7 @@ function VelocityCard({ velocity }: { velocity: V4Velocity }) {
       )}
       <div className="space-y-1.5 text-xs">
         <Row label="Concepts mastered" value={fmtValue(velocity.conceptsMastered)} />
-        <Row label="Velocity" value={fmtValue(velocity.velocity)} />
+        <Row label="Pace" value={fmtValue(velocity.velocity)} />
         <Row
           label="Cohort rank"
           value={
@@ -611,8 +613,8 @@ function PlateauCard({ plateau }: { plateau: V4Plateau }) {
       />
       <div className="space-y-1.5 text-xs">
         <Row label="Days in plateau" value={fmtValue(plateau.daysInPlateau)} />
-        <Row label="Recent velocity" value={fmtValue(plateau.recentVelocity)} />
-        <Row label="Older velocity" value={fmtValue(plateau.olderVelocity)} />
+        <Row label="Recent pace" value={fmtValue(plateau.recentVelocity)} />
+        <Row label="Older pace" value={fmtValue(plateau.olderVelocity)} />
       </div>
       <ActionList actions={plateau.recommendedActions} />
     </Panel>
@@ -761,6 +763,7 @@ function ConceptLens({ learnerId }: { learnerId: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [remediationFor, setRemediationFor] = useState<V4Cluster | null>(null);
+  const [explainOpen, setExplainOpen] = useState(false);
 
   const load = async () => {
     if (!conceptId.trim()) return;
@@ -769,7 +772,7 @@ function ConceptLens({ learnerId }: { learnerId: string }) {
     try {
       setClusters(await fetchMisconceptionCluster(conceptId.trim()));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to load misconceptions.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t load common mistakes.');
       setClusters(null);
     } finally {
       setLoading(false);
@@ -778,7 +781,7 @@ function ConceptLens({ learnerId }: { learnerId: string }) {
 
   return (
     <Panel>
-      <PanelTitle icon={<Brain className="h-4 w-4" />} title="Misconception analysis by concept" />
+      <PanelTitle icon={<Brain className="h-4 w-4" />} title="Common mistakes by concept" />
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-slate-500">Concept id</span>
@@ -792,6 +795,17 @@ function ConceptLens({ learnerId }: { learnerId: string }) {
         <Button variant="outline" onClick={load} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           Analyze
+        </Button>
+        {/* Graph RAG: why this learner is stuck on this concept — concept-level,
+            so it lives once here rather than once per misconception cluster
+            below, which would repeat the identical explanation N times. */}
+        <Button
+          variant="outline"
+          onClick={() => setExplainOpen(true)}
+          disabled={!conceptId.trim() || !learnerId}
+        >
+          <HelpCircle className="h-4 w-4" />
+          Why is this student stuck?
         </Button>
       </div>
 
@@ -826,6 +840,14 @@ function ConceptLens({ learnerId }: { learnerId: string }) {
           learnerId={learnerId}
           cluster={remediationFor}
           onClose={() => setRemediationFor(null)}
+        />
+      )}
+
+      {explainOpen && (
+        <ExplanationModal
+          learnerId={learnerId}
+          conceptId={conceptId.trim()}
+          onClose={() => setExplainOpen(false)}
         />
       )}
     </Panel>
@@ -936,7 +958,7 @@ function RemediationModal({
         );
       } catch (reason) {
         if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load remediation.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load remediation.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -1030,6 +1052,98 @@ function RemediationModal({
                 </div>
               )}
             </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Graph RAG: retrieval (root blockers, assessing questions, teaching content,
+ * misconceptions) and generation already happen server-side as two separate
+ * steps — this modal only renders the result, same shape as RemediationModal
+ * above (loading / error / empty states), reusing fetchCoherenceExplanation
+ * from the same coherence-map data layer the New PAL coherence screen uses.
+ */
+function ExplanationModal({
+  learnerId,
+  conceptId,
+  onClose,
+}: {
+  learnerId: string;
+  conceptId: string;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<ConceptExplanation | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const learnerIdNum = Number(learnerId);
+    const conceptIdNum = Number(conceptId);
+
+    if (!Number.isFinite(learnerIdNum) || !Number.isFinite(conceptIdNum)) {
+      setLoading(false);
+      setError('A learner id and a concept id are both needed to explain this.');
+      return;
+    }
+
+    const controller = new AbortController();
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        setData(await fetchCoherenceExplanation(learnerIdNum, conceptIdNum, controller.signal));
+      } catch (reason) {
+        if (controller.signal.aborted) return;
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load an explanation.');
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+    void run();
+    return () => controller.abort();
+  }, [learnerId, conceptId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/45" onClick={onClose} />
+      <div className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Why is this student stuck?</h2>
+            {data && <p className="text-xs text-slate-500">{data.conceptName}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-5 py-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-sm text-slate-500">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Reading the knowledge graph...
+            </div>
+          ) : error ? (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {error}
+            </div>
+          ) : !data ? (
+            <p className="py-8 text-center text-sm text-slate-500">No explanation is available.</p>
+          ) : !data.blocked ? (
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Nothing beneath this concept is unmastered for this student — it is reachable now.
+            </p>
+          ) : (
+            <p className="whitespace-pre-line rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              {data.explanation}
+            </p>
           )}
         </div>
       </div>

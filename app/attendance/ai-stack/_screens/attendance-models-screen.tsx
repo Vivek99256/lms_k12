@@ -97,14 +97,14 @@ export function AttendanceModelsScreen() {
           configurations.status === 'rejected'
             ? configurations.reason instanceof Error
               ? configurations.reason.message
-              : 'The AI configuration could not be read.'
+              : "Couldn't read the aI configuration. Try again."
             : '',
         );
         setLoading(false);
       })
       .catch(() => {
         if (cancelled) return;
-        setError('The AI configuration could not be read.');
+        setError("Couldn't read the aI configuration. Try again.");
         setLoading(false);
       });
 

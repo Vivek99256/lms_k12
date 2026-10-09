@@ -39,7 +39,7 @@ export default function DocumentReportPage() {
       setLevel1(result.level1);
       setPage(1);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to load the SQAA document report.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t load the SQAA document report.');
     } finally {
       setLoading(false);
     }
@@ -51,7 +51,7 @@ export default function DocumentReportPage() {
         setRows(result.rows);
         setLevel1(result.level1);
       })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Unable to load the SQAA document report.'))
+      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Couldn’t load the SQAA document report.'))
       .finally(() => setLoading(false));
   }, []);
 

@@ -84,6 +84,27 @@ function LearningPlanView() {
   const [plan, setPlan] = useState<LearningPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [subjectName, setSubjectName] = useState<string>('Mathematics');
+
+  // Discover subject name dynamically from syllabus
+  useEffect(() => {
+    if (!chapterId) return;
+    const controller = new AbortController();
+
+    import('@/app/pal/data/pal')
+      .then(({ fetchPalLanding }) => fetchPalLanding({ signal: controller.signal }))
+      .then((landing) => {
+        for (const subj of landing.subjects) {
+          if (subj.chapters.some((c) => String(c.id) === String(chapterId))) {
+            setSubjectName(subj.name);
+            break;
+          }
+        }
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [chapterId]);
 
   const load = useCallback(() => {
     const controller = new AbortController();
@@ -97,7 +118,7 @@ function LearningPlanView() {
         .then(setPlan)
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Your plan could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'Your plan couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -133,7 +154,7 @@ function LearningPlanView() {
       <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
-            <p className="text-sm text-rose-800">{error ?? 'Your plan could not be built.'}</p>
+            <p className="text-sm text-rose-800">{error ?? 'Your plan couldn’t be built.'}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={load}>Try again</Button>
               <Link href="/pal" className={buttonVariants({ size: 'sm' })}>Back to subjects</Link>
@@ -168,6 +189,9 @@ function LearningPlanView() {
                 completed={COMPLETED_THROUGH_CHECK}
                 bypassed={['intervention']}
                 orientation="vertical"
+                chapterId={chapterId}
+                chapterName={plan?.chapterName}
+                subjectName={subjectName}
               />
             </PalRailSection>
 
@@ -195,6 +219,9 @@ function LearningPlanView() {
           current={noDiagnostic ? 'diagnostic' : 'plan'}
           completed={noDiagnostic ? [] : stagesBefore('plan')}
           orientation="vertical"
+          chapterId={chapterId}
+          chapterName={plan.chapterName}
+          subjectName={subjectName}
         />
       </PalRailSection>
 

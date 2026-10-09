@@ -42,7 +42,7 @@ export default function ReviewAssignmentPage() {
 
   const load = useCallback(async () => {
     if (!assignmentId) {
-      setError("Invalid assignment reference.");
+      setError("This assignment link isn’t valid. Go back and try again.");
       setLoading(false);
       return;
     }
@@ -57,7 +57,7 @@ export default function ReviewAssignmentPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "This assignment could not be loaded for review."
+          : "This assignment couldn’t be loaded for review."
       );
     } finally {
       setLoading(false);
@@ -118,7 +118,7 @@ export default function ReviewAssignmentPage() {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "The review could not be saved."
+          : "The review couldn’t be saved."
       );
     } finally {
       setSaving(false);

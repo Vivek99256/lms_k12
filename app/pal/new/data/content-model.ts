@@ -108,10 +108,10 @@ async function callApi(
     if (response.status === 404) {
       throw new Error(
         serverMessage ||
-          'The Content Model API is not available on this server. It ships with the New PAL module — the backend may not be deployed yet.'
+          'This feature is not available right now. Please try again later.'
       );
     }
-    throw new Error(serverMessage || `HTTP ${response.status}: the Content Model API is unavailable.`);
+    throw new Error(serverMessage || `This feature is not available right now. Please try again later.`);
   }
 
   const record = toRecord(payload);

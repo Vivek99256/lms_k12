@@ -58,7 +58,7 @@ export default function OnlineExamAttemptPage() {
       })
       .catch((reason: unknown) => {
         if (cancelled || controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load the exam.');
+        setError(reason instanceof Error ? reason.message : "Couldn't load the exam. Try again.");
         setLoading(false);
       });
     return () => {
@@ -110,7 +110,7 @@ export default function OnlineExamAttemptPage() {
         router.push(`/exam/online/${paperId}/result?online_exam_id=${result.onlineExamId}`);
       } catch (reason) {
         submittedRef.current = false;
-        setSubmitError(reason instanceof Error ? reason.message : 'Unable to submit the exam.');
+        setSubmitError(reason instanceof Error ? reason.message : "Couldn't submit the exam. Try again.");
         setSubmitting(false);
       }
     },

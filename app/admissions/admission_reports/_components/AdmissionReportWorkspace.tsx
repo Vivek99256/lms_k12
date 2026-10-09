@@ -140,7 +140,7 @@ export default function AdmissionReportWorkspace({ reportId }: { reportId: Repor
         }
       } catch (loadError) {
         if (ignore) return;
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load report metadata.');
+        setError(loadError instanceof Error ? loadError.message : "Couldn't load report metadata. Try again.");
       } finally {
         if (!ignore) setIsMetaLoading(false);
       }
@@ -225,7 +225,7 @@ export default function AdmissionReportWorkspace({ reportId }: { reportId: Repor
       }));
       toast.success(`${config.title} loaded`, response.message || 'Report data loaded successfully.');
     } catch (runError) {
-      const message = runError instanceof Error ? runError.message : 'Failed to run the report.';
+      const message = runError instanceof Error ? runError.message : "Couldn't run the report. Try again.";
       setResult((current) => ({ ...current, rows: [], headers: current.headers }));
       setError(message);
       toast.error(config.title, message);
@@ -541,7 +541,7 @@ export default function AdmissionReportWorkspace({ reportId }: { reportId: Repor
                   <p className="text-sm font-semibold text-slate-900">Results</p>
                   <p className="text-xs text-slate-500">
                     {result.rows.length > 0
-                      ? `${result.rows.length} rows returned from the Laravel ERP`
+                      ? `${result.rows.length} rows found`
                       : 'Run the selected report to load data.'}
                   </p>
                 </div>

@@ -56,7 +56,7 @@ export function ConnectionsTab({
 
       setResult(outcome);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Relationships could not be loaded.');
+      setError(caught instanceof Error ? caught.message : 'Relationships couldn’t be loaded.');
     } finally {
       setLoading(false);
     }

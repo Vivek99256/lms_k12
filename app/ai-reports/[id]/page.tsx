@@ -161,7 +161,7 @@ export default function AiReportPage() {
       } catch (caught) {
         if (cancelled) return;
 
-        setError(caught instanceof Error ? caught.message : 'This report could not be opened.');
+        setError(caught instanceof Error ? caught.message : 'This report couldn’t be opened.');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -198,7 +198,7 @@ export default function AiReportPage() {
       setEditing(false);
       setNotice('Report saved.');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The report could not be saved.');
+      setError(caught instanceof Error ? caught.message : 'The report couldn’t be saved.');
     } finally {
       setBusy(null);
     }
@@ -227,7 +227,7 @@ export default function AiReportPage() {
     } catch (caught) {
       // The backend refuses rather than blanking a table it can no longer fill, so
       // the reason it gives is the useful thing to show.
-      setError(caught instanceof Error ? caught.message : 'The figures could not be refreshed.');
+      setError(caught instanceof Error ? caught.message : 'The figures couldn’t be refreshed.');
     } finally {
       setBusy(null);
     }
@@ -251,7 +251,7 @@ export default function AiReportPage() {
     try {
       setSendPreview(await getReportRecipients(context, report.id));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The recipients could not be worked out.');
+      setError(caught instanceof Error ? caught.message : 'The recipients couldn’t be worked out.');
     } finally {
       setBusy(null);
     }
@@ -270,10 +270,10 @@ export default function AiReportPage() {
       setSendPreview(null);
       setNotice(
         `${result.queued} notice${result.queued === 1 ? '' : 's'} queued for sending.` +
-          (result.failed_count > 0 ? ` ${result.failed_count} could not be queued.` : '')
+          (result.failed_count > 0 ? ` ${result.failed_count} couldn’t be queued.` : '')
       );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The notices could not be sent.');
+      setError(caught instanceof Error ? caught.message : 'The notices couldn’t be sent.');
     } finally {
       setBusy(null);
     }
@@ -283,7 +283,7 @@ export default function AiReportPage() {
     const frame = frameRef.current?.contentWindow;
 
     if (!frame) {
-      setError('The report could not be prepared for printing.');
+      setError('The report couldn’t be prepared for printing.');
 
       return;
     }
@@ -299,7 +299,7 @@ export default function AiReportPage() {
       await navigator.clipboard.writeText(window.location.href);
       setNotice('Link copied. Anyone you send it to will need access to this school.');
     } catch {
-      setError('The link could not be copied. Copy it from the address bar instead.');
+      setError('The link couldn’t be copied. Copy it from the address bar instead.');
     }
   }, []);
 

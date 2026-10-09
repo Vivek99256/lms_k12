@@ -40,7 +40,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(`${fallback}.`);
   }
 }
 
@@ -121,8 +121,8 @@ export async function fetchLbMasters(signal?: AbortSignal): Promise<LbMasterRow[
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the leader board master.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the leader board master'));
+  if (!res.ok) throw new Error(`Couldn’t load the leaderboard setup. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t load the leaderboard setup'));
 
   return toArray(raw.data).map((entry) => {
     const r = toRecord(entry);
@@ -183,8 +183,8 @@ export async function saveLbMaster(input: LbMasterInput, id?: string): Promise<s
     },
     body: body.toString(),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to save.`);
-  const raw = toRecord(await readJson(res, 'Failed to save'));
+  if (!res.ok) throw new Error(`Couldn’t save. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t save'));
   // status 0 = "Leader board Master Already Exist" (dedup) → surface as error.
   if (normalizeApiStatus(raw) === '0') throw new Error(readString(raw.message) || 'Already exists for this class/module.');
   return readString(raw.message) || (isUpdate ? 'Updated.' : 'Saved.');
@@ -199,7 +199,7 @@ export async function deleteLbMaster(id: string): Promise<string> {
     method: 'DELETE',
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to delete.`);
-  const raw = toRecord(await readJson(res, 'Failed to delete'));
+  if (!res.ok) throw new Error(`Couldn’t delete. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t delete'));
   return readString(raw.message) || 'Deleted.';
 }

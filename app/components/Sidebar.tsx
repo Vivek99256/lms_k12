@@ -312,11 +312,11 @@ export default function Sidebar({
                 <button
                   type="button"
                   onClick={refetch}
-                  title="Retry menu"
+                  title="Try again"
                   className={`flex items-center justify-center rounded-xl bg-white text-red-600 border border-red-100 hover:bg-red-50 transition-colors ${isCollapsed ? 'w-10 h-10' : 'w-full gap-2 px-3 py-2 text-xs font-bold'}`}
                 >
                   <RefreshCw size={15} />
-                  {!isCollapsed && <span>Retry</span>}
+                  {!isCollapsed && <span>Try again</span>}
                 </button>
               </div>
             )}
@@ -324,7 +324,7 @@ export default function Sidebar({
             {!showInitialLoading && !error && menuItems.length === 0 && (
               <div className={`rounded-2xl bg-gray-50/80 text-gray-500 ${isCollapsed ? 'p-2' : 'p-3'}`}>
                 {!isCollapsed ? (
-                  <p className="text-xs font-semibold leading-relaxed">No menu rights found.</p>
+                  <p className="text-xs font-semibold leading-relaxed">You don't have access to any menus yet. Contact your school administrator.</p>
                 ) : (
                   <Menu size={18} className="mx-auto" />
                 )}
@@ -380,22 +380,6 @@ export default function Sidebar({
             })}
           </nav>
         </div>
-{/*
-        <div className={`pb-4 mt-auto flex ${isCollapsed ? 'justify-center px-2' : 'px-4'}`}>
-          <div className={`bg-gray-50/80 border border-gray-100 flex items-center hover:bg-gray-100 transition-colors w-full ${isCollapsed ? 'p-2 rounded-[20px] justify-center' : 'p-3 rounded-2xl gap-3'}`}>
-            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-[#0D6EFD] font-bold border-2 border-white shadow-sm shrink-0">
-              AD
-            </div>
- 
-            {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-bold text-gray-900 truncate">Admin User</h4>
-                <p className="text-[11px] text-gray-500 truncate">Premium Plan</p>
-              </div>
-            )}              
-          </div>
-        </div>
-*/}        
       </div>
 
       {level2Panel && typeof document !== 'undefined' && createPortal(

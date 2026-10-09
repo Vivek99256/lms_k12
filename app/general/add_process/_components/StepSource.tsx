@@ -147,7 +147,7 @@ export function StepSource({
             </p>
           ) : sopModule && libraryError ? (
             <p className="text-xs text-amber-700">
-              The institute SOP library could not be loaded, so the pickers are empty &middot;{" "}
+              Couldn't load the institute SOP library, so the pickers are empty &middot;{" "}
               {libraryError}
             </p>
           ) : sopModule && catalogued.procedures > 0 ? (

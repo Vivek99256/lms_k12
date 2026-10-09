@@ -120,7 +120,7 @@ export function displayDate(value?: string | null) {
 }
 
 export function createCsv(records: ComplianceRecord[]) {
-  const headers = ['Sr No.', 'Name', 'Category', 'Department', 'Assigned To', 'Due Date', 'Frequency', 'Priority', 'Status', 'Evidence']
+  const headers = ['No.', 'Name', 'Category', 'Department', 'Assigned To', 'Due Date', 'Frequency', 'Priority', 'Status', 'Evidence']
   const rows = records.map((record, index) => [
     String(index + 1),
     record.name,
@@ -213,8 +213,8 @@ export function ComplianceForm({
   return (
     <div className="grid gap-5">
       {templates && templates.length > 0 && onApplyTemplate && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3">
-          <Sparkles className="size-4 shrink-0 text-primary" />
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-indigo-300 bg-indigo-50 p-3 dark:border-indigo-400/30 dark:bg-indigo-500/10">
+          <Sparkles className="size-4 shrink-0 text-indigo-600" />
           <span className="text-sm text-muted-foreground">Create from template:</span>
           <Select
             value=""
@@ -333,7 +333,7 @@ export function ComplianceForm({
           onFileSelect={(file) => onChange({ attachmentName: file?.name ?? '', attachmentFile: file ?? undefined })}
         />
         {currentAttachment && (
-          <div className="flex items-center gap-2 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-sm text-primary">
+          <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700">
             <Paperclip className="size-4" />
             <span className="truncate">Current attachment: {currentAttachment}</span>
           </div>
@@ -341,7 +341,7 @@ export function ComplianceForm({
       </div>
 
       <div className="flex justify-end">
-        <Button type="button" className="w-full gap-2 sm:w-auto" onClick={onSubmit} disabled={saving}>
+        <Button type="button" className="w-full gap-2 bg-indigo-600 text-white hover:bg-indigo-700 sm:w-auto" onClick={onSubmit} disabled={saving}>
           <Plus className="size-4" />
           {saving ? 'Saving...' : submitLabel}
         </Button>
@@ -354,7 +354,7 @@ export function TableSkeleton() {
   return (
     <div className="space-y-3 p-4">
       {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="h-12 w-full animate-pulse rounded bg-muted/40" />
+        <div key={index} className="h-12 w-full animate-pulse rounded bg-slate-100 dark:bg-white/5" />
       ))}
     </div>
   )

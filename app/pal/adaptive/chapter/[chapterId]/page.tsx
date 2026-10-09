@@ -24,6 +24,7 @@ import {
 } from '@/app/pal/_components/CompletionState';
 import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
+import { ConceptDiagnosticRoadmap } from './_components/ConceptDiagnosticRoadmap';
 
 /**
  * Stage 3 - which concept to practise, and at what level.
@@ -75,6 +76,27 @@ function AdaptiveConceptsView() {
   const [data, setData] = useState<AdaptiveConceptList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [subjectName, setSubjectName] = useState<string>('Mathematics');
+
+  // Discover subject name dynamically from syllabus
+  useEffect(() => {
+    if (!chapterId) return;
+    const controller = new AbortController();
+
+    import('@/app/pal/data/pal')
+      .then(({ fetchPalLanding }) => fetchPalLanding({ signal: controller.signal }))
+      .then((landing) => {
+        for (const subj of landing.subjects) {
+          if (subj.chapters.some((c) => String(c.id) === String(chapterId))) {
+            setSubjectName(subj.name);
+            break;
+          }
+        }
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [chapterId]);
 
   const {
     mastery,
@@ -106,7 +128,7 @@ function AdaptiveConceptsView() {
         .then(setData)
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Concepts could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'Concepts couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -143,6 +165,7 @@ function AdaptiveConceptsView() {
               completed={COMPLETED_THROUGH_CHECK}
               bypassed={['intervention']}
               orientation="vertical"
+              subjectName={subjectName}
             />
           </PalRailSection>
         }
@@ -223,14 +246,16 @@ function AdaptiveConceptsView() {
               current="adaptive"
               completed={data.hasDiagnostic ? stagesBefore('adaptive') : []}
               orientation="vertical"
+              chapterId={chapterId}
+              chapterName={data.chapterName}
+              subjectName={subjectName}
             />
           </PalRailSection>
         </>
       }
     >
-
       {!data.hasDiagnostic && (
-        <Card className="mb-4 border-amber-200 bg-amber-50">
+        <Card className="mb-6 border-amber-200 bg-amber-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm text-amber-900">
               You have not taken the chapter diagnostic yet, so the concept diagnostic will open
@@ -241,7 +266,7 @@ function AdaptiveConceptsView() {
         </Card>
       )}
 
-      {servable.length === 0 ? (
+      {data.concepts.length === 0 ? (
         <EmptyState
           icon={<Brain aria-hidden className="h-8 w-8" />}
           title="No concept diagnostic questions for this chapter yet"
@@ -249,41 +274,12 @@ function AdaptiveConceptsView() {
           action={<Link href="/pal" className={buttonVariants()}>Back to subjects</Link>}
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {servable.map((concept) => (
-            <ConceptCard
-              key={concept.conceptId}
-              concept={concept}
-              chapterId={chapterId}
-              completed={completedConceptIds.has(String(concept.conceptId))}
-              onStart={() => router.push(`/pal/adaptive/concept/${concept.conceptId}`)}
-            />
-          ))}
-        </div>
-      )}
-
-      {unavailable.length > 0 && (
-        <Card className="mt-5">
-          <CardHeader>
-            <CardTitle className="text-base">Not ready for a concept diagnostic yet</CardTitle>
-            <CardDescription>
-              {unavailable.length} concept{unavailable.length === 1 ? '' : 's'} in this chapter have
-              no multiple-choice questions written. Your teacher sees these as content gaps.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="flex flex-wrap gap-1.5">
-              {unavailable.map((concept) => (
-                <li
-                  key={concept.conceptId}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-500"
-                >
-                  {concept.name}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        /* Interactive Visual Learning Roadmap */
+        <ConceptDiagnosticRoadmap
+          concepts={data.concepts}
+          chapterId={chapterId}
+          completedConceptIds={completedConceptIds}
+        />
       )}
     </PalWorkspace>
   );

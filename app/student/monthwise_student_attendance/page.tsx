@@ -540,7 +540,7 @@ export default function MonthwiseStudentAttendancePage() {
         if (!active) return;
 
         if (!response.ok) {
-          throw new Error('Unable to load batch options.');
+          throw new Error("Couldn't load batch options. Try again.");
         }
 
         setBatchOptions(nextOptions);
@@ -551,7 +551,7 @@ export default function MonthwiseStudentAttendancePage() {
         setBatch('');
         setMessage((previous) => previous ?? {
           type: 'info',
-          text: 'Monthwise report batch filtering exists in Laravel, but the current backend batch endpoint depends on Laravel session flow and may be unavailable for the token-based frontend.',
+          text: 'Batch filtering is not available for this report right now.',
         });
       } finally {
         if (active) {
@@ -580,11 +580,11 @@ export default function MonthwiseStudentAttendancePage() {
     }));
 
     return [
-      { key: 'srNo', label: 'Sr No', align: 'center' },
+      { key: 'srNo', label: 'No.', align: 'center' },
       { key: 'monthYear', label: 'Month/Year' },
       { key: 'standardDivision', label: 'Standard/Division', width: '160px' },
-      { key: 'enrollmentNo', label: 'GR No' },
-      { key: 'studentName', label: 'Student Name', width: '220px' },
+      { key: 'enrollmentNo', label: 'GR no.' },
+      { key: 'studentName', label: 'Student name', width: '220px' },
       ...(batchOptions.length > 0 || report?.students.some((student) => student.batchTitle) ? [{ key: 'batchTitle', label: 'Batch' }] : []),
       ...dayColumns,
       { key: 'totalWorkingDays', label: 'Total Working Days', align: 'center' },
@@ -707,7 +707,7 @@ export default function MonthwiseStudentAttendancePage() {
       const payload = normalizePayload(responseBody);
 
       if (!response.ok) {
-        throw new Error(payload.message || `HTTP ${response.status}: Unable to fetch monthwise attendance report.`);
+        throw new Error(payload.message || `Couldn't load monthwise attendance report. Try again.`);
       }
 
       const normalizedReport = buildReport(payload, month, year);
@@ -720,7 +720,7 @@ export default function MonthwiseStudentAttendancePage() {
       setReport(null);
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to fetch monthwise attendance report.',
+        text: error instanceof Error ? error.message : "Couldn't load monthwise attendance report. Try again.",
       });
     } finally {
       setLoading(false);
@@ -742,7 +742,7 @@ export default function MonthwiseStudentAttendancePage() {
     <PageFrame>
       <PageHeader
         title="Monthwise Attendance Report"
-        description="Reuse the existing academic filters and proxy-based API flow to render the legacy monthwise attendance grid."
+        description="View monthly attendance for each student in a standard and division."
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" onClick={() => exportRowsAsCsv({ filename: 'monthwise-attendance-report.csv', columns: exportColumns, rows: exportRows })} disabled={exportRows.length === 0}>
@@ -753,7 +753,7 @@ export default function MonthwiseStudentAttendancePage() {
               <Download className="h-4 w-4" />
               Excel
             </Button>
-            <Button type="button" variant="outline" onClick={() => exportRowsAsPdf({ filename: 'monthwise-attendance-report.pdf', title: 'Monthwise Attendance Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })} disabled={exportRows.length === 0}>
+            <Button type="button" variant="outline" onClick={() => exportRowsAsPdf({ filename: 'monthwise-attendance-report.pdf', title: 'Monthwise Attendance Report', subtitle: 'Report period and academic year', columns: exportColumns, rows: exportRows })} disabled={exportRows.length === 0}>
               <Download className="h-4 w-4" />
               PDF
             </Button>
@@ -767,7 +767,7 @@ export default function MonthwiseStudentAttendancePage() {
 
       {message && <InlineMessage type={message.type} text={message.text} />}
 
-      <SectionPanel title="Filters" description="Laravel uses grade, standard, division, year, month, and an optional batch filter when available.">
+      <SectionPanel title="Filters" description="Filter by grade, standard, division, year and month. Batch is optional.">
         <div className="space-y-4">
           <SearchDropdown
             fields={['section', 'standard', 'division']}
@@ -834,11 +834,11 @@ export default function MonthwiseStudentAttendancePage() {
           <Table className="min-w-[1600px]">
             <TableHeader>
               <TableRow className="bg-slate-100 hover:bg-slate-100">
-                <TableHead>Sr No</TableHead>
+                <TableHead>No.</TableHead>
                 <TableHead>Month/Year</TableHead>
                 <TableHead>Standard/Division</TableHead>
-                <TableHead>GR No</TableHead>
-                <TableHead>Student Name</TableHead>
+                <TableHead>GR no.</TableHead>
+                <TableHead>Student name</TableHead>
                 {showBatchField && <TableHead>Batch</TableHead>}
                 {Array.from({ length: report?.daysInMonth || getDaysInMonth(year, month) }, (_, index) => (
                   <TableHead key={index + 1} className="text-center">

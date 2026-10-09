@@ -269,6 +269,30 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lmssocialcollabrotive': '/lms/social-collaborative',
   'lmssocialcollaborative.index': '/lms/social-collaborative',
   'lms/lmssocialcollaborative': '/lms/social-collaborative',
+  // Portfolio — legacy route names + path-style variants → Next.js /lms/portfolio
+  'lmsportfolio.index': '/lms/portfolio',
+  'lms/lmsportfolio': '/lms/portfolio',
+  'lmsportfolio': '/lms/portfolio',
+  'lms_portfolio.index': '/lms/portfolio',
+  'lms_portfolio': '/lms/portfolio',
+  'show_all_lmsportfolio.index': '/lms/portfolio',
+  'show_student_lmsportfolio.index': '/lms/portfolio',
+  'show_all_lmsportfolio': '/lms/portfolio',
+  'show_student_lmsportfolio': '/lms/portfolio',
+  'portfolio.index': '/lms/portfolio',
+  'portfolio': '/lms/portfolio',
+  // Virtual Classroom — legacy route names + path-style variants → Next.js /lms/virtual-classroom
+  'lmsvirtualclassroom.index': '/lms/virtual-classroom',
+  'lms/lmsvirtualclassroom': '/lms/virtual-classroom',
+  'lmsvirtualclassroom': '/lms/virtual-classroom',
+  'lms_virtual_classroom.index': '/lms/virtual-classroom',
+  'lms_virtual_classroom': '/lms/virtual-classroom',
+  'show_lmsvirtualclassroom.index': '/lms/virtual-classroom',
+  'show_lmsvirtualclassroom': '/lms/virtual-classroom',
+  'virtual_classroom.index': '/lms/virtual-classroom',
+  'virtual_classroom': '/lms/virtual-classroom',
+  'virtualclassroom.index': '/lms/virtual-classroom',
+  'virtualclassroom': '/lms/virtual-classroom',
   // MASTER modules
   'lb_master.index': '/lms/leader-board-master',
   'lms/lb_master': '/lms/leader-board-master',
@@ -333,6 +357,13 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   // 2026_09_29_100500_add_new_pal_ai_stack_submodule_menu. Same `new_pal.<sub_module>`
   // convention as its siblings above.
   'new_pal.ai_stack': '/pal/new/ai-stack',
+  // Coherence Map — New PAL's own tblmenumaster row (id 604, parent 531), link
+  // `coherence.map` rather than the `new_pal.<sub_module>` convention because
+  // the row predates that convention (see routes/web.php in next_lms_erp).
+  // Without this entry the generic fallback at the end of this function turns
+  // it into '/coherence.map', which is not a route — the real page is under
+  // /pal/new/* with its siblings.
+  'coherence.map': '/pal/new/coherence-map',
   'lmsassignment.index': '/lms/lmsAssignment',
   'lms/lmsassignment': '/lms/lmsAssignment',
   'lmsassignment_submission.index': '/lms/lmsAssignment_submission',
@@ -700,12 +731,15 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return '/user_log';
    }
 
-  // Document has graduated the same way, to /documents. Intercepted here so
-  // every API-driven surface (sidebar, Level 3 sub-header, master menu) lands on
-  // the live screen rather than the stub. Template still resolves to its
+  // Document has graduated the same way, to the IDMS library at /documents_new.
+  // Intercepted here so every API-driven surface (sidebar, Level 3 sub-header,
+  // master menu) lands on the live screen rather than the stub. Note this is the
+  // IDMS library and NOT the older aggregation dashboard at /documents, which is
+  // still mounted and still reachable by URL and by /documents/[source]; it just
+  // is no longer what the menu advertises. Template still resolves to its
   // coming-soon page.
   if (lowerLink.replace(/^\/+/, '') === 'general/coming-soon?module=document') {
-    return '/documents';
+    return '/documents_new';
   }
 
   // Event Bus has graduated to /platform-services/event-bus — a read-only

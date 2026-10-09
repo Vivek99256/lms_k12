@@ -63,7 +63,7 @@ export const SUB_MODULES: SubModule[] = [
   },
   {
     key: 'coherence-map',
-    label: 'Coherence map',
+    label: 'Concept map',
     href: '/pal/new/coherence-map',
     icon: Share2,
     description:

@@ -16,7 +16,7 @@ import { FeesNotificationSettings } from '@/app/fees/communication/_components/F
 export const FEES_COMMUNICATION_SCREENS: ModuleStaticScreen[] = [
   {
     id: 'notification-settings',
-    label: 'Notification Settings',
+    label: 'Notification settings',
     icon: BellRing,
     render: () => <FeesNotificationSettings />,
   },

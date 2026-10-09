@@ -108,7 +108,7 @@ function ChapterMasteryView() {
         .then(setData)
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Your mastery could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'Your mastery couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -179,6 +179,8 @@ function ChapterMasteryView() {
                 completed={COMPLETED_THROUGH_CHECK}
                 bypassed={['intervention']}
                 orientation="vertical"
+                chapterId={chapterId}
+                chapterName={data?.chapterName}
               />
             </PalRailSection>
           </>
@@ -225,6 +227,8 @@ function ChapterMasteryView() {
               completed={COMPLETED_THROUGH_CHECK}
               bypassed={['intervention']}
               orientation="vertical"
+              chapterId={chapterId}
+              chapterName={data.chapterName}
             />
           </PalRailSection>
 

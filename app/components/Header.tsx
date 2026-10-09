@@ -11,8 +11,6 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { resolveDashboardRole } from '@/app/dashboard/_lib/resolveDashboardRole';
-import { showDeferredModules } from '@/lib/roadmap';
 import { publishSelectedAcademicYear } from '@/lib/academic-year';
 import { useRouter } from 'next/navigation';
 import HeaderMenuSearch from '@/app/components/HeaderMenuSearch';
@@ -98,6 +96,24 @@ const aiIntelligenceIcons: Record<string, LucideIcon> = Object.fromEntries(
     return icon ? [[capability.name, icon] as const] : [];
   }),
 );
+
+/** Display text for menu entries whose lookup key (route/icon maps) is a different string. */
+const menuDisplayLabels: Record<string, string> = {
+  'RBAC': 'Roles and permissions',
+  'Workflow': 'Workflows',
+  'Notification': 'Notifications',
+  'Template': 'Templates',
+  'Scheduler': 'Schedules',
+  'Document': 'Documents',
+  'Integration': 'Integrations',
+  'Audit': 'Audit log',
+  'Event Bus': 'Activity feed',
+  'Add Process': 'Add process',
+  'Fields Configuration': 'Field settings',
+  'Mobile App Rights': 'Mobile app rights',
+  'Platform Administration': 'Platform administration',
+  "What's Coming": "What's coming",
+};
 
 function LogoImage({ url, fallback }: { url: string; fallback: React.ReactNode }) {
   const [hasError, setHasError] = useState(false);
@@ -193,7 +209,7 @@ export default function Header({
   menuItems?: MenuItem[];
   onMenuSearchNavigate?: (entry: MenuSearchEntry) => void;
 }) {
-  const { user, logout, refreshAcademicTerms, academicTerms, academicYears, menuContext } = useAuth();
+  const { user, logout, refreshAcademicTerms, academicTerms, academicYears } = useAuth();
   const router = useRouter();
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showTermDropdown, setShowTermDropdown] = useState(false);
@@ -235,12 +251,15 @@ export default function Header({
     'Notification': '/platform-services/notification',
     'Template': '/general/coming-soon?module=Template',
     'Scheduler': '/platform-services/scheduler',
-    // Document has graduated off the coming-soon placeholder to its real screen
-    // at /documents — a read-only aggregation over the document sources every
-    // other module already owns. Template remains a stub.
-    'Document': '/documents',
+    // Document points at the IDMS library, not the older aggregation dashboard
+    // that still sits at /documents. The dashboard reads counts out of tables
+    // other modules own; IDMS is the upload -> classify -> tag -> find module.
+    // Template remains a stub.
+    'Document': '/documents_new',
     'Integration': '/integration',
-    'Audit': '/user_log',
+    // Audit graduated from the per-user login log to the shared platform audit
+    // trail (read only), served by Laravel at /api/platform/audit.
+    'Audit': '/platform-services/audit',
     // Event Bus has graduated the same way, to a read-only monitoring plane over
     // the sync_log outbox, the audit tables and the outbound send-logs. It is not
     // an event bus: this product has none, and the standing decision is not to
@@ -287,12 +306,12 @@ export default function Header({
     icons: Record<string, LucideIcon>;
   }[] = [
     {
-      label: 'Platform Services',
+      label: 'Platform services',
       href: '/platform-administration',
       span: 2,
       columns: [
         { items: platformServicesItems },
-        { label: 'Setup & configuration', items: platformSetupItems },
+        { label: 'Setup and configuration', items: platformSetupItems },
       ],
       // Merged so one lookup serves the whole section. The two maps have no keys in
       // common — they describe different screens — so neither can shadow the other.
@@ -300,7 +319,7 @@ export default function Header({
       icons: { ...platformServicesIcons, ...platformSetupIcons },
     },
     {
-      label: 'AI & Intelligence',
+      label: 'AI and insights',
       href: '/ai',
       span: 1,
       columns: [{ items: aiIntelligenceItems }],
@@ -308,33 +327,6 @@ export default function Header({
       icons: aiIntelligenceIcons,
     },
   ];
-
-  // V1: the AI section and the roadmap screens are not part of the launch set, and the
-  // platform setup screens are for administrators. This only decides what the menu
-  // advertises; the routes behind it are still guarded by the backend.
-  const isAdminProfile = resolveDashboardRole(menuContext?.user_profile_name) === 'admin';
-  const v1MenuGroups = !isAdminProfile
-    ? []
-    : showDeferredModules()
-      ? menuGroups
-      : menuGroups
-          .filter((group) => group.label !== 'AI & Intelligence')
-          .map((group) =>
-            group.label === 'Platform Services'
-              ? {
-                  ...group,
-                  href: undefined,
-                  columns: [
-                    {
-                      label: 'Setup & configuration',
-                      items: platformSetupItems.filter(
-                        (item) => item !== 'Platform Administration' && item !== "What's Coming"
-                      ),
-                    },
-                  ],
-                }
-              : group
-          );
 
   // Seeded only from what this browser last chose. Anything else is adopted from
   // the institute's own rows once they resolve, below.
@@ -578,7 +570,7 @@ const logoUrl = (() => {
           className={`relative p-2 rounded-full transition-colors ${
             isChatbotOpen ? 'text-gray-600 bg-gray-100' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'
           }`}
-          title="Toggle Chatbot"
+          title="Open AI assistant"
         >
           <div className="w-8 h-8 bg-gradient-to-br from-[#0D6EFD] to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
           <Bot size={16} />
@@ -598,17 +590,17 @@ const logoUrl = (() => {
                 url={logoUrl}
                 fallback={
                   <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
-                    {user?.name?.charAt(0).toUpperCase() || 'S'}
+                    {user?.name?.charAt(0).toUpperCase() || 'U'}
                   </div>
                 }
               />
             ) : (
               <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
-                {user?.name?.charAt(0).toUpperCase() || 'S'}
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
             )}
             <span className="font-medium text-sm flex items-center gap-1">
-              {user?.name || 'Sarah Patel'}
+              {user?.name || 'User'}
               <ChevronDown size={14} className={`transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} />
             </span>
           </div>
@@ -636,7 +628,7 @@ const logoUrl = (() => {
               width — which is also why a section's span is only applied from sm up.
             */}
             <div className="grid max-h-[70vh] grid-cols-1 gap-x-3 gap-y-5 overflow-y-auto p-3 sm:grid-cols-[repeat(3,220px)]">
-              {v1MenuGroups.map((group) => {
+              {menuGroups.map((group) => {
                 // Read out of the group before the closures below capture it, so
                 // the optional href narrows to a string for the click handler.
                 const groupHref = group.href;
@@ -696,13 +688,13 @@ const logoUrl = (() => {
                                   key={subItem}
                                   type="button"
                                   onClick={() => { closeUserDropdown(); router.push(route); }}
-                                  title={subItem}
+                                  title={menuDisplayLabels[subItem] ?? subItem}
                                   className="h-10 w-full flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-1.5 text-left text-sm font-semibold text-muted-foreground shadow-xs transition-all cursor-pointer hover:border-muted-foreground/30 hover:bg-muted/60 hover:text-foreground hover:shadow-sm"
                                 >
                                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                                     {ItemIcon ? <ItemIcon size={15} /> : subItem.charAt(0).toUpperCase()}
                                   </span>
-                                  <span className="min-w-0 flex-1 truncate">{subItem}</span>
+                                  <span className="min-w-0 flex-1 truncate">{menuDisplayLabels[subItem] ?? subItem}</span>
                                 </button>
                               );
                             })}
@@ -728,7 +720,7 @@ const logoUrl = (() => {
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                   <LogOut size={15} />
                 </span>
-                Sign Out
+                Sign out
               </button>
             </div>
           </div>,

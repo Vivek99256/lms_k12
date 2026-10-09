@@ -329,7 +329,7 @@ export default function FeesCollectPage() {
 
       if (!res.ok) {
         const errorPayload = await res.json().catch(() => ({}));
-        throw new Error((errorPayload as Record<string, unknown>).message ? String(errorPayload.message) : `HTTP ${res.status}: Unable to load students`);
+        throw new Error((errorPayload as Record<string, unknown>).message ? String(errorPayload.message) : "Couldn't load students. Try again.");
       }
 
       const responseData = await readStudentsResponseProgressively(res, {
@@ -380,7 +380,7 @@ export default function FeesCollectPage() {
       }));
     } catch (fetchError) {
       if (fetchRequestIdRef.current !== requestId) return;
-      const message = fetchError instanceof Error ? fetchError.message : 'Unable to load student fees list.';
+      const message = fetchError instanceof Error ? fetchError.message : "Couldn't load student fees list. Try again.";
       if (append) {
         setHasMoreStudents(false);
         setError(message);
@@ -404,7 +404,7 @@ export default function FeesCollectPage() {
     const academicYearId = currentSession.academicYearId || session.academicYearId;
 
     if (!hostName || !currentSession.subInstituteId || !academicYearId) {
-      setError('Unable to open fee collection because session data is missing.');
+      setError("Missing session details. Reload the page and try again.");
       return;
     }
 
@@ -429,7 +429,7 @@ export default function FeesCollectPage() {
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         const message = asRecord(payload).message;
-        throw new Error(message ? String(message) : `HTTP ${res.status}: Unable to load fee collection data.`);
+        throw new Error(message ? String(message) : "Couldn't load fee collection data. Try again.");
       }
 
       if (typeof window !== 'undefined') {
@@ -438,7 +438,7 @@ export default function FeesCollectPage() {
 
       router.push(`/fees/collect/${encodeURIComponent(studentId)}`);
     } catch (collectError) {
-      setError(collectError instanceof Error ? collectError.message : 'Unable to load fee collection data.');
+      setError(collectError instanceof Error ? collectError.message : "Couldn't load fee collection data. Try again.");
     } finally {
       setCollectingStudentId(null);
     }
@@ -505,32 +505,32 @@ export default function FeesCollectPage() {
     || dashboardData.paymentMix.length > 0;
   const summaryCards = [
     {
-      title: 'Total Payable Fees',
+      title: 'Total payable',
       value: currencyFormatter.format(totalPayableFees),
       icon: <Wallet className="h-4 w-4" />,
     },
     {
-      title: 'Total Collected Fees',
+      title: 'Total collected',
       value: currencyFormatter.format(dashboardData.totalPaidFees),
       icon: <Banknote className="h-4 w-4" />,
     },
     {
-      title: 'Total Pending Fees',
+      title: 'Total outstanding',
       value: currencyFormatter.format(dashboardData.totalPendingFees),
       icon: <AlertCircle className="h-4 w-4" />,
     },
     {
-      title: 'Paid Students',
+      title: 'Paid students',
       value: String(dashboardData.paidStudents),
       icon: <Users className="h-4 w-4" />,
     },
     {
-      title: 'Pending Students',
+      title: 'Students with dues',
       value: String(dashboardData.pendingStudents),
       icon: <AlertCircle className="h-4 w-4" />,
     },
     {
-      title: 'Collection Rate',
+      title: 'Collection rate',
       value: `${dashboardData.collectionRate}%`,
       icon: <Target className="h-4 w-4" />,
     },
@@ -551,7 +551,7 @@ export default function FeesCollectPage() {
         metrics: [
           { key: 'total_payable', label: 'Total payable fees', value: totalPayableFees, unit: 'INR' },
           { key: 'total_collected', label: 'Total collected fees', value: dashboardData.totalPaidFees, unit: 'INR' },
-          { key: 'total_pending', label: 'Total pending fees', value: dashboardData.totalPendingFees, unit: 'INR' },
+          { key: 'total_pending', label: 'Total outstanding fees', value: dashboardData.totalPendingFees, unit: 'INR' },
           { key: 'pending_students', label: 'Students with dues', value: dashboardData.pendingStudents },
           { key: 'collection_rate', label: 'Collection rate', value: dashboardData.collectionRate, unit: '%' },
         ],
@@ -618,7 +618,7 @@ export default function FeesCollectPage() {
       <div className="mx-auto max-w-[1500px] space-y-5 ">
         <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-sm ring-1 ring-slate-200/70">
           <CardHeader className="border-b border-slate-100 pb-4">
-            <CardTitle className="text-lg font-semibold text-slate-900">Fees Collection Dashboard</CardTitle>
+            <CardTitle className="text-lg font-semibold text-slate-900">Fee collection dashboard</CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-4 pt-4">
@@ -783,8 +783,8 @@ export default function FeesCollectPage() {
                   </th>
                   <SortableHeader label="Student" />
                   <SortableHeader label="Class" />
-                  <th className="px-5 py-3 font-semibold">Fee Head</th>
-                  <th className="px-5 py-3 font-semibold">Due Date</th>
+                  <th className="px-5 py-3 font-semibold">Fee head</th>
+                  <th className="px-5 py-3 font-semibold">Due date</th>
                   <SortableHeader label="Amount" align="right" />
                   <th className="px-5 py-3 font-semibold">Status</th>
                   <th className="px-5 py-3 text-right font-semibold">Action</th>
@@ -1060,7 +1060,7 @@ function CompactPaidPendingComparisonChart({
       percentage: totalPayable > 0 ? Math.round((paid / totalPayable) * 100) : 0,
     },
     {
-      label: 'Pending',
+      label: 'Outstanding',
       amount: pending,
       students: pendingStudents,
       color: '#d97706',
@@ -1110,7 +1110,7 @@ function CompactPaidPendingComparisonChart({
         </svg>
 
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Total Payable</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Total payable</p>
           <p className="mt-2 text-xl font-bold text-slate-950">{currencyFormatter.format(totalPayable)}</p>
           <p className="mt-1 text-xs text-slate-500">{Math.round((paid / Math.max(totalPayable, 1)) * 100)}% collected</p>
         </div>
@@ -1219,7 +1219,7 @@ function CompactPaidPendingComparisonChart({
       badge: 'OK',
     },
     {
-      label: 'Pending',
+      label: 'Outstanding',
       amount: pending,
       students: pendingStudents,
       color: '#d97706',
@@ -1305,7 +1305,7 @@ function CompactPaidPendingComparisonChart({
           </svg>
 
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Total Payable</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Total payable</p>
             <p className="mt-2 text-2xl font-bold text-slate-950">{currencyFormatter.format(totalPayable)}</p>
             <p className="mt-1 text-xs text-slate-500">{collectionPercentage}% collected</p>
           </div>
@@ -1323,15 +1323,15 @@ function CompactPaidPendingComparisonChart({
 
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Collected Amount</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Collected amount</p>
             <p className="mt-2 text-sm font-bold text-emerald-700">{currencyFormatter.format(paid)}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Pending Amount</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Outstanding amount</p>
             <p className="mt-2 text-sm font-bold text-amber-700">{currencyFormatter.format(pending)}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Collection Percentage</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Collection percentage</p>
             <p className="mt-2 text-sm font-bold text-slate-900">{collectionPercentage}%</p>
           </div>
         </div>

@@ -149,7 +149,7 @@ export default function ConsolidateReportPage() {
       setTree([]);
       setStudents([]);
       setFallbackRows([]);
-      setError(err instanceof Error ? err.message : 'Failed to load the consolidate report.');
+      setError(err instanceof Error ? err.message : "Couldn't load the consolidated report. Try again.");
     } finally {
       setLoading(false);
       setSearched(true);
@@ -281,7 +281,7 @@ export default function ConsolidateReportPage() {
                     exportName="consolidate-report"
                     exportTitle="Consolidate report"
                     emptyTitle="No report data"
-                    emptyMessage="No records were returned for the selected criteria."
+                    emptyMessage="No records match your filters."
                   />
                 </div>
               ) : (

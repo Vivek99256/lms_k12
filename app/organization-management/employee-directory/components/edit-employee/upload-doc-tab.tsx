@@ -136,7 +136,7 @@ export function UploadDocTab({ employee, documentTypes, documentLists, onUpload 
               {documentLists && documentLists.length > 0 ? (
                 documentLists.map((doc: any, index: number) => (
                   <TableRow key={doc.id || index}>
-                    <TableCell className="font-medium">{doc.document_type || 'Staff Document'}</TableCell>
+                    <TableCell className="font-medium">{doc.document_type || 'Employee document'}</TableCell>
                     <TableCell>{doc.document_title || doc.title || doc.file_name || 'Document'}</TableCell>
                     <TableCell className="text-right">
                       {doc.file_name || doc.file_path || doc.url ? (

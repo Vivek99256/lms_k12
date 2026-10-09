@@ -102,8 +102,176 @@ async function errorResponse(upstream: Response, url: string): Promise<Response>
   );
 }
 
+import { evaluateChatbotIntent } from '@/lib/intelligence/chatbot-navigation';
+
 export async function POST(request: Request) {
   const baseUrl = upstreamBaseUrl();
+
+  const body = await request.text();
+  const authorization = request.headers.get('authorization');
+  const institute = request.headers.get('x-mcp-institute-id');
+
+  let question = '';
+  let routeContext = '';
+  let moduleContext = '';
+  let resolvedNav: {
+    route?: string;
+    headline?: string;
+    message?: string;
+    actionLabel?: string;
+    confirmation?: string;
+    module?: { name?: string; label?: string };
+  } | null = null;
+
+  try {
+    const json = JSON.parse(body);
+    question = String(json.question || json.prompt || '').trim();
+    routeContext = String(json.route || '').trim();
+    moduleContext = String(json.module || '').trim();
+    if (json.navigation && typeof json.navigation === 'object') resolvedNav = json.navigation;
+  } catch {
+    // plain text body
+  }
+
+  const intent = evaluateChatbotIntent(question, routeContext || moduleContext);
+
+  if (intent.type === 'unsupported') {
+    const result: AskResult = {
+      conversation: { id: null, reference: null, turn_id: null, turn: 1 },
+      question,
+      intent: {
+        key: 'unsupported_module_action',
+        label: 'Unsupported Module Action',
+        confidence: 1.0,
+        slots: {},
+      },
+      module: {
+        key: intent.currentModule.name,
+        label: intent.currentModule.label,
+        entity_key: null,
+        capabilities: {},
+        mcp_tools: [],
+        agent_key: null,
+        workflow_key: null,
+        case_type: null,
+        reaches_recommendation: false,
+        reaches_action: false,
+      },
+      answer: {
+        headline: intent.message || '',
+        sections: [],
+        follow_ups: [],
+        actions: [],
+      },
+      trace: [],
+      ladder: [],
+      stage_counts: {},
+      lifecycle_trace: [],
+      lifecycle_stage_counts: {},
+      links: {},
+      duration_ms: 0,
+    };
+
+    return createUIMessageStreamResponse({
+      stream: createUIMessageStream<AskUIMessage>({
+        execute: async ({ writer }) => {
+          for await (const chunk of askUiChunksFromResult(result)) {
+            writer.write(chunk);
+          }
+        },
+      }),
+    });
+  }
+
+  // Navigation ends the pipeline here: no Laravel call, no data query, no follow-ups.
+  // The client resolves the exact tab from the live registry and sends it; this
+  // route has no registry, so the client's target is what makes the request a
+  // navigation. Only same-origin paths are accepted.
+  const clientRoute =
+    typeof resolvedNav?.route === 'string' && /^\/(?!\/)/.test(resolvedNav.route)
+      ? resolvedNav.route
+      : null;
+
+  const navIntent =
+    intent.type === 'navigation'
+      ? intent
+      : clientRoute
+        ? {
+            type: 'navigation' as const,
+            currentModule: intent.currentModule,
+            targetModule: {
+              name: String(resolvedNav?.module?.name || 'fees'),
+              label: String(resolvedNav?.module?.label || 'Fees'),
+            },
+            headline: '',
+            message: '',
+            route: clientRoute,
+            actionLabel: 'Open',
+          }
+        : null;
+
+  if (navIntent) {
+    if (clientRoute) {
+      navIntent.route = clientRoute;
+      if (resolvedNav?.headline) navIntent.headline = String(resolvedNav.headline);
+      if (resolvedNav?.message) navIntent.message = String(resolvedNav.message);
+      if (resolvedNav?.actionLabel) navIntent.actionLabel = String(resolvedNav.actionLabel);
+    }
+    const intent = navIntent;
+
+    const targetKey = intent.targetModule?.name || 'fees';
+    const targetLabel = intent.targetModule?.label || 'Fees';
+    const confirmation =
+      (resolvedNav?.confirmation ? String(resolvedNav.confirmation) : '') || `Opening ${intent.headline || targetLabel}.`;
+
+    const result: AskResult = {
+      conversation: { id: null, reference: null, turn_id: null, turn: 1 },
+      question,
+      intent: {
+        key: 'navigation',
+        label: 'Navigation',
+        confidence: 1.0,
+        slots: {},
+      },
+      module: {
+        key: targetKey,
+        label: targetLabel,
+        entity_key: null,
+        capabilities: {},
+        mcp_tools: [],
+        agent_key: null,
+        workflow_key: null,
+        case_type: null,
+        reaches_recommendation: false,
+        reaches_action: false,
+      },
+      answer: {
+        // One short confirmation line: the tab opens on the client, and nothing about
+        // its content is fetched or described here.
+        headline: confirmation,
+        sections: [],
+        follow_ups: [],
+        actions: [],
+      },
+      trace: [],
+      ladder: [],
+      stage_counts: {},
+      lifecycle_trace: [],
+      lifecycle_stage_counts: {},
+      links: {},
+      duration_ms: 0,
+    };
+
+    return createUIMessageStreamResponse({
+      stream: createUIMessageStream<AskUIMessage>({
+        execute: async ({ writer }) => {
+          for await (const chunk of askUiChunksFromResult(result)) {
+            writer.write(chunk);
+          }
+        },
+      }),
+    });
+  }
 
   if (!baseUrl) {
     return Response.json(
@@ -111,10 +279,6 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-
-  const body = await request.text();
-  const authorization = request.headers.get('authorization');
-  const institute = request.headers.get('x-mcp-institute-id');
 
   const call = (path: string, accept: string) =>
     fetch(`${baseUrl}${path}`, {
@@ -126,8 +290,6 @@ export async function POST(request: Request) {
         ...(institute ? { 'X-MCP-Institute-Id': institute } : {}),
       },
       body,
-      // The user's abort travels the whole way. Without this the browser stops
-      // listening while Laravel keeps running a lifecycle turn that may write.
       signal: request.signal,
       cache: 'no-store',
     });
@@ -138,22 +300,13 @@ export async function POST(request: Request) {
   try {
     upstream = await call(streamPath, 'text/event-stream');
 
-    // A backend that predates the streaming route answers 404 for it while still
-    // serving `/ask` perfectly well — which is the state a deployment is in between
-    // shipping the two. Both routes return the same payload, so falling back keeps the
-    // panel working instead of failing on a route the answer never needed.
     if (upstream.status === 404 || upstream.status === 405) {
       const fallback = await call('/api/ai/ask', 'application/json');
 
       if (!fallback.ok) {
-        // Neither route exists: this is a wrong host, not an old one. Report the
-        // original path, since that is the one the panel is built to call.
         return errorResponse(fallback, `${baseUrl}${streamPath}`);
       }
 
-      // Parsed defensively rather than with `.json()`: a proxy or a login redirect can
-      // answer 200 with HTML, and letting that throw would surface as "unreachable",
-      // which points the reader at the network instead of at the response.
       const raw = await fallback.text();
       let result: AskResult | null = null;
 
@@ -189,7 +342,6 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     if (request.signal.aborted) {
-      // The user cancelled. There is nobody left to answer.
       return new Response(null, { status: 499 });
     }
 
@@ -198,22 +350,16 @@ export async function POST(request: Request) {
     return Response.json({ error: 'The assistant is unreachable.' }, { status: 502 });
   }
 
-  // Validation and scope failures happen before a byte is streamed and come back as
-  // ordinary JSON. Passing them through with their status keeps `useChat`'s error
-  // state honest instead of surfacing a 200 with an error buried in the stream.
   if (!upstream.ok || !upstream.body) {
     return errorResponse(upstream, `${baseUrl}${streamPath}`);
   }
 
   const stream = createUIMessageStream<AskUIMessage>({
     onError: (error) => {
-      // Never the upstream's words: a provider or query detail must not reach a
-      // browser. The lifecycle trace is the diagnostic surface.
       console.error('The assistant stream failed.', error);
 
       return 'The assistant could not finish that answer.';
     },
-    // The whole translation, and the only thing this route does with the response.
     execute: async ({ writer }) => {
       for await (const chunk of askUiChunks(upstream.body!)) {
         writer.write(chunk);
@@ -223,3 +369,4 @@ export async function POST(request: Request) {
 
   return createUIMessageStreamResponse({ stream });
 }
+

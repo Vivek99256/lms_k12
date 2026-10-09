@@ -9,7 +9,7 @@ import { EmptyState } from '@/app/dashboard/_components/DashboardPrimitives';
 import type { DashboardWidget, DashboardWidgetGroup } from '@/app/dashboard/_lib/dashboard-preferences';
 
 const GROUPS: Array<{ group: DashboardWidgetGroup; label: string }> = [
-  { group: 'kpi', label: 'KPI cards' },
+  { group: 'kpi', label: 'Summary cards' },
   { group: 'chart', label: 'Charts' },
   { group: 'panel', label: 'Other sections' },
 ];

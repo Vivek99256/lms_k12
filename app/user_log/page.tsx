@@ -39,6 +39,7 @@ import {
   type UserLogRecord,
   type UserOption,
 } from "./api";
+import { friendlyError } from '@/lib/user-messages';
 
 const PAGE_SIZE = 10;
 const columns: TableExportColumn[] = [
@@ -101,9 +102,7 @@ export default function UserLogPage() {
       setUsers(await loadUserLogUsers());
     } catch (loadError: unknown) {
       setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "User options could not be loaded."
+        friendlyError(loadError, "We couldn't load the user list. Please try again.")
       );
     } finally {
       setLoading(false);
@@ -165,9 +164,7 @@ export default function UserLogPage() {
       setGenerated(true);
     } catch (searchError: unknown) {
       setError(
-        searchError instanceof Error
-          ? searchError.message
-          : "User logs could not be loaded."
+        friendlyError(searchError, "We couldn't load the audit log. Please try again.")
       );
     } finally {
       setSearching(false);
@@ -178,7 +175,7 @@ export default function UserLogPage() {
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-900">
-          User Log Report
+          Audit log
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           Review user activity by date and account.
@@ -198,7 +195,7 @@ export default function UserLogPage() {
       >
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="user-log-from">From date *</Label>
+            <Label htmlFor="user-log-from">Start date *</Label>
             <Input
               id="user-log-from"
               type="date"
@@ -209,7 +206,7 @@ export default function UserLogPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="user-log-to">To date *</Label>
+            <Label htmlFor="user-log-to">End date *</Label>
             <Input
               id="user-log-to"
               type="date"
@@ -251,7 +248,7 @@ export default function UserLogPage() {
                   setQuery(event.target.value);
                   setPage(1);
                 }}
-                placeholder="Search user logs..."
+                placeholder="Search the audit log…"
                 className="h-8 pl-8"
               />
             </label>
@@ -276,7 +273,7 @@ export default function UserLogPage() {
                 onClick={() =>
                   exportRowsAsExcel({
                     filename: "user-log-report.xls",
-                    title: "User Log Report",
+                    title: "Audit log",
                     columns,
                     rows: exportRows,
                   })
@@ -290,7 +287,7 @@ export default function UserLogPage() {
                 disabled={!exportRows.length}
                 onClick={() =>
                   openPrintPreview({
-                    title: "User Log Report",
+                    title: "Audit log",
                     subtitle: `${fromDate} to ${toDate}`,
                     columns,
                     rows: exportRows,
@@ -401,7 +398,7 @@ function SearchableUserSelect({
             autoFocus
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search user..."
+            placeholder="Search user…"
             className="h-8 pl-8"
           />
         </div>

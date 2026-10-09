@@ -17,18 +17,13 @@ installErpAuthFetch();
  * scrolling shell would leave it a fraction of the screen with two toolbars.
  * These routes still sit behind the same authentication gate.
  *
- * /mobile/custom and /mobile-bridge are the other reason this list exists at
- * all: they're what Flutter's WebView actually opens (see MobileWebHandoffApiController
- * / DynamicWebScreen), at phone width with no room to spare -- wrapping them
- * in the admin sidebar doesn't just look wrong, it makes the page unusable.
- * The Mobile Page Builder editor is the same phone-frame-canvas case as the
- * document-template editor above.
+ * /mobile-bridge is the other reason this list exists: it is what the mobile apps open
+ * (see MobileWebHandoffApiController), at phone width with no room to spare -- wrapping it
+ * in the admin sidebar makes the page unusable.
  */
 const FULL_BLEED_ROUTES = [
   '/document-templates/editor',
-  '/mobile/custom',
   '/mobile-bridge',
-  '/general/mobile_page_builder/',
 ];
 
 export default function ConditionalApp({ children }: { children: React.ReactNode }) {

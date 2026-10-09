@@ -201,8 +201,8 @@ export async function fetchMissingDocumentReport(input: {
   }));
 
   const headers: LabelledKey[] = [
-    ...(input.userType === 'student' ? [{ key: 'enrollment_no', label: 'GR No' }] : []),
-    { key: 'student_name', label: input.userType === 'staff' ? 'Staff Name' : 'Student Name' },
+    ...(input.userType === 'student' ? [{ key: 'enrollment_no', label: 'GR no.' }] : []),
+    { key: 'student_name', label: input.userType === 'staff' ? 'Staff Name' : 'Student name' },
     ...(input.userType === 'student'
       ? [
           { key: 'standard_name', label: 'Standard' },
@@ -262,8 +262,8 @@ export async function fetchStudentRequestReport(input: {
   return {
     rows: normalizeFlatRows(payload.result_report),
     headers: [
-      { key: 'enrollment_no', label: 'GR No' },
-      { key: 'student_name', label: 'Student Name' },
+      { key: 'enrollment_no', label: 'GR no.' },
+      { key: 'student_name', label: 'Student name' },
       { key: 'REQUEST', label: 'Request Type' },
       { key: 'PROOF_OF_DOCUMENT', label: 'Document' },
       { key: 'REASON', label: 'Reason' },
@@ -418,10 +418,10 @@ export async function fetchAgewiseReport(input: {
 }
 
 export const STUDENT_REPORT_ORDER_OPTIONS: SelectOption[] = [
-  { id: 'student_name', label: 'Student Name' },
+  { id: 'student_name', label: 'Student name' },
   { id: 'standard_id', label: 'Standard' },
-  { id: 'enrollment_no', label: 'GR No' },
-  { id: 'roll_no', label: 'Roll No' },
+  { id: 'enrollment_no', label: 'GR no.' },
+  { id: 'roll_no', label: 'Roll no.' },
   { id: 'last_name', label: 'Last Name' },
 ];
 

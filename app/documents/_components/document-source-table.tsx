@@ -74,7 +74,7 @@ export function DocumentSourceTable({ sourceKey }: { sourceKey: string }) {
         syear,
       }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'These documents could not be loaded.');
+      setError(reason instanceof Error ? reason.message : "Couldn't load these documents. Try again.");
       setPage(null);
     } finally {
       setLoading(false);

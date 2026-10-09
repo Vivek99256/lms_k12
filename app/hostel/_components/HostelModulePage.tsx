@@ -69,7 +69,7 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
       const payload = await loadHostelModule(module, session, nextFilters ?? filters);
       setData(payload);
     } catch (loadError: unknown) {
-      setError(loadError instanceof Error ? loadError.message : "Hostel data could not be loaded.");
+      setError(loadError instanceof Error ? loadError.message : "Couldn't load hostel data. Try again.");
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,7 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
   }, [data.records, page, search]);
 
   const exportColumns = useMemo<TableExportColumn[]>(() => [
-    { key: "sr_no", label: "Sr No", width: "60px" },
+    { key: "sr_no", label: "No.", width: "60px" },
     ...config.columns.map((column) => ({ key: column.key, label: column.label })),
   ], [config.columns]);
 
@@ -399,8 +399,8 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <Label htmlFor="admission_category_id">Admission Category</Label>
-              {renderField({ key: "admission_category_id", label: "Admission Category", kind: "select", source: "admissionCategories" }, form, updateField)}
+              <Label htmlFor="admission_category_id">Admission category</Label>
+              {renderField({ key: "admission_category_id", label: "Admission category", kind: "select", source: "admissionCategories" }, form, updateField)}
             </div>
             <div>
               <Label htmlFor="hostel_id">Hostel *</Label>
@@ -414,7 +414,7 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
                 onChange={(event) => updateField("room_id", event.target.value)}
                 className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               >
-                <option value="">Select Room</option>
+                <option value="">Select room</option>
                 {data.availableRooms
                   .filter((room) => !form.hostel_id || text(room.values.hostel_id) === form.hostel_id)
                   .filter((room) => !filters.building_id || text(room.values.building_id) === filters.building_id)
@@ -427,19 +427,19 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
               </select>
             </div>
             <div>
-              <Label htmlFor="bed_no">Bed No</Label>
+              <Label htmlFor="bed_no">Bed no</Label>
               <Input id="bed_no" value={text(form.bed_no)} onChange={(event) => updateField("bed_no", event.target.value)} className="mt-1" />
             </div>
             <div>
-              <Label htmlFor="locker_no">Locker No</Label>
+              <Label htmlFor="locker_no">Locker no</Label>
               <Input id="locker_no" value={text(form.locker_no)} onChange={(event) => updateField("locker_no", event.target.value)} className="mt-1" />
             </div>
             <div>
-              <Label htmlFor="table_no">Table No</Label>
+              <Label htmlFor="table_no">Table no</Label>
               <Input id="table_no" value={text(form.table_no)} onChange={(event) => updateField("table_no", event.target.value)} className="mt-1" />
             </div>
             <div>
-              <Label htmlFor="bedsheet_no">Bedsheet No</Label>
+              <Label htmlFor="bedsheet_no">Bedsheet no</Label>
               <Input id="bedsheet_no" value={text(form.bedsheet_no)} onChange={(event) => updateField("bedsheet_no", event.target.value)} className="mt-1" />
             </div>
           </div>
@@ -553,7 +553,7 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Sr No</TableHead>
+                    <TableHead>No.</TableHead>
                     {config.columns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}
                     {config.kind !== "report" && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
@@ -568,7 +568,7 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
                   ) : visibleRecords.rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={config.columns.length + (config.kind !== "report" ? 2 : 1)} className="h-32 text-center text-slate-500">
-                        No records found for the current filters.
+                        No records match your filters.
                       </TableCell>
                     </TableRow>
                   ) : (
