@@ -136,6 +136,7 @@ import {
 import { type Course } from '../../data/courses';
 import {
   fetchChapterContent,
+  downloadStudyDeckPdf,
   fetchGeneratableQuestionFormats,
   fetchSemanticIntelligenceResult,
   generateIntelligenceQuestions,
@@ -185,6 +186,7 @@ import {
 } from './GenerationPipeline';
 import { FormatMultiSelect } from './FormatMultiSelect';
 import { getRequestContext, getSyear } from '../../page';
+import { pdfFileNameFromTitle } from '@/lib/study-deck/pdf';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import { useCurriculumMeta } from '../../data/curriculum';
@@ -527,12 +529,18 @@ interface ChapterContentItem {
   bodyHtml: string | null;
   /** Route of the existing H5P editor this item opens in. Only set for H5P items. */
   deepLink?: string;
+<<<<<<< HEAD
   /** topic_master.name - set for Prayogshala items. */
   topicName: string | null;
   /** Short description shown on the card - set for Prayogshala items. */
   summary: string | null;
   /** The whole activity, for the detail view. Only set for Prayogshala items. */
   prayogshala: PrayogshalaActivity | null;
+=======
+  /** The study deck's classroom PDF, reported by the backend. A second file of the same item; Open is unchanged. */
+  pdfUrl?: string;
+  chapterId?: string;
+>>>>>>> 93cdcbb9b1b783015b3cdcc1e4b396ba769036e8
   slides: {
     id: string;
     number: number;
@@ -620,6 +628,8 @@ function buildApiChapterContentItems(
         topicName: asset.topic_name?.trim() ? asset.topic_name.trim() : null,
         summary: type === 'Prayogshala' ? (asset.prayogshala?.objective ?? asset.description ?? null) : null,
         prayogshala: asset.prayogshala ?? null,
+        pdfUrl: asset.pdf_url,
+        chapterId: chapter.id,
       };
     })
   );
@@ -2848,6 +2858,19 @@ export default function ChapterListPage() {
       </div>
     </div>
   );
+
+  const handleDownloadPdf = (item: ChapterContentItem) => {
+    const requestContext = getRequestContext();
+    const chapterId = Number(item.chapterId);
+    const contentId = Number(item.id);
+    if (!requestContext || !Number.isFinite(chapterId) || !Number.isFinite(contentId)) {
+      setContentError('Course master session data is missing.');
+      return;
+    }
+    downloadStudyDeckPdf(chapterId, contentId, Number(requestContext.sub_institute_id), pdfFileNameFromTitle(item.title)).catch((error: unknown) => {
+      setContentError(error instanceof Error ? error.message : 'Couldn’t download the PDF.');
+    });
+  };
 
   const handleOpenContent = (item: ChapterContentItem) => {
     // A Prayogshala activity is a structured document (objective, procedure, safety...),
@@ -6293,6 +6316,7 @@ export default function ChapterListPage() {
                             key={item.id}
                             item={item}
                             onOpen={() => handleOpenContent(item)}
+                            onDownloadPdf={() => handleDownloadPdf(item)}
                             hideChapter
                           />
                         ))}
@@ -6308,6 +6332,7 @@ export default function ChapterListPage() {
                     key={item.id}
                     item={item}
                     onOpen={() => handleOpenContent(item)}
+                    onDownloadPdf={() => handleDownloadPdf(item)}
                   />
                 ))}
               </div>

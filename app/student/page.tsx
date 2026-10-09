@@ -56,6 +56,7 @@ import {
   type SubjectWithChapters,
 } from '@/app/course-master/data/chapters';
 import { resolveViewableUrl } from '@/app/course-master/data/content-links';
+import { StudyDeckEntry } from '@/components/study-deck/StudyDeckEntry';
 import {
   fetchMappedQuestionBank,
   groupQuestionBankItems,
@@ -1886,6 +1887,8 @@ export default function StudentPage() {
             Back
           </button>
         </div>
+
+        {selectedChapter ? <StudyDeckEntry chapterId={Number(selectedChapter.id)} /> : null}
 
         <div className="mt-6 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm sm:px-5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">

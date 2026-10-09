@@ -361,6 +361,11 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
   const contextQuery = h5pContextQuery(ctx);
   const backHref = isStudent ? `/h5p/html_contents?${contextQuery}` : `/h5p/h5p_flashacard?${contextQuery}`;
   const hasHint = Boolean(card?.hint && card.hint.trim() !== '');
+  // Embedded in another page (the study deck, PAL, the question bank quiz): that page draws the title
+  // and the learner needs no chapter/subject ids, and a card built from a bank question has no body
+  // by design - its question sits beside the answer box. Standalone decks are unchanged.
+  const embedded = Boolean(preloaded?.embedded);
+  const hasBody = Boolean(card?.content && card.content.trim() !== '');
 
   const swipe = useSwipe({
     onLeft: () => requestNavigate(current + 1),
@@ -370,12 +375,14 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
   return (
     <div className="p-4 sm:p-6">
       <div className="mx-auto">
-        <H5pPageHeader
-          title="Flash cards"
-          description={total > 0 ? `Card ${Math.min(current + 1, total)} of ${total}` : 'Interactive flash card practice'}
-          ctx={ctx}
-          backHref={backHref}
-        />
+        {embedded ? null : (
+          <H5pPageHeader
+            title="Flash cards"
+            description={total > 0 ? `Card ${Math.min(current + 1, total)} of ${total}` : 'Interactive flash card practice'}
+            ctx={ctx}
+            backHref={backHref}
+          />
+        )}
 
         {!hasH5pContext(ctx) ? (
           <MissingContextNotice />
@@ -427,13 +434,13 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
                         `overflow: hidden` here would erase them. */}
                     <div className="h5p-surface overflow-hidden">
                     {/* Card body */}
-                    <div className="relative min-h-[320px] p-6 sm:p-8">
-                      {card.content && card.content.trim() !== '' ? (
+                    <div className={`relative ${hasBody || !embedded ? 'min-h-[320px] p-6 sm:p-8' : hasHint ? 'min-h-[64px] p-6' : ''}`}>
+                      {hasBody ? (
                         <div
                           className="text-sm leading-relaxed text-slate-700 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded-lg"
-                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(card.content) }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(card.content ?? '') }}
                         />
-                      ) : (
+                      ) : embedded ? null : (
                         <p className="text-sm text-slate-400">No content available</p>
                       )}
 
@@ -581,7 +588,10 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
       {/* Result. A dialog rather than a decorated div: it takes the whole
           screen and the deck behind it is no longer usable, so it has to say
           so to anything that is not reading pixels. */}
-      {showResult ? (
+      {/* Not when a host page embeds the deck and takes the result itself (the study deck, a quiz): its own
+          Continue button must stay reachable, and the card already says "Answered correctly" inline. The
+          single choice player makes the same call for its embedded last question. */}
+      {showResult && !(embedded && preloaded?.onResult) ? (
         <div
           role="dialog"
           aria-modal="true"
