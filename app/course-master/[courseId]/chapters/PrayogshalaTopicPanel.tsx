@@ -160,6 +160,9 @@ export function PrayogshalaTopicPanel({ chapterId, canManage, reloadKey, onOpenL
                 {canManage && activity?.generation_error ? (
                   <p className="mt-1 text-xs text-rose-600">{activity.generation_error}</p>
                 ) : null}
+                {canManage && hasLab && activity?.source_refs?.note ? (
+                  <p className="mt-1 text-xs text-amber-700">{activity.source_refs.note}</p>
+                ) : null}
                 {canManage && entry.state === 'not_generated' && !entry.has_description && entry.concept_count === 0 ? (
                   <p className="mt-1 text-xs text-orange-700">This topic has little source content; generation may report that it needs more.</p>
                 ) : null}

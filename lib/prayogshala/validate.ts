@@ -62,6 +62,7 @@ export function validateLabConfig(lab: unknown): string[] {
   if (config.simulation.type === 'variable_model') {
     const visual = (config.simulation.params as { visual?: { bind?: Record<string, unknown> } }).visual;
     for (const [key, raw] of Object.entries(visual?.bind ?? {})) {
+      if (key === 'caption') continue; // plain text shown under the picture, not a formula
       if (typeof raw === 'string' && evaluate(raw, facts) === null) problems.push(`The picture setting "${key}" cannot be calculated.`);
     }
   }
