@@ -10,8 +10,20 @@
 
 import { activityKey } from '../study-deck/deck';
 import type { DeckActivity, ItemsInteraction } from '../study-deck/types';
-import { partForConcept } from './document';
-import type { ActivityPart, DocumentPart, RemedialUnitPart, RevisionNotePart, StudyDocument } from './types';
+import { partByNumber, partForConcept, partLabel, partsOf } from './document';
+import type {
+  ActivityPart,
+  BodyPart,
+  ClinicPart,
+  DiagnosticPart,
+  DocumentPart,
+  ExitPart,
+  GlossaryPart,
+  RemedialUnitPart,
+  RevisionNotePart,
+  RevisionTopicPart,
+  StudyDocument,
+} from './types';
 
 // ---------------------------------------------------------------------------
 // Revision notes: key terms and the checklist
@@ -21,18 +33,35 @@ export interface Flashcard {
   id: string;
   term: string;
   meaning: string;
-  /** The note it comes from. */
+  /** The part it comes from: the note, or the glossary. */
   part: number;
 }
 
-/** The notes' definitions as cards, in alphabetical order (the order of the PDF's key-terms table). */
+/** The glossary's terms that can be drawn as a card. The id is the glossary and the term's place in it. */
+function glossaryCards(glossary: GlossaryPart): Flashcard[] {
+  return glossary.content.terms.flatMap((t, index) =>
+    t.term.trim() && t.meaning.trim() ? [{ id: `term:${glossary.n}:${index}`, term: t.term.trim(), meaning: t.meaning.trim(), part: glossary.n }] : []
+  );
+}
+
+/**
+ * The key terms as cards, in alphabetical order (the order of the PDF's key-terms table): the glossary's terms when the
+ * document has a glossary, otherwise the definitions of the notes (the legacy design).
+ */
 export function flashcardsOf(doc: StudyDocument): Flashcard[] {
   if (doc.kind !== 'revision_notes') return [];
+  const parts = partsOf(doc);
+  const glossary = parts.find((part): part is GlossaryPart => part.type === 'glossary');
   const cards: Flashcard[] = [];
-  for (const note of doc.sections.slice(1) as RevisionNotePart[]) {
-    const definition = note.content.definition;
-    if (definition && definition.term.trim() && definition.text.trim()) {
-      cards.push({ id: `term:${note.n}`, term: definition.term.trim(), meaning: definition.text.trim(), part: note.n });
+  if (glossary) {
+    cards.push(...glossaryCards(glossary));
+  } else {
+    for (const note of parts) {
+      if (note.type !== 'note') continue;
+      const definition = note.content.definition;
+      if (definition && definition.term.trim() && definition.text.trim()) {
+        cards.push({ id: `term:${note.n}`, term: definition.term.trim(), meaning: definition.text.trim(), part: note.n });
+      }
     }
   }
 
@@ -53,17 +82,22 @@ export interface ChecklistGroup {
   items: ChecklistItem[];
 }
 
-/** "I can ..." points, grouped by topic in the outline's order (the PDF's checklist, made tickable). */
+/** The "I can ..." points of a note or a topic that have text, with the key each is ticked under (`check:<part>:<position>`). */
+export function tickItemsOf(part: RevisionNotePart | RevisionTopicPart): Array<{ key: string; text: string }> {
+  return part.content.checklist.flatMap((text, index) => (text.trim() ? [{ key: `check:${part.n}:${index}`, text: text.trim() }] : []));
+}
+
+/** "I can ..." points, grouped by topic in the outline's order (the PDF's checklist, made tickable). From the topics, or from the notes of a legacy document. */
 export function checklistOf(doc: StudyDocument): ChecklistGroup[] {
   if (doc.kind !== 'revision_notes') return [];
   const byTopic = new Map<number | null, ChecklistItem[]>();
-  for (const note of doc.sections.slice(1) as RevisionNotePart[]) {
-    note.content.checklist.forEach((text, index) => {
-      if (!text.trim()) return;
-      const list = byTopic.get(note.topic_id) ?? [];
-      list.push({ id: `check:${note.n}:${index}`, text: text.trim(), part: note.n, partTitle: note.title });
-      byTopic.set(note.topic_id, list);
-    });
+  for (const part of partsOf(doc)) {
+    if (part.type !== 'note' && part.type !== 'topic') continue;
+    for (const { key, text } of tickItemsOf(part)) {
+      const list = byTopic.get(part.topic_id) ?? [];
+      list.push({ id: key, text, part: part.n, partTitle: part.title });
+      byTopic.set(part.topic_id, list);
+    }
   }
 
   const groups: ChecklistGroup[] = [];
@@ -138,6 +172,54 @@ export function noteMistakeInteraction(note: RevisionNotePart): ItemsInteraction
   };
 }
 
+/** A topic's mix-ups: the wrong idea on the card, what is true when it is opened. Null when the topic has none. */
+export function topicMixupInteraction(topic: RevisionTopicPart): ItemsInteraction | null {
+  const mixups = topic.content.mixups.filter((m) => m.wrong_idea.trim() && m.correct.trim());
+  if (mixups.length === 0) return null;
+
+  return {
+    kind: 'reveal',
+    ...ITEMS,
+    intro: 'Select a card to see what is true instead.',
+    items: mixups.map((m, i) => ({ id: `m${i + 1}`, label: m.wrong_idea, text: m.correct })),
+  };
+}
+
+export interface ClinicCard {
+  /** Stable for a document: the part and the item's position in it. Done when the card has been opened. */
+  key: string;
+  wrongIdea: string;
+  whySeemsTrue: string;
+  correction: string;
+  checkIt: string;
+  /** The unit that teaches the idea, or null. */
+  unit: number | null;
+}
+
+/**
+ * The clinic's ideas to judge, one card each. The learner decides whether the idea is right, then opens the card for why it
+ * seems true, what is true, and a way to check it. An idea without a correction is left out: there would be nothing to open.
+ *
+ * Not an items interaction like the other mix-ups: each card carries three passages and a button to its unit, which the shared
+ * cards (one short text each, fitted to a canvas) have no place for.
+ */
+export function clinicCardsOf(clinic: ClinicPart): ClinicCard[] {
+  return clinic.content.items.flatMap((item, index) =>
+    item.wrong_idea.trim() && item.correction.trim()
+      ? [
+          {
+            key: `clinic:${clinic.n}:${index}`,
+            wrongIdea: item.wrong_idea.trim(),
+            whySeemsTrue: (item.why_it_seems_true ?? '').trim(),
+            correction: item.correction.trim(),
+            checkIt: (item.check_it ?? '').trim(),
+            unit: typeof item.unit === 'number' ? item.unit : null,
+          },
+        ]
+      : []
+  );
+}
+
 export interface GuidedQuestion {
   key: string;
   level: number;
@@ -177,6 +259,70 @@ export function followUpOf(doc: StudyDocument, unit: RemedialUnitPart): Array<{ 
     .filter((f) => f.part > 0 && f.part < doc.sections.length);
 }
 
+/**
+ * Pointers to unit parts ("take this unit if ..."), as buttons can open them. A number that is not a unit of this document is
+ * dropped, so a button never leads nowhere (and never to the teacher guide).
+ */
+export function unitPointers(doc: StudyDocument, numbers: readonly number[]): Array<{ part: number; label: string }> {
+  const out: Array<{ part: number; label: string }> = [];
+  for (const n of new Set(numbers)) {
+    const part = partByNumber(doc, n);
+    if (part && part.type === 'unit') out.push({ part: n, label: partLabel(doc, part) });
+  }
+
+  return out;
+}
+
+/** The units to take when this diagnostic question is missed. The item is found by question, then by position (the items follow the questions' order). */
+export function ifMissedFor(doc: StudyDocument, diagnostic: DiagnosticPart, activityIndex: number): Array<{ part: number; label: string }> {
+  const questionId = diagnostic.activities[activityIndex]?.question_id;
+  const item = diagnostic.content.items.find((i) => questionId !== null && i.question_id === questionId) ?? diagnostic.content.items[activityIndex];
+
+  return unitPointers(doc, (item?.if_missed ?? []).map((m) => m.n));
+}
+
+/** "You are ready when you get 4 of 5 right." Null when the part does not say (or says something that cannot be true). */
+export function readinessRule(exit: ExitPart): string | null {
+  const { ready_at: readyAt, total } = exit.content;
+  if (!Number.isInteger(readyAt) || !Number.isInteger(total) || readyAt < 1 || total < readyAt) return null;
+
+  return `You are ready when you get ${readyAt} of ${total} right.`;
+}
+
+// ---------------------------------------------------------------------------
+// Questions grouped by topic
+// ---------------------------------------------------------------------------
+
+export interface QuestionGroup {
+  /** The topic's name, or null for questions whose topic is not known. */
+  topic: string | null;
+  /** Positions in the part's `activities`. */
+  indexes: number[];
+}
+
+/**
+ * A part's questions grouped by the topic of the concept each is about, in the outline's order. When they all sit under one
+ * topic (or none can be placed) there is a single group with no name, and nothing is shown to split them.
+ */
+export function questionGroups(doc: StudyDocument, part: BodyPart): QuestionGroup[] {
+  const byTopic = new Map<number | null, number[]>();
+  part.activities.forEach((activity, index) => {
+    const topicId = activity.concept_id === null ? null : doc.concepts[String(activity.concept_id)]?.topic_id ?? null;
+    const key = doc.outline.some((t) => t.topic_id === topicId) ? topicId : null;
+    byTopic.set(key, [...(byTopic.get(key) ?? []), index]);
+  });
+
+  const groups: QuestionGroup[] = [];
+  for (const topic of doc.outline) {
+    const indexes = byTopic.get(topic.topic_id);
+    if (indexes) groups.push({ topic: topic.name, indexes });
+  }
+  const unplaced = byTopic.get(null);
+  if (unplaced) groups.push({ topic: null, indexes: unplaced });
+
+  return groups.length > 1 ? groups : [{ topic: null, indexes: part.activities.map((_, index) => index) }];
+}
+
 // ---------------------------------------------------------------------------
 // Classroom activities: discussion, reflection
 // ---------------------------------------------------------------------------
@@ -204,11 +350,16 @@ export type OnlineFeature =
   | 'term'
   | 'checklist'
   | 'discussion'
-  | 'reflection';
+  | 'reflection'
+  /** Text that is read here and answered nowhere (the table of likely gaps, the teacher guide). */
+  | 'reading';
 
 /**
  * The things a part has that work online, in the order they are shown. A part with none says so in the list (the PDF
  * still holds everything it says).
+ *
+ * A topic's table, comparison and recall points are shown whatever it holds, so they are not listed here; a diagnostic, a check,
+ * an independent practice and an exit check are their questions.
  */
 export function featuresOf(part: DocumentPart): OnlineFeature[] {
   const features: OnlineFeature[] = [];
@@ -223,12 +374,18 @@ export function featuresOf(part: DocumentPart): OnlineFeature[] {
     if (part.content.worked_example && part.content.worked_example.steps.length > 0) features.push('worked_example');
     if (part.content.mistakes.length > 0) features.push('mistakes');
   }
+  if (part.type === 'glossary' && glossaryCards(part).length > 0) features.push('term');
   if (part.image && part.interaction?.kind === 'hotspots') features.push('diagram');
   else if (part.interaction) features.push('interaction');
+  // After the picture: look at the diagram first, then at what people get wrong about it.
+  if (part.type === 'topic' && topicMixupInteraction(part)) features.push('mistakes');
+  if (part.type === 'clinic' && clinicCardsOf(part).length > 0) features.push('mistakes');
   if (part.activities.length > 0) features.push('questions');
   if (part.type === 'activity' && part.content.discussion.length > 0) features.push('discussion');
   if (part.type === 'activity' && part.content.reflection.length > 0) features.push('reflection');
-  if (part.type === 'note' && part.content.checklist.length > 0) features.push('checklist');
+  if ((part.type === 'note' || part.type === 'topic') && tickItemsOf(part).length > 0) features.push('checklist');
+  if (part.type === 'gaps' && (part.content.rows.length > 0 || part.content.others.length > 0)) features.push('reading');
+  if (part.type === 'teacher') features.push('reading');
 
   return features;
 }
@@ -260,8 +417,11 @@ export function partProgress(part: DocumentPart, done: ReadonlySet<string>): Pro
   if (part.type === 'note') {
     if (part.content.definition) tally(termKey(part));
     if (part.content.misconception) tally(mistakesKey(part));
-    part.content.checklist.forEach((_, i) => tally(`check:${part.n}:${i}`));
   }
+  if (part.type === 'topic' && topicMixupInteraction(part)) tally(mistakesKey(part));
+  if (part.type === 'note' || part.type === 'topic') tickItemsOf(part).forEach((item) => tally(item.key));
+  if (part.type === 'glossary') glossaryCards(part).forEach((card) => tally(card.id));
+  if (part.type === 'clinic') clinicCardsOf(part).forEach((card) => tally(card.key));
 
   return { done: count, total };
 }
