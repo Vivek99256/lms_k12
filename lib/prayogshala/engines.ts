@@ -62,6 +62,8 @@ export interface VisualState {
   kind: string;
   values: Record<string, number>;
   bars?: { label: string; value: number; max: number }[];
+  /** Optional plain-text caption from the config, for visuals that would otherwise print a generic one. */
+  caption?: string;
 }
 
 export interface Engine<S> {
@@ -280,7 +282,7 @@ export const osmosisEngine: Engine<OsmosisState> = {
 
 // ------------------------------------------------------------------------ variable model
 
-export const VISUAL_KINDS = ['heating', 'particles', 'ray', 'circuit', 'bars', 'rectangle'] as const;
+export const VISUAL_KINDS = ['heating', 'particles', 'ray', 'circuit', 'bars', 'rectangle', 'motion', 'wave', 'lever', 'atom', 'scenery', 'mixture', 'pendulum'] as const;
 export type VisualKind = (typeof VISUAL_KINDS)[number];
 
 export interface ModelControl {
@@ -327,6 +329,13 @@ const VISUAL_BIND_KEYS: Record<string, string[]> = {
   ray: ['incidence', 'reflection'],
   circuit: ['closed', 'brightness'],
   rectangle: ['width', 'height'],
+  motion: ['position', 'speed'],
+  wave: ['amplitude', 'frequency'],
+  lever: ['left_load', 'left_distance', 'right_load', 'right_distance'],
+  atom: ['protons', 'neutrons', 'electrons'],
+  scenery: ['sun', 'clouds', 'rain', 'water', 'plants'],
+  mixture: ['separated', 'energy'],
+  pendulum: ['length', 'swing'],
 };
 
 export const variableModelEngine: Engine<VariableModelState> = {
@@ -383,6 +392,7 @@ export const variableModelEngine: Engine<VariableModelState> = {
       }
     }
 
+    if (typeof bind.caption === 'string' && bind.caption.trim() !== '') visual.caption = bind.caption.trim().slice(0, 160);
     return { facts: scope, observation: hit ? fillTemplate(hit.text, text) : '', warnings, outputs, visual };
   },
 };

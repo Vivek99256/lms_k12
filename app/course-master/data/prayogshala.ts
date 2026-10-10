@@ -59,7 +59,17 @@ export interface PrayogshalaActivity {
   concept_ids: number[];
   concept_names: string[];
   /** Staff only: which topic, concepts and chapter extraction it was built from. */
-  source_refs: { topic_id?: number; chapter_id?: number; concept_ids?: number[]; extraction_ids?: number[]; excerpt_chars?: number } | null;
+  source_refs: {
+    topic_id?: number;
+    chapter_id?: number;
+    concept_ids?: number[];
+    extraction_ids?: number[];
+    excerpt_chars?: number;
+    /** Set when the source material was thin: 'topic_title_only' | 'topic_description_only'. */
+    grounding?: string;
+    /** Plain-language warning for reviewers about that thin grounding. */
+    note?: string;
+  } | null;
   /** The interactive lab, or null for a plain document activity. */
   lab_config: LabConfig | null;
   /** Set on activities that arrive through the chapter content list. */

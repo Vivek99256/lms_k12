@@ -187,3 +187,41 @@ test('every backend-emitted engine type is registered', () => {
     assert.ok(getEngine(type), type);
   }
 });
+
+// ------------------------------------------------------------- motion and wave visuals
+
+test('motion and wave visuals take their drawing inputs from the controls', () => {
+  const motion: VariableModelParams = {
+    controls: [
+      { id: 'v', label: 'Speed', unit: 'm/s', min: 0, max: 10, step: 1, default: 0 },
+      { id: 't', label: 'Time', unit: 's', min: 0, max: 10, step: 1, default: 0 },
+    ],
+    derived: [{ id: 'd', label: 'Distance', unit: 'm', formula: 'v*t', decimals: 0 }],
+    visual: { kind: 'motion', bind: { position: 'd/100', speed: 'v/10' } },
+    observations: [{ when: 'v==0', text: 'At rest.' }, { when: 'v>0', text: 'Moved {d} m.' }],
+  };
+  const rest = variableModelEngine.evaluate(motion, variableModelEngine.initialState(motion));
+  assert.deepEqual(rest.visual?.values, { position: 0, speed: 0 });
+  assert.equal(rest.observation, 'At rest.');
+  const moving = variableModelEngine.evaluate(motion, { values: { v: 5, t: 10 } });
+  assert.deepEqual(moving.visual?.values, { position: 0.5, speed: 0.5 });
+  assert.equal(moving.observation, 'Moved 50 m.');
+
+  const wave: VariableModelParams = {
+    controls: [{ id: 'a', label: 'Amplitude', min: 0, max: 10, step: 1, default: 5 }, { id: 'f', label: 'Frequency', min: 1, max: 8, step: 1, default: 2 }],
+    visual: { kind: 'wave', bind: { amplitude: 'a/10', frequency: 'f' } },
+    observations: [{ when: 'a>=0', text: 'ok' }],
+  };
+  assert.deepEqual(variableModelEngine.evaluate(wave, variableModelEngine.initialState(wave)).visual?.values, { amplitude: 0.5, frequency: 2 });
+});
+
+test('a plain-text caption on a visual is passed through and is not treated as a formula', () => {
+  const params: VariableModelParams = {
+    controls: [{ id: 'w', label: 'w', min: 1, max: 10, step: 1, default: 4 }],
+    visual: { kind: 'rectangle', bind: { width: 'w', height: '3', caption: 'Width = girth (model drawing)' } },
+    observations: [{ when: 'w>=1', text: 'ok' }],
+  };
+  assert.equal(variableModelEngine.evaluate(params, variableModelEngine.initialState(params)).visual?.caption, 'Width = girth (model drawing)');
+  const config = lab({ type: 'variable_model', params: { ...params, derived: [{ id: 'temp', label: 't', formula: 'w*10' }] } as unknown as Record<string, unknown> });
+  assert.doesNotMatch(validateLabConfig(config).join(' '), /caption/);
+});

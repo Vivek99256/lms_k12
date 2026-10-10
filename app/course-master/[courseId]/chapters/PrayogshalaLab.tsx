@@ -147,7 +147,7 @@ function RelevanceWorkspace({ params, state, setState, result }: WorkspaceProps<
         </div>
       </div>
 
-      <svg viewBox="0 0 320 110" className="w-full rounded-xl" style={{ background: C.panel2 }} role="img" aria-label={`Model sheet for: ${params.subject}`}>
+      <svg viewBox="0 0 320 110" className="w-full rounded-xl" style={{ background: C.panel2 }} role="img" aria-label={`Sheet for: ${params.subject}`}>
         <text x="12" y="18" fontSize="10" fill={C.muted}>{params.subject}</text>
         <path d="M20 90 Q150 -10 290 90" fill="none" stroke={C.line} strokeWidth="2" strokeDasharray="4 4" />
         <circle cx="20" cy="90" r="7" fill={C.sand} />
@@ -159,11 +159,11 @@ function RelevanceWorkspace({ params, state, setState, result }: WorkspaceProps<
             </text>
           </g>
         ))}
-        {keptDetails.length === 0 ? <text x="160" y="62" fontSize="11" textAnchor="middle" fill={C.muted}>Your model is empty - tick the details to keep</text> : null}
+        {keptDetails.length === 0 ? <text x="160" y="62" fontSize="11" textAnchor="middle" fill={C.muted}>Nothing ticked yet - tick the ones that apply</text> : null}
       </svg>
 
       <div>
-        <p className="mb-2 text-[12px] uppercase tracking-wide" style={{ color: C.muted }}>Details of the situation (tick the ones your model keeps)</p>
+        <p className="mb-2 text-[12px] uppercase tracking-wide" style={{ color: C.muted }}>Tick the ones that apply</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {params.details.map((detail) => {
             const on = state.kept.includes(detail.id);
@@ -187,7 +187,7 @@ function RelevanceWorkspace({ params, state, setState, result }: WorkspaceProps<
         </div>
       </div>
       <p className="text-[13px]" style={{ color: C.muted }}>
-        Kept: <b style={{ color: C.text }}>{result.facts.kept}</b> · Missing: <b style={{ color: result.facts.missed ? C.bad : C.text }}>{result.facts.missed}</b> · Extra: <b style={{ color: result.facts.extra ? C.warn : C.text }}>{result.facts.extra}</b>
+        Ticked: <b style={{ color: C.text }}>{result.facts.kept}</b> · Missing: <b style={{ color: result.facts.missed ? C.bad : C.text }}>{result.facts.missed}</b> · Extra: <b style={{ color: result.facts.extra ? C.warn : C.text }}>{result.facts.extra}</b>
       </p>
     </div>
   );
