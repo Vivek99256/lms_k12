@@ -5,7 +5,8 @@ import { CheckCircle2, Layers, ListChecks, Loader2, RefreshCw } from 'lucide-rea
 
 import { MemoryContext } from '@/components/study-deck/stage-ui';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
-import { KIND_LABEL, PART_NAME, partsOf } from '@/lib/study-document/document';
+import type { Audience } from '@/lib/study-document/api';
+import { KIND_LABEL, partLabel, partsFor } from '@/lib/study-document/document';
 import { checklistOf, featuresOf, flashcardsOf, partProgress } from '@/lib/study-document/online';
 import { doneSet, loadProgress, progressKey, progressReducer, saveProgress, type DocumentProgress, type ProgressAction, type StorageLike } from '@/lib/study-document/progress';
 import type { StudyDocument } from '@/lib/study-document/types';
@@ -20,6 +21,8 @@ export interface OnlinePracticeProps {
   instituteId: number;
   /** Identifies the learner so progress is kept per learner. */
   userKey: string;
+  /** Who is reading: a student is not shown the teacher guide of a remedial class. */
+  audience: Audience;
 }
 
 type Loaded = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; doc: StudyDocument; bank: BankQuestion[] };
@@ -46,7 +49,7 @@ function browserStorage(): StorageLike | null {
  * the study deck's own interaction views and question players. It runs inside the panel that opened it: no route, no tab.
  * Progress is kept in this browser only.
  */
-export function OnlinePractice({ chapterId, contentId, instituteId, userKey }: OnlinePracticeProps) {
+export function OnlinePractice({ chapterId, contentId, instituteId, userKey, audience }: OnlinePracticeProps) {
   const [attempt, setAttempt] = useState(0);
   // What came back is kept with the request it answers (see PdfFrame), so nothing is reset inside the effect.
   const requestKey = `${chapterId}:${contentId}:${instituteId}:${attempt}`;
@@ -94,11 +97,12 @@ export function OnlinePractice({ chapterId, contentId, instituteId, userKey }: O
     );
   }
 
-  return <Practice doc={loaded.doc} bank={loaded.bank} contentId={contentId} userKey={userKey} />;
+  return <Practice doc={loaded.doc} bank={loaded.bank} contentId={contentId} userKey={userKey} audience={audience} />;
 }
 
-function Practice({ doc, bank, contentId, userKey }: { doc: StudyDocument; bank: BankQuestion[]; contentId: number; userKey: string }) {
-  const parts = useMemo(() => partsOf(doc), [doc]);
+function Practice({ doc, bank, contentId, userKey, audience }: { doc: StudyDocument; bank: BankQuestion[]; contentId: number; userKey: string; audience: Audience }) {
+  // Only the parts this reader may see are listed, counted and opened. The glossary has no entry of its own: "Key terms" below is it.
+  const parts = useMemo(() => partsFor(doc, audience).filter((p) => p.type !== 'glossary'), [doc, audience]);
   const bankMap = useMemo(() => new Map(bank.map((q) => [Number(q.id), q])), [bank]);
   const terms = useMemo(() => flashcardsOf(doc), [doc]);
   const checklist = useMemo(() => checklistOf(doc), [doc]);
@@ -115,7 +119,12 @@ function Practice({ doc, bank, contentId, userKey }: { doc: StudyDocument; bank:
     saveProgress(browserStorage(), storeKey, progress);
   }, [storeKey, progress]);
 
-  const open = useCallback((n: number) => setSelected({ kind: 'part', n }), []);
+  const open = useCallback(
+    (n: number) => {
+      if (parts.some((p) => p.n === n)) setSelected({ kind: 'part', n });
+    },
+    [parts]
+  );
   const current = selected.kind === 'part' ? parts.find((p) => p.n === selected.n) : undefined;
 
   const items: Array<{ id: string; label: string; sub?: string; selection: Selection; muted?: boolean }> = [
@@ -129,7 +138,7 @@ function Practice({ doc, bank, contentId, userKey }: { doc: StudyDocument; bank:
 
       return {
         id: `part-${p.n}`,
-        label: `${PART_NAME[doc.kind]} ${p.n}: ${p.title}`,
+        label: partLabel(doc, p),
         sub: hasWork ? (progressOf.total > 0 ? `${progressOf.done}/${progressOf.total}` : '') : 'PDF only',
         selection: { kind: 'part', n: p.n } as Selection,
         muted: !hasWork,

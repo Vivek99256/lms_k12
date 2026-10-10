@@ -50,14 +50,33 @@ export function variantLabels(kind: DocumentKind): Record<PdfVariant, string> {
 }
 
 /**
- * Which copy opens first. A teacher opens the full copy (answers, teacher steps and keys); a student opens the copy
- * without them, so a student never lands on the answers by default.
+ * Which copy opens first. A teacher opens the full copy (answers, teacher steps and keys). A student opens the copy
+ * without them, so a student does not land on the answers by default, EXCEPT in revision notes: notes are read to be
+ * revised from, their questions are printed with the answer and the reason beside them, and the stored copy is what a
+ * learner is meant to study. A remedial class and a set of activities keep the answers-hidden copy (the student handout
+ * for activities), because there the learner does the work first.
  *
  * This is a default, not access control: the interface offers both copies to everyone, because the content endpoints are
  * not authenticated per learner (see docs). It is said plainly in the documentation and not hidden behind a button.
  */
-export function defaultVariant(audience: Audience): PdfVariant {
-  return audience === 'student' ? 'practice' : 'revision';
+export function defaultVariant(audience: Audience, kind: DocumentKind = 'revision_notes'): PdfVariant {
+  if (audience === 'teacher') return 'revision';
+
+  return kind === 'revision_notes' ? 'revision' : 'practice';
+}
+
+/** What a reader sees first in the viewer: the PDF for a teacher, "Try it online" for a student. */
+export type ViewerTab = 'pdf' | 'online';
+
+/**
+ * Which tab opens first. A student opens the online practice (diagrams to explore, cards to turn, questions that are
+ * marked) and has the PDF one click away; a teacher opens the PDF, as they print and hand it out.
+ *
+ * Whatever is not shown first is not fetched until it is asked for, so a student who stays on the online tab never makes the
+ * server draw a PDF.
+ */
+export function defaultTab(audience: Audience): ViewerTab {
+  return audience === 'student' ? 'online' : 'pdf';
 }
 
 /**

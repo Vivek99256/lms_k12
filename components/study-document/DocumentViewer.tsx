@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Download, FileText, Sparkles, X } from 'lucide-react';
 
-import { defaultVariant, documentFileName, variantLabels, variantsOffered, type Audience, type PdfVariant } from '@/lib/study-document/api';
+import { defaultTab, defaultVariant, documentFileName, variantLabels, variantsOffered, type Audience, type PdfVariant, type ViewerTab } from '@/lib/study-document/api';
 import { KIND_LABEL } from '@/lib/study-document/document';
 import type { DocumentKind } from '@/lib/study-document/types';
 import { loadDocumentPdf, saveBlob } from './data';
@@ -21,7 +21,7 @@ export interface DocumentViewerItem {
 export interface DocumentViewerProps {
   /** The document to show, or null for none. */
   item: DocumentViewerItem | null;
-  /** Who is reading: it only chooses which copy of the PDF opens first and which are offered. */
+  /** Who is reading: it only chooses which tab and which copy of the PDF open first, and which copies are offered. */
   audience: Audience;
   instituteId: number;
   /** Identifies the learner so progress in the online practice is kept per learner. */
@@ -29,7 +29,7 @@ export interface DocumentViewerProps {
   onClose: () => void;
 }
 
-type Tab = 'pdf' | 'online';
+type Tab = ViewerTab;
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, summary, iframe, [tabindex]:not([tabindex="-1"])';
 
@@ -56,9 +56,12 @@ function Viewer({ item, audience, instituteId, userKey, onClose }: DocumentViewe
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
   const offered = variantsOffered(item.kind, audience);
-  const [variant, setVariant] = useState<PdfVariant>(() => (offered.includes(defaultVariant(audience)) ? defaultVariant(audience) : offered[0]));
-  const [tab, setTab] = useState<Tab>('pdf');
-  const [onlineOpened, setOnlineOpened] = useState(false);
+  const [variant, setVariant] = useState<PdfVariant>(() => (offered.includes(defaultVariant(audience, item.kind)) ? defaultVariant(audience, item.kind) : offered[0]));
+  const [tab, setTab] = useState<Tab>(() => defaultTab(audience));
+  // A tab's content is fetched when the tab is first shown, not before: a student who opens on the online practice never
+  // makes the server read or draw a PDF, and a teacher who opens on the PDF does not load the practice.
+  const [onlineOpened, setOnlineOpened] = useState(() => defaultTab(audience) === 'online');
+  const [pdfOpened, setPdfOpened] = useState(() => defaultTab(audience) === 'pdf');
   const [saveError, setSaveError] = useState<string | null>(null);
   // The bytes of each copy, once read: switching back to a copy shows it at once, and a download needs no second request.
   const cache = useRef(new Map<PdfVariant, Blob>());
@@ -155,6 +158,7 @@ function Viewer({ item, audience, instituteId, userKey, onClose }: DocumentViewe
   const choose = (next: Tab) => {
     setTab(next);
     if (next === 'online') setOnlineOpened(true);
+    if (next === 'pdf') setPdfOpened(true);
   };
 
   return (
@@ -191,7 +195,7 @@ function Viewer({ item, audience, instituteId, userKey, onClose }: DocumentViewe
                   aria-pressed={variant === copy}
                   onClick={() => {
                     setVariant(copy);
-                    setTab('pdf');
+                    choose('pdf');
                   }}
                   className={`px-3 py-1.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-indigo-600 ${
                     variant === copy ? 'bg-indigo-600 text-white' : 'bg-white text-slate-800 hover:bg-slate-50'
@@ -253,15 +257,17 @@ function Viewer({ item, audience, instituteId, userKey, onClose }: DocumentViewe
 
         <div className="min-h-0 flex-1">
           <div id={`${titleId}-panel-pdf`} role="tabpanel" aria-labelledby={`${titleId}-tab-pdf`} hidden={tab !== 'pdf'} className="h-full">
-            <PdfFrame
-              cacheKey={variant}
-              title={`${item.title}, ${labels[variant]}`}
-              load={(signal) => read(variant, signal)}
-              onDownload={(blob) => void download(blob)}
-            />
+            {pdfOpened ? (
+              <PdfFrame
+                cacheKey={variant}
+                title={`${item.title}, ${labels[variant]}`}
+                load={(signal) => read(variant, signal)}
+                onDownload={(blob) => void download(blob)}
+              />
+            ) : null}
           </div>
           <div id={`${titleId}-panel-online`} role="tabpanel" aria-labelledby={`${titleId}-tab-online`} hidden={tab !== 'online'} className="h-full">
-            {onlineOpened ? <OnlinePractice chapterId={item.chapterId} contentId={item.contentId} instituteId={instituteId} userKey={userKey} /> : null}
+            {onlineOpened ? <OnlinePractice chapterId={item.chapterId} contentId={item.contentId} instituteId={instituteId} userKey={userKey} audience={audience} /> : null}
           </div>
         </div>
       </div>

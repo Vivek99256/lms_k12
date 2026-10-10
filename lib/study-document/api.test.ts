@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { canShowPdfInline, defaultVariant, documentFileName, documentPdfRequest, documentRequest, variantLabels, variantsOffered } from './api';
+import { canShowPdfInline, defaultTab, defaultVariant, documentFileName, documentPdfRequest, documentRequest, variantLabels, variantsOffered } from './api';
 
 test('a document is asked for by chapter, content item and school, never by a file name or a path', () => {
   assert.deepEqual(documentRequest(8592, 61401, 7), { chapter_id: 8592, content_id: 61401, sub_institute_id: 7 });
@@ -28,9 +28,19 @@ test('each kind names its two copies the way a reader would', () => {
   assert.deepEqual(variantLabels('activities'), { revision: 'Teacher edition', practice: 'Student handout' });
 });
 
-test('a teacher opens the full copy first and a student the copy without answers', () => {
-  assert.equal(defaultVariant('teacher'), 'revision');
-  assert.equal(defaultVariant('student'), 'practice');
+test('a teacher opens the full copy first; a student opens the copy without answers, except in revision notes', () => {
+  for (const kind of ['revision_notes', 'remedial', 'activities'] as const) {
+    assert.equal(defaultVariant('teacher', kind), 'revision', `a teacher opens the full ${kind}`);
+  }
+  assert.equal(defaultVariant('student', 'revision_notes'), 'revision', 'revision notes are read to be revised from, answers beside the questions');
+  assert.equal(defaultVariant('student', 'remedial'), 'practice', 'a remedial class is done first');
+  assert.equal(defaultVariant('student', 'activities'), 'practice', 'the student handout');
+  assert.equal(defaultVariant('student'), 'revision', 'a kind that is not named is the revision notes, the default');
+});
+
+test('a student opens the online practice first and a teacher the PDF', () => {
+  assert.equal(defaultTab('student'), 'online');
+  assert.equal(defaultTab('teacher'), 'pdf');
 });
 
 test("a student is not offered a classroom activity's teacher edition; everything else is offered to everyone", () => {
@@ -40,12 +50,13 @@ test("a student is not offered a classroom activity's teacher edition; everythin
     assert.deepEqual(variantsOffered(kind, 'student'), ['revision', 'practice'], 'a learner revising may want the answers');
     assert.deepEqual(variantsOffered(kind, 'teacher'), ['revision', 'practice']);
   }
-  // The copy a reader opens first is always one they are offered.
+  // The copy a reader opens first is always one they are offered, and a student is never defaulted to a teacher edition.
   for (const kind of ['revision_notes', 'remedial', 'activities'] as const) {
     for (const audience of ['teacher', 'student'] as const) {
-      assert.ok(variantsOffered(kind, audience).includes(defaultVariant(audience)), `${kind} ${audience}`);
+      assert.ok(variantsOffered(kind, audience).includes(defaultVariant(audience, kind)), `${kind} ${audience}`);
     }
   }
+  assert.equal(defaultVariant('student', 'activities'), variantsOffered('activities', 'student')[0], 'the student handout is the only activities copy a student has');
 });
 
 test('a download is named from the title, and the other copy says so', () => {

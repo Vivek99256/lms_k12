@@ -69,6 +69,10 @@ export interface RevisionOverview {
 export interface RemedialOverview {
   method: Array<{ label: string; text: string }>;
   focus: Array<{ concept_id: number; name: string; difficulty: string | null }>;
+  /** Purpose design only: an "I can ..." statement per topic. */
+  objectives?: Array<{ topic_id: number; name: string; text: string }>;
+  /** Purpose design only: the parts in the order a learner takes them. */
+  pathway?: Array<{ n: number; type: string; title: string }>;
 }
 
 export interface ActivitiesOverview {
@@ -116,6 +120,78 @@ export interface RemedialUnitContent {
   minutes: number;
 }
 
+// The "purpose" design: revision notes and a remedial class are two different documents, not one card grid with
+// different field names. A legacy document (`note` / `unit` parts) still opens; see `PART_TYPES` in document.ts.
+
+/** Revision notes, one per topic: the big idea, its concepts in a table, what to remember, and what to tick off. */
+export interface RevisionTopicContent {
+  big_idea: string;
+  /** One per concept of the topic. */
+  rows: Array<{ concept_id: number; name: string; essential: string; terms: string[] }>;
+  /** A side-by-side table; every row has `columns.length` cells. */
+  compare: { title: string; columns: string[]; rows: string[][] } | null;
+  mixups: Array<{ wrong_idea: string; correct: string }>;
+  recall: string[];
+  /** "I can ..." statements. */
+  checklist: string[];
+  minutes: number;
+}
+
+/** Alphabetical by term. */
+export interface GlossaryContent {
+  terms: Array<{ term: string; meaning: string; concept_id: number; topic_id: number }>;
+}
+
+/** The questions themselves are the part's `activities`. */
+export interface CheckContent {
+  intro: string;
+  note: string;
+}
+
+export interface DiagnosticContent {
+  intro: string;
+  scoring: string;
+  /** In `question_ids` order. `if_missed` names the unit parts to take when that question is missed (may be empty). */
+  items: Array<{ question_id: number; concept_id: number; topic_id: number; if_missed: Array<{ n: number; title: string }> }>;
+}
+
+export type GapPriority = 'higher' | 'medium' | 'lower';
+
+export interface GapsContent {
+  /** Always says these are potential difficulties worked out from the chapter's data, not measured results. */
+  note: string;
+  rows: Array<{ concept_id: number; name: string; topic_id: number; priority: GapPriority; reasons: string[]; check_first: string[]; covered_in: string }>;
+  /** Names of concepts that are not tabled (lower priority). */
+  others: string[];
+}
+
+export interface ClinicContent {
+  intro: string;
+  items: Array<{ concept_id: number; wrong_idea: string; why_it_seems_true: string; correction: string; check_it: string; unit: number | null }>;
+}
+
+export interface IndependentContent {
+  intro: string;
+}
+
+export interface ExitContent {
+  intro: string;
+  criteria: Array<{ text: string }>;
+  /** `ready_at` of `total` correct is ready; fewer means revisit the listed unit parts. */
+  ready_at: number;
+  total: number;
+  revisit: Array<{ concept_id: number; name: string; n: number }>;
+}
+
+/** Teacher-facing. A student audience never sees this part. */
+export interface TeacherContent {
+  purpose: string;
+  how_to_run: string[];
+  pacing: Array<{ n: number; title: string; minutes: number }>;
+  total_minutes: number;
+  interventions: Array<{ concept_id: number; name: string; n: number; look_for: string; try_this: string; if_still_stuck: string }>;
+}
+
 export interface ActivityContent {
   format: string;
   grouping: string;
@@ -142,10 +218,30 @@ export type ActivitiesOverviewPart = PartBase<'overview', ActivitiesOverview>;
 export type RevisionNotePart = PartBase<'note', RevisionNoteContent>;
 export type RemedialUnitPart = PartBase<'unit', RemedialUnitContent>;
 export type ActivityPart = PartBase<'activity', ActivityContent>;
+export type RevisionTopicPart = PartBase<'topic', RevisionTopicContent>;
+export type GlossaryPart = PartBase<'glossary', GlossaryContent>;
+export type CheckPart = PartBase<'check', CheckContent>;
+export type DiagnosticPart = PartBase<'diagnostic', DiagnosticContent>;
+export type GapsPart = PartBase<'gaps', GapsContent>;
+export type ClinicPart = PartBase<'clinic', ClinicContent>;
+export type IndependentPart = PartBase<'independent', IndependentContent>;
+export type ExitPart = PartBase<'exit', ExitContent>;
+export type TeacherPart = PartBase<'teacher', TeacherContent>;
+
+/** What a revision notes document holds after its overview: `note` is the legacy part, the rest are the purpose design. */
+export type RevisionPart = RevisionNotePart | RevisionTopicPart | GlossaryPart | CheckPart;
+/** What a remedial document holds after its overview: `unit` is in both designs. */
+export type RemedialPart = RemedialUnitPart | DiagnosticPart | GapsPart | ClinicPart | IndependentPart | ExitPart | TeacherPart;
+/** Any part after the overview, of any kind of document. */
+export type BodyPart = RevisionPart | RemedialPart | ActivityPart;
 
 interface DocumentBase<K extends DocumentKind, Overview, Part> {
   version: number;
   kind: K;
+  /** `purpose` for the new design; `compact`, or absent, for a legacy document. */
+  profile?: string;
+  /** Purpose design only: the page budget the document was written to. */
+  purpose?: { min_pages: number; max_pages: number; pages: { revision: number; practice: number } };
   /** The content library category it is filed under ("Revision Notes", "Remedial Class", "Classroom Activity"). */
   category: string;
   chapter: DocumentChapter;
@@ -165,11 +261,11 @@ interface DocumentBase<K extends DocumentKind, Overview, Part> {
   stats: Record<string, number>;
 }
 
-export type RevisionNotesDocument = DocumentBase<'revision_notes', RevisionOverviewPart, RevisionNotePart>;
-export type RemedialDocument = DocumentBase<'remedial', RemedialOverviewPart, RemedialUnitPart>;
+export type RevisionNotesDocument = DocumentBase<'revision_notes', RevisionOverviewPart, RevisionPart>;
+export type RemedialDocument = DocumentBase<'remedial', RemedialOverviewPart, RemedialPart>;
 export type ActivitiesDocument = DocumentBase<'activities', ActivitiesOverviewPart, ActivityPart>;
 
 export type StudyDocument = RevisionNotesDocument | RemedialDocument | ActivitiesDocument;
 
 /** Any one part, of any kind. */
-export type DocumentPart = RevisionOverviewPart | RemedialOverviewPart | ActivitiesOverviewPart | RevisionNotePart | RemedialUnitPart | ActivityPart;
+export type DocumentPart = RevisionOverviewPart | RemedialOverviewPart | ActivitiesOverviewPart | BodyPart;
