@@ -142,7 +142,7 @@ function getJourneyStepTitle(step: JourneyStepId | null, chapterName: string): s
 }
 
 function getJourneyStepDescription(step: JourneyStepId | null): string {
-  if (!step) return 'A sequential 10-stage learning path. Complete each stage in order to master this chapter.';
+  if (!step) return `A sequential ${JOURNEY_STEPS.length}-stage learning path. Complete each stage in order to master this chapter.`;
   const meta = JOURNEY_STEPS.find((s) => s.id === step);
   return meta ? meta.detail : 'Sequential progress along your personalized curriculum.';
 }
