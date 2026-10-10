@@ -53,6 +53,7 @@ import {
   type JourneyStepId,
 } from './H5PJourneyCollage';
 import { Compass } from 'lucide-react';
+import { ExperimentStepView } from './ExperimentStepView';
 
 export interface JourneyStepContentProps {
   stepId: JourneyStepId;
@@ -186,6 +187,16 @@ export function JourneyStepContent({
       case 'mastery':
         return (
           <MasteryStepView
+            chapterId={chapterId}
+            chapterName={chapterName}
+            onStepComplete={onStepComplete}
+            onNextStep={onNextStep}
+          />
+        );
+
+      case 'experiment':
+        return (
+          <ExperimentStepView
             chapterId={chapterId}
             chapterName={chapterName}
             onStepComplete={onStepComplete}
@@ -1560,18 +1571,18 @@ function MasteryStepView({
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-purple-100 bg-purple-50/70 p-4">
         <div>
-          <p className="text-xs font-bold text-purple-950">Lock in your knowledge with Spaced Recall?</p>
-          <p className="mt-0.5 text-xs text-purple-800">Advance to Step 10 to establish retention review intervals.</p>
+          <p className="text-xs font-bold text-purple-950">Put your mastery to work with an experiment?</p>
+          <p className="mt-0.5 text-xs text-purple-800">Advance to Step 10 to try the idea hands-on.</p>
         </div>
         <Button
           size="sm"
           className="gap-2 bg-purple-700 text-xs font-semibold text-white hover:bg-purple-800"
           onClick={() => {
             onStepComplete?.('mastery');
-            onNextStep?.('recall');
+            onNextStep?.('experiment');
           }}
         >
-          <span>Continue to Step 10: Spaced Recall</span>
+          <span>Continue to Step 10: Experiment</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </div>
@@ -1580,7 +1591,12 @@ function MasteryStepView({
 }
 
 // ---------------------------------------------------------------------------
-// Step 10: Spaced Recall & Retention (Long-term memory reviews)
+// Step 10 (Experiment) is ExperimentStepView, in its own file: it shows the
+// chapter's existing Prayogshala experiments.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Step 11: Spaced Recall & Retention (Long-term memory reviews)
 // ---------------------------------------------------------------------------
 function RecallStepView({
   chapterId,
@@ -1660,7 +1676,7 @@ function RecallStepView({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50/80 p-4">
         <div>
           <p className="text-xs font-bold text-teal-950">Complete PAL Journey Walked!</p>
-          <p className="mt-0.5 text-xs text-teal-900">All 10 stages have been unlocked and reviewed.</p>
+          <p className="mt-0.5 text-xs text-teal-900">All {JOURNEY_STEPS.length} stages have been unlocked and reviewed.</p>
         </div>
         <Button
           size="sm"
