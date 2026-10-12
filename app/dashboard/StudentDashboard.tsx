@@ -122,6 +122,19 @@ export default function StudentDashboard() {
           </div>
         </>
       )}
+
+      {/* Entry point to the alumni board (product-owner decision: students reach it from their dashboard). Shown whatever the
+          adaptive-learning content is doing, because it does not depend on it. */}
+      {!loading && (
+        <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-900">Alumni</h2>
+          <p className="mt-1 text-sm text-slate-600">Jobs and internships from people who studied here, and mentors who can guide you.</p>
+          <Link href="/alumni/student" className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            Open the alumni board
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
