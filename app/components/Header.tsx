@@ -305,18 +305,23 @@ export default function Header({
     routes: Record<string, string>;
     icons: Record<string, LucideIcon>;
   }[] = [
+    // Three sections side by side, so the three headings share one line. Setup and
+    // configuration used to be a sub-heading folded into Platform services, which
+    // put its label a row below the other two.
     {
       label: 'Platform services',
       href: '/platform-administration',
-      span: 2,
-      columns: [
-        { items: platformServicesItems },
-        { label: 'Setup and configuration', items: platformSetupItems },
-      ],
-      // Merged so one lookup serves the whole section. The two maps have no keys in
-      // common — they describe different screens — so neither can shadow the other.
-      routes: { ...platformServicesRoutes, ...platformSetupRoutes },
-      icons: { ...platformServicesIcons, ...platformSetupIcons },
+      span: 1,
+      columns: [{ items: platformServicesItems }],
+      routes: platformServicesRoutes,
+      icons: platformServicesIcons,
+    },
+    {
+      label: 'Setup and configuration',
+      span: 1,
+      columns: [{ items: platformSetupItems }],
+      routes: platformSetupRoutes,
+      icons: platformSetupIcons,
     },
     {
       label: 'AI and insights',
