@@ -62,6 +62,24 @@ export interface AlignmentStatedAmbition {
 }
 
 /**
+ * `careerAlignment`'s grounded-only narrative (App\CareerIntelligence\
+ * CareerAlignmentNarrator, Laravel repo) explaining what the alignment
+ * result above means for the student's current subjects/stream. Zero LLM
+ * calls happen before this — CaiCoreService::evaluate() is the only graph
+ * read — so `status` is one of three real outcomes, never a fabricated
+ * fourth: `ok` (narrative is real text), `insufficient_evidence` (no
+ * resolvable alignment to narrate — `message` carries the reason),
+ * `model_unavailable` (no AI key configured, or the provider rejected the
+ * request — `message` is a plain explanation, never the raw provider
+ * error).
+ */
+export interface AlignmentNarrative {
+  status: 'ok' | 'insufficient_evidence' | 'model_unavailable';
+  narrative: string | null;
+  message: string | null;
+}
+
+/**
  * Mirrors App\CareerIntelligence\CaiCoreService::evaluate()'s return shape
  * exactly (Laravel repo, Phase 3) — assembled from cai_core.cypher's own
  * RETURN clause plus the field names CI-SPEC-CONSOLE-001 documents binding
@@ -77,6 +95,7 @@ export interface AlignmentPayload {
   break_point: AlignmentBreakPoint | null;
   evidence_summary: unknown | null;
   insufficient_data_reason?: string;
+  narrative?: AlignmentNarrative;
 }
 
 /**

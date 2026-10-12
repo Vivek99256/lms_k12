@@ -228,18 +228,23 @@ export function TrackBar({
     return () => cancelAnimationFrame(frame);
   }, [pct]);
 
+  // A real 0% must still look like a control, not blank space: a hairline
+  // ring on the track and a faint minimum sliver when there is any value at
+  // all keep the bar legible instead of reading as a rendering glitch.
+  const fillPct = value > 0 ? Math.max(animatedPct, 3) : animatedPct;
+
   return (
     <div
       className="grid items-center gap-2.5"
       style={{ gridTemplateColumns: label ? 'minmax(84px,140px) 1fr minmax(48px,auto)' : '1fr minmax(48px,auto)' }}
     >
       {label ? <span className="truncate text-sm text-[#3c3833]">{label}</span> : null}
-      <span className="relative h-3.5">
-        <span className="absolute inset-0 overflow-hidden rounded-full bg-[#efeeec]">
+      <span className="relative h-3.5 min-w-[64px]">
+        <span className="absolute inset-0 overflow-hidden rounded-full bg-[#efeeec] ring-1 ring-inset ring-black/5">
           <span
             className="block h-full rounded-full bg-gradient-to-r transition-[width] duration-700 ease-out"
-            style={{ width: `${animatedPct}%`, backgroundImage: `linear-gradient(90deg, ${TONE_HEX[tone]}cc, ${TONE_HEX[tone]})` }}
-          />
+            style={{ width: `${fillPct}%`, backgroundImage: `linear-gradient(90deg, ${TONE_HEX[tone]}cc, ${TONE_HEX[tone]})` }}
+          /> 
         </span>
         {threshold !== undefined ? (
           <span className="absolute -top-0.5 -bottom-0.5 w-px bg-[#5c574f]/50" style={{ left: `${Math.min(100, Math.max(0, threshold))}%` }} />

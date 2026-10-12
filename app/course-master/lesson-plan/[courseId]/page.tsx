@@ -33,12 +33,14 @@ import {
   Circle,
   Clock,
   Globe2,
+  NotebookText,
   Presentation,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { LessonIntelligencePanel } from './LessonIntelligencePanel';
+import { LessonPlanDocumentPanel } from '../../lesson-plan-doc/LessonPlanDocumentPanel';
 import {
   LessonPlanDetailDialog,
   type LessonPlanContent,
@@ -2530,11 +2532,10 @@ export default function LessonPlanPage() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => router.push(lessonPlanRoutes.lessonPlan)}
               className="inline-flex items-center gap-2 rounded-[10px] border border-[#D8E1F0] bg-white px-4 py-2 text-[15px] font-medium text-[#0F172A] shadow-[0_1px_4px_rgba(15,23,42,0.04)]"
             >
-              <Calendar size={15} />
-              Master calendar
+              <NotebookText size={15} />
+              Lesson Plan
             </button>
             <button
               type="button"
@@ -2549,25 +2550,6 @@ export default function LessonPlanPage() {
               Concept wise
             </button>
           </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="inline-flex rounded-[14px] border border-[#D8E1F0] bg-[#EEF3FB] p-1 shadow-[0_1px_4px_rgba(15,23,42,0.04)]">
-              {(['day', 'week', 'month'] as CalendarViewMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setCalendarViewMode(mode)}
-                  className={`rounded-[10px] px-4 py-2 text-[14px] font-medium capitalize transition sm:px-5 ${
-                    calendarViewMode === mode
-                      ? 'bg-white text-[#4F46E5] shadow-[0_1px_4px_rgba(15,23,42,0.06)]'
-                      : 'text-[#475569] hover:text-[#0F172A]'
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         <LessonIntelligencePanel
@@ -2580,364 +2562,15 @@ export default function LessonPlanPage() {
           onScheduleChanged={() => setLessonPlanRefreshKey((key) => key + 1)}
         />
 
-        <div className="overflow-hidden rounded-[18px] border border-[#D8E1F0] bg-white shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-col gap-4 border-b border-[#E3EAF4] px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-[18px] font-semibold text-[#0F172A]">{calendarHeaderTitle}</h2>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex flex-wrap items-center gap-5 text-[14px] text-[#475569]">
-                {(['Delivered', 'Planned', 'Assessment'] as LessonPlanStatus[]).map((status) => (
-                  <div key={status} className="inline-flex items-center gap-2">
-                    <span className={`h-3 w-3 rounded-full ${getLegendDotClasses(status)}`} />
-                    <span>{status}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-1 self-end sm:self-auto">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setVisibleMonth((current) => {
-                      if (calendarViewMode === 'day') {
-                        return new Date(current.getFullYear(), current.getMonth(), current.getDate() - 1);
-                      }
-                      if (calendarViewMode === 'week') {
-                        return new Date(current.getFullYear(), current.getMonth(), current.getDate() - 7);
-                      }
-                      return new Date(current.getFullYear(), current.getMonth() - 1, 1);
-                    })
-                  }
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-[#64748B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A]"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setVisibleMonth((current) => {
-                      if (calendarViewMode === 'day') {
-                        return new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1);
-                      }
-                      if (calendarViewMode === 'week') {
-                        return new Date(current.getFullYear(), current.getMonth(), current.getDate() + 7);
-                      }
-                      return new Date(current.getFullYear(), current.getMonth() + 1, 1);
-                    })
-                  }
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-[#64748B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A]"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {lessonPlanLoading ? (
-            <div className="border-b border-[#E3EAF4] px-4 py-4 text-[14px] text-[#64748B] sm:px-6">
-              Loading lesson plan calendar...
-            </div>
-          ) : null}
-
-          {!lessonPlanLoading && lessonPlanError ? (
-            <div className="border-b border-[#FDE2E2] bg-[#FFF8F8] px-4 py-4 text-[14px] text-[#B91C1C] sm:px-6">
-              {lessonPlanError}
-            </div>
-          ) : null}
-
-          {!lessonPlanLoading && !lessonPlanError && lessonPlanEvents.length === 0 ? (
-            <div className="border-b border-[#E3EAF4] px-4 py-4 text-[14px] text-[#64748B] sm:px-6">
-              No lesson plan periods were returned for this calendar.
-            </div>
-          ) : null}
-
-          <div className="overflow-x-auto p-4 sm:p-5">
-            {calendarViewMode === 'month' ? (
-              <div className="min-w-[980px] overflow-hidden rounded-[14px] border border-[#D8E1F0]">
-                <div className="grid grid-cols-7 bg-[#F6F9FD]">
-                  {CALENDAR_WEEKDAYS.map((day) => (
-                    <div
-                      key={day}
-                      className={cn(
-                        'border-b border-r border-[#D8E1F0] px-3 py-3 text-center text-[14px] font-medium text-[#334155] last:border-r-0 transition-all duration-150',
-                        hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
-                      )}
-                    >
-                      {day}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-7">
-                  {calendarCells.map((date, index) => {
-                    const key = date ? formatDateKey(date) : `empty-${index}`;
-                    const events = date ? eventMap.get(key) ?? [] : [];
-                    const isCurrentMonth = Boolean(date);
-                    const containsHoveredPeriod = events.some((event) => event.id === hoveredPeriodId);
-
-                    return (
-                      <div
-                        key={key}
-                        className={cn(
-                          'min-h-[96px] border-b border-r border-[#D8E1F0] p-2.5 last:border-r-0 transition-all duration-150',
-                          isCurrentMonth ? 'bg-white' : 'bg-[#F3F6FA]',
-                          hoveredPeriod && !containsHoveredPeriod && 'opacity-45 blur-[1px]'
-                        )}
-                      >
-                        {date ? (
-                          <>
-                            <div
-                              className={cn(
-                                'mb-2 text-[14px] font-medium text-[#334155] transition-all duration-150',
-                                hoveredPeriod && !containsHoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
-                              )}
-                            >
-                              {date.getDate()}
-                            </div>
-                            <div className="space-y-2">
-                              {events.map((event) => (
-                                <div
-                                  key={event.id}
-                                  role="button"
-                                  tabIndex={0}
-                                  onMouseEnter={(hoverEvent) => openPeriodHover(hoverEvent.currentTarget, event)}
-                                  onMouseLeave={scheduleCloseHover}
-                                  onFocus={(focusEvent) => openPeriodHover(focusEvent.currentTarget, event)}
-                                  onBlur={scheduleCloseHover}
-                                  className={cn(
-                                    getEventCardClasses(event.status),
-                                    'min-w-0 transition-all duration-150',
-                                    hoveredPeriodId === event.id &&
-                                      'relative z-[99995] scale-[1.02] opacity-100 blur-none shadow-xl ring-2 ring-violet-200',
-                                    hoveredPeriodId !== null &&
-                                      hoveredPeriodId !== event.id &&
-                                      'opacity-25 blur-[2px]',
-                                    hoveredPeriodId === null && 'opacity-100 blur-0'
-                                  )}
-                                >
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <p className="line-clamp-2 font-medium">{event.conceptTitle}</p>
-                                      <p className="mt-1 text-[12px] text-[#64748B]">
-                                        {event.startTime} - {event.endTime}
-                                      </p>
-                                    </div>
-                                    <span className="shrink-0 text-[12px] text-[#64748B]">{event.slotLabel}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : calendarViewMode === 'day' ? (
-              <div className="min-w-[980px] overflow-hidden rounded-[14px] border border-[#D8E1F0]">
-                <div className="grid grid-cols-[92px_minmax(0,1fr)] bg-[#F6F9FD]">
-                  <div
-                    className={cn(
-                      'border-b border-r border-[#D8E1F0] px-3 py-3 transition-all duration-150',
-                      hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
-                    )}
-                  />
-                  <div
-                    className={cn(
-                      'border-b border-[#D8E1F0] px-3 py-3 text-center text-[14px] font-medium text-[#334155] transition-all duration-150',
-                      hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
-                    )}
-                  >
-                    <div>{visibleMonth.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                    <div className="mt-1 text-[13px] text-[#64748B]">
-                      {visibleMonth.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="max-h-[680px] overflow-y-auto">
-                  <div className="grid grid-cols-[92px_minmax(0,1fr)]">
-                    <div className="border-r border-[#D8E1F0] bg-[#F8FAFC]">
-                      {Array.from(
-                        { length: DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1 },
-                        (_, index) => DAY_TIMELINE_START_HOUR + index
-                      ).map((hour) => (
-                        <div
-                          key={hour}
-                          className={cn(
-                            'flex h-[72px] items-start justify-center border-b border-[#EAF0F7] px-2 pt-2 text-[13px] font-medium text-[#475569] transition-all duration-150',
-                            hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
-                          )}
-                        >
-                          {formatHourLabel(hour)}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div
-                      className="relative bg-white"
-                      style={{ height: `${(DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1) * DAY_TIMELINE_HOUR_HEIGHT}px` }}
-                    >
-                      {Array.from(
-                        { length: DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1 },
-                        (_, index) => DAY_TIMELINE_START_HOUR + index
-                      ).map((hour, index, hours) => (
-                        <div
-                          key={`separator-${hour}`}
-                          className={cn(
-                            'absolute left-0 right-0 border-b border-[#EAF0F7] transition-all duration-150',
-                            index !== hours.length - 1 ? '' : 'border-b-0',
-                            hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
-                          )}
-                          style={{ top: `${index * DAY_TIMELINE_HOUR_HEIGHT}px` }}
-                        />
-                      ))}
-
-                      {(eventMap.get(formatDateKey(visibleMonth)) ?? []).map((event) => {
-                        const { startHour, endHour } = getSlotHourRange(event.slotLabel);
-                        const top = (startHour - DAY_TIMELINE_START_HOUR) * DAY_TIMELINE_HOUR_HEIGHT + 4;
-                        const height = Math.max((endHour - startHour) * DAY_TIMELINE_HOUR_HEIGHT - 8, 44);
-
-                        return (
-                          <CalendarEventCard
-                            key={event.id}
-                            event={event}
-                            hoveredPeriodId={hoveredPeriodId}
-                            className="absolute left-2 right-2"
-                            style={{ top: `${top}px`, height: `${height}px` }}
-                            onOpenHover={openPeriodHover}
-                            onSelect={setOpenLesson}
-                            onCloseHover={scheduleCloseHover}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="min-w-[980px] overflow-hidden rounded-[14px] border border-[#D8E1F0]">
-                <div className="grid grid-cols-[92px_repeat(7,minmax(120px,1fr))] bg-[#F6F9FD]">
-                  <div
-                    className={cn(
-                      'border-b border-r border-[#D8E1F0] px-3 py-3 transition-all duration-150',
-                      hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
-                    )}
-                  />
-                  {weekDates.map((date, index, dates) => (
-                    <div
-                      key={`${formatDateKey(date)}-${index}`}
-                      className={cn(
-                        'border-b px-3 py-3 text-center text-[14px] font-medium text-[#334155] transition-all duration-150',
-                        index !== dates.length - 1 ? 'border-r border-[#D8E1F0]' : '',
-                        hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
-                      )}
-                    >
-                      <div>{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                      <div className="mt-1 text-[13px] text-[#64748B]">
-                        {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="max-h-[680px] overflow-y-auto">
-                  <div className="grid grid-cols-[92px_repeat(7,minmax(120px,1fr))]">
-                    <div className="border-r border-[#D8E1F0] bg-[#F8FAFC]">
-                      {Array.from(
-                        { length: DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1 },
-                        (_, index) => DAY_TIMELINE_START_HOUR + index
-                      ).map((hour) => (
-                        <div
-                          key={hour}
-                          className={cn(
-                            'flex h-[72px] items-start justify-center border-b border-[#EAF0F7] px-2 pt-2 text-[13px] font-medium text-[#475569] transition-all duration-150',
-                            hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
-                          )}
-                        >
-                          {formatHourLabel(hour)}
-                        </div>
-                      ))}
-                    </div>
-
-                    {weekDates.map((date, dayIndex) => {
-                      const key = formatDateKey(date);
-                      const dayEvents = [...(eventMap.get(key) ?? [])].sort((left, right) => {
-                        const leftRange = getSlotHourRange(left.slotLabel);
-                        const rightRange = getSlotHourRange(right.slotLabel);
-                        return leftRange.startHour - rightRange.startHour;
-                      });
-                      const overlapCountBySlot = new Map<string, number>();
-                      const containsHoveredPeriod = dayEvents.some((event) => event.id === hoveredPeriodId);
-
-                      return (
-                        <div
-                          key={key}
-                          className={cn(
-                            'relative bg-white transition-all duration-150',
-                            dayIndex !== weekDates.length - 1 ? 'border-r border-[#D8E1F0]' : '',
-                            hoveredPeriod && !containsHoveredPeriod && 'opacity-45 blur-[1px]'
-                          )}
-                          style={{ height: `${(DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1) * DAY_TIMELINE_HOUR_HEIGHT}px` }}
-                        >
-                          {Array.from(
-                            { length: DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1 },
-                            (_, index) => DAY_TIMELINE_START_HOUR + index
-                          ).map((hour, index, hours) => (
-                            <div
-                              key={`${key}-separator-${hour}`}
-                              className={cn(
-                                'absolute left-0 right-0 border-b border-[#EAF0F7] transition-all duration-150',
-                                index !== hours.length - 1 ? '' : 'border-b-0',
-                                hoveredPeriod && !containsHoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
-                              )}
-                              style={{ top: `${index * DAY_TIMELINE_HOUR_HEIGHT}px` }}
-                            />
-                          ))}
-
-                          {dayEvents.map((event) => {
-                            const { startHour, endHour } = getSlotHourRange(event.slotLabel);
-                            const slotKey = `${startHour}-${endHour}`;
-                            const overlapIndex = overlapCountBySlot.get(slotKey) ?? 0;
-                            overlapCountBySlot.set(slotKey, overlapIndex + 1);
-                            const totalOverlaps = dayEvents.filter((item) => {
-                              const range = getSlotHourRange(item.slotLabel);
-                              return range.startHour === startHour && range.endHour === endHour;
-                            }).length;
-
-                            const top = (startHour - DAY_TIMELINE_START_HOUR) * DAY_TIMELINE_HOUR_HEIGHT + 4;
-                            const height = Math.max((endHour - startHour) * DAY_TIMELINE_HOUR_HEIGHT - 8, 44);
-                            const widthCalc = `calc(${100 / totalOverlaps}% - 8px)`;
-                            const leftCalc = totalOverlaps > 1 ? `calc(${(100 / totalOverlaps) * overlapIndex}% + 4px)` : '4px';
-
-                            return (
-                              <CalendarEventCard
-                                key={event.id}
-                                event={event}
-                                hoveredPeriodId={hoveredPeriodId}
-                                className="absolute"
-                                style={{
-                                  top: `${top}px`,
-                                  height: `${height}px`,
-                                  width: widthCalc,
-                                  left: leftCalc,
-                                }}
-                                onOpenHover={openPeriodHover}
-                                onSelect={setOpenLesson}
-                                onCloseHover={scheduleCloseHover}
-                              />
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <LessonPlanDocumentPanel
+          subjectId={subjectId}
+          standardId={standardId ?? ''}
+          chapters={courseChapters}
+          chapterId={chapterId}
+          onChapterIdChange={(nextChapterId) =>
+            router.push(`/course-master/lesson-plan/${course.id}?chapterId=${nextChapterId}`)
+          }
+        />
 
         <CreateLessonPlanDialog
           open={isCreateLessonPlanOpen}

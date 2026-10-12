@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Users, School, BookOpen, ClipboardList, PenSquare, CalendarCheck, Megaphone, NotebookPen, Clock, Wallet, IdCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchTeacherDashboard, getDashboardSession, type TeacherDashboardSummary } from '@/app/dashboard/_lib/dashboard-api';
+import { DashboardAuthError, fetchTeacherDashboard, getDashboardSession, type TeacherDashboardSummary } from '@/app/dashboard/_lib/dashboard-api';
 import { DashboardError, DashboardSkeleton, EmptyState, QuickActionLink, SectionPanel, StatCard } from '@/app/dashboard/_components/DashboardPrimitives';
 import { DashboardBarChart } from '@/app/dashboard/_components/DashboardBarChart';
 import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
@@ -26,7 +26,7 @@ const TEACHER_WIDGETS = [
 ] as const satisfies readonly DashboardWidget[];
 
 export default function TeacherDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [data, setData] = useState<TeacherDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,9 +43,18 @@ export default function TeacherDashboard() {
     const session = getDashboardSession();
     fetchTeacherDashboard(session)
       .then(setData)
-      .catch((err: Error) => setError(err.message))
+      .catch((err: Error) => {
+        // Same dead-end-retry problem as AdminDashboard: a 401 here means the
+        // session is gone, not that the request should be retried.
+        if (err instanceof DashboardAuthError) {
+          setError('Your session has expired. Signing you out...');
+          logout();
+          return;
+        }
+        setError(err.message);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [logout]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

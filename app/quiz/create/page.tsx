@@ -5,11 +5,12 @@ import { BookOpen, Plus, Trash2, CheckCircle2, Settings, Layers, Save, AlertCirc
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { buildSessionContext, fetchQuizSubjects, type QuizChapter, type QuizSubject } from '../_lib/quiz-api';
+import { buildSessionContext, fetchQuizSubjects, publishQuiz, type QuizChapter, type QuizSubject } from '../_lib/quiz-api';
 
 export default function CreateQuizPage() {
   const router = useRouter();
   const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [subjectsData, setSubjectsData] = useState<QuizSubject[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<QuizSubject | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<QuizChapter | null>(null);
@@ -92,12 +93,46 @@ export default function CreateQuizPage() {
     setQuestions(updated);
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
+    setPublishError(null);
+
+    if (!selectedSubject || !selectedChapter) {
+      setPublishError('Select a subject and chapter first.');
+      return;
+    }
+    if (!quizDetails.title.trim()) {
+      setPublishError('Give this quiz a title.');
+      return;
+    }
+    const invalidQuestion = questions.find(
+      (q) => !q.text.trim() || q.options.filter((o) => o.trim()).length < 2
+    );
+    if (invalidQuestion) {
+      setPublishError('Every question needs text and at least two filled-in options.');
+      return;
+    }
+
     setIsPublishing(true);
-    setTimeout(() => {
-      setIsPublishing(false);
+    try {
+      const session = buildSessionContext();
+      await publishQuiz(session, {
+        standardId: selectedSubject.standardId,
+        subjectId: selectedSubject.id,
+        chapterId: selectedChapter.id,
+        title: quizDetails.title,
+        timeAllowedMinutes: quizDetails.timeLimit,
+        questions: questions.map((q) => ({
+          text: q.text,
+          options: q.options,
+          correctOptionIndex: q.correctOptionIndex,
+        })),
+      });
       router.push('/quiz');
-    }, 1500);
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : "Couldn't publish the quiz. Try again.");
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -128,7 +163,13 @@ export default function CreateQuizPage() {
           </div>
 
           <div className="p-8 max-w-5xl mx-auto space-y-8 pb-24">
-            
+
+            {publishError && (
+              <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-2xl p-4">
+                <AlertCircle size={16} /> {publishError}
+              </div>
+            )}
+
             {/* Section 1: Target Subject & Chapter */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-100">

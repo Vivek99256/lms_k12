@@ -1,5 +1,13 @@
 'use client';
 
+// SUPERSEDED, 2026-10-10: this page (the singular /pal/report — a flat
+// exam-attempts table, no narrative) is kept in place for review rather than
+// deleted, but the live sidebar menu row that used to open it ("PAL Report",
+// tblmenumaster id 495) has been repointed in app/data/routeMapper.ts to
+// /pal/reports/attainment, the current PAL Reports narrative work. Nothing
+// should link to this route going forward; if you are looking for the PAL
+// report screen, use /pal/reports/attainment instead.
+
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,

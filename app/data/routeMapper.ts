@@ -231,8 +231,16 @@ const LMS_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lmsactivitystream': '/lms/activity-stream',
   'lmsstudent_report.index': '/lms/student-analysis',
   'lms/lmsstudent_report': '/lms/student-analysis',
-  'palreport.index': '/pal/report',
-  'lms/palreport': '/pal/report',
+  // Repointed 2026-10-10: /pal/report (singular) is the old flat exam-attempts
+  // table with no narrative — superseded by the New PAL Reports work at
+  // /pal/reports/attainment (plural). The live sidebar menu row these two
+  // Laravel route names resolve from (tblmenumaster id 495, "PAL Report" —
+  // see components/intelligence/module/registry.ts lines ~269-271) is
+  // otherwise unchanged; only where it navigates to has moved. The old page
+  // itself is left in place (see its own top-of-file comment) rather than
+  // deleted, since a Next.js route should not be removed speculatively.
+  'palreport.index': '/pal/reports/attainment',
+  'lms/palreport': '/pal/reports/attainment',
   'question_wise_report': '/lms/question-wise-report',
   'lms/questionreport': '/lms/question-wise-report',
   'questionreport': '/lms/question-wise-report',

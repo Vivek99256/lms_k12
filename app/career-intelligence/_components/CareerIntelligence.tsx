@@ -214,6 +214,41 @@ function AlignmentBanner({ payload }: { payload: AlignmentPayload | null }) {
   );
 }
 
+/**
+ * `alignment.narrative` (CareerAlignmentNarrator, Laravel repo) — a bounded,
+ * grounded-only explanation of what the alignment result above means for
+ * the student's current subjects/stream. Rendered only for `ok` (the real
+ * text) and `model_unavailable` (an honest "not ready yet" note) — the
+ * `insufficient_evidence` status is intentionally not duplicated here since
+ * `AlignmentBanner` already shows the same underlying reason when
+ * `alignment_status` is `INSUFFICIENT_DATA`.
+ */
+function AlignmentNarrativeCard({ payload }: { payload: AlignmentPayload | null }) {
+  const narrative = payload?.narrative;
+
+  if (!narrative || narrative.status === 'insufficient_evidence') return null;
+
+  return (
+    <Card className="border-indigo-200 bg-indigo-50/40">
+      <CardContent className="flex items-start gap-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[#4F46E5]">
+          <Sparkles className="size-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">AI explanation</p>
+          {narrative.status === 'ok' ? (
+            <p className="mt-1 text-sm leading-6">{narrative.narrative}</p>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {narrative.message || 'An AI explanation isn’t available right now.'}
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function OverviewCard({
   icon: Icon, iconClass, label, title, footer,
 }: {
@@ -643,6 +678,7 @@ export function CareerIntelligence({ studentId }: { studentId?: string }) {
         <Button variant="outline" size="sm" onClick={() => void refresh()}><RefreshCw />Refresh</Button>
       </div>
       <AlignmentBanner payload={alignment} />
+      <AlignmentNarrativeCard payload={alignment} />
       <OverviewCards data={data} alignment={alignment} />
       <div className="grid gap-4 lg:grid-cols-3">
         <BreakPointAnalysis alignment={alignment} />

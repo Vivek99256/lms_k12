@@ -7,7 +7,6 @@ import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import {
   BookOpen,
   Briefcase,
-  CalendarDays,
   ClipboardList,
   Compass,
   Cpu,
@@ -18,6 +17,7 @@ import {
   ListTree,
   Music,
   Network,
+  NotebookText,
   Palette,
   PenTool,
   Search,
@@ -99,6 +99,10 @@ function getCourseRoutes(courseId: number | string, standardId?: number | string
     coherenceMap: `/course-master/${id}/chapters?view=coherence-map`,
     // A view of the chapters screen rather than its own route, matching the other
     // sub-views there (question-bank, concept-intelligence, content).
+    // Read-only chapter-wise Lesson Plan document (lms_lesson_plan). Deliberately a
+    // different route from `lessonPlan` above, which is the AI Lesson Intelligence
+    // calendar - two unrelated features that happen to share the words "lesson plan".
+    planDocument: `/course-master/lesson-plan-doc/${id}`,
   };
 }
 
@@ -610,7 +614,7 @@ export default function CourseMasterPage() {
           </div>
 
           <div className="absolute right-5 top-5 flex items-center gap-1.5">
-            <button type="button" title="Lesson plans" aria-label={`Open ${subject.subject_name} lesson plans`} onClick={(event) => { event.stopPropagation(); router.push(routes.lessonPlan); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDD6FE] bg-[#F3F0FF] text-[#6D4AFF] transition hover:bg-[#E8E1FF]"><CalendarDays className="h-4 w-4" strokeWidth={1.9} /></button>
+            <button type="button" title="Lesson Plan" aria-label={`Open ${subject.subject_name} lesson plan`} onClick={(event) => { event.stopPropagation(); router.push(routes.planDocument); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#FBCFE8] bg-[#FDF2F8] text-[#DB2777] transition hover:bg-[#FCE7F3]"><NotebookText className="h-4 w-4" strokeWidth={1.9} /></button>
             <button type="button" title="Curriculum" aria-label={`Open ${subject.subject_name} curriculum`} onClick={(event) => { event.stopPropagation(); router.push(routes.curriculum); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BAE6FD] bg-[#ECF9FF] text-[#0284C7] transition hover:bg-[#DDF4FF]"><ListTree className="h-4 w-4" strokeWidth={1.9} /></button>
             <button type="button" title="Chapters" aria-label={`Open ${subject.subject_name} chapters`} onClick={(event) => { event.stopPropagation(); router.push(routes.chapters); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BBF7D0] bg-[#ECFDF3] text-[#16A34A] transition hover:bg-[#DCFBE8]"><BookOpen className="h-4 w-4" strokeWidth={1.9} /></button>
             <button type="button" title="Coherence map" aria-label={`Open ${subject.subject_name} coherence map`} onClick={(event) => { event.stopPropagation(); router.push(routes.coherenceMap); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#FDE68A] bg-[#FFFBEB] text-[#D97706] transition hover:bg-[#FEF3C7]"><Network className="h-4 w-4" strokeWidth={1.9} /></button>

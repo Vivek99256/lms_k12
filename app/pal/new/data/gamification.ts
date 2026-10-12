@@ -678,7 +678,15 @@ export interface CareerQuest {
     scenariosCompleted: number;
     scenariosRequired: number;
   };
-  report: { eligible: boolean; generatedAt: string | null };
+  report: {
+    eligible: boolean;
+    generatedAt: string | null;
+    // Grounded-only narrative (App\Services\PAL\Gamification\CareerQuestNarrator),
+    // stored alongside the rest of the report snapshot. `null` until a report has
+    // been generated at least once; status is one of ok / insufficient_evidence /
+    // graph_unavailable / model_unavailable — never a fabricated narrative.
+    narrative: { status: string; narrative: string | null; message: string | null } | null;
+  };
 }
 
 function readCareerQuest(raw: unknown): CareerQuest | null {
@@ -797,6 +805,17 @@ function readCareerQuest(raw: unknown): CareerQuest | null {
     report: {
       eligible: readBoolean(report.eligible),
       generatedAt: readNullableString(report.generated_at),
+      narrative: ((): { status: string; narrative: string | null; message: string | null } | null => {
+        if (!report.snapshot) return null;
+        const snapshot = toRecord(report.snapshot);
+        if (!snapshot.narrative) return null;
+        const n = toRecord(snapshot.narrative);
+        return {
+          status: readString(n.status),
+          narrative: readNullableString(n.narrative),
+          message: readNullableString(n.message),
+        };
+      })(),
     },
   };
 }

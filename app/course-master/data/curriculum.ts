@@ -11,6 +11,16 @@
 import { useEffect, useState } from 'react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 
+/**
+ * Optional local-development override for the ERP host — same escape hatch
+ * lib/erp-client.ts's buildSessionContext() already provides for the rest of
+ * the app. Without it, getCurriculumSession() below uses the session's own
+ * host_name (set at login) ahead of anything else, so a backend change made
+ * only locally never reaches this screen even while the frontend itself runs
+ * on localhost — the exact trap this override exists to route around.
+ */
+const ERP_BASE_URL_OVERRIDE = (process.env.NEXT_PUBLIC_ERP_BASE_URL || '').replace(/\/$/, '');
+
 export type CurriculumSession = {
   token: string;
   hostName: string;
@@ -178,7 +188,7 @@ export function getCurriculumSession(): CurriculumSession | null {
     const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
 
     const token = readString(userData.user_token ?? userData.token);
-    const hostName = readString(userData.host_name) || API_BASE_URL;
+    const hostName = ERP_BASE_URL_OVERRIDE || readString(userData.host_name) || API_BASE_URL;
     const subInstituteId = readString(userData.sub_institute_id ?? menuContext.sub_institute_id);
     const academicYearId =
       readString(localStorage.getItem('selectedAcademicYear')) ||

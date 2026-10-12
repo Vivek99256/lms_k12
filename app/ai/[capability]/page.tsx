@@ -34,6 +34,7 @@ import { ArrowLeft, ArrowUpRight, LayoutGrid } from 'lucide-react';
 import { capabilityStatusLabel, getCapabilityBySlug } from '@shared/ai-intelligence-core';
 
 import { CapabilityLiveData } from '../_components/CapabilityLiveData';
+import { KnowledgeRagAsk } from '../_components/KnowledgeRagAsk';
 import { PointList, SectionCard, StatusChip } from '../_components/console-ui';
 
 export default function AiCapabilityPage() {
@@ -73,6 +74,15 @@ export default function AiCapabilityPage() {
             Open {capability.name}
             <ArrowUpRight className="size-4" />
           </Link>
+        )}
+
+        {/* The one capability with a real action today gets it here, above the
+            generic live-records panel — asking a question is the thing someone
+            opens this screen to do, not a record to browse. */}
+        {capability.slug === 'knowledge-rag' && (
+          <div className="mt-6">
+            <KnowledgeRagAsk />
+          </div>
         )}
 
         {/* Live records lead. What the capability holds for this school is the

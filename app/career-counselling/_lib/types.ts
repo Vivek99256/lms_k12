@@ -8,6 +8,49 @@ export interface RiasecQuestion {
   text: string;
 }
 
+/**
+ * `careerCounsellingNarrative` (App\CareerIntelligence\CareerCounsellingNarrator,
+ * Laravel repo, `lms/counselling` namespace). "An AI counsellor retrieving
+ * the student's skill/interest graph" grounded in what actually exists:
+ * CaiCoreService's real career-alignment evaluation plus the student's real
+ * concept-mastery state (Set Coherence Map) — NOT the RIASEC quiz above,
+ * which is a separate, non-graph O*NET pipeline with no Neo4j relationship
+ * behind it. `status` mirrors explain()'s own contract: `ok` (real
+ * narrative text, plus the two real data sources it was grounded in),
+ * `insufficient_evidence` (neither a resolvable career alignment nor any
+ * recorded concept practice exists yet — most students today), `model_unavailable`
+ * (no AI key configured, or the provider rejected the request), or
+ * `graph_unavailable` (Neo4j itself could not be reached).
+ */
+export type CounsellingNarrativeStatus = 'ok' | 'insufficient_evidence' | 'model_unavailable' | 'graph_unavailable';
+
+export interface CounsellingMasteryConcept {
+  concept_id: number;
+  name: string;
+  mastery: number;
+  attempts: number;
+}
+
+export interface CounsellingMasterySnapshot {
+  subject_id: number;
+  subject_name: string;
+  total_concepts: number;
+  mastered: number;
+  ready: number;
+  blocked: number;
+  percent_mastered: number;
+  evidenced_count: number;
+  weakest_evidenced_concepts: CounsellingMasteryConcept[];
+}
+
+export interface CounsellingNarrativePayload {
+  status: CounsellingNarrativeStatus;
+  narrative: string | null;
+  message: string | null;
+  alignment: Record<string, unknown> | null;
+  mastery: CounsellingMasterySnapshot | null;
+}
+
 export interface RiasecQuestionsPayload {
   question: RiasecQuestion[];
 }

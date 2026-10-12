@@ -192,12 +192,12 @@ function LoCard({
             <Pill tone={GAP_TONE[row.gap_category]}>{GAP_LABEL[row.gap_category]}</Pill>
           </div>
 
-          <div className="mt-2.5 flex flex-wrap items-center gap-4 border-t border-[#f1f0ed] pt-2.5">
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[#f1f0ed] pt-2.5">
             {row.achievement.value === null ? (
               <span className="text-xs italic text-[#a09a93]">No achievement evidence yet</span>
             ) : (
-              <div className="min-w-[180px] max-w-xs flex-1">
-                <TrackBar label="" value={row.achievement.value} max={100} tone={statusTone(row.achievement.status)} valueLabel={formatAchievementValue(row.achievement.value)} threshold={75} />
+              <div className="w-full max-w-[280px] shrink-0">
+                <TrackBar label="Achievement" value={row.achievement.value} max={100} tone={statusTone(row.achievement.status)} valueLabel={formatAchievementValue(row.achievement.value)} threshold={75} />
               </div>
             )}
             {row.achievement.mastery !== null ? (
