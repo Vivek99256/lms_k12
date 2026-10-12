@@ -40,6 +40,12 @@ export default function ConditionalApp({ children }: { children: React.ReactNode
     return null;
   }
 
+  // The alumni portal is its own sign-in with its own tokens (see app/alumni-portal): it must not show the staff login, and it
+  // never gets the staff sidebar. Matched as an exact path prefix so no other route is affected.
+  if (pathname === '/alumni-portal' || pathname.startsWith('/alumni-portal/')) {
+    return <>{children}</>;
+  }
+
   if (!isAuthenticated) {
     return <LoginPage />;
   }

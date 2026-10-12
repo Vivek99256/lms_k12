@@ -7,6 +7,7 @@ import {
   Check,
   ClipboardCheck,
   Compass,
+  FlaskConical,
   GraduationCap,
   Layers,
   Lightbulb,
@@ -34,6 +35,7 @@ export const STEP_SEQUENCE: JourneyStepId[] = [
   'check',
   'intervention',
   'mastery',
+  'experiment',
   'recall',
 ];
 
@@ -140,8 +142,17 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     gridClass: 'w-full',
   },
   {
-    id: 'recall',
+    id: 'experiment',
     stepNumber: 10,
+    label: 'Experiment',
+    shortDescription: 'Prayogshala Labs',
+    detail: 'Practical experiments from Prayogshala for this chapter, to see the ideas work hands-on.',
+    icon: FlaskConical,
+    gridClass: 'w-full',
+  },
+  {
+    id: 'recall',
+    stepNumber: 11,
     label: 'Spaced Recall',
     shortDescription: 'Memory Retention',
     detail: 'Scheduled refresher practice to ensure lasting retention and retrieval.',
@@ -200,6 +211,11 @@ export const DEFAULT_STAGE_IMAGES: Record<JourneyStepId, JourneyImageInfo> = {
     title: 'Chapter Mastery & Achievement',
     provider: 'educational-library',
   },
+  experiment: {
+    url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1000&q=80',
+    title: 'Hands-on Experiment',
+    provider: 'educational-library',
+  },
   recall: {
     url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=1000&q=80',
     title: 'Spaced Recall and Retention',
@@ -238,9 +254,14 @@ export function isStepUnlocked(
     return completedSet.has('check') || completedSet.has('intervention');
   }
 
-  // Recall (Step 10) is unlocked if Mastery (Step 9) is completed
-  if (stepId === 'recall') {
+  // Experiment (Step 10) is unlocked if Mastery (Step 9) is completed
+  if (stepId === 'experiment') {
     return completedSet.has('mastery');
+  }
+
+  // Recall (Step 11) is unlocked if Experiment (Step 10) is completed
+  if (stepId === 'recall') {
+    return completedSet.has('experiment');
   }
 
   const idx = STEP_SEQUENCE.indexOf(stepId);
@@ -262,7 +283,7 @@ export function getNextStep(stepId: JourneyStepId): JourneyStepId | null {
  * Col 1: Step 1 (height 6), Step 2 (height 6)
  * Col 2: Step 3 (height 8, tall portrait), Step 4 (height 4)
  * Col 3: Step 5 (height 7, tall portrait), Step 6 (height 3), Step 7 (height 2)
- * Col 4: Step 8 (height 4), Step 9 (height 5, mastery hero), Step 10 (height 3)
+ * Col 4: Step 8 (height 3), Step 9 (height 4, mastery hero), Step 10 (height 3), Step 11 (height 2)
  */
 const DESKTOP_MOSAIC_AREAS: Record<JourneyStepId, { gridColumn: string; gridRow: string }> = {
   diagnostic: { gridColumn: '1 / 4', gridRow: '1 / 7' },
@@ -272,15 +293,17 @@ const DESKTOP_MOSAIC_AREAS: Record<JourneyStepId, { gridColumn: string; gridRow:
   practice: { gridColumn: '7 / 10', gridRow: '1 / 8' },
   feedback: { gridColumn: '7 / 10', gridRow: '8 / 11' },
   check: { gridColumn: '7 / 10', gridRow: '11 / 13' },
-  intervention: { gridColumn: '10 / 13', gridRow: '1 / 5' },
-  mastery: { gridColumn: '10 / 13', gridRow: '5 / 10' },
-  recall: { gridColumn: '10 / 13', gridRow: '10 / 13' },
+  intervention: { gridColumn: '10 / 13', gridRow: '1 / 4' },
+  mastery: { gridColumn: '10 / 13', gridRow: '4 / 8' },
+  experiment: { gridColumn: '10 / 13', gridRow: '8 / 11' },
+  recall: { gridColumn: '10 / 13', gridRow: '11 / 13' },
 };
 
 /**
- * 2-column mobile mosaic layout (12 columns x 12 rows).
+ * 2-column mobile mosaic layout (12 columns x 14 rows).
  * Col 1: Steps 1, 3, 5, 7, 9
  * Col 2: Steps 2, 4, 6, 8, 10
+ * Full width underneath: Step 11 (an odd tile out, so it spans both columns)
  */
 const MOBILE_MOSAIC_AREAS: Record<JourneyStepId, { gridColumn: string; gridRow: string }> = {
   diagnostic: { gridColumn: '1 / 7', gridRow: '1 / 3' },
@@ -291,9 +314,13 @@ const MOBILE_MOSAIC_AREAS: Record<JourneyStepId, { gridColumn: string; gridRow: 
   feedback: { gridColumn: '7 / 13', gridRow: '6 / 8' },
   check: { gridColumn: '1 / 7', gridRow: '8 / 10' },
   intervention: { gridColumn: '7 / 13', gridRow: '8 / 10' },
-  mastery: { gridColumn: '1 / 7', gridRow: '10 / 13' },
-  recall: { gridColumn: '7 / 13', gridRow: '10 / 13' },
+  mastery: { gridColumn: '1 / 7', gridRow: '10 / 12' },
+  experiment: { gridColumn: '7 / 13', gridRow: '10 / 12' },
+  recall: { gridColumn: '1 / 13', gridRow: '12 / 15' },
 };
+
+const DESKTOP_MOSAIC_ROWS = 12;
+const MOBILE_MOSAIC_ROWS = 14;
 
 export interface H5PJourneyCollageProps {
   subjectName: string;
@@ -414,7 +441,7 @@ export function H5PJourneyCollage({
           <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs">
             <span className="font-medium text-slate-500">Progress:</span>
             <span className="font-bold text-slate-800">
-              {completedCount} / 10 stages ({progressPercent}%)
+              {completedCount} / {JOURNEY_STEPS.length} stages ({progressPercent}%)
             </span>
           </div>
 
@@ -441,9 +468,9 @@ export function H5PJourneyCollage({
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
-          gridTemplateRows: 'repeat(12, minmax(0, 1fr))',
+          gridTemplateRows: `repeat(${isDesktop ? DESKTOP_MOSAIC_ROWS : MOBILE_MOSAIC_ROWS}, minmax(0, 1fr))`,
           gap: isDesktop ? '6px' : '4px',
-          height: isDesktop ? '640px' : '560px',
+          height: isDesktop ? '640px' : '650px',
         }}
       >
         {JOURNEY_STEPS.map((step) => {

@@ -2,6 +2,8 @@
 import { getRequestContext, getSyear } from '../page';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { buildSessionContext } from '@/lib/erp-client';
+import type { PrayogshalaActivity } from './prayogshala';
+import { pdfDownloadName, studyDeckPdfRequest } from '@/lib/study-deck/pdf';
 import {
   normaliseGeneratableFormats,
   type GeneratableFormat,
@@ -583,6 +585,51 @@ export interface ChapterContentAsset {
   h5p_type?: string;
   /** Route of the existing H5P editor this item opens in. */
   deep_link?: string;
+  /**
+   * Prayogshala items are merged in by the backend like H5P ones: a namespaced string id
+   * ("prayogshala:7"), content_category 'Prayogshala', and the whole activity under
+   * `prayogshala` so opening one needs no second request.
+   */
+  prayogshala?: PrayogshalaActivity;
+  topic_name?: string | null;
+  /** Canonical URL of a study deck's classroom PDF. Only present when the PDF is really stored. */
+  pdf_url?: string;
+  /**
+   * Set by the server on a study document: revision notes, a remedial class or classroom activities written by the study
+   * pipeline, whose PDF is the primary file and which open in place with an online practice (see lib/study-document).
+   * Absent on every other row, and never guessed from a title or a category.
+   */
+  study_doc_kind?: 'revision_notes' | 'remedial' | 'activities' | null;
+}
+
+/**
+ * Download a study deck's classroom PDF. The server finds the file from the content item and checks that the item
+ * belongs to this chapter and school; the browser only receives the bytes.
+ */
+export async function downloadStudyDeckPdf(chapterId: number, contentId: number, subInstituteId: number, fileName?: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-study-deck/pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/pdf' },
+    body: JSON.stringify(studyDeckPdfRequest(chapterId, contentId, subInstituteId)),
+  });
+  if (!res.ok) {
+    let message = 'Couldn’t download the PDF.';
+    try {
+      message = ((await res.json()) as { message?: string }).message || message;
+    } catch {
+      /* keep the default */
+    }
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = pdfDownloadName(res.headers.get('Content-Disposition'), fileName);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export interface ChapterContentResponse {
@@ -918,9 +965,15 @@ export async function fetchChapterContent(
     body.source = options.source;
   }
 
+  // The token is what scopes Prayogshala to the caller's institute on the server; the
+  // sub_institute_id in the body is only honoured for the older content types.
+  const { token } = buildSessionContext();
   const res = await fetch(`${API_BASE_URL}/api/lms-chapter-content`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(body),
   });
 

@@ -93,6 +93,8 @@ const LEGACY_LINK_ROUTES: Record<string, string> = {
   'online_fees.index': '/fees/online-fees-settings',
   'fees_monthly_report.index': '/fees/reports',
   'chapter_master.index': '/course-master',
+  'class_face_attendance.index': '/face_attendance/class_face_attendance',
+  'student_face_attendance.index': '/face_attendance/student_face_attendance',
 };
 
 const RESULT_LEGACY_ROUTES: Record<string, string> = Object.fromEntries(

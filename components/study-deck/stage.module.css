@@ -1,0 +1,90 @@
+/*
+ * Motion for the study-deck stage. Small and quick: a screen eases in from the side the learner is travelling toward,
+ * panels fade in, and the camera over a diagram eases toward the part being explained. All of it is switched off for
+ * people who ask for reduced motion.
+ *
+ * IMPORTANT: nothing here may move content OUTWARD (no positive translate, no scale above 1). The stage measures
+ * whether a screen fits by whether anything spills past its edges, and a screen that is still animating in must not
+ * look like it spills. Scaling up from below 1, fading, and moving up or left are all safe.
+ */
+
+@keyframes enterNext {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes enterPrev {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(-0.4em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes settle {
+  from {
+    opacity: 0.6;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Next grows out of the right-hand edge, back out of the left-hand one: a cue for the direction of travel. */
+.enterNext {
+  transform-origin: 100% 50%;
+  animation: enterNext 340ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.enterPrev {
+  transform-origin: 0% 50%;
+  animation: enterPrev 340ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.fadeUp {
+  animation: fadeUp 280ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.settle {
+  animation: settle 360ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.camera {
+  transition: transform 750ms cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enterNext,
+  .enterPrev,
+  .fadeUp,
+  .settle {
+    animation: none;
+  }
+
+  .camera {
+    transition: none;
+  }
+}

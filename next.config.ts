@@ -69,6 +69,16 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Lets a second dev server (for example the isolated browser-E2E one) run beside the main one without sharing
+  // `.next`. Unset, this is the default `.next`, so nothing changes for normal use.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
+  // Source maps cost build memory (see node_modules/next/dist/docs/01-app/02-guides/memory-usage.md).
+  // The ~690-page build was SIGKILLed for OOM on Vercel.
+  productionBrowserSourceMaps: false,
+  enablePrerenderSourceMaps: false,
+  experimental: {
+    serverSourceMaps: false,
+  },
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },

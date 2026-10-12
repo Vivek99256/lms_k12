@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-e2e/
 /out/
 
 # production
@@ -55,3 +56,6 @@ next-env.d.ts
 /.codex/
 *.log
 /diff_frontend.txt
+
+# study-deck pictures live in the database (study_deck_images); the review copy keeps deck.json only
+/public/study-deck/*/images/

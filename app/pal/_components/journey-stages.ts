@@ -3,6 +3,7 @@ import {
   BookOpen,
   ClipboardCheck,
   Compass,
+  FlaskConical,
   Lightbulb,
   ListChecks,
   MessageSquareText,
@@ -54,6 +55,7 @@ export type JourneyStageKey =
   | 'check'
   | 'intervention'
   | 'mastery'
+  | 'experiment'
   | 'recall';
 
 export interface JourneyStage {
@@ -140,6 +142,12 @@ export const JOURNEY_STAGES: JourneyStage[] = [
     blurb: 'Where this concept stands across the whole chapter.',
   },
   {
+    key: 'experiment',
+    label: 'Experiment',
+    icon: FlaskConical,
+    blurb: "The chapter's Prayogshala experiments, to see the ideas work hands-on.",
+  },
+  {
     key: 'recall',
     label: 'Recall',
     icon: Repeat,
@@ -180,7 +188,7 @@ export function stagesBefore(stage: JourneyStageKey): JourneyStageKey[] {
 /** Diagnostic through Check, minus Extra support. The old six-key literal. */
 export const COMPLETED_THROUGH_CHECK: readonly JourneyStageKey[] = stagesBefore('mastery');
 
-/** ...and Mastery too. The recall screen's seven-key literal. */
+/** ...and Mastery and Experiment too. The recall screen's literal. */
 export const COMPLETED_THROUGH_MASTERY: readonly JourneyStageKey[] = stagesBefore('recall');
 
 /** Lookup by key, for call sites that have a key and want a label or an icon. */
@@ -253,6 +261,10 @@ export function stageHref(
       return concept ? `/pal/intervention/concept/${concept}` : null;
     case 'mastery':
       return concept ? `/pal/mastery/concept/${concept}` : null;
+    // Experiment has no screen of its own: it lives inside the chapter journey
+    // (JourneyStepContent), which needs a chapter, so a concept alone has nowhere to go.
+    case 'experiment':
+      return null;
     case 'recall':
       return '/pal/recall';
     default:

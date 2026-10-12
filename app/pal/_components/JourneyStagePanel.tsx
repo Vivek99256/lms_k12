@@ -15,6 +15,7 @@ import {
   type ConceptDiagnosticResult,
 } from '@/app/pal/data/pal-diagnostic';
 import { defaultLearnerId, fetchNextAction, type EsoAction } from '@/app/pal/data/pal-eso';
+import { fetchChapterExperiments } from '@/app/pal/data/pal-experiments';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -208,6 +209,8 @@ async function loadStageBody(
         : conceptId
           ? conceptResultBody(conceptId, signal)
           : missingId('this chapter or concept');
+    case 'experiment':
+      return chapterId ? experimentBody(chapterId) : missingId('this chapter');
     case 'recall':
       return recallBody(chapterId ?? undefined, signal);
     default:
@@ -452,6 +455,36 @@ async function masteryChapterBody(chapterId: string | number, signal: AbortSigna
 async function conceptResultBody(conceptId: string | number, signal: AbortSignal) {
   const result = await fetchConceptResult(conceptId, signal);
   return <ConceptResultRows result={result} />;
+}
+
+/**
+ * The chapter's Prayogshala experiments, read through the same client and the
+ * same eligibility rule Course master uses. Running one needs the full screen.
+ */
+async function experimentBody(chapterId: string | number) {
+  const { experiments } = await fetchChapterExperiments(chapterId);
+
+  if (experiments.length === 0) {
+    return (
+      <p className="text-sm text-slate-600">No Prayogshala experiment has been published for this chapter yet.</p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Rows rows={[['Experiments', String(experiments.length)]]} />
+      <ul className="space-y-1.5">
+        {experiments.slice(0, 6).map((activity) => (
+          <li key={activity.id} className="flex items-baseline justify-between gap-3 text-sm">
+            <span className="text-slate-900">{activity.title}</span>
+            <span className="shrink-0 text-xs text-slate-600">
+              {activity.lab_config ? 'lab' : activity.activity_type_label.toLowerCase()}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 async function recallBody(chapterId: string | number | undefined, signal: AbortSignal) {
