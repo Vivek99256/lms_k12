@@ -98,6 +98,11 @@ export interface DeckImage {
   attribution: string;
   attribution_required: boolean;
   title?: string | null;
+  /**
+   * False when the picture should never be used as a soft background behind another slide (a grey electron micrograph or a
+   * photograph of equipment makes a dull or busy texture). Absent means it may be.
+   */
+  backdrop?: boolean;
 }
 
 /** A prompt for the class to talk about, with a possible answer for the teacher. Never marked. */
@@ -257,7 +262,7 @@ export interface StudyDeck {
   version: number;
   /** Every stored picture the deck uses, by sha1. Present once the deck has been stored. */
   assets?: Record<string, DeckAsset>;
-  chapter: { id: number; name: string; standard_id: number; subject_id: number; standard_name: string; subject_name: string };
+  chapter: { id: number; name: string; /** The chapter's place in its subject ("Chapter 2"), when the school's list numbers it. */ number?: number; standard_id: number; subject_id: number; standard_name: string; subject_name: string };
   slide_count: number;
   teaching_strategy: string | null;
   outline: Array<{ topic_id: number; name: string; concept_ids: number[] }>;

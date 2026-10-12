@@ -71,6 +71,25 @@ cannot mistake it for overflow) and is switched off for `prefers-reduced-motion`
 Every slide without a practice question also carries a **discussion prompt** ("Talk about it") with a possible answer behind a button. It is not
 marked.
 
+## Look: one colour family per topic
+
+Every slide is drawn on its topic's colour family (`lib/study-deck/theme.ts`, no React, tested in `theme.test.ts`): the cover, hook,
+objectives and closing screens use the brand indigo, then blue, teal, purple, cyan and amber follow the deck's topics in order. A family
+is five shades (`accent`, `strong`, `soft`, `softer`, `line`) set as the CSS variables `--sd-*` on the lesson's wrapper (`StudyDeckPlayer` for the
+chrome, `SlideStage` for the slide) and mapped to the `sd-*` colour utilities in `app/globals.css`. Contrast is a test: the accent carries
+white text at 4.5:1 or better, the strong shade 7:1 on the soft ones. A slide has a soft gradient, corner artwork that depends on the
+topic (round cells, lens rings, membrane heads, organelles, dividing pairs, a hex tissue; plain data in `backdropShapes`, drawn as an inline
+SVG background), a stripe along the top and the slide number bottom-right. Cards on a row use `TONES` (six colours, numbered, so colour is
+never the only carrier of meaning); a card's icon is chosen from its own words by `glyphOf` (`glyph.ts`) and only decorates.
+
+The cover is deliberately simple and edge to edge: the chapter's own micrograph under a blue-teal wash that fades toward the right so the picture shows, "Standard 9 | Science", "Chapter 2" (the chapter's sort order in the school's own list, `deck.chapter.number`; left out when the school has none), the title, one line about the chapter and a single **Start lesson** button that moves to slide 2. It carries no quiz, hotspot, scenario or practice, and nothing else on it can be pressed.
+
+**Photographs behind slides.** Each slide sits on two soft washes of its topic's colour. A slide whose own picture is a wide, large photograph (`isBleedPhoto`: at least 900 px wide and 1.25:1 or wider, never a drawn diagram) and which is made of a photograph and a list to explore (`usesBleed`) is drawn **on that photograph**, shown clearly across the whole slide: the title and the items go in a translucent white panel (`PANEL`, 88% white) at the left and the opened item in a second one over the lower part of the photograph; nothing on the photograph can be pressed, so a panel never hides a control. Every other slide takes the nearest suitable photograph of its own topic as a faint texture (`backdropSlideOf`, 20% opacity under the washes), so the deck reads as one piece; only the deck's own registered pictures are ever used (a picture can opt out with `backdrop: false`, used for grey electron micrographs and equipment shots). A phone-width stage never uses a photograph as the slide: it keeps the picture above the controls.
+
+**Hotspot slides** (wide stage): the title across the top, the picture at the left and, at the right, one panel with the numbered parts and the explanation of the open one. The explanation used to open over the picture and hide the markers beneath it; it now never covers the picture, so every marker can be pressed at any time. The marker is the H5P image-hotspots marker (a numbered pin in the topic's colour) and the whole labelled box is also a target.
+
+**Practice flashcards** show a "Show the answer" button (the question's stored answer) so a student who is stuck after "Not quite" can see it; the practice dialog's answer row wraps on a phone so the answer box stays usable.
+
 ## Data
 
 | Piece | Where it comes from |
@@ -126,6 +145,10 @@ recorded as learning activity. It now only happens for the few practice question
 - Progress is not visible to teachers and does not follow the learner to another device.
 - `/api/lms-question-bank` is not tenant-scoped (see `question-bank-library.ts`); the deck inherits that.
 - Hotspots exist only on drawn diagrams. A found photograph cannot carry them: nothing can see where its parts are.
+- A screen with a **scenario, a match or an order** is drawn as text and choices with no room for a large picture, so the slide's picture
+  (if it has one) is a thumbnail with its credit under the text, and "View larger" opens it over the lesson (`SideFigure` in `stage-ui.tsx`;
+  the arrow keys do not move the lesson while it is open). Before this, those three layouts did not show the slide's picture at all. On a
+  phone-width screen there is no room under the text, so the picture is left out there.
 - The entry is a "Study lesson" card on the student chapter content view (`components/study-deck/StudyDeckEntry.tsx`);
   it shows only when a stored deck exists for the chapter (it asks the same read endpoint, and shows nothing on a 404).
 - The logic is covered by `lib/study-deck/*.test.ts`. The components were exercised in real Chrome (desktop and a 390px

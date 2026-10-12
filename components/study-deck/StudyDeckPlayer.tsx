@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Dumbbell, List, X } from 'lucide-react';
 
@@ -17,11 +17,12 @@ import {
   type StorageLike,
 } from '@/lib/study-deck/progress';
 import { nextPosition, pendingHint, previousPosition, stepsOf } from '@/lib/study-deck/stage';
+import { THEMES, themeOf, themeVars } from '@/lib/study-deck/theme';
 import type { StudyDeck } from '@/lib/study-deck/types';
 import { OutlineDrawer } from './OutlinePanel';
 import { PracticeDialog } from './PracticeDialog';
 import { SlideView } from './SlideView';
-import { FitCanvas, MemoryContext, motion } from './stage-ui';
+import { FitCanvas, MemoryContext, motion, SlideStage } from './stage-ui';
 import { SummaryScreen } from './SummaryScreen';
 
 export interface StudyDeckPlayerProps {
@@ -119,6 +120,8 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
   const exploredDone = Boolean(progress.activities[(stepKind === 'example' ? exampleKey : interactionKey)(slide)]?.done);
   const hint = finished ? null : pendingHint(slide, stepKind, exploredDone);
   const totals = deckTotals(deck, progress, playable);
+  // The lesson wears the colours of the topic on screen: the chrome around the slide follows it.
+  const theme = finished ? THEMES.brand : themeOf(deck, slide);
 
   const forward = useCallback(() => {
     if (finished) return;
@@ -167,22 +170,27 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
   const atStart = !finished && index === 0 && stepIndex === 0;
   const last = !finished && nextPosition(deck, { n: slide.n, step: stepIndex }) === null;
   const nav =
-    'inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600';
+    'inline-flex items-center gap-1.5 rounded-xl px-5 py-2 text-sm font-semibold shadow-sm transition active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sd-accent';
 
   return (
-    <section aria-label="Study lesson" className="fixed inset-0 z-[200] flex h-dvh flex-col overflow-hidden bg-slate-100">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3">
-        <button type="button" onClick={exit} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">
+    <section
+      aria-label="Study lesson"
+      data-sd-theme={theme.key}
+      className="fixed inset-0 z-[200] flex h-dvh flex-col overflow-hidden bg-sd-soft/60 transition-colors"
+      style={{ ...themeVars(theme), backgroundColor: theme.softer } as CSSProperties}
+    >
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-sd-line bg-white px-3">
+        <button type="button" onClick={exit} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent">
           <X className="h-4 w-4" aria-hidden="true" />
           Exit
         </button>
-        <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{deck.chapter.name}</p>
-        <p className="shrink-0 text-xs text-slate-600">{finished ? 'Finished' : `Slide ${slide.n} of ${deck.slides.length}`}</p>
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-sd-strong">{deck.chapter.name}</p>
+        <p className="shrink-0 text-xs font-medium text-slate-700">{finished ? 'Finished' : `Slide ${slide.n} of ${deck.slides.length}`}</p>
         {!finished && slide.activities.length > 0 ? (
           <button
             type="button"
             onClick={() => setPracticeOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
           >
             <Dumbbell className="h-4 w-4" aria-hidden="true" />
             <span className="hidden sm:inline">Practice</span>
@@ -191,7 +199,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
         <button
           type="button"
           onClick={() => setOutlineOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
         >
           <List className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Outline</span>
@@ -203,9 +211,9 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={totals.percent}
-        className="h-1 shrink-0 bg-slate-200"
+        className="h-1.5 shrink-0 bg-sd-soft"
       >
-        <div className="h-full bg-indigo-600 transition-[width]" style={{ width: `${totals.percent}%` }} />
+        <div className="h-full rounded-r-full bg-sd-accent transition-[width] duration-500" style={{ width: `${totals.percent}%` }} />
       </div>
 
       <div ref={stageRef} className="flex min-h-0 flex-1 flex-col">
@@ -213,6 +221,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
           <MemoryContext.Provider value={memory}>
           <div key={`${slide.n}:${stepIndex}:${finished}`} className={`h-full ${direction === 'back' ? motion.enterPrev : motion.enterNext}`}>
           {finished ? (
+            <SlideStage theme={THEMES.brand}>
             <SummaryScreen
               deck={deck}
               progress={progress}
@@ -225,6 +234,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
               }}
               onReview={goto}
             />
+            </SlideStage>
           ) : (
             <SlideView
               key={`${slide.n}:${stepIndex}`}
@@ -235,6 +245,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
               assetBase={assetBase}
               onResult={onResult}
               onGoto={goto}
+              onNext={forward}
             />
           )}
           </div>
@@ -242,7 +253,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
         </FitCanvas>
       </div>
 
-      <footer className="grid h-16 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-t border-slate-200 bg-white px-3">
+      <footer className="grid h-16 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-t border-sd-line bg-white px-3">
         <button
           type="button"
           onClick={back}
@@ -255,13 +266,13 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
 
         <div className="min-w-0 text-center">
           {hint ? (
-            <p role="status" className="line-clamp-2 text-xs font-medium leading-tight text-indigo-800 sm:text-sm">
+            <p role="status" className="line-clamp-2 text-xs font-medium leading-tight text-sd-strong sm:text-sm">
               {hint}
             </p>
           ) : (
             <div className="flex items-center justify-center gap-2" aria-label={`Screen ${stepIndex + 1} of ${steps.length}`}>
               {steps.length > 1 && !finished
-                ? steps.map((_, i) => <span key={i} aria-hidden="true" className={`h-2 w-2 rounded-full ${i === stepIndex ? 'bg-indigo-600' : 'bg-slate-300'}`} />)
+                ? steps.map((_, i) => <span key={i} aria-hidden="true" className={`h-2 w-2 rounded-full ${i === stepIndex ? 'bg-sd-accent' : 'bg-slate-300'}`} />)
                 : null}
               <span className="truncate text-xs text-slate-600">{finished ? 'Well done' : `${totals.percent}% complete`}</span>
             </div>
@@ -269,14 +280,14 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
         </div>
 
         {finished ? (
-          <button type="button" onClick={exit} className={`${nav} bg-indigo-600 text-white hover:bg-indigo-700`}>
+          <button type="button" onClick={exit} className={`${nav} bg-sd-accent text-white hover:bg-sd-strong`}>
             Exit lesson
           </button>
         ) : (
           <button
             type="button"
             onClick={forward}
-            className={`${nav} ${hint ? 'border border-indigo-300 bg-white text-indigo-800 hover:bg-indigo-50' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+            className={`${nav} ${hint ? 'border border-sd-line bg-white text-sd-strong hover:bg-sd-softer' : 'bg-sd-accent text-white hover:bg-sd-strong'}`}
           >
             {last ? 'Finish' : 'Continue'}
             <ChevronRight className="h-4 w-4" aria-hidden="true" />

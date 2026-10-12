@@ -46,6 +46,12 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* The study lesson's colour family (set per slide on the lesson's wrapper; see lib/study-deck/theme.ts). */
+  --color-sd-accent: var(--sd-accent);
+  --color-sd-strong: var(--sd-strong);
+  --color-sd-soft: var(--sd-soft);
+  --color-sd-softer: var(--sd-softer);
+  --color-sd-line: var(--sd-line);
 }
 
 body {

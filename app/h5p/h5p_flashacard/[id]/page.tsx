@@ -516,9 +516,11 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
                             event.preventDefault();
                             handleCheck();
                           }}
-                          className="flex items-center gap-2"
+                          // Wraps on a narrow card: the answer box keeps a usable width and Check drops below it.
+                          className="flex flex-wrap items-center gap-2"
                         >
                           <Input
+                            className="min-w-[9rem] flex-1"
                             value={answer}
                             onChange={(event) => setAnswer(event.target.value)}
                             placeholder="Type your answer here…"
