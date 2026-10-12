@@ -45,6 +45,7 @@ function chapterStatus(chapter: ApiChapter): 'Completed' | 'In Progress' | 'Not 
 function toDisplayChapters(chapters: ApiChapter[]) {
   return chapters.map((chapter) => ({
     id: chapter.number,
+    chapterId: chapter.id,
     name: chapter.title,
     topics: chapter.concepts?.length ?? 0,
     status: chapterStatus(chapter),
@@ -52,8 +53,10 @@ function toDisplayChapters(chapters: ApiChapter[]) {
 }
 
 interface ChapterCardProps {
+  onOpenLessonPlan: (chapterId: string) => void;
   chapter: {
     id: number;
+    chapterId: string;
     name: string;
     topics: number;
     status: string;
@@ -61,7 +64,7 @@ interface ChapterCardProps {
   accentColor: string;
 }
 
-function ChapterCard({ chapter, accentColor }: ChapterCardProps) {
+function ChapterCard({ chapter, accentColor, onOpenLessonPlan }: ChapterCardProps) {
   const statusConfig = {
     Completed: {
       bg: 'bg-emerald-50',
@@ -136,10 +139,11 @@ function ChapterCard({ chapter, accentColor }: ChapterCardProps) {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => onOpenLessonPlan(chapter.chapterId)}
             className="h-8 rounded-lg border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-semibold flex-1"
           >
             <ClipboardList size={14} className="mr-1.5" />
-            View Details
+            Lesson plan
           </Button>
           <Button
             size="sm"
@@ -351,6 +355,9 @@ export default function ChaptersPage() {
                 key={chapter.id}
                 chapter={chapter}
                 accentColor={course.accentColor}
+                onOpenLessonPlan={(chapterId) =>
+                  router.push(`/course-master/lesson-plan/${courseId}/chapters/${encodeURIComponent(chapterId)}`)
+                }
               />
             ))}
           </div>
