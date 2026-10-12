@@ -69,6 +69,15 @@ export interface ContentTypeListProps<TRow extends H5pContentRow> {
   searchText?: (row: TRow) => string;
   /** A type with no media still imports and exports; this is about the button. */
   canImport?: boolean;
+  /**
+   * Buttons of a type's own, shown beside Import and Add, for teachers only.
+   *
+   * Given the chapter context, a way to reload the list, and a way to put a
+   * message in the page's success banner, so an extra action (Branching
+   * Scenario's "Generate with AI") reports back the way the built-in ones do
+   * without this component knowing what it does.
+   */
+  extraActions?: (tools: { ctx: H5pContext; reload: () => void; notify: (message: string) => void }) => ReactNode;
 }
 
 /**
@@ -208,6 +217,7 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
   columns,
   searchText,
   canImport = true,
+  extraActions,
 }: ContentTypeListProps<TRow>) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -396,6 +406,7 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
           actions={
             !isStudent ? (
               <>
+                {hasH5pContext(ctx) ? extraActions?.({ ctx, reload: load, notify: setSuccess }) : null}
                 {canImport ? (
                   <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
                     {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}

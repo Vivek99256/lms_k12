@@ -598,7 +598,7 @@ export interface H5pContentTypeApi<TRow, TPayload> {
   importPackage(ctx: H5pContext, file: File): Promise<H5pImportResult>;
 }
 
-function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
+export function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
   spec: ContentTypeSpec
 ): H5pContentTypeApi<TRow, TPayload> {
   const base = `/h5p/${spec.path}`;

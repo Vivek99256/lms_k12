@@ -13,6 +13,7 @@ import {
   CircleCheck,
   Copy,
   Crosshair,
+  GitBranch,
   Presentation,
   HelpCircle,
   Highlighter,
@@ -67,6 +68,9 @@ const TYPE_ICONS: Record<string, typeof ImageIcon> = {
   // must not look like the same one.
   single_choice_set: ListChecks,
   true_false: CircleCheck,
+
+  // 2026-10-10. A decision tree, drawn as one.
+  branching_scenario: GitBranch,
 };
 
 /** Registry route name (`scenario_based.index`) → this app's route. */

@@ -314,7 +314,7 @@ function mapping(
 const ESSAY_NOTE =
   'H5P.Essay is not built in this platform -- no table, no authoring screen, no route. The written-answer player renders the prompt, takes a response and reveals the stored model answer. It marks nothing, because nothing here can mark prose.';
 const CASE_NOTE =
-  'H5P.BranchingScenario is a planned type with no table and no player. Course presentation carries the source on the first slide and each sub-part on its own.';
+  'H5P.BranchingScenario exists in this platform now (Branching scenario), but it is a decision tree to be authored or generated, not a way to ask one stored question. A case study stays a presentation: the source on the first slide and each sub-part on its own.';
 
 /**
  * Every question form the catalogue defines, in the order the brief lists them.

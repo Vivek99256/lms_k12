@@ -15,7 +15,7 @@ function screen(loader: () => Promise<{ default: ScreenComponent }>): ScreenComp
 
 /**
  * Route -> page component, for every page in this app that can be mounted
- * inside a category tab. 539 entries.
+ * inside a category tab. 541 entries.
  */
 export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/academic_setup/create_batch': screen(() => import('@/app/academic_setup/create_batch/page')),
@@ -219,6 +219,8 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/h5p/h5p_arithmetic_quiz/create': screen(() => import('@/app/h5p/h5p_arithmetic_quiz/create/page')),
   '/h5p/h5p_blanks': screen(() => import('@/app/h5p/h5p_blanks/page')),
   '/h5p/h5p_blanks/create': screen(() => import('@/app/h5p/h5p_blanks/create/page')),
+  '/h5p/h5p_branching_scenario': screen(() => import('@/app/h5p/h5p_branching_scenario/page')),
+  '/h5p/h5p_branching_scenario/create': screen(() => import('@/app/h5p/h5p_branching_scenario/create/page')),
   '/h5p/h5p_course_presentation': screen(() => import('@/app/h5p/h5p_course_presentation/page')),
   '/h5p/h5p_course_presentation/create': screen(() => import('@/app/h5p/h5p_course_presentation/create/page')),
   '/h5p/h5p_drag_drop': screen(() => import('@/app/h5p/h5p_drag_drop/page')),
