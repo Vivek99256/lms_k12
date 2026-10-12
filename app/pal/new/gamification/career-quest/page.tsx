@@ -431,6 +431,23 @@ export default function CareerQuestPage() {
               </div>
             ) : null}
 
+            {/* Grounded-only narrative (CareerQuestNarrator) — rendered honestly either
+                way: real generated text for `ok`, or the plain reason the system gave
+                instead of text for every other status. Never a placeholder standing in
+                for a fabricated narrative. */}
+            {data.report.narrative?.status === 'ok' && data.report.narrative.narrative ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-sm font-medium text-slate-900">What this means for you</p>
+                <p className="mt-1 text-sm leading-5 text-slate-700">{data.report.narrative.narrative}</p>
+              </div>
+            ) : data.report.narrative && data.report.narrative.status !== 'ok' ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-xs leading-4 text-amber-800">
+                  {data.report.narrative.message ?? 'A narrative could not be written for this report.'}
+                </p>
+              </div>
+            ) : null}
+
             <button
               type="button"
               onClick={() => void buildReport()}

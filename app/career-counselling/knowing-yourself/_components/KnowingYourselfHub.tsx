@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
-  CircleAlert, Compass, LoaderCircle, RefreshCw, RotateCcw, Trophy,
+  CircleAlert, Compass, LoaderCircle, RefreshCw, RotateCcw, Sparkles, Trophy,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle,
 } from '@/components/ui/card';
-import { loadInterestQuestions, loadInterestResults } from '../../_lib/api';
-import type { RiasecQuestion, RiasecResultItem } from '../../_lib/types';
+import { loadCounsellingNarrative, loadInterestQuestions, loadInterestResults } from '../../_lib/api';
+import type { CounsellingNarrativePayload, RiasecQuestion, RiasecResultItem } from '../../_lib/types';
 import { IntroBanner } from './IntroBanner';
 import { QuizPanel } from './QuizPanel';
 import { RiasecDoughnutChart } from './RiasecDoughnutChart';
@@ -104,6 +104,50 @@ function ScoreTile({ item, onClick }: { item: RiasecResultItem; maxScore: number
   );
 }
 
+/**
+ * `careerCounsellingNarrative` (CareerCounsellingNarrator, Laravel repo) —
+ * "an AI counsellor retrieving the student's skill/interest graph",
+ * grounded in the student's real career-alignment evaluation plus their
+ * real concept-mastery state. This is intentionally NOT derived from the
+ * RIASEC results above it on this page — those are a separate, non-graph
+ * O*NET pipeline with no Neo4j relationship behind it.
+ */
+function AiCounsellorCard({
+  narrative, loading, error, onRetry,
+}: {
+  narrative: CounsellingNarrativePayload | null; loading: boolean; error: string; onRetry: () => void;
+}) {
+  return (
+    <Card className="border-indigo-200 bg-indigo-50/40">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Sparkles className="size-4 text-[#4F46E5]" />
+          AI counsellor
+        </CardTitle>
+        <CardDescription>
+          Grounded in your real career-alignment check and your actual concept practice — never invented.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex min-h-16 items-center justify-center gap-2 text-sm text-muted-foreground">
+            <LoaderCircle className="size-4 animate-spin" />
+            Loading your counselling note…
+          </div>
+        ) : error || !narrative ? (
+          <CenterMessage title="Couldn’t load your counselling note" description={error} retry={onRetry} />
+        ) : narrative.status === 'ok' ? (
+          <p className="text-sm leading-6">{narrative.narrative}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {narrative.message || 'An AI counselling note isn’t available right now.'}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function KnowingYourselfHub() {
   const router = useRouter();
   const pathname = usePathname();
@@ -120,6 +164,10 @@ export function KnowingYourselfHub() {
   const [resultsLoading, setResultsLoading] = useState(false);
   const [resultsError, setResultsError] = useState('');
   const [activeItem, setActiveItem] = useState<RiasecResultItem | null>(null);
+
+  const [narrative, setNarrative] = useState<CounsellingNarrativePayload | null>(null);
+  const [narrativeLoading, setNarrativeLoading] = useState(false);
+  const [narrativeError, setNarrativeError] = useState('');
 
   useEffect(() => {
     // Deep-link / resume: a shared or bookmarked URL with ?answers= jumps
@@ -173,6 +221,29 @@ export function KnowingYourselfHub() {
       void refreshResults(answers);
     }
   }, [step, answers, refreshResults]);
+
+  const refreshNarrative = useCallback(async () => {
+    setNarrativeLoading(true);
+    setNarrativeError('');
+    try {
+      setNarrative(await loadCounsellingNarrative());
+    } catch (err) {
+      setNarrative(null);
+      setNarrativeError(err instanceof Error ? err.message : 'Couldn’t load your counselling note.');
+    } finally {
+      setNarrativeLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // The AI counsellor note is independent of the RIASEC quiz results above
+    // it — it loads once results are reached, but never blocks or depends
+    // on the RIASEC call succeeding.
+    if (step === TOTAL_STEPS) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void refreshNarrative();
+    }
+  }, [step, refreshNarrative]);
 
   const introStep = useMemo(() => INTRO_STEPS[Math.min(step, 4) - 1], [step]);
 
@@ -350,6 +421,13 @@ export function KnowingYourselfHub() {
                   </Button>
                 </CardFooter>
               </Card>
+
+              <AiCounsellorCard
+                narrative={narrative}
+                loading={narrativeLoading}
+                error={narrativeError}
+                onRetry={() => void refreshNarrative()}
+              />
             </>
           )}
         </>

@@ -138,3 +138,67 @@ export function fetchCapabilities(): Promise<CapabilityIndex> {
 export function fetchCapability(slug: string): Promise<CapabilityDetail> {
   return get<CapabilityDetail>(`/${encodeURIComponent(slug)}`);
 }
+
+// ---------------------------------------------------------------------------
+// Knowledge & RAG — `POST /api/ai/knowledge-rag/ask`.
+//
+// The one real action this capability has today: ask a free-text question
+// and get back an answer grounded in this institute's own ingested
+// curriculum content, or an honest `insufficient_evidence` /
+// `model_unavailable` when it cannot. Not nested under `/capabilities` like
+// the rest of this file — that path is the read-only "what's configured"
+// panel every capability shares; this is the one capability-specific action
+// that exists so far.
+
+export interface KnowledgeRagSource {
+  content_master_id: number;
+  title: string;
+  score: number;
+}
+
+export interface KnowledgeRagAnswer {
+  status: 'ok' | 'insufficient_evidence' | 'model_unavailable';
+  answer: string | null;
+  message: string | null;
+  sources: KnowledgeRagSource[];
+}
+
+export async function askKnowledgeRag(question: string): Promise<KnowledgeRagAnswer> {
+  const session = readSession();
+
+  if (!session) {
+    throw new AiCapabilityError('Sign in to ask the Knowledge & RAG assistant.', 401);
+  }
+
+  const baseUrl = resolveAiBaseUrl(session.baseUrl);
+
+  const response = await fetch(`${baseUrl}/api/ai/knowledge-rag/ask`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.token}`,
+      ...(session.instituteId.trim() ? { 'X-MCP-Institute-Id': session.instituteId } : {}),
+    },
+    body: JSON.stringify({ question }),
+  });
+
+  const text = await response.text();
+  let payload: AiEnvelope<KnowledgeRagAnswer>;
+
+  try {
+    payload = (text.trim() ? JSON.parse(text) : {}) as AiEnvelope<KnowledgeRagAnswer>;
+  } catch {
+    throw new AiCapabilityError('The Knowledge & RAG assistant returned a non-JSON response.', response.status);
+  }
+
+  if (!response.ok || payload.success === false) {
+    throw new AiCapabilityError(
+      payload.message || `The Knowledge & RAG assistant request failed (${response.status}).`,
+      response.status
+    );
+  }
+
+  return payload.data as KnowledgeRagAnswer;
+}

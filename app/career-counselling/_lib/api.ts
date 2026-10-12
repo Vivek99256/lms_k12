@@ -5,7 +5,7 @@ import {
 } from '@/lib/erp-client';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import type {
-  CounsellingAttempt, CounsellingCourse, CounsellingCoursesPayload,
+  CounsellingAttempt, CounsellingCourse, CounsellingCoursesPayload, CounsellingNarrativePayload,
   RiasecQuestion, RiasecQuestionsPayload, RiasecResultItem, RiasecResultsPayload,
 } from './types';
 
@@ -123,4 +123,17 @@ export function counsellingExamUrl(courseId: number): string {
 
 export function mbtiPaperUrl(courseId: number): string {
   return `${API_BASE_URL}/lms/lmsMBTIPaper?course_id=${courseId}`;
+}
+
+/**
+ * AI counsellor narrative — `student_id` is omitted for a student viewing
+ * their own narrative (the Laravel side infers the current student from the
+ * session token) and supplied when staff open it from a student's profile,
+ * mirroring `app/career-intelligence/_lib/api.ts`'s `loadAlignment`.
+ */
+export async function loadCounsellingNarrative(studentId?: string): Promise<CounsellingNarrativePayload> {
+  const payload = await counsellingRequest<{ data: CounsellingNarrativePayload }>('careerCounsellingNarrative', {
+    student_id: studentId,
+  });
+  return payload.data;
 }

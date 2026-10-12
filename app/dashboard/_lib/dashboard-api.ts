@@ -6,6 +6,20 @@ import { asRecord, assertApiSuccess, getApiBaseUrl, getFeesSession, readString, 
 export type DashboardSession = FeesSession;
 export const getDashboardSession = getFeesSession;
 
+/**
+ * A 401 from these endpoints means the stored session is gone or invalid
+ * (expired token, or storage cleared by a sign-out/inactivity-timeout in
+ * another tab) — distinct from a regular failure, so callers can sign the
+ * user out instead of showing a raw backend message behind a "Try again"
+ * button that can never succeed (it re-reads the same empty session).
+ */
+export class DashboardAuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DashboardAuthError';
+  }
+}
+
 function buildDashboardProxyHeaders(session: DashboardSession) {
   const headers = new Headers();
   headers.set('Accept', 'application/json');
@@ -39,7 +53,9 @@ async function postDashboardProxy<T extends ApiStatusPayload>(path: string, sess
   }
 
   if (!response.ok) {
-    throw new Error(readString(asRecord(payload).message) || "We couldn't load the dashboard. Please try again.");
+    const message = readString(asRecord(payload).message) || "We couldn't load the dashboard. Please try again.";
+    if (response.status === 401) throw new DashboardAuthError(message);
+    throw new Error(message);
   }
 
   assertApiSuccess(payload, "We couldn't load the dashboard. Please try again.");
@@ -82,7 +98,9 @@ async function postDashboardDirect<T extends ApiStatusPayload>(laravelPath: stri
   }
 
   if (!response.ok) {
-    throw new Error(readString(asRecord(payload).message) || "We couldn't load the dashboard. Please try again.");
+    const message = readString(asRecord(payload).message) || "We couldn't load the dashboard. Please try again.";
+    if (response.status === 401) throw new DashboardAuthError(message);
+    throw new Error(message);
   }
 
   assertApiSuccess(payload, "We couldn't load the dashboard. Please try again.");
