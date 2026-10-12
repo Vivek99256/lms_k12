@@ -383,6 +383,10 @@ export const H5P_ROUTE_MAP: Record<string, string> = {
   // exchange, and it is unchanged.
   'h5p_single_choice_set.index': '/h5p/h5p_single_choice_set',
   'h5p_true_false.index': '/h5p/h5p_true_false',
+
+  // 2026-10-10: Branching Scenario. A native type over its own tables, played
+  // by this product's player; see docs/h5p-branching-scenario.md.
+  'h5p_branching_scenario.index': '/h5p/h5p_branching_scenario',
 };
 
 export async function fetchHubModules(ctx: H5pContext): Promise<H5pHubModule[]> {

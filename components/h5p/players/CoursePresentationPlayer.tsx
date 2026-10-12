@@ -20,8 +20,10 @@ import type { PlayerProps } from './types';
  * multiple-choice element, and one that does not keeps its model answer in the
  * slide notes, which are author-facing and never shown to a learner.
  *
- * H5P.BranchingScenario, which the earlier brief asked for, is a planned type
- * in this platform with no table and no player.
+ * H5P.BranchingScenario is a type of its own in this platform now (see
+ * app/h5p/h5p_branching_scenario). It is a decision tree that is authored or
+ * generated for a chapter, not a way to play one stored question, so a case
+ * study stays a presentation.
  */
 export function CoursePresentationPlayer({ question, subParts = [], onResult, embedded = true }: PlayerProps) {
   const { activity, reason } = buildFor(question, 'course_presentation', subParts);
