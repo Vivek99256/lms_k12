@@ -144,6 +144,7 @@ export default function LessonPlanDocumentPage() {
           chapters={chapters}
           chapterId={chapterId}
           onChapterIdChange={handleChapterChange}
+          onEdit={() => router.push(`/course-master/lesson-plan-doc/${courseId}/edit?chapterId=${chapterId}`)}
         />
       </div>
     </div>
