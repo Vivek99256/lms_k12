@@ -46,6 +46,12 @@ export default function ConditionalApp({ children }: { children: React.ReactNode
     return <>{children}</>;
   }
 
+  // Parents pay school fees from a link the school sends them (app/pay): no account exists for them, so this page
+  // is reachable signed out and never gets the staff sidebar. Matched as an exact path prefix, like the alumni portal.
+  if (pathname === '/pay' || pathname.startsWith('/pay/')) {
+    return <>{children}</>;
+  }
+
   if (!isAuthenticated) {
     return <LoginPage />;
   }
