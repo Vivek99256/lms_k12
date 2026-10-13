@@ -83,7 +83,7 @@ export function ExplainDock({ deck, slide, layout, tabs, done, onDone }: Explain
         <section
           id={panelId}
           aria-label={`${slide.title}: more on this slide`}
-          className={`absolute inset-x-[1.4em] bottom-[3.5em] z-20 flex flex-col overflow-hidden rounded-[1.1em] border-2 border-indigo-200 bg-white shadow-[0_10px_40px_rgba(15,23,42,0.22)] ${
+          className={`absolute inset-x-[1.4em] bottom-[3.5em] z-20 flex flex-col overflow-hidden rounded-[1.1em] border-2 border-sd-line bg-white shadow-[0_10px_40px_rgba(15,23,42,0.22)] ${
             portrait ? 'max-h-[62%]' : 'max-h-[50%]'
           } ${motion.fadeUp}`}
         >
@@ -99,8 +99,8 @@ export function ExplainDock({ deck, slide, layout, tabs, done, onDone }: Explain
                 tabIndex={tab === t.id ? 0 : -1}
                 onClick={() => dispatch({ type: 'tab', tab: t.id })}
                 onKeyDown={(event) => onTabKey(event, index)}
-                className={`rounded-t-[0.7em] border border-b-0 px-[0.9em] py-[0.4em] text-[0.8em] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 ${
-                  tab === t.id ? 'border-slate-200 bg-white text-indigo-900' : 'border-transparent text-slate-600 hover:bg-white/70'
+                className={`rounded-t-[0.7em] border border-b-0 px-[0.9em] py-[0.4em] text-[0.8em] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent ${
+                  tab === t.id ? 'border-slate-200 bg-white text-sd-strong' : 'border-transparent text-slate-600 hover:bg-white/70'
                 }`}
               >
                 {t.label}
@@ -113,18 +113,18 @@ export function ExplainDock({ deck, slide, layout, tabs, done, onDone }: Explain
         </section>
       ) : null}
 
-      <div className="flex shrink-0 items-center gap-[0.8em] px-[1.4em] pb-[0.8em] pt-[0.1em]">
+      <div className="flex shrink-0 items-center gap-[0.8em] py-[0.1em] pb-[0.8em] pl-[1.4em] pr-[6.5em]">
         <button
           type="button"
           aria-expanded={state.open}
           aria-controls={state.open ? panelId : undefined}
           onClick={() => dispatch({ type: 'toggle' })}
-          className="inline-flex items-center gap-[0.5em] rounded-[0.8em] border-2 border-indigo-300 bg-indigo-50 px-[1.1em] py-[0.45em] text-[0.85em] font-semibold text-indigo-900 transition hover:border-indigo-500 hover:bg-indigo-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="inline-flex shrink-0 items-center gap-[0.5em] whitespace-nowrap rounded-[0.8em] border-2 border-sd-line bg-sd-softer px-[1.1em] py-[0.45em] text-[0.85em] font-semibold text-sd-strong transition hover:border-sd-accent hover:bg-sd-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sd-accent"
         >
           <Lightbulb className="h-[1.15em] w-[1.15em]" aria-hidden="true" />
           {state.open ? 'Hide explanation' : label}
         </button>
-        {!state.open && tabs.length > 1 ? <span className="truncate text-[0.7em] text-slate-500">{tabs.map((t) => t.label).join(' · ')}</span> : null}
+        {!state.open && tabs.length > 1 && !portrait ? <span className="truncate rounded-full bg-white/80 px-[0.8em] py-[0.15em] text-[0.7em] text-slate-700">{tabs.map((t) => t.label).join(' · ')}</span> : null}
       </div>
     </>
   );
@@ -146,7 +146,7 @@ function TabBody({ deck, slide, layout, tab, answer, onAnswer }: { deck: StudyDe
           </div>
         ))}
         {key ? (
-          <p className="flex items-start gap-[0.6em] rounded-[0.8em] border border-indigo-200 bg-indigo-50 px-[0.9em] py-[0.6em] text-[1.05em] leading-snug text-indigo-950">
+          <p className="flex items-start gap-[0.6em] rounded-[0.8em] border border-sd-line bg-sd-softer px-[0.9em] py-[0.6em] text-[1.05em] leading-snug text-sd-strong">
             <KeyRound className="mt-[0.15em] h-[1.1em] w-[1.1em] shrink-0" aria-hidden="true" />
             <span>
               <span className="font-semibold">Key idea. </span>
@@ -218,7 +218,7 @@ function TabBody({ deck, slide, layout, tab, answer, onAnswer }: { deck: StudyDe
             type="button"
             onClick={onAnswer}
             aria-expanded={answer}
-            className="inline-flex items-center gap-[0.5em] rounded-[0.7em] border border-sky-300 bg-white px-[1em] py-[0.4em] text-[0.8em] font-semibold text-sky-900 hover:bg-sky-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+            className="inline-flex items-center gap-[0.5em] rounded-[0.7em] border border-sky-300 bg-white px-[1em] py-[0.4em] text-[0.8em] font-semibold text-sky-900 hover:bg-sky-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
           >
             {answer ? <EyeOff className="h-[1.1em] w-[1.1em]" aria-hidden="true" /> : <Eye className="h-[1.1em] w-[1.1em]" aria-hidden="true" />}
             {answer ? 'Hide the possible answer' : 'Show a possible answer'}

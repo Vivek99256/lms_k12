@@ -14,6 +14,7 @@
  */
 
 import { exampleCards } from './interactions';
+import { isBleedPhoto } from './theme';
 import type { DeckSlide, StudyDeck } from './types';
 
 export type StepKind = 'teach' | 'example' | 'discuss';
@@ -141,4 +142,18 @@ export function pendingHint(slide: DeckSlide, step: StepKind, explored: boolean)
     case 'order':
       return 'Put the steps in order to continue.';
   }
+}
+
+/**
+ * True when a slide is drawn with its own photograph filling the whole slide, text on translucent panels over it.
+ *
+ * Only a slide that is made of a photograph and a list to explore (or a photograph beside its explanation) can be: a
+ * diagram with hotspots, a decision, a match or an order needs its own room. A phone-width stage keeps the picture
+ * above the controls instead, and a photograph too small or too narrow to fill a slide is shown as a figure.
+ */
+export function usesBleed(slide: DeckSlide, portrait: boolean): boolean {
+  if (portrait) return false;
+  const layout = layoutOf(slide);
+
+  return (layout === 'explore' || layout === 'image-text') && isBleedPhoto(slide.image);
 }

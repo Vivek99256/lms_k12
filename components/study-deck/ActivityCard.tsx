@@ -1,7 +1,7 @@
 'use client';
 
-import { memo, useCallback } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { memo, useCallback, useState } from 'react';
+import { CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 import { NotPlayable, QuestionPlayer } from '@/components/h5p/players';
 import type { Question, QuestionResult } from '@/components/h5p/players/types';
@@ -48,12 +48,17 @@ const PlayerSlot = memo(function PlayerSlot({
  */
 function ActivityCardImpl({ resolved, activityKey, done, connects, onResult }: ActivityCardProps) {
   const { activity } = resolved;
+  const [answerShown, setAnswerShown] = useState(false);
 
   // The stored explanation, shown only AFTER the learner has answered. In the embedded one-question
   // mode the choice player's own verdict says "review the solution" without showing one, and a flashcard
   // check says only right or wrong, so this is where the learner is told why. A written answer already has
   // its own "compare with the model answer" step, so it is not repeated here.
   const explanation = resolved.ok && done && resolved.as !== 'essay' ? explanationOf(resolved.question) : '';
+
+  // A flashcard says only "Not quite. Have another go" to a wrong answer, so a learner who is stuck had no way to see what
+  // the answer is. This lets them look, whenever they choose; looking changes nothing (no score, no progress).
+  const flashAnswer = resolved.ok && resolved.as === 'flashcards' ? explanationOf(resolved.question) : '';
 
   // A stable handler: some players re-seed themselves when their callback changes identity,
   // which would send the learner back to the first card mid-answer.
@@ -72,10 +77,10 @@ function ActivityCardImpl({ resolved, activityKey, done, connects, onResult }: A
   return (
     <section
       aria-label={`${activity.label} activity`}
-      className="rounded-2xl border border-indigo-200 bg-white p-4 shadow-sm sm:p-5"
+      className="rounded-2xl border border-sd-line bg-white p-4 shadow-sm sm:p-5"
     >
       <header className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 text-xs font-semibold text-white">{activity.label}</span>
+        <span className="rounded-full bg-sd-accent px-2.5 py-0.5 text-xs font-semibold text-white">{activity.label}</span>
         {activity.decision ? (
           <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900">Make a decision</span>
         ) : null}
@@ -96,7 +101,27 @@ function ActivityCardImpl({ resolved, activityKey, done, connects, onResult }: A
         <NotPlayable reason={resolved.reason} />
       )}
 
-      {explanation ? (
+      {flashAnswer ? (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setAnswerShown((v) => !v)}
+            aria-expanded={answerShown}
+            className="inline-flex items-center gap-2 rounded-xl border border-sd-line bg-white px-3 py-1.5 text-sm font-semibold text-sd-strong hover:bg-sd-softer focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
+          >
+            {answerShown ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+            {answerShown ? 'Hide the answer' : 'Show the answer'}
+          </button>
+          {answerShown ? (
+            <aside aria-label="The answer" className="mt-2 rounded-xl border border-sd-line bg-sd-softer p-3 text-sm text-slate-900">
+              <p className="font-semibold text-sd-strong">The answer</p>
+              <p className="mt-0.5 leading-relaxed">{flashAnswer}</p>
+            </aside>
+          ) : null}
+        </div>
+      ) : null}
+
+      {explanation && !(flashAnswer && answerShown) ? (
         <aside aria-label="Explanation" className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
           <p className="font-semibold">Why</p>
           <p className="mt-0.5 leading-relaxed">{explanation}</p>

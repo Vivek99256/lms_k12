@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
-import { ArrowRight, CheckCircle2, Compass, RotateCcw, Undo2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Compass, RotateCcw, Undo2 } from 'lucide-react';
 
 import {
   advance,
@@ -14,8 +14,8 @@ import {
   scenarioProgress,
   type ScenarioState,
 } from '@/lib/study-deck/interactions';
-import type { ScenarioInteraction } from '@/lib/study-deck/types';
-import { Tag, useRememberedReducer, useStage } from './stage-ui';
+import type { DeckImage, ScenarioInteraction } from '@/lib/study-deck/types';
+import { SideFigure, Tag, TONES, useRememberedReducer, useStage } from './stage-ui';
 
 export interface ScenarioViewProps {
   interaction: ScenarioInteraction;
@@ -26,6 +26,9 @@ export interface ScenarioViewProps {
   lead: ReactNode;
   /** Where this screen's state is kept for the session. */
   memoryKey: string;
+  /** The slide's own picture, shown beside the text when it has one. */
+  image?: DeckImage | null;
+  assetBase?: string | null;
 }
 
 type Action = { type: 'choose'; id: string } | { type: 'again' } | { type: 'next' } | { type: 'restart' };
@@ -37,7 +40,7 @@ type Action = { type: 'choose'; id: string } | { type: 'again' } | { type: 'next
  *
  * Nothing is scored. A choice is described as sound or not the best choice, because the point is to see why.
  */
-export function ScenarioView({ interaction, done, onDone, lead, memoryKey }: ScenarioViewProps) {
+export function ScenarioView({ interaction, done, onDone, lead, memoryKey, image, assetBase }: ScenarioViewProps) {
   const { portrait } = useStage();
   const [state, dispatch] = useRememberedReducer(memoryKey, (s: ScenarioState, a: Action) => {
     switch (a.type) {
@@ -76,14 +79,14 @@ export function ScenarioView({ interaction, done, onDone, lead, memoryKey }: Sce
     heading.current?.focus({ preventScroll: true });
   }, [state.nodeId, state.ended, state.chosen]);
 
-  const button = 'inline-flex items-center gap-[0.4em] rounded-[0.7em] px-[1em] py-[0.5em] text-[0.8em] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600';
+  const button = 'inline-flex items-center gap-[0.4em] rounded-[0.7em] px-[1em] py-[0.5em] text-[0.8em] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sd-accent';
 
   return (
     <section
       aria-label="What would you do?"
       className={`grid h-full min-h-0 gap-[1.2em] p-[1.4em] ${portrait ? 'grid-rows-[auto_minmax(0,1fr)]' : 'grid-cols-[minmax(0,4.6fr)_minmax(0,7.4fr)]'}`}
     >
-      <div className="flex min-h-0 min-w-0 flex-col justify-center gap-[0.9em]">
+      <div className="flex min-h-0 min-w-0 flex-col justify-center-safe gap-[0.9em]">
         {lead}
         <div className="space-y-[0.5em]">
           <div className="flex flex-wrap items-center gap-[0.6em]">
@@ -101,11 +104,15 @@ export function ScenarioView({ interaction, done, onDone, lead, memoryKey }: Sce
               </span>
             ) : null}
           </div>
-          <p className="rounded-[0.8em] bg-slate-50 p-[0.8em] text-[0.95em] leading-snug text-slate-800">{interaction.situation}</p>
+          <div className="rounded-[1em] border-l-[0.35em] border-sd-accent bg-white/90 p-[0.9em] shadow-[0_0.2em_0.9em_rgba(15,23,42,0.12)]">
+            <p className="mb-[0.2em] text-[0.62em] font-bold uppercase tracking-wider text-sd-strong">The situation</p>
+            <p className="text-[0.95em] leading-snug text-slate-900">{interaction.situation}</p>
+          </div>
         </div>
+        <SideFigure image={image} assetBase={assetBase} />
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-col justify-center gap-[0.8em]">
+      <div className="flex min-h-0 min-w-0 flex-col justify-center-safe gap-[0.8em]">
         {state.ended ? (
           <div className="space-y-[0.8em]">
             <h3 ref={heading} tabIndex={-1} className="text-[1.3em] font-semibold text-slate-900 outline-none">
@@ -139,8 +146,9 @@ export function ScenarioView({ interaction, done, onDone, lead, memoryKey }: Sce
               <br />
               {picked.text}
             </p>
-            <div className={`space-y-[0.5em] rounded-[0.9em] border p-[1em] ${picked.sound ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
-              <p className={`text-[0.7em] font-semibold uppercase tracking-wider ${picked.sound ? 'text-emerald-900' : 'text-amber-900'}`}>
+            <div className={`space-y-[0.5em] rounded-[1em] border-2 border-l-[0.4em] p-[1em] shadow-[0_0.2em_0.9em_rgba(15,23,42,0.1)] ${picked.sound ? 'border-emerald-300 bg-emerald-50' : 'border-amber-300 bg-amber-50'}`}>
+              <p className={`flex items-center gap-[0.5em] text-[0.8em] font-bold uppercase tracking-wider ${picked.sound ? 'text-emerald-900' : 'text-amber-900'}`}>
+                {picked.sound ? <CheckCircle2 className="h-[1.3em] w-[1.3em]" aria-hidden="true" /> : <AlertTriangle className="h-[1.3em] w-[1.3em]" aria-hidden="true" />}
                 {picked.sound ? 'A sound choice' : 'Not the best choice'}
               </p>
               <p className={`text-[1.05em] leading-snug ${picked.sound ? 'text-emerald-950' : 'text-amber-950'}`}>
@@ -157,7 +165,7 @@ export function ScenarioView({ interaction, done, onDone, lead, memoryKey }: Sce
                 <Undo2 className="h-[1.1em] w-[1.1em]" aria-hidden="true" />
                 Try a different choice
               </button>
-              <button type="button" onClick={() => dispatch({ type: 'next' })} className={`${button} bg-indigo-600 text-white hover:bg-indigo-700`}>
+              <button type="button" onClick={() => dispatch({ type: 'next' })} className={`${button} bg-sd-accent text-white hover:bg-sd-strong`}>
                 {picked.next ? 'Next decision' : 'See what to take from this'}
                 <ArrowRight className="h-[1.1em] w-[1.1em]" aria-hidden="true" />
               </button>
@@ -169,15 +177,17 @@ export function ScenarioView({ interaction, done, onDone, lead, memoryKey }: Sce
               {node.prompt}
             </h3>
             <ul className="space-y-[0.6em]" aria-label="Your choices">
-              {node.choices.map((choice) => (
+              {node.choices.map((choice, choiceIndex) => (
                 <li key={choice.id}>
                   <button
                     type="button"
                     onClick={() => dispatch({ type: 'choose', id: choice.id })}
                     aria-pressed={state.chosen === choice.id}
-                    className="flex min-h-[3.6em] w-full items-center gap-[0.8em] rounded-[0.9em] border-2 border-slate-300 bg-white px-[1.1em] py-[0.7em] text-left text-[1.05em] leading-snug text-slate-900 shadow-sm transition hover:border-indigo-500 hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    className="group flex min-h-[3.6em] w-full items-center gap-[0.8em] rounded-[1em] border-2 border-sd-line bg-white px-[1em] py-[0.7em] text-left text-[1.05em] leading-snug text-slate-900 shadow-[0_0.2em_0.7em_rgba(15,23,42,0.1)] transition hover:-translate-y-[0.05em] hover:border-sd-accent hover:bg-sd-softer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sd-accent"
                   >
-                    <span aria-hidden="true" className="h-[1.1em] w-[1.1em] shrink-0 rounded-full border-2 border-slate-400" />
+                    <span aria-hidden="true" className={`flex h-[2em] w-[2em] shrink-0 items-center justify-center rounded-[0.7em] text-[0.9em] font-extrabold text-white ${TONES[choiceIndex % TONES.length].dot}`}>
+                      {String.fromCharCode(65 + choiceIndex)}
+                    </span>
                     {choice.text}
                   </button>
                 </li>
