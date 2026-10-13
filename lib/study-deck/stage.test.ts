@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { parseDeck } from './deck';
-import { allPositions, exampleRequired, layoutOf, nextPosition, pendingHint, previousPosition, startSlideOf, stepsOf } from './stage';
+import { allPositions, exampleRequired, layoutOf, nextPosition, pendingHint, previousPosition, startSlideOf, stepsOf, usesBleed } from './stage';
 import type { DeckSlide, StudyDeck } from './types';
 
 const deck = (): StudyDeck => parseDeck(JSON.parse(readFileSync(new URL('./fixtures/study-deck-golden.json', import.meta.url), 'utf8')));
@@ -132,4 +132,18 @@ test('a link can name the slide to open: a plain whole number the deck has, noth
   assert.equal(startSlideOf('', d), null);
   assert.equal(startSlideOf(null, d), null);
   assert.equal(startSlideOf(undefined, d), null);
+});
+
+test('usesBleed: a photograph with a list to explore fills the slide on a wide stage only', () => {
+  const photo = { type: 'photo', url: 'u', alt: 'a', caption: null, width: 1280, height: 800, licence: 'CC0', source_url: 's', creator: 'c', attribution: '', attribution_required: false } as never;
+  const small = { ...(photo as object), width: 500, height: 333 } as never;
+  const diagram = { ...(photo as object), type: 'diagram', width: 1600, height: 900 } as never;
+  const base = { n: 5, slide_type: 'concept_visual', taught_concept_ids: [1], image: photo, interaction: { kind: 'reveal', intro: 'x', wrapup: 'y', items: [] }, content: { bullets: [], explanations: [], body: '' } } as unknown as DeckSlide;
+
+  assert.equal(usesBleed(base, false), true);
+  assert.equal(usesBleed(base, true), false, 'a phone keeps the picture above the controls');
+  assert.equal(usesBleed({ ...base, image: small }, false), false, 'too small to fill a slide');
+  assert.equal(usesBleed({ ...base, image: diagram }, false), false, 'a drawn diagram is never cropped');
+  assert.equal(usesBleed({ ...base, interaction: { kind: 'hotspots', intro: '', wrapup: '', spots: [] } } as never, false), false, 'hotspots need the whole picture and their own room');
+  assert.equal(usesBleed({ ...base, interaction: { kind: 'scenario' } } as never, false), false);
 });

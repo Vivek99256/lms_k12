@@ -27,7 +27,7 @@ export function OutlinePanel({ deck, progress, currentSlide, onGoto }: OutlinePa
       <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{deck.chapter.name}</p>
       {topics.map((topic) => (
         <div key={topic.topicId}>
-          <p className="text-sm font-semibold text-slate-900">{topic.name}</p>
+          <p className="border-l-4 border-sd-accent pl-2 text-sm font-bold text-sd-strong">{topic.name}</p>
           <ul className="mt-1 space-y-0.5">
             {topic.concepts.map(({ concept, taughtOn }) => {
               const status = conceptStatus(deck, progress, concept.id);
@@ -42,8 +42,8 @@ export function OutlinePanel({ deck, progress, currentSlide, onGoto }: OutlinePa
                     disabled={target === undefined}
                     aria-current={here ? 'step' : undefined}
                     onClick={() => target !== undefined && onGoto(target)}
-                    className={`flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 ${
-                      here ? 'bg-indigo-50 font-medium text-indigo-900' : 'text-slate-700 hover:bg-slate-100'
+                    className={`flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent ${
+                      here ? 'bg-sd-softer font-medium text-sd-strong' : 'text-slate-700 hover:bg-slate-100'
                     } disabled:cursor-not-allowed disabled:opacity-50`}
                   >
                     {complete ? (
@@ -81,13 +81,13 @@ export function OutlineDrawer({ onClose, ...panel }: OutlineDrawerProps) {
         onKeyDown={(event) => event.key === 'Escape' && onClose()}
         className="flex h-full w-[min(22rem,90vw)] flex-col bg-white shadow-2xl"
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <p className="text-sm font-semibold text-slate-900">Outline</p>
+        <div className="flex items-center justify-between border-b border-sd-line bg-sd-softer px-4 py-3">
+          <p className="text-sm font-bold text-sd-strong">Outline</p>
           <button
             type="button"
             onClick={onClose}
             autoFocus
-            className="rounded-lg px-2 py-1 text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+            className="rounded-lg px-2 py-1 text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
           >
             Close
           </button>

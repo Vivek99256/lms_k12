@@ -5,6 +5,7 @@ import { CheckCircle2, Circle, RotateCcw } from 'lucide-react';
 import { outlineOf } from '@/lib/study-deck/deck';
 import { conceptStatus, deckTotals, type DeckProgress } from '@/lib/study-deck/progress';
 import type { StudyDeck } from '@/lib/study-deck/types';
+import { themeForTopic } from '@/lib/study-deck/theme';
 import { Eyebrow, useStage } from './stage-ui';
 
 export interface SummaryScreenProps {
@@ -32,7 +33,7 @@ export function SummaryScreen({ deck, progress, playable, onRestart, onReview }:
       <header className="flex flex-wrap items-end justify-between gap-[0.8em]">
         <div className="space-y-[0.3em]">
           <Eyebrow>Chapter finished</Eyebrow>
-          <h2 id="summary-title" tabIndex={-1} className={`font-semibold leading-tight tracking-tight text-slate-900 outline-none ${portrait ? 'text-[1.4em]' : 'text-[1.9em]'}`}>
+          <h2 id="summary-title" tabIndex={-1} className={`font-extrabold leading-tight tracking-tight text-sd-strong outline-none ${portrait ? 'text-[1.4em]' : 'text-[1.9em]'}`}>
             {deck.chapter.name}
           </h2>
           <p className="text-[0.85em] text-slate-700">
@@ -45,7 +46,7 @@ export function SummaryScreen({ deck, progress, playable, onRestart, onReview }:
         <button
           type="button"
           onClick={onRestart}
-          className="inline-flex items-center gap-[0.5em] rounded-[0.7em] border border-slate-300 bg-white px-[1em] py-[0.45em] text-[0.8em] font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+          className="inline-flex items-center gap-[0.5em] rounded-[0.7em] border border-slate-300 bg-white px-[1em] py-[0.45em] text-[0.8em] font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
         >
           <RotateCcw className="h-[1.1em] w-[1.1em]" aria-hidden="true" />
           Start again
@@ -53,10 +54,13 @@ export function SummaryScreen({ deck, progress, playable, onRestart, onReview }:
       </header>
 
       <div className={`grid min-h-0 flex-1 auto-rows-fr gap-[0.6em] ${portrait ? 'grid-cols-1' : 'grid-cols-4'}`}>
-        {outlineOf(deck).map((topic) => (
-          <div key={topic.topicId} className="flex min-h-0 flex-col gap-[0.2em] overflow-hidden rounded-[0.8em] border border-slate-200 bg-slate-50 p-[0.6em]">
-            <h3 className="text-[0.72em] font-semibold leading-tight text-slate-900">{topic.name}</h3>
-            <ul className="space-y-[0.1em]">
+        {outlineOf(deck).map((topic, topicIndex) => {
+          const t = themeForTopic(topicIndex);
+
+          return (
+          <div key={topic.topicId} className="flex min-h-0 flex-col overflow-hidden rounded-[0.9em] border bg-white/90 shadow-[0_0.15em_0.6em_rgba(15,23,42,0.1)]" style={{ borderColor: t.line }}>
+            <h3 className="px-[0.7em] py-[0.4em] text-[0.78em] font-bold leading-tight text-white" style={{ background: t.accent }}>{topicIndex + 1}. {topic.name}</h3>
+            <ul className="space-y-[0.1em] p-[0.6em]">
               {topic.concepts.map(({ concept, taughtOn }) => {
                 const s = conceptStatus(deck, progress, concept.id);
 
@@ -72,7 +76,7 @@ export function SummaryScreen({ deck, progress, playable, onRestart, onReview }:
                       <button
                         type="button"
                         onClick={() => onReview(taughtOn[0])}
-                        className="text-indigo-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+                        className="text-sd-strong underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
                       >
                         Review
                       </button>
@@ -82,7 +86,8 @@ export function SummaryScreen({ deck, progress, playable, onRestart, onReview }:
               })}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
-import { X } from 'lucide-react';
+import { Dumbbell, X } from 'lucide-react';
 
 import { activityKey, resolveActivity, type ResolvedActivity } from '@/lib/study-deck/deck';
 import type { ResultInput } from '@/lib/study-deck/progress';
@@ -46,16 +46,21 @@ export function PracticeDialog({ deck, slide, bank, progress, onResult, onClose 
         onKeyDown={(event) => event.key === 'Escape' && onClose()}
         className="flex max-h-[90dvh] w-[min(52rem,96vw)] flex-col rounded-2xl bg-white shadow-2xl outline-none"
       >
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-          <div>
-            <p className="text-base font-semibold text-slate-900">Practice</p>
-            <p className="text-xs text-slate-600">Optional. This does not change your lesson progress.</p>
+        <div className="flex items-center justify-between gap-3 border-b border-sd-line bg-sd-softer px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sd-accent text-white shadow-sm">
+              <Dumbbell className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-base font-bold text-sd-strong">Practice</p>
+              <p className="text-xs text-slate-600">Optional. This does not change your lesson progress.</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close practice"
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
