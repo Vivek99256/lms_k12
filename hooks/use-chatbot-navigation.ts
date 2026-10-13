@@ -12,6 +12,7 @@ import { getFeesSession, type FeesSession } from '@/app/fees/_lib/fees-api';
 import {
   detectNavigationIntent,
   evaluateChatbotIntent,
+  withSupplementalModules,
   type ChatbotIntentEvaluation,
   type NavigationMatch,
 } from '@/lib/intelligence/chatbot-navigation';
@@ -90,7 +91,12 @@ export function useChatbotNavigation() {
 
         if (cancelled) return;
 
-        const catMap = new Map<string, ModuleCategory[]>(entries as Array<[string, ModuleCategory[]]>);
+        const fetchedMap = new Map<string, ModuleCategory[]>(entries as Array<[string, ModuleCategory[]]>);
+        // Menus the registry has no row for (Alumni Management) are added from code, and
+        // only when the registry does not already carry them.
+        const supplemented = withSupplementalModules(reg, fetchedMap);
+        reg = supplemented.registry;
+        const catMap = supplemented.categoriesMap;
 
         // Cache only a usable result, so an empty one is retried on the next open.
         if (catMap.get('fees')?.length) {

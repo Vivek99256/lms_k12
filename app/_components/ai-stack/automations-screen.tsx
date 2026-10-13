@@ -45,9 +45,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Bot,
-  CheckCircle2,
   ChevronRight,
-  Gavel,
   Info,
   Lock,
   Pause,
@@ -70,12 +68,12 @@ import {
   listAgentRuns,
   listAgents,
   listPendingApprovals,
-  resolveApproval,
   runAgent,
 } from '@/lib/intelligence/client';
 import type { AgentRunResult, PendingApproval } from '@/lib/intelligence/types';
 import { logModuleOperation, readModuleWorkspaceSession } from '@/lib/module-ai/module-ai-stack';
 
+import { ModuleApprovalQueue } from './module-approval-queue';
 import { AiStackCard, AiStackCardHeading, AiStackPill, formatWhen } from './ai-stack-chrome';
 import { aiStackRbacKey, type AiStackBoundAgent, type AiStackModule } from './ai-stack-module';
 
@@ -378,8 +376,6 @@ function BoundAgentPanel({ module, agent: bound }: { module: AiStackModule; agen
 
   const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
   const [approvals, setApprovals] = useState<PendingApproval[]>([]);
-  const [approvalNote, setApprovalNote] = useState('');
-  const [deciding, setDeciding] = useState<number | null>(null);
   const [token, setToken] = useState(0);
 
   // `setLoading(true)` lives here rather than in the effect body. Calling setState
@@ -474,25 +470,6 @@ function BoundAgentPanel({ module, agent: bound }: { module: AiStackModule; agen
       logModuleOperation(module, `${module.key}_agent_run`, { status: 'failed', message });
     } finally {
       setRunning(false);
-    }
-  };
-
-  const decide = async (approval: PendingApproval, decision: 'approved' | 'rejected') => {
-    setDeciding(approval.id);
-    setApprovalNote('');
-
-    try {
-      const summary = await resolveApproval(readModuleWorkspaceSession(), approval.id, decision);
-      setApprovalNote(
-        `Approval #${approval.id} ${decision}. The ${bound.workflowKey} run is now ${summary.status}${
-          summary.current_step ? ` at "${summary.current_step}"` : ''
-        }.`,
-      );
-      reload();
-    } catch (cause) {
-      setApprovalNote(cause instanceof Error ? cause.message : 'The decision could not be recorded.');
-    } finally {
-      setDeciding(null);
     }
   };
 
@@ -620,12 +597,7 @@ function BoundAgentPanel({ module, agent: bound }: { module: AiStackModule; agen
           </p>
         )}
 
-        <ApprovalQueue
-          approvals={approvals}
-          deciding={deciding}
-          note={approvalNote}
-          onDecide={(approval, decision) => void decide(approval, decision)}
-        />
+        <ModuleApprovalQueue moduleLabel={module.label} workflowKey={bound.workflowKey} onChanged={reload} />
 
         <RunHistory runs={history} agentName={manifest?.name ?? bound.fallbackName} />
       </div>
@@ -830,81 +802,6 @@ function CaseList({ cases }: { cases: AgentCase[] }) {
           )}
         </div>
       ))}
-    </div>
-  );
-}
-
-function ApprovalQueue({
-  approvals,
-  deciding,
-  note,
-  onDecide,
-}: {
-  approvals: PendingApproval[];
-  deciding: number | null;
-  note: string;
-  onDecide: (approval: PendingApproval, decision: 'approved' | 'rejected') => void;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
-        <Gavel className="size-3.5" />
-        Waiting for a person ({approvals.length})
-      </p>
-
-      {note && (
-        <p className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
-          {note}
-        </p>
-      )}
-
-      {approvals.length === 0 ? (
-        <p className="mt-2 text-xs text-slate-500">Nothing from this workflow is waiting on a decision.</p>
-      ) : (
-        <ul className="mt-3 space-y-2">
-          {approvals.map((approval) => (
-            <li
-              key={approval.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
-            >
-              <div className="min-w-0 text-xs text-amber-900">
-                <p className="font-medium">
-                  Approval #{approval.id} · run #{approval.run_id}
-                  {approval.step_key ? ` · ${approval.step_key}` : ''}
-                </p>
-                <p className="mt-0.5 opacity-80">
-                  {approval.subject_entity_key
-                    ? `${approval.subject_entity_key} #${approval.subject_id}`
-                    : 'no subject'}
-                  {approval.case_id ? ` · case #${approval.case_id}` : ''}
-                  {approval.expires_at ? ` · expires ${formatWhen(approval.expires_at)}` : ''}
-                </p>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => onDecide(approval, 'approved')}
-                  disabled={deciding === approval.id}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  <CheckCircle2 className="size-3.5" />
-                  Approve
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDecide(approval, 'rejected')}
-                  disabled={deciding === approval.id}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  <XCircle className="size-3.5" />
-                  Reject
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

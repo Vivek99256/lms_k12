@@ -77,6 +77,25 @@ const MODULE_ALIASES: Record<string, string[]> = {
   task_management: ['task', 'tasks', 'task management'],
 };
 
+/**
+ * The registry names a few modules differently from the slugs this file keys on:
+ * the Student menu is `student`, Admission is `admission` and Transport is `transport`,
+ * while the aliases, display names and `getCurrentModule()` use `students`,
+ * `admissions` and `transportation`. Comparing the two raw made the chatbot tell a
+ * person on the Student page that "this action isn't available from the Student module".
+ * Every comparison between a registry name and a current-module name goes through here.
+ */
+const REGISTRY_SLUG_TO_MODULE: Record<string, string> = {
+  student: 'students',
+  admission: 'admissions',
+  transport: 'transportation',
+};
+
+export function canonicalModuleName(name?: string | null): string {
+  const key = (name || '').toLowerCase().trim();
+  return REGISTRY_SLUG_TO_MODULE[key] ?? key;
+}
+
 const MODULE_DEFAULT_ROUTES: Record<string, string> = {
   fees: '/fees/onboarding',
   students: '/students/search_student',
@@ -166,9 +185,211 @@ export const APPROVAL_ROUTES: Record<string, string> = {
   fees: '/fees/ai-stack?tab=automations',
 };
 
+/**
+ * The modules that have an agent or workflow which pauses for a person, and where each one's
+ * queue is: its own AI Stack → Automations tab. These are the modules for which
+ * `workflow_definitions` / `ai_agents` hold a flow with an approval step. Every other
+ * module has no action that can wait for approval, and the chatbot says so rather than
+ * opening an empty tab. A module gains approvals by gaining such a flow — it is added here
+ * when that happens, not before.
+ */
+const APPROVAL_CAPABLE_ROUTES: Record<string, string> = {
+  students: '/modules/student/ai-stack?tab=automations',
+  attendance: '/modules/attendance/ai-stack?tab=automations',
+  admissions: '/modules/admission/ai-stack?tab=automations',
+  exam: '/modules/exam/ai-stack?tab=automations',
+  'exam-assessment': '/modules/exam-assessment/ai-stack?tab=automations',
+  'new-pal': '/modules/new-pal/ai-stack?tab=automations',
+};
+
+function hasApprovalFlow(moduleName: string): boolean {
+  const key = moduleName.replace(/_/g, '-');
+  return key === 'fees' || key in APPROVAL_CAPABLE_ROUTES;
+}
+
 export function approvalsRouteFor(pathOrModule?: string | null): string | null {
-  const moduleName = getCurrentModule(pathOrModule).name;
-  return APPROVAL_ROUTES[moduleName] ?? null;
+  // A workspace module key ("exam_assessment") names its module outright.
+  const direct = (pathOrModule || '').toLowerCase().trim().replace(/_/g, '-');
+  if (direct in APPROVAL_CAPABLE_ROUTES) return APPROVAL_CAPABLE_ROUTES[direct];
+
+  const moduleName = resolveCurrentModule(pathOrModule, []).name.replace(/_/g, '-');
+  return APPROVAL_ROUTES[moduleName] ?? APPROVAL_CAPABLE_ROUTES[moduleName] ?? null;
+}
+
+/**
+ * Where a module's pending approvals are decided, from the live registry.
+ *
+ * Every module's AI Stack has an Automations tab (`?tab=automations` is how the category
+ * page selects it), and that is the queue where a bound agent's or workflow's pending
+ * items are approved or rejected. Fees keeps its own page, so it stays in
+ * `APPROVAL_ROUTES`; every other module is resolved here from the route its own AI Stack
+ * tab already has, which means no route is invented and none can point at another module.
+ * A module with no AI Stack tab gets no approvals route and the request falls through.
+ */
+function registryApprovalRoute(
+  moduleName: string,
+  registry: ModuleRegistryEntry[],
+  categoriesMap: Map<string, ModuleCategory[]>
+): string | null {
+  const wanted = canonicalModuleName(moduleName);
+  const entry = registry.find((candidate) => canonicalModuleName(candidate.moduleName) === wanted);
+  if (!entry) return null;
+
+  const aiStack = (categoriesMap.get(entry.moduleName) ?? []).find((category) => category.key === 'ai-stack');
+  if (!aiStack?.route) return null;
+
+  return `${aiStack.route}${aiStack.route.includes('?') ? '&' : '?'}tab=automations`;
+}
+
+// ---------------------------------------------------------------------------
+// Static fallback for when the live registry is not available
+// ---------------------------------------------------------------------------
+
+/**
+ * The registry is fetched asynchronously, once per session, from the API. When that fetch
+ * has not finished, failed, or returned nothing for a module, every request that needed it
+ * fell through to the data pipeline: "Open Student onboarding" came back as a list of
+ * students and "Show me pending approvals" as "I could not answer that".
+ *
+ * Every module's tab pages live at one predictable address, `/modules/<module>/<tab>` — the
+ * live data was checked and the exceptions are only Fees (its own pages, handled by
+ * `FALLBACK_TAB_ROUTES`) and Users (whose tabs are served from `/modules/user-i-card/`,
+ * with the AI Stack tab at `/modules/user/ai-stack`). So the destination of a tab request
+ * can be known without the registry. The live registry always wins when it has the answer;
+ * this only fills the gap when it does not.
+ *
+ * Circular and Parent Communication are deliberately absent: they have an AI Stack tab and
+ * no other, so a "tab" request for either has no fixed destination to fall back to.
+ */
+interface StaticModule {
+  /** The module name the registry uses. */
+  slug: string;
+  label: string;
+  /** Other names the module goes by: the AI module key the workspace sends. */
+  aliasKeys: string[];
+  tabBase?: string;
+  aiStackRoute?: string;
+}
+
+const STATIC_MODULES: StaticModule[] = [
+  { slug: 'student', label: 'Student', aliasKeys: ['students'] },
+  { slug: 'user', label: 'Users', aliasKeys: [], tabBase: '/modules/user-i-card', aiStackRoute: '/modules/user/ai-stack' },
+  { slug: 'library', label: 'Library', aliasKeys: [] },
+  { slug: 'attendance', label: 'Attendance', aliasKeys: [] },
+  { slug: 'mobile-apps', label: 'Mobile Apps', aliasKeys: ['mobile_apps'] },
+  { slug: 'communication', label: 'Communication', aliasKeys: ['easy_com'] },
+  { slug: 'timetable', label: 'Timetable', aliasKeys: [] },
+  { slug: 'exam', label: 'Exam', aliasKeys: [] },
+  { slug: 'admission', label: 'Admission', aliasKeys: ['admissions'] },
+  { slug: 'inward-outward', label: 'Inward Outward', aliasKeys: ['inward_outward'] },
+  { slug: 'petty-cash', label: 'Petty Cash', aliasKeys: ['petty_cash'] },
+  { slug: 'hostel', label: 'Hostel', aliasKeys: [] },
+  { slug: 'consent', label: 'Consent', aliasKeys: [] },
+  { slug: 'ptm', label: 'PTM', aliasKeys: [] },
+  { slug: 'visitor-management', label: 'Visitor Management', aliasKeys: ['visitor_management'] },
+  { slug: 'transport', label: 'Transport', aliasKeys: ['transportation'] },
+  { slug: 'inventory', label: 'Inventory', aliasKeys: [] },
+  { slug: 'front-desk', label: 'Front Desk', aliasKeys: ['front_desk'] },
+  { slug: 'complaint', label: 'Complaint', aliasKeys: [] },
+  { slug: 'utility', label: 'Utility', aliasKeys: ['migration-modules'] },
+  { slug: 'document-templates', label: 'Document Templates', aliasKeys: [] },
+];
+
+/** The static module a path or module key belongs to, if it is one of them. */
+function staticModuleFor(pathOrName?: string | null): StaticModule | null {
+  const key = (pathOrName || '').toLowerCase().trim().split('?')[0].replace(/\/+$/, '');
+  if (!key) return null;
+
+  const direct = STATIC_MODULES.find((mod) => mod.slug === key || mod.aliasKeys.includes(key));
+  if (direct) return direct;
+
+  const byPath = STATIC_MODULES.find((mod) =>
+    [`/modules/${mod.slug}`, mod.tabBase].some((base) => base && (key === base || key.startsWith(`${base}/`)))
+  );
+  if (byPath) return byPath;
+
+  const known = getCurrentModule(key).name;
+  if (known === 'general') return null;
+
+  return STATIC_MODULES.find((mod) => canonicalModuleName(mod.slug) === known || mod.aliasKeys.includes(known)) ?? null;
+}
+
+function staticTabRoute(mod: StaticModule, categoryKey: string): string {
+  if (categoryKey === 'ai-stack' && mod.aiStackRoute) return mod.aiStackRoute;
+  return `${mod.tabBase ?? `/modules/${mod.slug}`}/${categoryKey}`;
+}
+
+function staticApprovalRoute(moduleName: string): string | null {
+  const mod = staticModuleFor(moduleName);
+  return mod ? `${staticTabRoute(mod, 'ai-stack')}?tab=automations` : null;
+}
+
+/**
+ * A tab of the module the user is on, with no module named in the request.
+ * The live registry answers first (a module that lacks the tab has no such page, so the
+ * request is not a navigation); Fees and the static table cover the registry being absent.
+ */
+function currentModuleTab(
+  currentModule: ChatbotModuleContext,
+  categoryKey: string,
+  registry: ModuleRegistryEntry[],
+  categoriesMap: Map<string, ModuleCategory[]>
+): { route: string; label: string } | null {
+  const entry = registry.find((candidate) => canonicalModuleName(candidate.moduleName) === currentModule.name);
+  const categories = entry ? categoriesMap.get(entry.moduleName) : undefined;
+
+  if (categories?.length) {
+    const category = categories.find((candidate) => candidate.key === categoryKey);
+    return category?.route ? { route: category.route, label: category.label } : null;
+  }
+
+  const label = FALLBACK_TAB_LABELS[categoryKey] ?? categoryKey;
+
+  const feesRoute = currentModule.name === 'fees' ? FALLBACK_TAB_ROUTES.fees?.[categoryKey] : undefined;
+  if (feesRoute) return { route: feesRoute, label };
+
+  const mod = staticModuleFor(currentModule.name);
+  return mod ? { route: staticTabRoute(mod, categoryKey), label } : null;
+}
+
+/**
+ * The module the user is on. `getCurrentModule()` only knows about eleven modules by path;
+ * every other module's pages resolved to "general", which switched the cross-module guard
+ * off for them and left approvals with no module to name. A page under a registry
+ * module's own route now resolves to that module.
+ */
+function resolveCurrentModule(
+  pathOrName: string | null | undefined,
+  registry: ModuleRegistryEntry[]
+): ChatbotModuleContext {
+  const known = getCurrentModule(pathOrName);
+  if (known.name !== 'general') return known;
+
+  const fromStatic = (): ChatbotModuleContext => {
+    const mod = staticModuleFor(pathOrName);
+    return mod ? { name: canonicalModuleName(mod.slug), label: mod.label } : known;
+  };
+
+  if (!registry.length) return fromStatic();
+
+  const path = (pathOrName || '').toLowerCase().split('?')[0].replace(/\/+$/, '');
+  if (!path) return known;
+
+  let best: { entry: ModuleRegistryEntry; length: number } | null = null;
+  for (const entry of registry) {
+    for (const route of [entry.baseRoute, ...(entry.routes ?? [])]) {
+      const candidate = (route || '').toLowerCase().replace(/\/+$/, '');
+      if (!candidate || candidate === '/') continue;
+      const matches = path === candidate || path.startsWith(`${candidate}/`);
+      if (matches && (!best || candidate.length > best.length || (candidate.length === best.length && isNamedAfterLabel(entry) && !isNamedAfterLabel(best.entry)))) {
+        best = { entry, length: candidate.length };
+      }
+    }
+  }
+
+  return best
+    ? { name: canonicalModuleName(best.entry.moduleName), label: best.entry.label || best.entry.moduleName }
+    : fromStatic();
 }
 
 // "Show me pending approvals", "take me to staff approval", "approve this action",
@@ -263,7 +484,41 @@ function matchModuleSlug(lowerText: string): string | null {
       }
     }
   }
+  // The modules with no alias list (Users, Petty Cash, Hostel…) are named by their label,
+  // so that naming one works when the live registry is not there to supply it.
+  // A name that is also a tab name ("Communication") is skipped: "open Communication in
+  // Fees module" asks for Fees' Communication tab, not for the Communication module.
+  const tabWords = new Set([
+    ...Object.values(CATEGORY_ALIASES).flat(),
+    ...Object.values(FALLBACK_TAB_LABELS).map((label) => label.toLowerCase()),
+  ]);
+  for (const mod of STATIC_MODULES) {
+    for (const phrase of [mod.label.toLowerCase(), mod.slug.replace(/-/g, ' ')]) {
+      if (tabWords.has(phrase)) continue;
+      if (containsPhrase(lowerText, phrase) && phrase.length > bestLength) {
+        bestSlug = canonicalModuleName(mod.slug);
+        bestLength = phrase.length;
+      }
+    }
+  }
   return bestSlug;
+}
+
+/**
+ * The request with the named module's own name taken out, so that a module called
+ * "Communication" is not also read as a request for the Communication tab.
+ */
+function withoutModuleName(lowerText: string, moduleSlug: string | null): string {
+  if (!moduleSlug) return lowerText;
+  const mod = staticModuleFor(moduleSlug);
+  const phrases = [
+    ...(MODULE_ALIASES[moduleSlug] ?? []),
+    ...(mod ? [mod.label.toLowerCase(), mod.slug.replace(/-/g, ' ')] : []),
+  ].filter((phrase) => containsPhrase(lowerText, phrase));
+  const longest = phrases.sort((a, b) => b.length - a.length)[0];
+  if (!longest) return lowerText;
+  const escaped = longest.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return lowerText.replace(new RegExp(`\\b${escaped}\\b`, 'i'), ' ').replace(/\s+/g, ' ').trim();
 }
 
 function matchCategoryKey(lowerText: string): string | null {
@@ -315,7 +570,12 @@ function matchModule(
     ];
 
     for (const alias of candidates) {
-      if (containsPhrase(text, alias) && alias.length > bestLength) {
+      if (!containsPhrase(text, alias)) continue;
+      // Two registry entries can share one menu label (the Users menu is claimed by
+      // both `user` and `user-i-card`). On a tie the entry named after the label wins.
+      const tiedButBetterNamed =
+        alias.length === bestLength && bestMatch !== null && isNamedAfterLabel(entry) && !isNamedAfterLabel(bestMatch);
+      if (alias.length > bestLength || tiedButBetterNamed) {
         bestMatch = entry;
         bestLength = alias.length;
       }
@@ -323,6 +583,12 @@ function matchModule(
   }
 
   return bestMatch;
+}
+
+function isNamedAfterLabel(entry: ModuleRegistryEntry): boolean {
+  const name = entry.moduleName.toLowerCase().replace(/[_-]/g, ' ');
+  const label = entry.label.toLowerCase();
+  return name === label || `${name}s` === label || name === `${label}s`;
 }
 
 function matchCategory(
@@ -351,9 +617,35 @@ function matchCategory(
   return bestMatch;
 }
 
+/** The phrases that name a module: its label, its slug and its aliases. */
+function modulePhrases(entry: ModuleRegistryEntry): string[] {
+  return [
+    entry.label.toLowerCase(),
+    entry.moduleName.toLowerCase().replace(/[_-]/g, ' '),
+    ...(MODULE_ALIASES[entry.moduleName] ?? []),
+    ...(MODULE_ALIASES[canonicalModuleName(entry.moduleName)] ?? []),
+  ].map((phrase) => normalize(phrase)).filter(Boolean);
+}
+
+/**
+ * The request with the module's own name taken out. Tab names are matched against this,
+ * because the module's name is not a request for a tab: "Open Communication onboarding"
+ * must open Onboarding, not the Communication tab that the word "communication" also names.
+ */
+function withoutModulePhrase(text: string, entry: ModuleRegistryEntry): string {
+  const found = modulePhrases(entry)
+    .filter((phrase) => containsPhrase(text, phrase))
+    .sort((a, b) => b.length - a.length)[0];
+  if (!found) return text;
+  const escaped = found.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(`\\b${escaped}\\b`, 'i'), ' ').replace(/\s+/g, ' ').trim();
+}
+
 function matchItem(
   text: string,
-  categories: ModuleCategory[]
+  categories: ModuleCategory[],
+  /** Items that only repeat the module's own name, ignored when a tab was asked for. */
+  ignoreLabels?: Set<string>
 ): { category: ModuleCategory; item: ModuleCategory['items'][number] } | null {
   let best: { category: ModuleCategory; item: ModuleCategory['items'][number] } | null = null;
   let bestLength = 0;
@@ -361,6 +653,7 @@ function matchItem(
   for (const category of categories) {
     for (const item of category.items ?? []) {
       const label = normalize(item.label);
+      if (ignoreLabels?.has(label)) continue;
       if (label.length > 3 && item.link && containsPhrase(text, label) && label.length > bestLength) {
         best = { category, item };
         bestLength = label.length;
@@ -405,11 +698,17 @@ export function detectNavigationIntent(
     };
   }
 
-  const categoryMatch = matchCategory(text, categories);
+  const categoryMatch = matchCategory(withoutModulePhrase(text, moduleMatch), categories);
 
   // A named screen ("open fee collect") is more specific than its tab. Its link is
-  // the one the tab's own card opens, so the chatbot adds no route of its own.
-  const itemMatch = matchItem(text, categories);
+  // the one the tab's own card opens, so the chatbot adds no route of its own. When a
+  // tab WAS asked for, a screen that merely repeats the module's name ("Petty Cash" in
+  // Petty Cash) is not the more specific thing: "Go to Petty Cash reports" is Reports.
+  const itemMatch = matchItem(
+    text,
+    categories,
+    categoryMatch ? new Set(modulePhrases(moduleMatch)) : undefined
+  );
   if (
     itemMatch &&
     hasVerb &&
@@ -459,7 +758,7 @@ export function evaluateChatbotIntent(
   registry: ModuleRegistryEntry[] = [],
   categoriesMap: Map<string, ModuleCategory[]> = new Map()
 ): ChatbotIntentEvaluation {
-  const currentModule = getCurrentModule(currentModulePathOrName);
+  const currentModule = resolveCurrentModule(currentModulePathOrName, registry);
   const text = normalize(userMessage);
 
   if (!text) {
@@ -471,10 +770,45 @@ export function evaluateChatbotIntent(
   // 0. Approvals: open the screen where staff decide. The chatbot never approves or
   // rejects itself — that decision stays with the staff member, on the existing screen.
   if (APPROVAL_PATTERN.test(lower) && !APPROVAL_QUESTION_START.test(lower)) {
-    const approvalModule = matchModuleSlug(lower.replace(/staff approvals?/g, '')) ?? currentModule.name;
-    const approvalRoute = APPROVAL_ROUTES[approvalModule];
+    const approvalText = lower.replace(/staff approvals?/g, '');
+    const namedInRegistry = matchModule(approvalText, registry);
+    const approvalModule =
+      matchModuleSlug(approvalText) ??
+      (namedInRegistry ? canonicalModuleName(namedInRegistry.moduleName) : null) ??
+      currentModule.name;
+    // A module with no flow that can pause for a person has nothing to approve: say so,
+    // rather than opening a tab that can only ever be empty.
+    if (approvalModule !== 'general' && !hasApprovalFlow(approvalModule)) {
+      const label =
+        (namedInRegistry && canonicalModuleName(namedInRegistry.moduleName) === approvalModule ? namedInRegistry.label : null) ??
+        (currentModule.name === approvalModule ? currentModule.label : null) ??
+        staticModuleFor(approvalModule)?.label ??
+        MODULE_DISPLAY_NAMES[approvalModule];
+
+      if (label) {
+        return {
+          type: 'unsupported',
+          currentModule,
+          targetModule: { name: approvalModule, label },
+          message: `${label} has no actions that wait for approval, so there is nothing to approve here.`,
+        };
+      }
+    }
+
+    const approvalRoute =
+      APPROVAL_ROUTES[approvalModule] ??
+      registryApprovalRoute(approvalModule, registry, categoriesMap) ??
+      // Only when the registry has no entry at all for the module: a registry that is
+      // loaded and says the module has no AI Stack tab is believed.
+      (registry.some((entry) => canonicalModuleName(entry.moduleName) === approvalModule)
+        ? null
+        : staticApprovalRoute(approvalModule));
     if (approvalRoute) {
-      const moduleLabel = MODULE_DISPLAY_NAMES[approvalModule] ?? approvalModule;
+      const moduleLabel =
+        MODULE_DISPLAY_NAMES[approvalModule] ??
+        (namedInRegistry && canonicalModuleName(namedInRegistry.moduleName) === approvalModule ? namedInRegistry.label : null) ??
+        (currentModule.name === approvalModule ? currentModule.label : null) ??
+        approvalModule;
       return {
         type: 'navigation',
         currentModule,
@@ -494,10 +828,52 @@ export function evaluateChatbotIntent(
     }
   }
 
+  // 0.5. A tab of the module the user is already in, with no module named:
+  // "Go to onboarding", "open reports". That is a request to move within the current
+  // module and nothing else — no data is fetched and no module is asked about.
+  if (
+    currentModule.name !== 'general' &&
+    hasNavigationIntent(lower) &&
+    !matchModule(lower, registry) &&
+    !matchModuleSlug(lower)
+  ) {
+    // The current module's own name is taken out first: in Communication, "open Communication
+    // onboarding" asks for Onboarding, and the word is only a tab name when nothing else is.
+    const tabKey =
+      matchCategoryKey(withoutModuleName(lower, currentModule.name)) ?? matchCategoryKey(lower);
+    const asksForData =
+      ['pending', 'whose', 'owing', 'class', 'due', 'balance', 'details'].some((word) => lower.includes(word)) &&
+      !lower.includes('onboarding');
+
+    if (tabKey && !asksForData) {
+      const tab = currentModuleTab(currentModule, tabKey, registry, categoriesMap);
+
+      if (tab) {
+        return {
+          type: 'navigation',
+          currentModule,
+          targetModule: currentModule,
+          headline: `${currentModule.label} ${tab.label}`,
+          message: `Open the ${currentModule.label} ${tab.label.toLowerCase()} process.`,
+          route: tab.route,
+          actionLabel: `Open ${currentModule.label} ${tab.label}`,
+          navigationMatch: {
+            route: tab.route,
+            moduleLabel: currentModule.label,
+            categoryLabel: tab.label,
+            confidence: 'exact',
+            moduleName: currentModule.name,
+            categoryKey: tabKey,
+          },
+        };
+      }
+    }
+  }
+
   // 1. Navigation / Module action intent detection
   const navMatch = detectNavigationIntent(userMessage, registry, categoriesMap);
-  const matchedModuleSlug = navMatch?.moduleName || matchModuleSlug(lower);
-  const matchedCategoryKey = navMatch?.categoryKey || matchCategoryKey(lower);
+  const matchedModuleSlug = canonicalModuleName(navMatch?.moduleName) || matchModuleSlug(lower);
+  const matchedCategoryKey = navMatch?.categoryKey || matchCategoryKey(withoutModuleName(lower, matchedModuleSlug));
 
   // Exclude standard data queries from being misinterpreted as navigation (e.g. "Whose fees are pending?")
   const isDataQuery =
@@ -511,8 +887,12 @@ export function evaluateChatbotIntent(
 
   const wantsNavigation = hasNavigationIntent(lower) || isDirectModuleSwitch(lower, matchedModuleSlug ?? '');
 
-  if (matchedModuleSlug && wantsNavigation && (!isDataQuery || lower.includes('onboarding') || isDirectModuleSwitch(lower, matchedModuleSlug))) {
-    const targetModuleLabel = MODULE_DISPLAY_NAMES[matchedModuleSlug] || navMatch?.moduleLabel || (matchedModuleSlug.charAt(0).toUpperCase() + matchedModuleSlug.slice(1));
+  // A request that names one of the module's own screens ("Open Assign Class Teacher")
+  // is not a data question just because a screen's name contains "class" or "pending".
+  const namesAScreen = Boolean(navMatch?.itemLabel) && navMatch?.confidence === 'exact';
+
+  if (matchedModuleSlug && wantsNavigation && (!isDataQuery || namesAScreen || lower.includes('onboarding') || isDirectModuleSwitch(lower, matchedModuleSlug))) {
+    const targetModuleLabel = MODULE_DISPLAY_NAMES[matchedModuleSlug] || navMatch?.moduleLabel || staticModuleFor(matchedModuleSlug)?.label || (matchedModuleSlug.charAt(0).toUpperCase() + matchedModuleSlug.slice(1));
     const isDirectSwitch = isDirectModuleSwitch(lower, matchedModuleSlug);
 
     // If currently in a specific module (e.g. 'students') and target action belongs to another module (e.g. 'fees'),
@@ -535,7 +915,11 @@ export function evaluateChatbotIntent(
     // route, which has none) fall back to the module's fixed tab pages. A named tab
     // with no known route is never replaced by the module default — that is what
     // opened Onboarding for every request.
-    const fallback = matchedCategoryKey ? FALLBACK_TAB_ROUTES[matchedModuleSlug]?.[matchedCategoryKey] : undefined;
+    const staticModule = staticModuleFor(matchedModuleSlug);
+    const fallback = matchedCategoryKey
+      ? FALLBACK_TAB_ROUTES[matchedModuleSlug]?.[matchedCategoryKey] ??
+        (staticModule ? staticTabRoute(staticModule, matchedCategoryKey) : undefined)
+      : undefined;
     if (!navMatch && matchedCategoryKey && !fallback) {
       return { type: 'standard', currentModule };
     }
@@ -549,7 +933,10 @@ export function evaluateChatbotIntent(
         : null);
 
     const route =
-      navMatch?.route || fallback || MODULE_DEFAULT_ROUTES[matchedModuleSlug] || `/${matchedModuleSlug}`;
+      navMatch?.route ||
+      fallback ||
+      MODULE_DEFAULT_ROUTES[matchedModuleSlug] ||
+      (staticModule ? staticTabRoute(staticModule, 'onboarding') : `/${matchedModuleSlug}`);
 
     const headline = categoryLabel
       ? `${targetModuleLabel} ${categoryLabel}`
@@ -587,4 +974,56 @@ export function evaluateChatbotIntent(
 
 export function navigationMessage(match: NavigationMatch): string {
   return `Navigating to **${match.moduleLabel}** → **${match.categoryLabel}**`;
+}
+
+// ---------------------------------------------------------------------------
+// Modules the menu has but the category registry does not
+// ---------------------------------------------------------------------------
+
+/**
+ * Alumni Management is a level-2 menu with nine screens and no row in the category
+ * registry, so the chatbot could not open it by name. Its screens are listed here as the
+ * menu names them (`tblmenumaster`, parent 893), as a supplement that is only used when
+ * the registry has no entry of its own: the day the registry gains one, that wins.
+ */
+const SUPPLEMENTAL_ALUMNI_SCREENS: Array<[string, string]> = [
+  ['Alumni Dashboard', '/alumni/dashboard'],
+  ['Alumni List', '/alumni/list'],
+  ['Add Alumni', '/alumni/add'],
+  ['Alumni Directory', '/alumni/directory'],
+  ['Alumni Events', '/alumni/events'],
+  ['Alumni Surveys', '/alumni/surveys'],
+  ['Alumni Reports', '/alumni/reports'],
+  ['Import Alumni', '/alumni/import'],
+  ['Alumni Audit Log', '/alumni/audit'],
+];
+
+export function withSupplementalModules(
+  registry: ModuleRegistryEntry[],
+  categoriesMap: Map<string, ModuleCategory[]>
+): { registry: ModuleRegistryEntry[]; categoriesMap: Map<string, ModuleCategory[]> } {
+  const hasAlumni = registry.some((entry) => /^alumni/.test(entry.moduleName.toLowerCase()));
+  if (hasAlumni) return { registry, categoriesMap };
+
+  const next = new Map(categoriesMap);
+  next.set('alumni', [
+    {
+      key: 'operations',
+      label: 'Operations',
+      description: 'Alumni Management screens.',
+      route: '/alumni/dashboard',
+      onboardingModuleKey: '',
+      platformModuleKey: '',
+      auditModuleKeys: [],
+      items: SUPPLEMENTAL_ALUMNI_SCREENS.map(([label, link], index) => ({ id: -(index + 1), label, link })),
+    },
+  ]);
+
+  return {
+    registry: [
+      ...registry,
+      { moduleName: 'alumni', level2MenuId: null, label: 'Alumni Management', categoryCount: 1, baseRoute: '/alumni', routes: [] },
+    ],
+    categoriesMap: next,
+  };
 }
