@@ -719,7 +719,7 @@ export default function ChatbotPanel({
               <BotIcon className="size-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Edvance AI</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Advance AI</h3>
               <p className="text-[11px] font-medium text-gray-500">Multilingual, voice-enabled school intelligence</p>
             </div>
           </div>
