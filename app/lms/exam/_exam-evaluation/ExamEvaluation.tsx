@@ -32,8 +32,14 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import SheetReviewPanel from './SheetReviewPanel';
+import { useRouter } from 'next/navigation';
+import { sheetsAwaitingIdentity } from '@/lib/exam-evaluation/identity';
+import { canReprocess, describeBulkResult, eligibleSummary, rerunTitle, stalledMessage } from '@/lib/exam-evaluation/recovery';
+import ConfirmActionDialog from './ConfirmActionDialog';
+import IdentityReviewPanel from './IdentityReviewPanel';
+import { BATCH_STATUS_STYLES, SHEET_STATUS_LABELS, SHEET_STATUS_STYLES } from './status-styles';
 import {
+  confirmIdentities,
   createBatch,
   deleteBatch,
   deleteSheet,
@@ -41,32 +47,22 @@ import {
   fetchBatch,
   fetchBatches,
   fetchExamPapers,
+  fetchSheetFileUrl,
   publishBatch,
   reprocessSheet,
+  reviewSheet,
   uploadSheets,
   type ExamPaperOption,
 } from './api';
 import type { AnswerKeySummary, BatchDetail, EvaluationBatch, EvaluationSheet, SheetStatus } from './types';
 
-/** While any sheet is still being read, the table refreshes itself. */
+/**
+ * While the system is working on any sheet — reading its student, or marking it —
+ * the table refreshes itself. A sheet waiting for a teacher is NOT in flight:
+ * nothing will change until someone acts, so there is nothing to poll for.
+ */
 const POLL_INTERVAL_MS = 4000;
-const IN_FLIGHT: SheetStatus[] = ['Pending', 'Processing'];
-
-const SHEET_STATUS_STYLES: Record<SheetStatus, string> = {
-  Pending: 'bg-slate-100 text-slate-600 border-slate-200',
-  Processing: 'bg-sky-50 text-sky-700 border-sky-200',
-  Evaluated: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  'Needs review': 'bg-amber-50 text-amber-700 border-amber-200',
-  Approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Failed: 'bg-red-50 text-red-700 border-red-200',
-};
-
-const BATCH_STATUS_STYLES: Record<string, string> = {
-  Draft: 'bg-slate-100 text-slate-600 border-slate-200',
-  Processing: 'bg-sky-50 text-sky-700 border-sky-200',
-  Review: 'bg-amber-50 text-amber-700 border-amber-200',
-  Published: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-};
+const IN_FLIGHT: SheetStatus[] = ['Identifying', 'Pending', 'Processing'];
 
 const ACCEPTED_TYPES = 'application/pdf,image/jpeg,image/png';
 
@@ -81,6 +77,7 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 export default function ExamEvaluation() {
+  const router = useRouter();
   const [batches, setBatches] = useState<EvaluationBatch[]>([]);
   const [batchesLoading, setBatchesLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -89,7 +86,7 @@ export default function ExamEvaluation() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [reviewSheetId, setReviewSheetId] = useState<number | null>(null);
+  const [confirmPublish, setConfirmPublish] = useState(false);
 
   // -- New evaluation ------------------------------------------------------
   const [creating, setCreating] = useState(false);
@@ -138,6 +135,16 @@ export default function ExamEvaluation() {
     void loadBatches();
   }, [loadBatches]);
 
+  // Coming back from the review page: reopen the batch that was being worked on.
+  useEffect(() => {
+    const requested = Number(new URLSearchParams(window.location.search).get('examBatch'));
+
+    if (Number.isInteger(requested) && requested > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedId(requested);
+    }
+  }, []);
+
   useEffect(() => {
     if (selectedId === null) {
       setDetail(null);
@@ -152,6 +159,7 @@ export default function ExamEvaluation() {
     () => (detail?.sheets ?? []).filter((sheet) => IN_FLIGHT.includes(sheet.status)).length,
     [detail]
   );
+  const awaitingCount = useMemo(() => sheetsAwaitingIdentity(detail?.sheets ?? []).length, [detail]);
 
   // A sheet left in Pending/Processing is one the queue has not finished with,
   // so the table polls until the batch settles — and stops the moment it does,
@@ -296,7 +304,9 @@ export default function ExamEvaluation() {
         }
 
         if ((next.uploaded ?? 0) > 0) {
-          setNotice(`${next.uploaded} sheet(s) uploaded. Reading and scoring them now…`);
+          setNotice(
+            `${next.uploaded} sheet(s) uploaded. Reading the student’s details from each now — you’ll confirm who each one belongs to before any of them is marked.`
+          );
         }
       } catch (uploadError) {
         setError(errorMessage(uploadError, 'Couldn’t upload these answer sheets.'));
@@ -330,6 +340,100 @@ export default function ExamEvaluation() {
     },
     [loadDetail, selectedId]
   );
+
+  // -- Student identification ----------------------------------------------
+  //
+  // Each of these changes who a sheet belongs to, so each reloads the batch from
+  // the server afterwards rather than trusting what it sent: what the screen then
+  // shows is what was actually saved.
+
+  const afterIdentityChange = useCallback(async () => {
+    if (selectedId !== null) {
+      await loadDetail(selectedId, true);
+    }
+
+    await loadBatches();
+  }, [loadBatches, loadDetail, selectedId]);
+
+  /** Confirms the suggested student, or — when `studentId` is given — the one the teacher chose instead. */
+  const confirmStudent = useCallback(
+    async (sheet: EvaluationSheet, studentId?: number) => {
+      setBusy(true);
+      setError('');
+      setNotice('');
+
+      try {
+        await reviewSheet(sheet.id, studentId !== undefined ? { studentId } : { confirmIdentity: true });
+        await afterIdentityChange();
+        setNotice(`Student confirmed for “${sheet.original_name}”. It is being marked now.`);
+      } catch (confirmError) {
+        setError(errorMessage(confirmError, 'Couldn’t confirm this student.'));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [afterIdentityChange]
+  );
+
+  /** Withdraws a suggestion without choosing anyone else; the sheet stays unmarked. */
+  const leaveUnassigned = useCallback(
+    async (sheet: EvaluationSheet) => {
+      setBusy(true);
+      setError('');
+      setNotice('');
+
+      try {
+        await reviewSheet(sheet.id, { studentId: null });
+        await afterIdentityChange();
+        setNotice(`“${sheet.original_name}” is unassigned. It won’t be marked until you choose a student.`);
+      } catch (clearError) {
+        setError(errorMessage(clearError, 'Couldn’t unassign this sheet.'));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [afterIdentityChange]
+  );
+
+  const confirmMany = useCallback(
+    async (sheets: EvaluationSheet[]) => {
+      if (selectedId === null || sheets.length === 0) return;
+
+      setBusy(true);
+      setError('');
+      setNotice('');
+
+      try {
+        const next = await confirmIdentities(selectedId, sheets.map((sheet) => sheet.id));
+        const done = next.confirmed?.length ?? 0;
+        const left = next.skipped?.length ?? 0;
+
+        setDetail(next);
+        await loadBatches();
+        setNotice(describeBulkResult(done, left));
+      } catch (confirmError) {
+        setError(errorMessage(confirmError, 'Couldn’t confirm these students.'));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [loadBatches, selectedId]
+  );
+
+  /** Opens the scan in a new tab, at the page the student’s details were found on. */
+  const viewScan = useCallback(async (sheet: EvaluationSheet) => {
+    try {
+      const objectUrl = await fetchSheetFileUrl(sheet.id, false);
+      const isPdf = sheet.file_type.toLowerCase().includes('pdf');
+      const target = isPdf && sheet.identity_page ? `${objectUrl}#page=${sheet.identity_page}` : objectUrl;
+
+      window.open(target, '_blank', 'noopener');
+      // Long enough for the new tab to load it; short enough not to hold a child's scan in memory all day.
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5 * 60 * 1000);
+    } catch (viewError) {
+      setError(errorMessage(viewError, 'That scan couldn’t be opened.'));
+    }
+  }, []);
 
   const removeSheet = useCallback(
     async (sheet: EvaluationSheet) => {
@@ -384,21 +488,6 @@ export default function ExamEvaluation() {
   const publish = useCallback(async () => {
     if (!detail) return;
 
-    const unapproved = detail.batch.total_sheets - detail.batch.approved_sheets;
-    const warning =
-      unapproved > 0
-        ? `\n\n${unapproved} sheet(s) have not been approved and will NOT be published.`
-        : '';
-
-    if (
-      !window.confirm(
-        `Publish ${detail.batch.approved_sheets} approved sheet(s) to the gradebook?` +
-          `${warning}\n\nThis cannot be undone from here.`
-      )
-    ) {
-      return;
-    }
-
     setBusy(true);
     setError('');
 
@@ -412,8 +501,28 @@ export default function ExamEvaluation() {
       setError(errorMessage(publishError, 'Couldn’t publish this evaluation.'));
     } finally {
       setBusy(false);
+      setConfirmPublish(false);
     }
   }, [detail, loadBatches, loadDetail]);
+
+  // Review has its own page now, so a sheet can be linked to, reloaded and stepped
+  // through. `back` carries the address of this screen (minus the return markers)
+  // so the review page can bring the teacher back to the same place.
+  const openReview = useCallback(
+    (sheetId: number) => {
+      if (!detail) return;
+
+      const here = new URL(window.location.href);
+
+      here.searchParams.delete('examTab');
+      here.searchParams.delete('examBatch');
+
+      router.push(
+        `/lms/exam/evaluation/${detail.batch.id}/${sheetId}?back=${encodeURIComponent(here.pathname + here.search + here.hash)}`
+      );
+    },
+    [detail, router]
+  );
 
   const published = detail?.batch.status === 'Published';
 
@@ -558,7 +667,7 @@ export default function ExamEvaluation() {
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              <BatchHeader batch={detail.batch} pendingCount={pendingCount} />
+              <BatchHeader batch={detail.batch} pendingCount={pendingCount} awaitingCount={awaitingCount} />
 
               {published ? (
                 <div className="flex items-center gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-[13px] text-[#047857]">
@@ -587,17 +696,31 @@ export default function ExamEvaluation() {
                   </label>
                   <p className="text-[12.5px] leading-5 text-[#5F7087]">
                     PDF, JPG or PNG, up to 20 MB each. Select the whole class at once — each file is
-                    read on its own, and the student is identified from the roll number, GR number or
-                    name on the sheet.
+                    first read for the student’s roll number, GR number and name, and you confirm who
+                    it belongs to before it is marked.
                   </p>
                 </div>
+              )}
+
+              {published ? null : (
+                <IdentityReviewPanel
+                  batch={detail.batch}
+                  sheets={detail.sheets}
+                  roster={detail.roster}
+                  busy={busy}
+                  onConfirm={(sheet, studentId) => void confirmStudent(sheet, studentId)}
+                  onLeaveUnassigned={(sheet) => void leaveUnassigned(sheet)}
+                  onConfirmMany={(sheets) => void confirmMany(sheets)}
+                  onViewScan={(sheet) => void viewScan(sheet)}
+                  onReadAgain={(sheet) => void rerun(sheet.id)}
+                />
               )}
 
               <SheetTable
                 sheets={detail.sheets}
                 readOnly={published}
                 busy={busy}
-                onReview={setReviewSheetId}
+                onReview={openReview}
                 onRerun={(id) => void rerun(id)}
                 onRemove={(sheet) => void removeSheet(sheet)}
               />
@@ -610,7 +733,7 @@ export default function ExamEvaluation() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => void publish()}
+                    onClick={() => setConfirmPublish(true)}
                     disabled={busy || detail.batch.approved_sheets === 0}
                     className="inline-flex items-center gap-2 rounded-[10px] bg-[#0F766E] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#115E59] disabled:opacity-50"
                   >
@@ -624,23 +747,46 @@ export default function ExamEvaluation() {
         </section>
       </div>
 
-      {reviewSheetId !== null && detail ? (
-        <SheetReviewPanel
-          sheetId={reviewSheetId}
-          roster={detail.roster}
-          readOnly={published}
-          onClose={() => setReviewSheetId(null)}
-          onChanged={() => {
-            void loadDetail(detail.batch.id, true);
-            void loadBatches();
-          }}
-        />
-      ) : null}
+      <ConfirmActionDialog
+        open={confirmPublish && detail !== null}
+        title="Publish this evaluation?"
+        confirmLabel={`Publish ${detail?.batch.approved_sheets ?? 0} approved`}
+        busy={busy}
+        onCancel={() => setConfirmPublish(false)}
+        onConfirm={() => void publish()}
+        description={
+          detail ? (
+            <>
+              <p>
+                {detail.batch.approved_sheets} approved {detail.batch.approved_sheets === 1 ? 'sheet is' : 'sheets are'}{' '}
+                written to the offline exam results the rest of the ERP reports on, using your marks. A student’s earlier
+                result for this exam is replaced, not added to.
+              </p>
+              {detail.batch.total_sheets - detail.batch.approved_sheets > 0 ? (
+                <p className="mt-2 font-semibold text-amber-700">
+                  {detail.batch.total_sheets - detail.batch.approved_sheets}{' '}
+                  {detail.batch.total_sheets - detail.batch.approved_sheets === 1 ? 'sheet has' : 'sheets have'} not been
+                  approved and will not be published.
+                </p>
+              ) : null}
+              <p className="mt-2">This can’t be undone from here.</p>
+            </>
+          ) : null
+        }
+      />
     </div>
   );
 }
 
-function BatchHeader({ batch, pendingCount }: { batch: EvaluationBatch; pendingCount: number }) {
+function BatchHeader({
+  batch,
+  pendingCount,
+  awaitingCount,
+}: {
+  batch: EvaluationBatch;
+  pendingCount: number;
+  awaitingCount: number;
+}) {
   const subtitle = [batch.paper_name, batch.standard_name, batch.subject_name].filter(Boolean).join(' · ');
 
   return (
@@ -654,7 +800,13 @@ function BatchHeader({ batch, pendingCount }: { batch: EvaluationBatch; pendingC
         {pendingCount > 0 ? (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11.5px] font-semibold text-sky-700">
             <Loader2 size={12} className="animate-spin" />
-            Reading {pendingCount}
+            Working on {pendingCount}
+          </span>
+        ) : null}
+        {awaitingCount > 0 ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11.5px] font-semibold text-amber-700">
+            <AlertTriangle size={12} />
+            {awaitingCount} to confirm
           </span>
         ) : null}
         <Stat label="Sheets" value={String(batch.total_sheets)} />
@@ -729,6 +881,12 @@ function SheetTable({
                     <span className="font-semibold text-[#172554]">
                       {sheet.student_roll_no ? `${sheet.student_roll_no}. ` : ''}
                       {sheet.student_name}
+                      {/* A suggestion is never shown as if it were settled. */}
+                      {sheet.identity_confirmed ? null : (
+                        <span className="ml-1.5 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 align-middle text-[10.5px] font-semibold text-amber-700">
+                          suggested
+                        </span>
+                      )}
                     </span>
                   )}
                   <span className="mt-0.5 block truncate text-[11.5px] text-[#98A4B6]" title={sheet.original_name}>
@@ -752,11 +910,17 @@ function SheetTable({
                       SHEET_STATUS_STYLES[sheet.status] ?? SHEET_STATUS_STYLES.Pending
                     }`}
                   >
-                    {sheet.status}
+                    {SHEET_STATUS_LABELS[sheet.status] ?? sheet.status}
                   </span>
                   {sheet.failure_reason ? (
                     <span className="mt-1 block max-w-[240px] text-[11px] leading-4 text-[#B91C1C]">
                       {sheet.failure_reason}
+                    </span>
+                  ) : null}
+                  {/* A sheet whose job seems lost: said calmly, with the way out beside it. */}
+                  {stalledMessage(sheet) ? (
+                    <span className="mt-1 block max-w-[240px] text-[11px] leading-4 text-[#B45309]">
+                      {stalledMessage(sheet)}
                     </span>
                   ) : null}
                 </td>
@@ -773,7 +937,7 @@ function SheetTable({
                   <div className="flex items-center justify-end gap-1.5">
                     <button
                       type="button"
-                      disabled={sheet.status === 'Pending' || sheet.status === 'Processing' || sheet.status === 'Failed'}
+                      disabled={IN_FLIGHT.includes(sheet.status) || sheet.status === 'Awaiting identity' || sheet.status === 'Failed'}
                       onClick={() => onReview(sheet.id)}
                       className="inline-flex items-center gap-1.5 rounded-[9px] border border-[#E4E9F2] px-2.5 py-1.5 text-[12px] font-semibold text-[#334155] transition hover:bg-[#F3F5F9] disabled:opacity-40"
                     >
@@ -785,11 +949,11 @@ function SheetTable({
                       <>
                         <button
                           type="button"
-                          disabled={busy || sheet.status === 'Processing'}
+                          disabled={busy || !canReprocess(sheet)}
                           onClick={() => onRerun(sheet.id)}
                           className="rounded-[9px] border border-[#E4E9F2] p-1.5 text-[#5F7087] transition hover:bg-[#F3F5F9] disabled:opacity-40"
                           aria-label="Re-run evaluation"
-                          title="Read and score this sheet again"
+                          title={rerunTitle(sheet)}
                         >
                           <RefreshCw size={14} />
                         </button>
@@ -847,6 +1011,9 @@ function NewEvaluationPanel({
   onCreate: () => void;
 }) {
   const missing = answerKey?.missing_model_answers ?? [];
+  const eligible = answerKey ? eligibleSummary(answerKey) : null;
+  // With nobody eligible no sheet could ever be assigned, so reading any would only spend money.
+  const nobodyEligible = answerKey !== null && answerKey.eligible_students === 0;
 
   return (
     <div className="flex flex-col gap-4 rounded-[18px] border border-[#E4E9F2] bg-white p-4">
@@ -940,6 +1107,35 @@ function NewEvaluationPanel({
               </span>
             </p>
           ) : null}
+
+          {/* The AI key, checked by its FORMAT before anything is uploaded: an administrator's problem,
+              said now rather than after a class set has been scanned and every sheet has failed. */}
+          {answerKey.ai_warning ? (
+            <p
+              role="alert"
+              className="flex items-start gap-2 rounded-[10px] border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] leading-5 text-[#B91C1C]"
+            >
+              <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+              <span>
+                <strong>AI marking isn’t set up correctly.</strong> {answerKey.ai_warning} Sheets uploaded now will fail
+                until an administrator fixes it; they can be read again afterwards.
+              </span>
+            </p>
+          ) : null}
+
+          {/* Who a sheet can be assigned to, said before any scanning: a count, never names. */}
+          {eligible ? (
+            <p
+              className={`flex items-start gap-2 rounded-[10px] border px-3 py-2 text-[12.5px] leading-5 ${
+                eligible.warn
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-[#E4E9F2] bg-white text-[#5F7087]'
+              }`}
+            >
+              {eligible.warn ? <AlertTriangle size={15} className="mt-0.5 shrink-0" /> : null}
+              <span>{eligible.text}</span>
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -954,7 +1150,7 @@ function NewEvaluationPanel({
         <button
           type="button"
           onClick={onCreate}
-          disabled={busy || paperId === null || !!answerKeyError}
+          disabled={busy || paperId === null || !!answerKeyError || nobodyEligible}
           className="inline-flex items-center gap-2 rounded-[10px] bg-[#5846EA] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4738CE] disabled:opacity-50"
         >
           {busy ? <Loader2 size={16} className="animate-spin" /> : <ScanLine size={16} />}
