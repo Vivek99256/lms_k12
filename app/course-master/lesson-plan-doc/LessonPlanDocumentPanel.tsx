@@ -29,9 +29,11 @@ import {
   ChevronDown,
   ChevronsDownUp,
   ChevronsUpDown,
+  Pencil,
   Timer,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -42,16 +44,16 @@ import type { Chapter } from '../data/chapters';
 import { getCurriculumSession } from '../data/curriculum';
 import { fetchLessonPlanDocument, type LessonPlanActivity, type LessonPlanDocument } from '../data/lessonPlanDocument';
 
-type Category = 'summary' | 'teaching' | 'learning' | 'map';
+export type Category = 'summary' | 'teaching' | 'learning' | 'map';
 
-const CATEGORY_META: Record<Category, { label: string; accent: string; soft: string; border: string }> = {
+export const CATEGORY_META: Record<Category, { label: string; accent: string; soft: string; border: string }> = {
   summary: { label: 'Summary', accent: '#5648E8', soft: '#F1F0FE', border: '#D9D5FB' },
   teaching: { label: 'Teaching', accent: '#0284C7', soft: '#EDF8FF', border: '#BEE4FB' },
   learning: { label: 'Learning', accent: '#16A34A', soft: '#EFFBF3', border: '#C3EDD2' },
   map: { label: 'Map & Alignment', accent: '#D97706', soft: '#FFF7E8', border: '#FBE3B8' },
 };
 
-const DAY_META = { label: 'Day Planning', accent: '#9333EA', soft: '#F8F1FE', border: '#E6D3FB' };
+export const DAY_META = { label: 'Day Planning', accent: '#9333EA', soft: '#F8F1FE', border: '#E6D3FB' };
 
 interface FieldDef {
   key: string;
@@ -287,6 +289,8 @@ export interface LessonPlanDocumentPanelProps {
   chapters: Chapter[];
   chapterId: string;
   onChapterIdChange: (chapterId: string) => void;
+  /** Navigates to the dedicated editor. Omitted entirely, this panel stays read-only. */
+  onEdit?: () => void;
 }
 
 export function LessonPlanDocumentPanel({
@@ -295,6 +299,7 @@ export function LessonPlanDocumentPanel({
   chapters,
   chapterId,
   onChapterIdChange,
+  onEdit,
 }: LessonPlanDocumentPanelProps) {
   const [plan, setPlan] = useState<LessonPlanDocument | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
@@ -392,32 +397,45 @@ export function LessonPlanDocumentPanel({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm sm:p-5">
-        <p className="mb-2 text-[13px] font-medium text-[#52637A]">Chapter</p>
-        <Select
-          value={chapterId || undefined}
-          onValueChange={(value) => {
-            if (value) onChapterIdChange(value);
-          }}
-        >
-          <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 px-4 text-[15px] text-slate-900 sm:w-96">
-            {/* Base UI's SelectValue shows the raw value string unless told how to
-                resolve a label for it - chapter ids aren't meant to be read directly. */}
-            <SelectValue placeholder="Select a chapter">
-              {(value: string) => {
-                const match = chapters.find((chapter) => chapter.id === value);
-                return match ? `${match.number}. ${match.title}` : 'Select a chapter';
-              }}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {chapters.map((chapter) => (
-              <SelectItem key={chapter.id} value={chapter.id}>
-                {chapter.number}. {chapter.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-5">
+        <div>
+          <p className="mb-2 text-[13px] font-medium text-[#52637A]">Chapter</p>
+          <Select
+            value={chapterId || undefined}
+            onValueChange={(value) => {
+              if (value) onChapterIdChange(value);
+            }}
+          >
+            <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 px-4 text-[15px] text-slate-900 sm:w-96">
+              {/* Base UI's SelectValue shows the raw value string unless told how to
+                  resolve a label for it - chapter ids aren't meant to be read directly. */}
+              <SelectValue placeholder="Select a chapter">
+                {(value: string) => {
+                  const match = chapters.find((chapter) => chapter.id === value);
+                  return match ? `${match.number}. ${match.title}` : 'Select a chapter';
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {chapters.map((chapter) => (
+                <SelectItem key={chapter.id} value={chapter.id}>
+                  {chapter.number}. {chapter.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {onEdit && chapterId ? (
+          <Button
+            type="button"
+            onClick={onEdit}
+            className="h-11 shrink-0 rounded-xl bg-[#5648E8] px-5 font-semibold text-white hover:bg-[#4738c9]"
+          >
+            <Pencil className="h-4 w-4" />
+            {planLoading ? 'Edit lesson plan' : plan ? 'Edit lesson plan' : 'Create lesson plan'}
+          </Button>
+        ) : null}
       </div>
 
       {!chapterId ? (

@@ -23,6 +23,9 @@ export interface LessonPlanActivity {
 export interface LessonPlanMapping {
   type: string | null;
   value: string | null;
+  /** Ids behind the resolved names above - present so the editor can pre-select its mapping dropdowns. */
+  type_id?: number;
+  value_id?: number;
 }
 
 export interface LessonPlanDaySection {
