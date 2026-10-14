@@ -4,7 +4,7 @@ import {
   withStreamedTrace,
   type ChatShapedReply,
 } from './ask-adapter';
-import type { AnswerAction, AnswerSection, TraceStage } from './types';
+import type { AnswerAction, AnswerLanguage, AnswerSection, TraceStage } from './types';
 
 /**
  * How a governed lifecycle turn is carried inside an AI SDK UI message.
@@ -59,6 +59,8 @@ export type PanelMessage = {
    * turn finishes; the bubble draws it as the lead line over the details.
    */
   headline: string;
+  /** The language this answer is written in, so it can be read aloud by the right voice. */
+  language?: AnswerLanguage;
   citations: ChatShapedReply['response']['citations'];
   actions: AnswerAction[];
   followUps: string[];
@@ -151,6 +153,7 @@ export function toPanelMessage(message: AskUIMessage): PanelMessage {
     content: content || reply.message.content,
     module: reply.response.data.module,
     headline: reply.response.data.headline ?? '',
+    language: reply.response.data.language,
     citations: reply.response.citations,
     actions: reply.actions,
     followUps: reply.response.followUpSuggestions,

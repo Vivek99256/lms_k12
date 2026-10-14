@@ -681,3 +681,20 @@ test("an empty headline is absent rather than an empty string", () => {
 
   assert.equal(reply.response.data.headline, undefined);
 });
+
+test("the language an answer was written in travels with it, so the right voice reads it", () => {
+  const reply = toChatShapedReply(
+    result({
+      answer: { headline: "10 विद्यार्थियों पर फीस बकाया है।", sections: [], actions: [], follow_ups: [] },
+      language: { code: "hi", delivered: "hi", tts: "hi-IN", explicit: false, translated_input: true },
+    }),
+    "m3",
+  );
+
+  assert.equal(reply.response.data.language?.delivered, "hi");
+  assert.equal(reply.response.data.language?.tts, "hi-IN");
+});
+
+test("an answer from a backend that does not report a language carries none", () => {
+  assert.equal(toChatShapedReply(result(), "m4").response.data.language, undefined);
+});

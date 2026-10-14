@@ -450,6 +450,24 @@ export interface AnswerPayload {
   follow_ups: string[];
 }
 
+/**
+ * Which language a turn was asked in and answered in.
+ *
+ * `delivered` is what the answer text is actually written in; it differs from `code` only when
+ * the words could not be translated, in which case the screen is English and must be read by an
+ * English voice. `tts` is the tag to pick that voice by. `explicit` is true when the person
+ * asked for a language ("reply in Gujarati"), which is what makes it stick for later turns.
+ */
+export interface AnswerLanguage {
+  code: "en" | "hi" | "gu";
+  delivered: "en" | "hi" | "gu";
+  tts: string;
+  explicit: boolean;
+  translated_input?: boolean;
+  question_original?: string;
+  question_english?: string | null;
+}
+
 export interface AskIntent {
   key: string;
   label: string;
@@ -515,6 +533,8 @@ export interface AskResult {
   depth_reached?: number;
   /** Which pipeline answered: "lifecycle_v2" or "ask_service_v1". */
   pipeline?: string;
+  /** The language the turn was asked and answered in. Absent from backends that predate it. */
+  language?: AnswerLanguage;
   links: Record<string, unknown>;
   duration_ms: number;
 }

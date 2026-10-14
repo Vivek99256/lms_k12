@@ -1,5 +1,6 @@
 import type {
   AnswerAction,
+  AnswerLanguage,
   AnswerPayload,
   AnswerSection,
   AskResult,
@@ -64,6 +65,8 @@ export interface ChatShapedReply {
        * that also draws the sections — showing it would print everything twice.
        */
       headline?: string;
+      /** The language the answer is written in, and the voice tag that reads it. */
+      language?: AnswerLanguage;
       depthReached?: number;
       /** Present so the panel can render the ladder beside the reply. */
       lifecycleTrace?: TraceStage[];
@@ -273,6 +276,7 @@ export function toChatShapedReply(result: AskResult, messageId: string): ChatSha
       data: {
         module: moduleKey,
         headline: result.answer.headline?.trim() || undefined,
+        language: result.language,
         pipeline: result.pipeline,
         depthReached: result.depth_reached,
         lifecycleTrace: trace,
