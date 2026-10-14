@@ -4,12 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   BookOpen,
-  CalendarDays,
   ChevronDown,
   ChevronRight,
   FlaskConical,
-  GraduationCap,
-  List,
 } from 'lucide-react';
 import { getRequestContext, getSyear } from '../../../page';
 import { getSubjectAndChapters, type Chapter, type SubjectWithChapters } from '../../../data/chapters';
@@ -26,6 +23,7 @@ import {
   type UnitChapter,
 } from '../../../data/curriculum';
 import { Tooltip } from '@/components/ui/tooltip';
+import { CourseMasterTabs } from '../../../_components/CourseMasterTabs';
 
 type ResolvedCurriculumTarget = {
   subjectId: string;
@@ -728,39 +726,7 @@ export default function CurriculumPage() {
           </div>
         </div>
 
-        <div className="mb-4 border-b border-[#D8E1F0]">
-          <div className="flex flex-wrap items-center gap-8">
-            <button
-              type="button"
-              onClick={() => router.push(`/course-master/lesson-plan/${courseId}`)}
-              className="pb-3 text-[15px] font-medium text-[#334155] transition hover:text-[#0F172A]"
-            >
-              <span className="inline-flex items-center gap-2">
-                <CalendarDays size={16} />
-                Lesson plans
-              </span>
-            </button>
-            <button
-              type="button"
-              className="border-b-2 border-[#4F46E5] pb-3 text-[15px] font-medium text-[#4F46E5]"
-            >
-              <span className="inline-flex items-center gap-2">
-                <GraduationCap size={16} />
-                Curriculum
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(`/course-master/${courseId}/chapters`)}
-              className="pb-3 text-[15px] font-medium text-[#334155] transition hover:text-[#0F172A]"
-            >
-              <span className="inline-flex items-center gap-2">
-                <List size={16} />
-                Chapters
-              </span>
-            </button>
-          </div>
-        </div>
+        <CourseMasterTabs courseId={courseId} active="curriculum" />
 
         {loading ? (
           <div className="rounded-[18px] border border-[#D8E1F0] bg-white px-6 py-14 text-center text-[15px] text-[#64748B] shadow-[0_2px_10px_rgba(15,23,42,0.05)]">

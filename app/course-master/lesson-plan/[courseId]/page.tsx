@@ -40,6 +40,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { LessonIntelligencePanel } from './LessonIntelligencePanel';
+import { CourseMasterTabs } from '../../_components/CourseMasterTabs';
 import { LessonPlanDocumentPanel } from '../../lesson-plan-doc/LessonPlanDocumentPanel';
 import {
   LessonPlanDetailDialog,
@@ -2102,13 +2103,7 @@ export default function LessonPlanPage() {
               <Calendar size={15} />
               Master calendar
             </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-[10px] border border-[#D8E1F0] bg-white px-4 py-2 text-[15px] font-medium text-[#0F172A] shadow-[0_1px_4px_rgba(15,23,42,0.04)]"
-            >
-              <List size={15} />
-              Concept wise
-            </button>
+           
           </div>
 
           <Button
@@ -2445,41 +2440,9 @@ export default function LessonPlanPage() {
           </div>
         </div>
 
-        <div className="mb-4 border-b border-[#D8E1F0]">
-          <div className="flex flex-wrap items-center gap-8">
-            <button
-              type="button"
-              className="border-b-2 border-[#4F46E5] pb-3 text-[15px] font-medium text-[#4F46E5]"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Calendar size={16} />
-                Lesson plans
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(lessonPlanRoutes.curriculum)}
-              className="pb-3 text-[15px] font-medium text-[#334155] transition hover:text-[#0F172A]"
-            >
-              <span className="inline-flex items-center gap-2">
-                <GraduationCap size={16} />
-                Curriculum
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(lessonPlanRoutes.chapters)}
-              className="pb-3 text-[15px] font-medium text-[#334155] transition hover:text-[#0F172A]"
-            >
-              <span className="inline-flex items-center gap-2">
-                <BookOpen size={16} />
-                Chapters
-              </span>
-            </button>
-          </div>
-        </div>
+        <CourseMasterTabs courseId={course.id} active="lessonPlan" />
 
-        <div className="mb-5 rounded-[18px] border border-[#D8E1F0] bg-white px-5 py-4 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+        {/* <div className="mb-5 rounded-[18px] border border-[#D8E1F0] bg-white px-5 py-4 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#EEF2FF] text-[#4F46E5]">
@@ -2524,33 +2487,11 @@ export default function LessonPlanPage() {
           {divisionError ? (
             <p className="mt-3 text-[13px] font-medium text-[#DC2626]">{divisionError}</p>
           ) : null}
-        </div>
+        </div> */}
 
         {selectedDivisionId ? (
           <>
-        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-[10px] border border-[#D8E1F0] bg-white px-4 py-2 text-[15px] font-medium text-[#0F172A] shadow-[0_1px_4px_rgba(15,23,42,0.04)]"
-            >
-              <NotebookText size={15} />
-              Lesson Plan
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  `/course-master/lesson-plan/${course.id}?view=key-concepts&chapterId=${selectedChapter?.id ?? ''}`
-                )
-              }
-              className="inline-flex items-center gap-2 rounded-[10px] border border-transparent bg-[#EEF3FB] px-4 py-2 text-[15px] font-medium text-[#475569] transition hover:bg-white hover:border-[#D8E1F0]"
-            >
-              <List size={15} />
-              Concept wise
-            </button>
-          </div>
-        </div>
+        
 
         <LessonIntelligencePanel
           baseUrl={sessionContext.hostName || API_BASE_URL}
