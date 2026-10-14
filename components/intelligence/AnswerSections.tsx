@@ -3,6 +3,8 @@
 import { AlertTriangle, CheckCircle2, Circle, Clock, Info, ShieldAlert } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { uiLabel } from '@/lib/voice/ui-labels';
+import { useAnswerLanguage } from './answer-language';
 import type { AnswerSection, EvidenceItem, KeyValueItem } from '@/lib/intelligence/types';
 
 /**
@@ -177,7 +179,8 @@ function Card({
     action: 'border-amber-200 bg-amber-50/50',
   }[kind];
 
-  const label = { data: 'From your records', reasoning: 'AI analysis', action: 'Needs a decision' }[kind];
+  const language = useAnswerLanguage();
+  const label = uiLabel(language, { data: 'fromRecords', reasoning: 'aiAnalysis', action: 'needsDecision' }[kind] as 'fromRecords' | 'aiAnalysis' | 'needsDecision');
 
   return (
     <section className={cn('rounded-xl border p-3', chrome)}>
@@ -237,6 +240,7 @@ function Records({
   module?: string;
   onAsk?: (question: string) => void;
 }) {
+  const language = useAnswerLanguage();
   const items = section.items ?? [];
 
   if (!items.length) return null;
@@ -307,7 +311,7 @@ function Records({
                   onClick={() => onAsk(question)}
                   className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-[#0D6EFD]/30 hover:text-[#0D6EFD]"
                 >
-                  View
+                  {uiLabel(language, 'view')}
                 </button>
               ) : null}
             </li>

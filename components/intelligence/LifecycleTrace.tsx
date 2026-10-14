@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Ban, Check, ChevronDown, Circle, Clock, Minus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { stepsCompleted, uiLabel } from '@/lib/voice/ui-labels';
+import { useAnswerLanguage } from './answer-language';
 import type { StageStatus, TraceStage } from '@/lib/intelligence/types';
 
 /**
@@ -155,6 +157,8 @@ export function LifecycleTrace({
   durationMs?: number | null;
   className?: string;
 }) {
+  const language = useAnswerLanguage();
+
   if (!stages?.length) return null;
 
   const tally = counts ?? {};
@@ -164,10 +168,10 @@ export function LifecycleTrace({
     <div className={cn('rounded-xl border border-slate-200 bg-white', className)}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-slate-100 px-4 py-3">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-          Agent activity
+          {uiLabel(language, 'agentActivity')}
         </p>
         <p className="text-[11px] tabular-nums text-slate-500">
-          {reached} of {stages.length} steps completed
+          {stepsCompleted(language, reached, stages.length)}
         </p>
         <div className="ml-auto flex flex-wrap items-center gap-3">
           {ORDER.filter((s) => tally[s]).map((s) => (

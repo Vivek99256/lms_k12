@@ -21,6 +21,13 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 
 import { useVoiceInteraction } from '@/hooks/use-voice-interaction';
+import {
+  UNSUPPORTED_RECOGNITION_MESSAGE,
+  isNonLatin,
+  languageOf,
+  speechTextFor,
+} from '@/lib/voice/voice-utils';
+import { uiLabel, type UiLanguage } from '@/lib/voice/ui-labels';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -62,6 +69,8 @@ import {
 import type { AnswerAction } from '@/lib/intelligence/types';
 import { LifecycleTrace } from '@/components/intelligence/LifecycleTrace';
 import { AnswerSections } from '@/components/intelligence/AnswerSections';
+import { AnswerLanguageProvider } from '@/components/intelligence/answer-language';
+import { HandoffCard } from '@/components/intelligence/HandoffCard';
 import { moduleHandoffFor } from '@/lib/intelligence/module-handoff';
 import { useAgentActionHandler } from '@/hooks/use-agent-action-handler';
 import { useChatbotNavigation } from '@/hooks/use-chatbot-navigation';
@@ -101,6 +110,13 @@ type ChatMessage = PanelMessage;
  * the "clear on refresh" rule has to be decided once per page load rather than per
  * component mount — see the note in that module.
  */
+
+/** The language an answer is written in, for the page's own wording around it. */
+function answerLanguageOf(message: { language?: { delivered?: string } }): UiLanguage {
+  const delivered = message.language?.delivered;
+
+  return delivered === 'hi' || delivered === 'gu' ? delivered : 'en';
+}
 
 function readStoredSession() {
   if (typeof window === 'undefined') {
@@ -277,6 +293,8 @@ export default function ChatbotPanel({
             payload?: AnswerAction['payload'];
             module?: string | null;
             route?: string | null;
+            inputMode?: 'voice' | 'text';
+            language?: string;
           };
 
           return {
@@ -295,6 +313,11 @@ export default function ChatbotPanel({
               payload: turn.payload ?? {},
               module: turn.module ?? null,
               route: turn.route ?? null,
+              // Hints for the language layer. The sentence itself decides first; these only
+              // settle what its characters cannot (a romanised voice transcript, or a language
+              // the person asked for earlier in this conversation).
+              input_mode: turn.inputMode ?? 'text',
+              ...(turn.language ? { language: turn.language } : {}),
               meta: {
                 ...(session.subInstituteId
                   ? { institute_id: Number(session.subInstituteId) }
@@ -381,9 +404,19 @@ export default function ChatbotPanel({
     return configured.length > 0 ? configured : FALLBACK_PROMPTS;
   }, [workspace.suggestions]);
 
+  // Set below, once `sendMessage` exists: what to do with a question that was just spoken.
+  const voiceAskRef = useRef<((text: string, tag: string) => void) | null>(null);
+  // A question is on its way; its answer is the one to read aloud.
+  const awaitingAnswerRef = useRef(false);
+  const spokenIdRef = useRef<string | null>(null);
+  const sendingRef = useRef(false);
+
   const {
     supportedLanguages,
     isSupported,
+    isSpeechSupported,
+    speakReplies,
+    setSpeakReplies,
     language,
     setLanguage,
     transcript,
@@ -396,7 +429,9 @@ export default function ChatbotPanel({
     stopSpeaking,
     error: voiceError,
     clearError,
-  } = useVoiceInteraction();
+  } = useVoiceInteraction({
+    onFinalTranscript: (text, tag) => voiceAskRef.current?.(text, tag),
+  });
 
   // The SDK messages are what gets persisted, not the rendered view of them: parts
   // rehydrate into the same panel message, and a stored view model would not.
@@ -432,6 +467,7 @@ export default function ChatbotPanel({
     // A new thread must not inherit the previous one's referents, or "why is she at
     // risk?" would resolve against a student the user has just walked away from.
     lifecycleThreadRef.current = null;
+    awaitingAnswerRef.current = false;
     writeLifecycleThreadId(null);
     setThread({ id: `teach-assistant-${Date.now()}`, seed: [] });
     setInput('');
@@ -452,17 +488,25 @@ export default function ChatbotPanel({
    *   page before Approve is clicked, and using that page's module would make the
    *   backend lose the agent and workflow binding.
    */
-  function sendMessage(
+  async function sendMessage(
     raw: string,
     actionPayload?: AnswerAction['payload'],
-    actionModule?: string
+    actionModule?: string,
+    voice?: { language: string }
   ) {
     const trimmed = raw.trim();
 
-    if (!trimmed || isLoading) return;
+    if (!trimmed || isLoading || sendingRef.current) return;
+
+    // Page navigation ("open admissions") is recognised here, in English, against the live tab
+    // registry. A sentence in Hindi or Gujarati is turned into English first; the sentence the
+    // person said is still what is asked and shown.
+    sendingRef.current = true;
+    const forIntent = isNonLatin(trimmed) ? (await translateForIntent(trimmed, voice?.language)) ?? trimmed : trimmed;
+    sendingRef.current = false;
 
     const currentModName = actionModule ?? workspace.context?.module ?? pathname;
-    const intentEval = evaluateIntent ? evaluateIntent(trimmed, currentModName) : null;
+    const intentEval = evaluateIntent ? evaluateIntent(forIntent, currentModName) : null;
 
     if (intentEval?.type === 'navigation' && intentEval.route) {
       executeNavigation({ route: intentEval.route });
@@ -470,6 +514,7 @@ export default function ChatbotPanel({
 
     setInput('');
     setTranscript('');
+    awaitingAnswerRef.current = true;
 
     void sendUiMessage(
       { text: trimmed },
@@ -479,6 +524,8 @@ export default function ChatbotPanel({
           payload: actionPayload ?? {},
           module: actionModule ?? workspace.context?.module ?? null,
           route: pathname,
+          inputMode: voice ? 'voice' : 'text',
+          language: voice?.language,
           // The target the panel resolved from the live tab registry, so the answer
           // card links to the same screen the panel just opened.
           ...(intentEval?.type === 'navigation' && intentEval.route
@@ -500,8 +547,76 @@ export default function ChatbotPanel({
     );
   }
 
+  /** A Hindi or Gujarati sentence in English, for navigation only. Null if it could not be translated. */
+  async function translateForIntent(text: string, language?: string): Promise<string | null> {
+    try {
+      const response = await fetch('/api/ai/ask/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          ...(session.subInstituteId ? { 'X-MCP-Institute-Id': String(session.subInstituteId) } : {}),
+        },
+        body: JSON.stringify({ text, language, module: workspace.context?.module ?? undefined }),
+      });
+
+      if (!response.ok) return null;
+
+      const english = ((await response.json()) as { data?: { english?: unknown } })?.data?.english;
+
+      return typeof english === 'string' && english.trim() ? english.trim() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // What was just spoken is asked as an ordinary question. If an answer is still arriving it is
+  // left in the box rather than lost, so the person can send it when the answer is done.
+  useEffect(() => {
+    voiceAskRef.current = (text, tag) => {
+      if (isLoading) {
+        setInput(text);
+        setTranscript('');
+        return;
+      }
+
+      void sendMessage(text, undefined, undefined, { language: tag });
+    };
+  });
+
+  // The language of an answer: remember it when the person asked for it, follow it for the
+  // microphone, and read it aloud — in the language it is written in — when that is switched on.
+  // A message restored from an earlier visit is never read out: only an answer to a question
+  // asked in this session.
+  useEffect(() => {
+    const answer = latestAssistantMessage;
+
+    if (!answer || !answer.isComplete || spokenIdRef.current === answer.id) return;
+
+    spokenIdRef.current = answer.id;
+
+    if (!awaitingAnswerRef.current) return;
+
+    awaitingAnswerRef.current = false;
+
+    const answered = answer.language;
+
+    // Asking for a language out loud ("reply in Gujarati") also points the microphone at it.
+    // The language itself is NOT remembered: the next message is judged on its own.
+    if (answered?.explicit) {
+      const asked = languageOf(answered.code);
+
+      if (asked) setLanguage(asked.tag);
+    }
+
+    if (speakReplies) {
+      void speakText(speechTextFor(answer.headline, answer.content), answered?.tts ?? 'en-IN');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestAssistantMessage, speakReplies]);
+
   const handleSend = () => {
-    sendMessage(transcript || input);
+    void sendMessage(transcript || input);
   };
 
   /*
@@ -813,12 +928,14 @@ export default function ChatbotPanel({
                             {message.headline}
                           </p>
                         ) : null}
-                        <AnswerSections
-                          sections={message.sections}
-                          module={message.module}
-                          onAsk={(question) => sendMessage(question, undefined, message.module)}
-                          className="-mx-1"
-                        />
+                        <AnswerLanguageProvider value={answerLanguageOf(message)}>
+                          <AnswerSections
+                            sections={message.sections}
+                            module={message.module}
+                            onAsk={(question) => sendMessage(question, undefined, message.module)}
+                            className="-mx-1"
+                          />
+                        </AnswerLanguageProvider>
                       </>
                     ) : (
                       message.content
@@ -832,19 +949,19 @@ export default function ChatbotPanel({
                     {message.role === 'assistant' && message.citations?.length ? (
                       <div className="mt-2.5 border-t border-gray-100 pt-2">
                         <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
-                          Sources
+                          {uiLabel(answerLanguageOf(message), 'sources')}
                         </p>
                         <ul className="mt-1 space-y-0.5">
-                          {message.citations.map((citation) => (
-                            <li key={citation.tool} className="text-[11px] leading-snug text-gray-500">
+                          {message.citations.map((citation, citationIndex) => (
+                            <li key={`${citation.tool}-${citationIndex}`} className="text-[11px] leading-snug text-gray-500">
                               <span className={citation.available ? '' : 'text-amber-600'}>
                                 {citation.module || citation.tool}
-                                {citation.available ? '' : ' — no data returned'}
+                                {citation.available ? '' : ` — ${uiLabel(answerLanguageOf(message), 'noDataReturned')}`}
                               </span>
                               {citation.unavailableSignals?.length ? (
                                 <span className="text-amber-600">
                                   {' '}
-                                  · not recorded: {citation.unavailableSignals.join(', ')}
+                                  · {uiLabel(answerLanguageOf(message), 'notRecorded')}: {citation.unavailableSignals.join(', ')}
                                 </span>
                               ) : null}
                             </li>
@@ -907,25 +1024,19 @@ export default function ChatbotPanel({
                       if (!handoff) return null;
 
                       return (
-                        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
-                          <h4 className="text-sm font-semibold text-emerald-900">{handoff.title}</h4>
-                          <p className="mt-0.5 text-xs leading-5 text-emerald-800/80">
-                            {handoff.description}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              executeNavigation({
-                                route: handoff.route,
-                                query: handoff.query,
-                                label: handoff.label,
-                              })
-                            }
-                            className="mt-2.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
-                          >
-                            {handoff.label}
-                          </button>
-                        </div>
+                        <HandoffCard
+                          handoff={handoff}
+                          language={answerLanguageOf(message)}
+                          module={message.module}
+                          auth={session}
+                          onOpen={() =>
+                            executeNavigation({
+                              route: handoff.route,
+                              query: handoff.query,
+                              label: handoff.label,
+                            })
+                          }
+                        />
                       );
                     })()}
 
@@ -1007,7 +1118,11 @@ export default function ChatbotPanel({
                                   )}
                                   aria-hidden
                                 />
-                                {traceOpen ? 'Hide details' : live ? 'Working…' : 'Show details'}
+                                {traceOpen
+                                  ? uiLabel(answerLanguageOf(message), 'hideDetails')
+                                  : live
+                                    ? uiLabel(answerLanguageOf(message), 'working')
+                                    : uiLabel(answerLanguageOf(message), 'showDetails')}
                                 <span className="tabular-nums text-gray-400">
                                   {/*
                                     While the turn runs the denominator is only the
@@ -1020,7 +1135,9 @@ export default function ChatbotPanel({
                               </button>
 
                               {traceOpen ? (
-                                <LifecycleTrace stages={message.lifecycleTrace} className="mt-2" />
+                                <AnswerLanguageProvider value={answerLanguageOf(message)}>
+                                  <LifecycleTrace stages={message.lifecycleTrace} className="mt-2" />
+                                </AnswerLanguageProvider>
                               ) : null}
                             </div>
                           );
@@ -1218,6 +1335,7 @@ export default function ChatbotPanel({
                 }
               }}
               disabled={!isSupported}
+              title={isSupported ? 'Speak your question' : UNSUPPORTED_RECOGNITION_MESSAGE}
             >
               {isRecording ? <Square className="size-3.5" /> : <Mic className="size-3.5" />}
               {isRecording ? 'Stop' : 'Voice'}
@@ -1231,7 +1349,10 @@ export default function ChatbotPanel({
                 if (isSpeaking) {
                   stopSpeaking();
                 } else if (latestAssistantMessage?.content) {
-                  speakText(latestAssistantMessage.content);
+                  void speakText(
+                    speechTextFor(latestAssistantMessage.headline, latestAssistantMessage.content),
+                    latestAssistantMessage.language?.tts ?? 'en-IN'
+                  );
                 }
               }}
               disabled={!latestAssistantMessage?.content}
@@ -1241,9 +1362,26 @@ export default function ChatbotPanel({
             </Button>
           </div>
 
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-xs text-gray-600">
+              <input
+                type="checkbox"
+                checked={speakReplies}
+                disabled={!isSpeechSupported}
+                onChange={(event) => setSpeakReplies(event.target.checked)}
+                className="size-3.5 rounded border-gray-300"
+              />
+              Read replies aloud
+            </label>
+          </div>
+
+          {!isSupported ? (
+            <p className="mt-2 text-[11px] leading-snug text-gray-500">{UNSUPPORTED_RECOGNITION_MESSAGE}</p>
+          ) : null}
+
           {isRecording ? (
             <div className="mt-2 text-[11px] font-medium uppercase tracking-wide text-red-600">
-              Recording in progress...
+              Listening in {languageOf(language)?.label ?? language}… speak now
             </div>
           ) : null}
         </div>
