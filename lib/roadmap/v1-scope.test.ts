@@ -34,6 +34,13 @@ test('New PAL (tblmenumaster parent 531) is not V1-deferred, despite sharing the
   }
 });
 
+test('Career Counseling screens are not V1-deferred; Career Explorer still is', () => {
+  for (const route of ['/career-awareness', '/career-awareness/certainty', '/career-intelligence', '/career-counselling/interest-profile']) {
+    assert.equal(isDeferredModuleRoute(route), false, route);
+  }
+  assert.equal(isDeferredModuleRoute('/career-explorer/college'), true);
+});
+
 test('legacy /pal/* screens that are NOT New PAL children stay V1-deferred', () => {
   // These are real pages but are not under tblmenumaster parent 531 (New PAL) —
   // /pal/frameworks in particular hangs off parent 327 (Curriculum) instead.

@@ -1,8 +1,14 @@
+'use client';
+
+import { useState } from 'react';
 import { BadgeCheck, TrendingUp } from 'lucide-react';
+import { CareerCertaintyCard } from '@/app/career-intelligence/CareerIntelligenceHub';
 
 export function Certainty() {
+  const [open, setOpen] = useState(false);
   return (
     <div className="space-y-5">
+      <CareerCertaintyCard open={open} onOpenChange={setOpen} />
       <div>
         <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <BadgeCheck className="size-4 text-primary" />

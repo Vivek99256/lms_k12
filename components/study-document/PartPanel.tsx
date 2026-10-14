@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { ArrowRight, Eye, Lightbulb } from 'lucide-react';
 
 import { ActivityCard } from '@/components/study-deck/ActivityCard';
+import { VisualFigure } from '@/components/study-deck/VisualFigure';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import { partHeading, partLabel, partName, partTag, resolvePart, topicNameOf } from '@/lib/study-document/document';
 import {
@@ -593,6 +594,20 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
               <li key={i}>{s}</li>
             ))}
           </ol>
+        </Block>
+      ) : null}
+
+      {part.image && part.interaction?.kind !== 'hotspots' ? <VisualFigure image={part.image} assetBase={null} /> : null}
+
+      {part.type === 'unit' && part.content.prerequisites.length > 0 ? (
+        <Block title="Remember first" hint="You need these ideas for this unit.">
+          <ul className="space-y-2 text-sm text-slate-900">
+            {part.content.prerequisites.map((p) => (
+              <li key={p.concept_id}>
+                <span className="font-medium">{p.name}.</span> {p.refresher}
+              </li>
+            ))}
+          </ul>
         </Block>
       ) : null}
 

@@ -274,6 +274,11 @@ const V1_DEFERRED_ROUTE_EXCEPTIONS = [
   '/pal/eso', // new_pal.eso
   '/pal/pedagogy-engine', // new_pal.pedagogy_engine
   '/pal/reports/attainment', // new_pal.reports
+  // Career Counseling (tblmenumaster 455) is rights-granted to the Student role, so it
+  // must reach the sidebar. /career-explorer stays deferred.
+  '/career-awareness',
+  '/career-counselling',
+  '/career-intelligence',
 ] as const;
 
 export function showDeferredModules(): boolean {

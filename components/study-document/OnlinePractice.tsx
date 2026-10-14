@@ -7,12 +7,13 @@ import { MemoryContext } from '@/components/study-deck/stage-ui';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import type { Audience } from '@/lib/study-document/api';
 import { KIND_LABEL, partLabel, partsFor } from '@/lib/study-document/document';
-import { checklistOf, featuresOf, flashcardsOf, partProgress } from '@/lib/study-document/online';
+import { checklistOf, featuresOf, flashcardsOf, interactionDoneKey, partProgress } from '@/lib/study-document/online';
 import { doneSet, loadProgress, progressKey, progressReducer, saveProgress, type DocumentProgress, type ProgressAction, type StorageLike } from '@/lib/study-document/progress';
 import type { StudyDocument } from '@/lib/study-document/types';
 import { ChecklistPanel } from './ChecklistPanel';
 import { loadBank, loadStudyDocument } from './data';
 import { Flashcards } from './Flashcards';
+import { InteractionStage } from './InteractionStage';
 import { PartPanel } from './PartPanel';
 
 export interface OnlinePracticeProps {
@@ -105,6 +106,8 @@ function Practice({ doc, bank, contentId, userKey, audience }: { doc: StudyDocum
   const parts = useMemo(() => partsFor(doc, audience).filter((p) => p.type !== 'glossary'), [doc, audience]);
   const bankMap = useMemo(() => new Map(bank.map((q) => [Number(q.id), q])), [bank]);
   const terms = useMemo(() => flashcardsOf(doc), [doc]);
+  // The glossary has no screen of its own, so an interaction it carries is shown on the Key terms screen.
+  const glossary = useMemo(() => partsFor(doc, audience).find((p) => p.type === 'glossary') ?? null, [doc, audience]);
   const checklist = useMemo(() => checklistOf(doc), [doc]);
   const storeKey = progressKey(userKey, contentId);
   const [progress, dispatch] = useReducer(reduce, undefined, () => loadProgress(browserStorage(), storeKey, contentId));
@@ -128,7 +131,7 @@ function Practice({ doc, bank, contentId, userKey, audience }: { doc: StudyDocum
   const current = selected.kind === 'part' ? parts.find((p) => p.n === selected.n) : undefined;
 
   const items: Array<{ id: string; label: string; sub?: string; selection: Selection; muted?: boolean }> = [
-    ...(doc.kind === 'revision_notes' && terms.length > 0 ? [{ id: 'terms', label: 'Key terms', sub: `${terms.filter((t) => done.has(t.id)).length}/${terms.length}`, selection: { kind: 'terms' } as Selection }] : []),
+    ...(doc.kind === 'revision_notes' && terms.length > 0 ? [{ id: 'terms', label: 'Key terms', sub: `${terms.filter((t) => done.has(t.id)).length + (glossary?.interaction && done.has(interactionDoneKey(glossary)) ? 1 : 0)}/${terms.length + (glossary?.interaction ? 1 : 0)}`, selection: { kind: 'terms' } as Selection }] : []),
     ...(doc.kind === 'revision_notes' && checklist.length > 0
       ? [{ id: 'checklist', label: 'Revision checklist', sub: `${checklist.flatMap((g) => g.items).filter((i) => done.has(i.id)).length}/${checklist.flatMap((g) => g.items).length}`, selection: { kind: 'checklist' } as Selection }]
       : []),
@@ -204,6 +207,17 @@ function Practice({ doc, bank, contentId, userKey, audience }: { doc: StudyDocum
               <h2 className="text-xl font-semibold tracking-tight text-slate-900">Key terms</h2>
               <p className="text-sm text-slate-700">The terms from the notes, with what each one means. Turn a card over to check yourself.</p>
               <Flashcards cards={terms} known={done} onKnown={(key, known) => dispatch({ type: known ? 'done' : 'undone', key })} />
+              {glossary?.interaction ? (
+                <InteractionStage
+                  interaction={glossary.interaction}
+                  image={glossary.image}
+                  eyebrow="Try it"
+                  title="Match the key terms"
+                  done={done.has(interactionDoneKey(glossary))}
+                  onDone={() => dispatch({ type: 'done', key: interactionDoneKey(glossary) })}
+                  memoryKey="glossary:ix"
+                />
+              ) : null}
             </div>
           ) : selected.kind === 'checklist' ? (
             <div className="mx-auto max-w-3xl space-y-3">

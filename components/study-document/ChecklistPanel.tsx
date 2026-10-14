@@ -56,11 +56,11 @@ export function ChecklistPanel({ groups, ticked, onToggle, onClear, onOpenPart }
       </div>
 
       {groups.map((group) => (
-        <fieldset key={`${group.topicId ?? 'other'}`} className="space-y-2">
+        <fieldset key={`${group.topicId ?? 'other'}`} className="min-w-0 space-y-2">
           <legend className="mb-1 text-sm font-semibold text-indigo-900">{group.topic}</legend>
           <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
             {group.items.map((item) => (
-              <li key={item.id} className="flex items-start gap-3 px-3 py-2.5">
+              <li key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2.5 sm:flex-nowrap">
                 <input
                   id={item.id}
                   type="checkbox"
@@ -68,14 +68,14 @@ export function ChecklistPanel({ groups, ticked, onToggle, onClear, onOpenPart }
                   onChange={() => onToggle(item.id)}
                   className="mt-1 h-4 w-4 shrink-0 rounded border-slate-400 accent-indigo-600"
                 />
-                <label htmlFor={item.id} className="flex-1 text-sm leading-snug text-slate-900">
+                <label htmlFor={item.id} className="min-w-0 flex-1 basis-40 text-sm leading-snug text-slate-900">
                   {item.text}
                 </label>
                 {onOpenPart ? (
                   <button
                     type="button"
                     onClick={() => onOpenPart(item.part)}
-                    className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-slate-600 underline-offset-2 hover:text-indigo-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+                    className="max-w-full shrink-0 rounded-md px-1.5 py-0.5 text-left text-xs text-slate-600 underline-offset-2 hover:text-indigo-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
                   >
                     {item.partTitle}
                   </button>
