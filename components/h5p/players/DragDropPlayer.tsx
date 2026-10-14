@@ -1,54 +1,59 @@
 'use client';
 
+import { DragDropActivity } from '@/app/h5p/h5p_drag_drop/components/drag-drop-activity';
 import { MatchingPlayer } from './MatchingPlayer';
-import { NotPlayable } from './shared';
+import { buildFor, NotPlayable } from './shared';
 import type { PlayerProps } from './types';
 
 /**
- * Drag and drop — and the honest account of why it is a thin wrapper.
+ * Drag and drop.
  *
- * WHAT H5P.DragQuestion NEEDS AND THE BANK DOES NOT HAVE. A drag question is a
- * background image, a set of draggable elements and a set of DROP ZONES, each
- * with an x, a y, a width and a height on that canvas. The zones are the
- * question: they are what makes one place on the image right and every other
- * place wrong.
+ * Two kinds of question reach this player, and they are told apart by what the row
+ * carries rather than by a flag:
  *
- * `lms_question_master` stores none of it. A question's figures carry
- * `url, sha256, width, height, caption, ocr_text, page` — the size of the
- * picture, never a position within it — and 11 of 1,211 rows in a measured
- * chapter carry a figure at all. There is no coordinate anywhere in the
- * schema, so a drag question cannot be derived: it would have to be AUTHORED,
- * which is the manual step this architecture removes.
+ *   - An image-based question (question_format_code "drag_drop") carries its picture, its
+ *     drop zones and the answer key in the row, so it is played as the real thing: labels
+ *     dragged onto parts of a picture, marked against the key. See DragDropActivity.
+ *   - A match-the-following question is a drag interaction whose targets are labels rather
+ *     than places on a picture. That is derivable from the two columns, so it renders
+ *     through MatchingPlayer as it always has.
  *
- * WHAT THIS DOES INSTEAD. A "match the following" question is a drag
- * interaction whose targets are labels rather than places on an image, and
- * that IS derivable. So a match question renders through `MatchingPlayer`,
- * and anything else says plainly what is missing rather than drawing an empty
- * canvas a learner cannot answer.
- *
- * TO MAKE THIS REAL, one of two things has to happen first: drop zones become
- * a stored part of an image question (a schema change plus an authoring
- * surface), or an existing authored `h5p_drag_drop` activity is referenced by
- * the question rather than derived from it.
+ * Any other row has no zones to drop on and the bank stores none for it, so it says so
+ * plainly rather than drawing a canvas a learner cannot answer.
  */
 export function DragDropPlayer(props: PlayerProps) {
-  const { question } = props;
-  const hasFigure = Array.isArray(question.figures) && question.figures.length > 0;
-  const hasImage = hasFigure || /<img/i.test(String(question.question ?? ''));
+  const { question, onResult } = props;
 
-  // A match question is a drag interaction with label targets: derivable, and
-  // already built.
   const code = String(question.question_type_code ?? '').toLowerCase();
   if (code === 'match_following') {
     return <MatchingPlayer {...props} />;
   }
 
+  const { activity, reason } = buildFor(question, 'drag_drop');
+
+  if (!activity || activity.kind !== 'drag_drop') {
+    return (
+      <NotPlayable
+        reason={
+          reason ??
+          'Only image-based drag and drop questions, and match-the-following questions, can be played as a drag interaction. Other questions have no drop zones stored.'
+        }
+      />
+    );
+  }
+
   return (
-    <NotPlayable
-      reason={
-        hasImage
-          ? 'This question carries an image but no drop zones. A drag question needs a position on that image for every answer, and the question bank stores image dimensions only — never a coordinate. It has to be authored, or the schema has to carry zones.'
-          : 'Only match-the-following questions can be derived as a drag interaction. Everything else needs drop zones, which the question bank does not store.'
+    <DragDropActivity
+      item={activity.item}
+      onResult={(result) =>
+        onResult?.({
+          questionId: Number(question.id),
+          score: result.score,
+          maxScore: result.maxScore,
+          correct: result.passed,
+          durationSeconds: result.durationSeconds,
+          response: result.response,
+        })
       }
     />
   );

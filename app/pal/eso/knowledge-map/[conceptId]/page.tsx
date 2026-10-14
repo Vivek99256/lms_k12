@@ -163,6 +163,29 @@ function ctaLabel(status: KnowledgeMapNodeStatus): string | null {
   }
 }
 
+/**
+ * Where a card from outside the chapter being viewed actually lives — "same
+ * grade, another chapter" reads differently from "a different grade
+ * entirely", and a student deciding whether to go learn this first needs to
+ * know which one it is. Null for the current chapter's own concepts.
+ */
+function locationLabel(concept: KnowledgeMapConcept, currentStandardId: number | null): string | null {
+  if (concept.chapterRelation === 'current') return null;
+
+  if (concept.chapterRelation === 'previous' || concept.chapterRelation === 'next') {
+    const prefix = concept.chapterRelation === 'previous' ? 'Previous chapter' : 'Next chapter';
+    return concept.chapterName ? `${prefix} · ${concept.chapterName}` : prefix;
+  }
+
+  const crossGrade = currentStandardId !== null && concept.standardId !== null && concept.standardId !== currentStandardId;
+  if (crossGrade) {
+    const grade = concept.standardName ? `Standard ${concept.standardName}` : 'Another grade';
+    return concept.chapterName ? `${grade} · ${concept.chapterName}` : grade;
+  }
+
+  return concept.chapterName ? `From ${concept.chapterName}` : 'From another chapter';
+}
+
 function joinWithAnd(items: string[]): string {
   if (items.length === 0) return '';
   if (items.length === 1) return items[0];
@@ -231,6 +254,13 @@ function KnowledgeMapView({
 
       <h1 className="mt-2 text-2xl font-bold text-slate-900">{data.chapterName}</h1>
       {data.chapterDescription && <p className="mt-1 max-w-3xl text-sm text-slate-500">{data.chapterDescription}</p>}
+      {(data.previousChapter || data.nextChapter) && (
+        <p className="mt-1 text-xs text-slate-400">
+          {data.previousChapter && <>Previous: {data.previousChapter.name}</>}
+          {data.previousChapter && data.nextChapter && <span className="mx-1.5">·</span>}
+          {data.nextChapter && <>Next: {data.nextChapter.name}</>}
+        </p>
+      )}
       <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-600">{summaryParagraph(data)}</p>
 
       {current && (
@@ -238,7 +268,8 @@ function KnowledgeMapView({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <span className="inline-block rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold text-white">You are here</span>
-              <h2 className="mt-1.5 text-lg font-bold text-slate-900">{current.name}</h2>
+              {current.topicName && <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-indigo-400">{current.topicName}</p>}
+              <h2 className="mt-1 text-lg font-bold text-slate-900">{current.name}</h2>
               <p className="mt-0.5 text-xs text-slate-500">
                 {STATUS_LABEL[current.status]}
                 {current.responses > 0 ? ` · ${current.responses} response${current.responses === 1 ? '' : 's'}` : ' · No responses yet'}
@@ -288,7 +319,12 @@ function KnowledgeMapView({
         <span className="text-slate-400">Reads downwards. Arrows point from the prerequisite to what needs it.</span>
       </div>
 
-      <DepthGraph concepts={data.concepts} edges={data.edges} onOpenConcept={onOpenConcept} />
+      <DepthGraph
+        concepts={data.concepts}
+        edges={data.edges}
+        onOpenConcept={onOpenConcept}
+        currentStandardId={current?.standardId ?? null}
+      />
 
       <DependencyTable concepts={data.concepts} edges={data.edges} />
 
@@ -486,10 +522,13 @@ function DepthGraph({
   concepts,
   edges,
   onOpenConcept,
+  currentStandardId,
 }: {
   concepts: KnowledgeMapConcept[];
   edges: KnowledgeMapEdge[];
   onOpenConcept: (conceptId: number) => void;
+  /** The standard the chapter being viewed belongs to — lets a card tell "another chapter, same grade" apart from "a different grade entirely". */
+  currentStandardId: number | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -691,6 +730,7 @@ function DepthGraph({
                     onOpenConcept={onOpenConcept}
                     onActivate={activate}
                     onDeactivate={deactivate}
+                    currentStandardId={currentStandardId}
                   />
                 </div>
               ))}
@@ -724,12 +764,14 @@ function GraphNode({
   onOpenConcept,
   onActivate,
   onDeactivate,
+  currentStandardId,
 }: {
   concept: KnowledgeMapConcept;
   emphasis: Emphasis;
   onOpenConcept: (conceptId: number) => void;
   onActivate: (conceptId: number) => void;
   onDeactivate: () => void;
+  currentStandardId: number | null;
 }) {
   const clickable = concept.status !== 'locked' && concept.status !== 'not_ready';
   const cta = ctaLabel(concept.status);
@@ -746,6 +788,9 @@ function GraphNode({
       {concept.isCurrent && (
         <span className="absolute -top-3 left-3 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">You are here</span>
       )}
+      {concept.topicName && (
+        <div className="truncate text-[9.5px] font-medium uppercase tracking-wide text-slate-400">{concept.topicName}</div>
+      )}
       <div className="flex items-center gap-1.5">
         <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[concept.status]}`} />
         <span className="truncate text-sm font-semibold text-slate-900">{concept.name}</span>
@@ -754,6 +799,11 @@ function GraphNode({
         {STATUS_LABEL[concept.status]}
         {concept.responses > 0 ? ` · ${concept.responses} response${concept.responses === 1 ? '' : 's'}` : ' · No responses'}
       </div>
+      {locationLabel(concept, currentStandardId) && (
+        <div className="mt-0.5 truncate text-[10px] font-medium uppercase tracking-wide text-indigo-400">
+          {locationLabel(concept, currentStandardId)}
+        </div>
+      )}
       {concept.misconceptionCount > 0 && (
         <div className="text-[11px] text-slate-400">
           {concept.misconceptionCount} misconception{concept.misconceptionCount === 1 ? '' : 's'}

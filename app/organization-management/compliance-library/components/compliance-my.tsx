@@ -9,52 +9,41 @@
  * by the backend, not by hiding rows client-side.
  */
 
-import { Eye, Paperclip } from 'lucide-react'
-import { Badge } from '@/components/ui/g2g/badge'
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Eye, ListChecks, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/g2g/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/g2g/card'
-import { StatusBadge } from '@/components/ui/status-badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/g2g/table'
 import { useMyCompliance } from '../../_lib/use-compliance-extras'
 import { displayDate, TableSkeleton } from './compliance-library-management-shared'
-
-const PRIORITY_VARIANT: Record<string, 'default' | 'navy' | 'warning' | 'destructive'> = {
-  Low: 'default',
-  Medium: 'navy',
-  High: 'warning',
-  Critical: 'destructive',
-}
+import { PriorityPill, StatTile, StatusPill, TABLE_HEADER_CLASS, ToneBadge, type Tone } from './compliance-theme'
 
 export function MyCompliance({ onSelectRecord }: { onSelectRecord: (id: string) => void }) {
   const { records, summary, loading } = useMyCompliance()
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {[
-          { label: 'Total', value: summary?.total ?? 0 },
-          { label: 'Upcoming', value: summary?.upcoming ?? 0 },
-          { label: 'Due Soon', value: summary?.due_soon ?? 0 },
-          { label: 'Overdue', value: summary?.overdue ?? 0 },
-          { label: 'Completed', value: summary?.completed ?? 0 },
-        ].map((stat) => (
-          <div key={stat.label} className="rounded-xl border border-border/70 bg-background/80 p-4 shadow-sm">
-            <p className="text-sm text-muted-foreground">{stat.label}</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{stat.value}</p>
-          </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {([
+          { label: 'Total', value: summary?.total ?? 0, tone: 'brand', icon: ListChecks },
+          { label: 'Upcoming', value: summary?.upcoming ?? 0, tone: 'info', icon: CalendarClock },
+          { label: 'Due soon', value: summary?.due_soon ?? 0, tone: 'warning', icon: Clock },
+          { label: 'Overdue', value: summary?.overdue ?? 0, tone: 'error', icon: AlertTriangle },
+          { label: 'Completed', value: summary?.completed ?? 0, tone: 'success', icon: CheckCircle2 },
+        ] as { label: string; value: number; tone: Tone; icon: typeof Clock }[]).map((stat) => (
+          <StatTile key={stat.label} label={stat.label} value={stat.value} tone={stat.tone} icon={<stat.icon className="size-4" />} />
         ))}
       </div>
 
       <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle className="text-lg">My Compliance</CardTitle>
+          <CardTitle className="text-lg">My compliance</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <TableSkeleton />
           ) : (
             <Table>
-              <TableHeader>
+              <TableHeader className={TABLE_HEADER_CLASS}>
                 <TableRow>
                   <TableHead>Compliance</TableHead>
                   <TableHead>Due Date</TableHead>
@@ -77,22 +66,22 @@ export function MyCompliance({ onSelectRecord }: { onSelectRecord: (id: string) 
                       <TableCell className="font-medium text-foreground">{record.name}</TableCell>
                       <TableCell>{displayDate(record.due_date)}</TableCell>
                       <TableCell>
-                        <Badge variant={PRIORITY_VARIANT[record.priority ?? ''] ?? 'default'}>{record.priority ?? '-'}</Badge>
+                        <PriorityPill priority={record.priority} />
                       </TableCell>
                       <TableCell>
-                        <StatusBadge status={record.derived_status ?? record.status ?? undefined} size="sm" />
+                        <StatusPill status={record.derived_status ?? record.status} />
                       </TableCell>
                       <TableCell>
                         {record.evidence_count ? (
-                          <span className="inline-flex items-center gap-1 text-primary">
-                            <Paperclip className="size-3.5" /> {record.evidence_count}
-                          </span>
+                          <ToneBadge tone="info">
+                            <Paperclip className="size-3" /> {record.evidence_count}
+                          </ToneBadge>
                         ) : (
                           <span className="text-muted-foreground">None</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon-sm" aria-label={`View ${record.name}`} onClick={() => onSelectRecord(String(record.id))}>
+                        <Button variant="ghost" size="icon-sm" className="text-slate-600 hover:bg-slate-100 hover:text-slate-900" aria-label={`View ${record.name}`} onClick={() => onSelectRecord(String(record.id))}>
                           <Eye className="size-4" />
                         </Button>
                       </TableCell>

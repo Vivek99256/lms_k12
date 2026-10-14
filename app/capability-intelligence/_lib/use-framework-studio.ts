@@ -49,6 +49,18 @@ export interface UseCompetencyStudioState {
   matrixError: string | null;
   loadMatrix: (category: string | null, jobroles: string[]) => Promise<void>;
 
+  /** The Framework -> Competency hierarchy for one framework (its
+   * `s_competency_framework_items`, joined to the skill catalog) — the real
+   * data `GET /competency/frameworks/{id}` already returns via
+   * `CompetencyFrameworkController::show()`, not previously read by this
+   * screen (only the framework LIST, never one framework's own items, was
+   * wired here). */
+  frameworkDetail: Framework | null;
+  frameworkDetailLoading: boolean;
+  frameworkDetailError: string | null;
+  viewFramework: (id: number) => Promise<void>;
+  clearFrameworkDetail: () => void;
+
   reviews: MappingReview[];
   reviewCounts: ReviewCounts;
   reviewsLoading: boolean;
@@ -96,6 +108,10 @@ export function useCompetencyStudio(structureSearch = ''): UseCompetencyStudioSt
   const [reviewCounts, setReviewCounts] = useState<ReviewCounts>(EMPTY_COUNTS);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
+
+  const [frameworkDetail, setFrameworkDetail] = useState<Framework | null>(null);
+  const [frameworkDetailLoading, setFrameworkDetailLoading] = useState(false);
+  const [frameworkDetailError, setFrameworkDetailError] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -152,6 +168,25 @@ export function useCompetencyStudio(structureSearch = ''): UseCompetencyStudioSt
     } finally {
       setMatrixLoading(false);
     }
+  }, []);
+
+  const viewFramework = useCallback(async (id: number) => {
+    setFrameworkDetailLoading(true);
+    setFrameworkDetailError(null);
+    try {
+      const res = await competencyStudioService.getFramework(buildSessionContext(), id);
+      setFrameworkDetail(res.data ?? null);
+    } catch (err) {
+      setFrameworkDetailError(toMessage(err, 'Couldn’t load this framework’s competencies.'));
+      setFrameworkDetail(null);
+    } finally {
+      setFrameworkDetailLoading(false);
+    }
+  }, []);
+
+  const clearFrameworkDetail = useCallback(() => {
+    setFrameworkDetail(null);
+    setFrameworkDetailError(null);
   }, []);
 
   const loadReviews = useCallback(async (status: string) => {
@@ -296,6 +331,12 @@ export function useCompetencyStudio(structureSearch = ''): UseCompetencyStudioSt
     matrixLoading,
     matrixError,
     loadMatrix,
+
+    frameworkDetail,
+    frameworkDetailLoading,
+    frameworkDetailError,
+    viewFramework,
+    clearFrameworkDetail,
 
     reviews,
     reviewCounts,

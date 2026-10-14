@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Compliance Templates management - Compliance Management,
+ * Compliance templates management - Compliance Management,
  * frontend-completion pass. New component; backs the register's "Create
  * from Template" picker (`ComplianceForm`'s `templates`/`onApplyTemplate`
  * props) with somewhere to actually manage those templates. Same
@@ -12,7 +12,7 @@
 import { useState } from 'react'
 import { Copy, Edit3, FileText, Plus, Trash2 } from 'lucide-react'
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/g2g/badge'
+import { IconTile, TABLE_HEADER_CLASS, ToneBadge } from './compliance-theme'
 import { Button } from '@/components/ui/g2g/button'
 import { Card, CardContent, CardHeader, CardDescription, CardTitle } from '@/components/ui/g2g/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -83,7 +83,8 @@ export function ComplianceTemplates({ categoryOptions, isAdmin }: { categoryOpti
       <CardHeader className="flex-row items-center justify-between gap-4">
         <div>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="size-5 text-primary" /> Compliance Templates
+            <IconTile tone="warning"><FileText className="size-5" /></IconTile>
+            Compliance templates
           </CardTitle>
           <CardDescription>Reusable starting points for common inspections and renewals - pick one when creating a compliance record.</CardDescription>
         </div>
@@ -94,12 +95,12 @@ export function ComplianceTemplates({ categoryOptions, isAdmin }: { categoryOpti
         )}
       </CardHeader>
       <CardContent className="p-0">
-        {notice && <div className="mx-4 mb-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">{notice}</div>}
+        {notice && <div className="mx-4 mb-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{notice}</div>}
         {loading ? (
           <TableSkeleton />
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className={TABLE_HEADER_CLASS}>
               <TableRow>
                 <TableHead>Template Name</TableHead>
                 <TableHead>Category</TableHead>
@@ -117,7 +118,7 @@ export function ComplianceTemplates({ categoryOptions, isAdmin }: { categoryOpti
                   <TableCell>{template.default_frequency ?? '-'}</TableCell>
                   <TableCell>{template.default_priority ?? '-'}</TableCell>
                   <TableCell>
-                    <Badge variant={template.is_global ? 'muted' : 'navy'}>{template.is_global ? 'Platform default' : 'This school'}</Badge>
+                    <ToneBadge tone={template.is_global ? 'neutral' : 'brand'}>{template.is_global ? 'Platform default' : 'This school'}</ToneBadge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">

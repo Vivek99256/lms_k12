@@ -24,8 +24,11 @@ export const MODULE_DASHBOARD_ROUTES: Record<string, string> = {
   hostel: '/hostel/dashboard',
   transportation: '/Transportation/dashboard',
   transport: '/Transportation/dashboard',
-  document: '/documents',
-  documents: '/documents',
+  // The Document module's dashboard entry lands on the IDMS library, matching the
+  // Platform Services menu. /documents still exists but is the legacy
+  // aggregation view, not what the module advertises.
+  document: '/documents_new',
+  documents: '/documents_new',
 };
 
 export function resolveModuleDashboardRoute(label: string | null | undefined): string | undefined {

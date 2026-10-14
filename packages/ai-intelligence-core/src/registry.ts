@@ -340,9 +340,22 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
     whyCentral:
       'Ingestion, chunking and embedding are expensive and identical everywhere. What differs is only which corpus a tenant may read — which is an access rule, not a reason for three pipelines.',
     todayInK12:
-      'Enterprise Brain carries the knowledge screens (library, ESO library, memory, KASBA). There is no shared ingestion contract and no roadmap row.',
+      'Real, but product-local rather than shared. `ContentEmbeddingService` (2026-10-10) chunks a ' +
+      '`content_master` document, embeds each chunk via `GeminiClient::embed()`, and scores retrieval by plain ' +
+      'cosine similarity — no vector DB, mirroring hpbrain_backend\'s own `KnowledgeIngestionService`/' +
+      '`Embeddings` pattern (read before writing this) rather than inventing a second shape for the same ' +
+      'contract. `POST /api/ai/knowledge-rag/ask` (2026-10-12) extends that into free-text question answering: ' +
+      'it retrieves the closest chunks for one institute\'s own curriculum documents and asks the model to ' +
+      'answer only from them, reporting `ok` / `insufficient_evidence` / `model_unavailable` rather than ever ' +
+      'guessing — the same grounded-only discipline `CareerQuestNarrator` and `CoherenceMapController::explain()` ' +
+      'already use. Enterprise Brain separately carries its own knowledge screens (library, ESO library, memory, ' +
+      'KASBA). Neither is the other: there is still no shared ingestion contract, no cross-product corpus, and ' +
+      'no roadmap row — this is one product\'s own working implementation of the pattern, not the centralised ' +
+      'service this entry describes.',
     toCentralise: [
-      'One ingestion pipeline: source, chunking, embedding, refresh schedule.',
+      'One ingestion pipeline: source, chunking, embedding, refresh schedule — today there are two working ' +
+        'but separate implementations of this shape (K-12\'s `ContentEmbeddingService`, hpbrain_backend\'s ' +
+        '`KnowledgeIngestionService`), not one shared pipeline.',
       'Corpora scoped by tenant and by product, so retrieval cannot cross a boundary.',
       'A retrieval contract the runtime calls, so a caller asks a question and never runs a search.',
     ],
@@ -351,15 +364,15 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
       'Embedding cost is paid once per document rather than once per product.',
       'Answers cite a passage, which is what makes them checkable.',
     ],
-    status: 'coming-soon',
+    status: 'in-progress',
     solutions: {
       lms_k12: {
-        today: 'no',
-        use: 'Would ground answers in circulars, policies and curriculum documents.',
+        today: 'partial',
+        use: 'Grounds free-text answers in this institute\'s own ingested curriculum content via `/ai/knowledge-rag`; not yet extended to circulars or policies, and not a shared corpus another product can read.',
       },
       g2g: {
         today: 'no',
-        use: 'Would ground them in competency frameworks and role definitions.',
+        use: 'Would ground answers in competency frameworks and role definitions.',
       },
       enterprise_brain: {
         today: 'partial',
@@ -413,11 +426,26 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
     whyCentral:
       'This is the substrate the other capabilities stand on. A student’s evidence in K-12, their capability record in G2G and their signals in Enterprise Brain describe one person; kept apart they describe three.',
     todayInK12:
-      'Not built as a shared store. Enterprise Brain has a graph screen, and concept intelligence is live over its own records.',
+      'Not built as a shared store, and that is a more specific gap than "not built": K-12 already runs a ' +
+      'large, live Neo4j graph (see `GraphSchema`/`CoherenceGraphProjection` and the `neo4j_sync_trigger_*` ' +
+      'tables) — it is simply product-specific, reachable only from inside K-12, and keyed to K-12\'s own id ' +
+      'space. A documented shared vocabulary now exists describing how K-12\'s, G2G\'s and Enterprise Brain\'s ' +
+      'graph labels relate to each other, which is necessary groundwork but is a document, not a query path. ' +
+      'No shared cross-product query endpoint exists today. The nearest real attempt is EB-side, not ' +
+      'K-12-exposed: hpbrain_backend\'s `PersonProfileController` (`GET /api/.../person/{id}/profile`) does its ' +
+      'own ad hoc cross-schema reads — a direct same-schema join for G2G/EB (confirmed to share `hp_erp` and the ' +
+      'same `tbluser` id space before it was built), and, for K-12, a lookup through ' +
+      '`cross_product_identity_links`, a crosswalk that today holds zero confirmed rows (73 proposals, none yet ' +
+      'reviewed) — so even that controller\'s K-12 section honestly reports "not yet confirmed" rather than a ' +
+      'result. That is the honest state of cross-product identity, not a shared knowledge graph. Enterprise ' +
+      'Brain has its own graph screen, and K-12\'s concept intelligence is live over its own records — three ' +
+      'real, separate stores, not one.',
     toCentralise: [
-      'One entity and relationship model spanning learner, capability, role, concept and evidence.',
+      'One entity and relationship model spanning learner, capability, role, concept and evidence — the ' +
+        'shared vocabulary document is a first step toward this, not this itself.',
       'Write contracts, so each product contributes facts without owning the schema.',
       'Tenant isolation in the store itself, not in the callers.',
+      'A real cross-product identity crosswalk with confirmed (not merely proposed) rows — `PersonProfileController`\'s own K-12 section cannot resolve a person today for exactly this reason.',
     ],
     afterCentralisation: [
       'One record of what is known about an entity, contributed to by all three products.',
@@ -429,7 +457,7 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
     solutions: {
       lms_k12: {
         today: 'no',
-        use: 'Would contribute learning evidence and read capability context back.',
+        use: 'Runs its own large, live, product-specific graph already (see `todayInK12`); would contribute that learning evidence to a shared store and read capability context back — neither direction exists yet.',
       },
       g2g: {
         today: 'no',
@@ -437,7 +465,7 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
       },
       enterprise_brain: {
         today: 'partial',
-        use: 'Has the graph screen and is the natural host for the shared store.',
+        use: 'Has the graph screen and is the natural host for the shared store; its own `PersonProfileController` cross-product read is the nearest real attempt, and even it cannot resolve a K-12 identity yet (see `todayInK12`).',
       },
     },
   },

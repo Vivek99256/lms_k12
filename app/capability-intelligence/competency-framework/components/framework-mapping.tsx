@@ -24,7 +24,7 @@ import {
   Info, Copy, Download, Upload, Plus, ChevronDown, ChevronRight,
   LayoutGrid, Users, Calendar, Search, Layers, Edit2, Trash2, ListChecks, Send,
   Check, X, Folder, FileText, PieChart, Map as MapIcon,
-  DownloadCloud, Loader2, MoreVertical, Settings, Filter,
+  DownloadCloud, Loader2, MoreVertical, Settings, Filter, Eye,
 } from 'lucide-react'
 import { Select } from '@/components/ui/g2g/select'
 import { Button } from '@/components/ui/g2g/button'
@@ -139,6 +139,15 @@ export function FrameworkMapping() {
   const [showLegend, setShowLegend] = useState(true)
 
   // Dialog state
+  const [frameworkDetailOpen, setFrameworkDetailOpen] = useState(false)
+  const openFrameworkDetail = (id: number) => {
+    setFrameworkDetailOpen(true)
+    viewFramework(id)
+  }
+  const closeFrameworkDetail = () => {
+    setFrameworkDetailOpen(false)
+    clearFrameworkDetail()
+  }
   const [frameworkDialog, setFrameworkDialog] = useState<{ open: boolean; editing: Framework | null }>({ open: false, editing: null })
   const [categoryDialog, setCategoryDialog] = useState(false)
   const [bulkDialog, setBulkDialog] = useState(false)
@@ -151,6 +160,7 @@ export function FrameworkMapping() {
   const {
     loading, error, summary, structure, proficiency, weights, frameworks, roles, retry,
     matrix, matrixLoading, loadMatrix,
+    frameworkDetail, frameworkDetailLoading, frameworkDetailError, viewFramework, clearFrameworkDetail,
     reviews, reviewCounts, reviewsLoading, loadReviews,
     saving, actionMessage, actionError, clearMessages,
     saveCell, clearCell, saveWeights, createFramework, updateFramework,
@@ -490,7 +500,19 @@ export function FrameworkMapping() {
                 <Layers className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-foreground truncate">{summary?.active_framework?.name ?? 'No active framework'}</p>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <p className="text-sm font-bold text-foreground truncate">{summary?.active_framework?.name ?? 'No active framework'}</p>
+                  {summary?.active_framework && (
+                    <button
+                      onClick={() => openFrameworkDetail(summary.active_framework!.id)}
+                      aria-label={`View ${summary.active_framework.name}'s competencies`}
+                      title="View competencies"
+                      className="text-muted-foreground hover:text-primary shrink-0"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-1">
                   {summary?.active_framework && (
                     <StatusBadge variant={frameworkStatusVariant(summary.active_framework.status)} label={summary.active_framework.status === 'active' ? 'Published' : summary.active_framework.status} size="sm" />
@@ -518,6 +540,7 @@ export function FrameworkMapping() {
                               <Send className="w-3.5 h-3.5" />
                             </button>
                           )}
+                          <button onClick={() => openFrameworkDetail(fw.id)} aria-label={`View ${fw.name}'s competencies`} title="View competencies" className="text-muted-foreground hover:text-primary"><Eye className="w-3.5 h-3.5" /></button>
                           <button onClick={() => openFrameworkDialog(fw)} aria-label={`Edit ${fw.name}`} className="text-muted-foreground hover:text-primary"><Edit2 className="w-3.5 h-3.5" /></button>
                           <button onClick={() => deleteFramework(fw.id)} aria-label={`Delete ${fw.name}`} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
@@ -1066,6 +1089,68 @@ export function FrameworkMapping() {
             <Button onClick={submitFramework} disabled={saving || !fwForm.name.trim()} className="h-9 px-6 rounded-lg font-bold bg-primary text-primary-foreground hover:bg-primary/90">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : (frameworkDialog.editing ? 'Save' : 'Create')}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Framework Competencies Dialog — the Framework -> Competency hierarchy
+          itself: `s_competency_framework_items` joined to the skill catalog,
+          via `GET /competency/frameworks/{id}` (CompetencyFrameworkController
+          ::show()/frameworkItems()), already real on the backend and now read
+          here for the first time. */}
+      <Dialog open={frameworkDetailOpen} onOpenChange={open => { if (!open) closeFrameworkDetail() }}>
+        <DialogContent className="sm:max-w-[640px] p-0 overflow-hidden max-h-[80vh] flex flex-col">
+          <DialogHeader className="p-6 pb-4 border-b border-primary/10 m-0 shrink-0">
+            <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+              {frameworkDetail?.name ?? 'Framework'}
+              {frameworkDetail && (
+                <StatusBadge variant={frameworkStatusVariant(frameworkDetail.status)} label={frameworkDetail.status === 'active' ? 'Published' : frameworkDetail.status} size="sm" />
+              )}
+            </DialogTitle>
+            {frameworkDetail && (
+              <p className="text-sm text-muted-foreground">
+                Version {frameworkDetail.version} · {frameworkDetail.items?.length ?? 0} competenc{(frameworkDetail.items?.length ?? 0) === 1 ? 'y' : 'ies'}
+              </p>
+            )}
+          </DialogHeader>
+          <div className="p-6 overflow-y-auto g2g-scrollbar flex-1">
+            {frameworkDetailLoading ? (
+              <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            ) : frameworkDetailError ? (
+              <ErrorState title="Couldn't load this framework" description={frameworkDetailError} retry={() => frameworkDetail && openFrameworkDetail(frameworkDetail.id)} />
+            ) : !frameworkDetail?.items?.length ? (
+              <EmptyState icon={<LayoutGrid className="w-10 h-10" />} title="No competencies yet" description="This framework has no competencies mapped to it." />
+            ) : (
+              <Table className="w-full text-sm">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="px-3 py-2 font-bold text-foreground">Competency</TableHead>
+                    <TableHead className="px-3 py-2 font-bold text-foreground">Category</TableHead>
+                    <TableHead className="px-3 py-2 text-center font-bold text-foreground">Required Level</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border">
+                  {frameworkDetail.items.map(item => (
+                    <TableRow key={item.id}>
+                      <TableCell className="px-3 py-2 font-medium text-foreground">{item.competency_name ?? `#${item.competency_id}`}</TableCell>
+                      <TableCell className="px-3 py-2 text-muted-foreground">
+                        {item.category ?? '—'}{item.sub_category ? ` / ${item.sub_category}` : ''}
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-center">
+                        {item.required_proficiency ? (
+                          <span className="inline-flex items-center gap-1.5 font-bold text-foreground">
+                            <span className={`w-2 h-2 rounded-full ${levelColor(Number(item.required_proficiency))}`} /> {item.required_proficiency}
+                          </span>
+                        ) : '—'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <DialogFooter className="p-6 pt-4 border-t border-primary/5 bg-muted/10 m-0 shrink-0">
+            <Button variant="outline" onClick={closeFrameworkDetail} className="h-9 px-6 rounded-lg font-bold border-border bg-background">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

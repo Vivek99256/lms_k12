@@ -35,6 +35,7 @@ export interface DiagnosticLikeQuestion {
   modelAnswer: string | null;
   assertion: string | null;
   reason: string | null;
+  pairs?: Array<{ left: string; right: string }> | null;
   standardId: number | null;
   subjectId: number | null;
   chapterId: number | null;
@@ -50,6 +51,7 @@ export function toBankQuestion(question: DiagnosticLikeQuestion): BankQuestion {
     model_answer: question.modelAnswer,
     assertion: question.assertion,
     reason: question.reason,
+    pairs: question.pairs ?? null,
     options: question.options.map((option, index) => ({
       label: String.fromCharCode(65 + index),
       text: option.answer,

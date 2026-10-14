@@ -89,6 +89,8 @@ export interface PalExamQuestion {
   difficulty: string | null;
   assertion: string | null;
   reason: string | null;
+  /** Structured match-the-following pairs; absent / null on any row without them. */
+  pairs?: Array<{ left: string; right: string }> | null;
   standardId: number | null;
   subjectId: number | null;
   chapterId: number | null;
@@ -114,6 +116,7 @@ export function toBankQuestion(question: PalExamQuestion): BankQuestion {
     difficulty: question.difficulty,
     assertion: question.assertion,
     reason: question.reason,
+    pairs: question.pairs ?? null,
     options: question.options.map((option, index) => ({
       // A..Z by stored order, matching how the bank endpoint labels the same
       // rows, so a question reads identically in PAL and in the bank.

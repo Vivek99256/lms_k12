@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
+import { JourneyRail, stagesBefore, type JourneyStageKey } from '@/app/pal/_components/JourneyRail';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -82,6 +83,9 @@ function EsoConceptFlow() {
   const viewAsStudent = useViewAsStudent();
 
   const conceptId = Number(searchParams.get('conceptId') || '0');
+  const chapterId =
+    searchParams.get('chapterId') ||
+    (typeof window !== 'undefined' ? sessionStorage.getItem('pal_active_chapter_id') : null);
   // The real student entry point (AdaptiveLearningButton) never puts
   // learnerId in this URL — it always resolves to defaultLearnerId(), the
   // authenticated session's own id. `?learnerId=` is read here only for
@@ -207,15 +211,29 @@ function EsoConceptFlow() {
     );
   }
 
-  // The stage list, and - while practising - how far through the phase they
+  const resolveEsoStage = (): JourneyStageKey => {
+    if (planPending) return 'plan';
+    const act = action?.action ?? '';
+    if (act === 'teach' || act === 'reteach') return 'learn';
+    if (act === 'practice' || act === 'continue_practice') return 'practice';
+    if (act === 'check_understanding') return 'check';
+    if (act === 'mastered_stop_practice') return 'mastery';
+    if (act === 'retrieval_due' || act === 'retained' || act === 'reloop_node') return 'recall';
+    return 'practice';
+  };
+  const esoStage = resolveEsoStage();
+
+  // The journey rail and - while practising - how far through the phase they
   // are. Both were inline above the step before; in the rail they stay visible
   // without pushing the question itself down the page.
   const rail = (
     <>
-      <PalRailSection title="Your progress">
-        <LearningFlowRail
-          action={action?.action ?? ''}
-          stageKey={planPending ? 'plan' : undefined}
+      <PalRailSection title="Your journey">
+        <JourneyRail
+          current={esoStage}
+          completed={stagesBefore(esoStage)}
+          chapterId={chapterId}
+          conceptId={conceptId}
           orientation="vertical"
         />
       </PalRailSection>

@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Users, GraduationCap, School, Wallet, UserPlus, BookOpenCheck, Megaphone, MessageCircleWarning, FileText, Settings, Cake } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchAdminDashboard, getDashboardSession, type AdminDashboardSummary } from '@/app/dashboard/_lib/dashboard-api';
+import { DashboardAuthError, fetchAdminDashboard, getDashboardSession, type AdminDashboardSummary } from '@/app/dashboard/_lib/dashboard-api';
 import { DashboardError, DashboardSkeleton, EmptyState, QuickActionLink, SectionPanel, StatCard } from '@/app/dashboard/_components/DashboardPrimitives';
 import { DashboardBarChart } from '@/app/dashboard/_components/DashboardBarChart';
 import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
@@ -32,7 +32,7 @@ function formatCurrency(amount: number) {
 }
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [data, setData] = useState<AdminDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,9 +47,19 @@ export default function AdminDashboard() {
     const session = getDashboardSession();
     fetchAdminDashboard(session)
       .then(setData)
-      .catch((err: Error) => setError(err.message))
+      .catch((err: Error) => {
+        // The stored session is gone/invalid (expired, or cleared by a
+        // sign-out/timeout in another tab) — "Try again" would just hit the
+        // same empty session again, so sign out properly instead.
+        if (err instanceof DashboardAuthError) {
+          setError('Your session has expired. Signing you out...');
+          logout();
+          return;
+        }
+        setError(err.message);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [logout]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

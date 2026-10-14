@@ -2,6 +2,12 @@
 import { getRequestContext, getSyear } from '../page';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { buildSessionContext } from '@/lib/erp-client';
+import type { PrayogshalaActivity } from './prayogshala';
+import { pdfDownloadName, studyDeckPdfRequest } from '@/lib/study-deck/pdf';
+import {
+  normaliseGeneratableFormats,
+  type GeneratableFormat,
+} from '@/lib/question-generation/generatable-formats';
 
 export interface Chapter {
   id: string;
@@ -579,6 +585,51 @@ export interface ChapterContentAsset {
   h5p_type?: string;
   /** Route of the existing H5P editor this item opens in. */
   deep_link?: string;
+  /**
+   * Prayogshala items are merged in by the backend like H5P ones: a namespaced string id
+   * ("prayogshala:7"), content_category 'Prayogshala', and the whole activity under
+   * `prayogshala` so opening one needs no second request.
+   */
+  prayogshala?: PrayogshalaActivity;
+  topic_name?: string | null;
+  /** Canonical URL of a study deck's classroom PDF. Only present when the PDF is really stored. */
+  pdf_url?: string;
+  /**
+   * Set by the server on a study document: revision notes, a remedial class or classroom activities written by the study
+   * pipeline, whose PDF is the primary file and which open in place with an online practice (see lib/study-document).
+   * Absent on every other row, and never guessed from a title or a category.
+   */
+  study_doc_kind?: 'revision_notes' | 'remedial' | 'activities' | null;
+}
+
+/**
+ * Download a study deck's classroom PDF. The server finds the file from the content item and checks that the item
+ * belongs to this chapter and school; the browser only receives the bytes.
+ */
+export async function downloadStudyDeckPdf(chapterId: number, contentId: number, subInstituteId: number, fileName?: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-study-deck/pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/pdf' },
+    body: JSON.stringify(studyDeckPdfRequest(chapterId, contentId, subInstituteId)),
+  });
+  if (!res.ok) {
+    let message = 'Couldn’t download the PDF.';
+    try {
+      message = ((await res.json()) as { message?: string }).message || message;
+    } catch {
+      /* keep the default */
+    }
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = pdfDownloadName(res.headers.get('Content-Disposition'), fileName);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export interface ChapterContentResponse {
@@ -644,8 +695,24 @@ export interface GenerateIntelligenceQuestionsRequest {
   subject_id: number;
   standard_id: number;
   chapter_id: number;
-  question_type_id: number;
-  question_type: IntelligenceQuestionType;
+  /**
+   * The `question_type_catalog.code` to generate, from the formats endpoint
+   * (fetchGeneratableQuestionFormats). The teacher picks it; the model never does.
+   *
+   * There is deliberately no `question_type_id` here: the server resolves it from
+   * the catalogue, and ignores one if it is sent. `question_type` ('mcq' |
+   * 'narrative') still works as a legacy alias for callers that predate formats.
+   */
+  question_format_code?: string;
+  /**
+   * Several catalogue codes in one request. The server validates each against the
+   * same registry + catalogue rules, splits `total_questions` evenly across them
+   * (registry order, remainder to the first formats) and generates each share through
+   * the ordinary single-format path. One entry behaves exactly like `question_format_code`.
+   * Wins over `question_format_code` when both are sent.
+   */
+  question_format_codes?: string[];
+  question_type?: IntelligenceQuestionType;
   total_questions: number;
   grade_id?: number;
   quota?: IntelligenceQuestionQuotaRow[];
@@ -653,7 +720,8 @@ export interface GenerateIntelligenceQuestionsRequest {
 
 export interface GeneratedQuestionPreview {
   id: number;
-  question_type: IntelligenceQuestionType;
+  /** The catalogue code the question was generated as ('mcq', 'true_false', ...). */
+  question_type: string;
   question_title: string;
   description?: string;
   subconcept?: string;
@@ -681,7 +749,37 @@ export interface GeneratedQuestionPreview {
       knowledge_ref?: string;
       mark?: number;
     }>;
+    /** fill_blank: one answer per gap, in order. */
+    answers?: string[];
+    /** match_following: the structured pairs, in answer-key order. */
+    pairs?: Array<{ left: string; right: string }>;
+    /** assertion_reason: the two halves, kept apart. */
+    assertion?: string;
+    reason?: string;
+    /** numerical: the unit and the working. */
+    unit?: string | null;
+    solution_steps?: string[];
+    /** case_study: the context and its lettered parts. */
+    stimulus?: string | null;
+    sub_parts?: Array<{ label?: string; text?: string; marks?: number; model_answer?: string }>;
+    /** true_false: the verdict as a boolean. */
+    statement_truth?: boolean;
   };
+}
+
+/** One format's outcome inside a multi-format generation run. */
+export interface GeneratedFormatResult {
+  question_format_code: string;
+  label: string;
+  question_type_id?: number | null;
+  /** False when this format produced nothing (the others may still have succeeded). */
+  status: boolean;
+  message: string;
+  requested: number;
+  generated: number;
+  inserted: number;
+  skipped_duplicate: number;
+  skipped_invalid: number;
 }
 
 export interface GenerateIntelligenceQuestionsResponse {
@@ -695,6 +793,14 @@ export interface GenerateIntelligenceQuestionsResponse {
     skipped_invalid?: number;
     question_ids?: number[];
     questions?: GeneratedQuestionPreview[];
+    /** The catalogue code the run generated, echoed by the server. Null for the legacy narrative alias, and for a multi-format run. */
+    question_format_code?: string | null;
+    /** Every format the run covered, in the order the server ran them. */
+    question_format_codes?: string[];
+    /** One entry per format of a multi-format run: what each was asked for and what it produced. */
+    formats?: GeneratedFormatResult[];
+    /** Resolved server-side from the catalogue, never taken from the request. */
+    question_type_id?: number;
     missing_slice?: boolean;
     [key: string]: unknown;
   };
@@ -859,9 +965,15 @@ export async function fetchChapterContent(
     body.source = options.source;
   }
 
+  // The token is what scopes Prayogshala to the caller's institute on the server; the
+  // sub_institute_id in the body is only honoured for the older content types.
+  const { token } = buildSessionContext();
   const res = await fetch(`${API_BASE_URL}/api/lms-chapter-content`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(body),
   });
 
@@ -938,6 +1050,47 @@ export async function generateIntelligenceQuestions(
     message: (raw.message as string) || 'Questions generated successfully.',
     data: raw.data as GenerateIntelligenceQuestionsResponse['data'],
   };
+}
+
+/**
+ * The question formats a teacher can generate.
+ *
+ * Served by the backend as the formats that are BOTH in `question_type_catalog` and
+ * implemented by the generator, so the modal lists exactly what will work and
+ * nothing is hardcoded here. Behind the same bearer-token gate as generation, but
+ * not rate limited: it spends nothing.
+ */
+export async function fetchGeneratableQuestionFormats(): Promise<GeneratableFormat[]> {
+  const session = buildSessionContext();
+
+  if (!session.token) {
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/intelligence/questions/formats`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${session.token}`,
+    },
+  });
+
+  const raw = await readApiJson(res, 'Failed to load the question formats');
+  if (res.status === 401) {
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+  if (res.status === 403) {
+    throw new Error(
+      getApiErrorMessage(raw, 'You are not authorised to generate questions.')
+    );
+  }
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to load the question formats'));
+  }
+
+  // Defensive: an entry that is not a usable format is dropped, never rendered as a
+  // card the teacher could pick and then watch fail.
+  return normaliseGeneratableFormats(raw.data);
 }
 
 export async function fetchSemanticIntelligenceChapters(): Promise<SemanticIntelligenceChapter[]> {
@@ -1057,6 +1210,12 @@ export interface QuestionBankApiQuestion {
   assertion?: string | null;
   reason?: string | null;
   sub_part_labels?: string[];
+  /** Structured match-the-following pairs; null on every row written before the format-driven generator. */
+  pairs?: Array<{ left: string; right: string }> | null;
+  /** Drag-the-words word bank; null on every row that has none. */
+  distractors?: string[] | null;
+  /** Image-based Drag & Drop payload; null on every row that has none. Checked again by readDragDrop(). */
+  drag_drop?: import('@/lib/h5p/question-bank-h5p-map').DragDropData | null;
   correct_option?: string | null;
 }
 

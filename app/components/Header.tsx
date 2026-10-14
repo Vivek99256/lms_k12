@@ -251,12 +251,15 @@ export default function Header({
     'Notification': '/platform-services/notification',
     'Template': '/general/coming-soon?module=Template',
     'Scheduler': '/platform-services/scheduler',
-    // Document has graduated off the coming-soon placeholder to its real screen
-    // at /documents — a read-only aggregation over the document sources every
-    // other module already owns. Template remains a stub.
-    'Document': '/documents',
+    // Document points at the IDMS library, not the older aggregation dashboard
+    // that still sits at /documents. The dashboard reads counts out of tables
+    // other modules own; IDMS is the upload -> classify -> tag -> find module.
+    // Template remains a stub.
+    'Document': '/documents_new',
     'Integration': '/integration',
-    'Audit': '/user_log',
+    // Audit graduated from the per-user login log to the shared platform audit
+    // trail (read only), served by Laravel at /api/platform/audit.
+    'Audit': '/platform-services/audit',
     // Event Bus has graduated the same way, to a read-only monitoring plane over
     // the sync_log outbox, the audit tables and the outbound send-logs. It is not
     // an event bus: this product has none, and the standing decision is not to
@@ -302,18 +305,23 @@ export default function Header({
     routes: Record<string, string>;
     icons: Record<string, LucideIcon>;
   }[] = [
+    // Three sections side by side, so the three headings share one line. Setup and
+    // configuration used to be a sub-heading folded into Platform services, which
+    // put its label a row below the other two.
     {
       label: 'Platform services',
       href: '/platform-administration',
-      span: 2,
-      columns: [
-        { items: platformServicesItems },
-        { label: 'Setup and configuration', items: platformSetupItems },
-      ],
-      // Merged so one lookup serves the whole section. The two maps have no keys in
-      // common — they describe different screens — so neither can shadow the other.
-      routes: { ...platformServicesRoutes, ...platformSetupRoutes },
-      icons: { ...platformServicesIcons, ...platformSetupIcons },
+      span: 1,
+      columns: [{ items: platformServicesItems }],
+      routes: platformServicesRoutes,
+      icons: platformServicesIcons,
+    },
+    {
+      label: 'Setup and configuration',
+      span: 1,
+      columns: [{ items: platformSetupItems }],
+      routes: platformSetupRoutes,
+      icons: platformSetupIcons,
     },
     {
       label: 'AI and insights',

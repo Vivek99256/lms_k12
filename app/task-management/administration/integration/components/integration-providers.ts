@@ -20,6 +20,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDef[] = [
     // Reuses the existing /easy_com/sms_api screen and API.
     route: '/integration/sms-gateway',
     fields: [
+      { key: 'api_url', label: 'API URL', type: 'text', required: true, placeholder: 'https://sms.example.com/send' },
       { key: 'api_key', label: 'API Key', type: 'password', required: true, placeholder: 'Enter API key' },
       { key: 'sender_id', label: 'Sender ID', type: 'text', required: true, placeholder: 'e.g. TXTSCHL' },
       { key: 'route', label: 'Route', type: 'select', options: [
@@ -38,6 +39,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDef[] = [
     // Reuses the existing /easy_com/whatsapp_api screen and API.
     route: '/integration/whatsapp-api',
     fields: [
+      { key: 'api_url', label: 'API URL', type: 'text', required: true, placeholder: 'https://graph.facebook.com/v19.0' },
       { key: 'access_token', label: 'Access Token', type: 'password', required: true, placeholder: 'Enter access token' },
       { key: 'phone_number_id', label: 'Phone Number ID', type: 'text', required: true, placeholder: 'Enter phone number ID' },
       { key: 'business_account_id', label: 'Business Account ID', type: 'text', required: true, placeholder: 'Enter business account ID' },
@@ -62,7 +64,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDef[] = [
         { label: 'TLS', value: 'tls' },
         { label: 'SSL', value: 'ssl' },
       ]},
-      { key: 'from_email', label: 'From Email', type: 'text', required: true, placeholder: 'noreply@example.com' },
+      { key: 'from_address', label: 'From Email', type: 'text', required: true, placeholder: 'noreply@example.com' },
       { key: 'from_name', label: 'From Name', type: 'text', required: true, placeholder: 'Your Institution Name' },
     ],
   },
@@ -77,7 +79,7 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDef[] = [
     // unimplemented provider, not a new one-off form.
     route: '/integration/push-notification',
     fields: [
-      { key: 'service_account_key', label: 'Service Account Key (JSON)', type: 'textarea', required: true, placeholder: 'Paste your service account JSON key here...' },
+      { key: 'server_key', label: 'Server Key', type: 'password', required: true, placeholder: 'Enter the server key' },
       { key: 'project_id', label: 'Project ID', type: 'text', required: true, placeholder: 'my-project-id' },
     ],
   },
@@ -95,8 +97,9 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDef[] = [
     // opening the generic config form below.
     route: '/integration/online-fees-settings',
     fields: [
-      { key: 'key_id', label: 'Key ID', type: 'text', required: true, placeholder: 'rzp_live_...' },
-      { key: 'key_secret', label: 'Key Secret', type: 'password', required: true, placeholder: 'Enter key secret' },
+      { key: 'merchant_id', label: 'Merchant ID', type: 'text', required: true, placeholder: 'Enter merchant ID' },
+      { key: 'api_key', label: 'API Key', type: 'password', required: true, placeholder: 'rzp_live_...' },
+      { key: 'api_secret', label: 'API Secret', type: 'password', required: true, placeholder: 'Enter API secret' },
       { key: 'webhook_secret', label: 'Webhook Secret', type: 'password', required: true, placeholder: 'Enter webhook secret' },
     ],
   },
@@ -112,8 +115,8 @@ export const INTEGRATION_PROVIDERS: IntegrationProviderDef[] = [
     // Push Notification, above.
     route: '/integration/biometric-attendance',
     fields: [
-      { key: 'device_ip', label: 'Device IP Address', type: 'text', required: true, placeholder: 'e.g. 192.168.1.50' },
-      { key: 'device_port', label: 'Device Port', type: 'number', required: true, placeholder: 'e.g. 4370' },
+      { key: 'device_url', label: 'Device or gateway URL', type: 'text', required: true, placeholder: 'https://attendance.example.com' },
+      { key: 'api_key', label: 'API Key', type: 'password', required: true, placeholder: 'Enter API key' },
       { key: 'device_serial_number', label: 'Device Serial Number', type: 'text', required: true, placeholder: 'Enter device serial number' },
       { key: 'sync_interval', label: 'Sync Interval', type: 'select', options: [
         { label: 'Every 5 minutes', value: '5' },

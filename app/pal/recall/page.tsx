@@ -123,6 +123,7 @@ function RecallView() {
               completed={COMPLETED_THROUGH_MASTERY}
               bypassed={['intervention']}
               orientation="vertical"
+              chapterId={chapterId}
             />
           </PalRailSection>
         </>

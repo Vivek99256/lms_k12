@@ -99,11 +99,21 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
         </div>
         {activeFilters.length > 0 && (
           <div className="flex gap-2 flex-wrap">
-            {activeFilters.map((filter) => (
-              <Badge key={filter.id} variant="secondary">
-                {filter.label}: {filter.value}
-              </Badge>
-            ))}
+            {activeFilters.map((filter) => {
+              // 'select' filters pass an option id as `value` (so the dropdown knows
+              // which option is selected) - the chip should show that option's label,
+              // the same name the dropdown itself displays, not the raw id.
+              const display =
+                filter.type === 'select'
+                  ? (filter.options?.find((opt) => opt.value === filter.value)?.label ?? filter.value)
+                  : filter.value
+
+              return (
+                <Badge key={filter.id} variant="secondary">
+                  {filter.label}: {display}
+                </Badge>
+              )
+            })}
           </div>
         )}
       </div>

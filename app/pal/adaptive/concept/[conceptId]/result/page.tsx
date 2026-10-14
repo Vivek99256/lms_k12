@@ -202,7 +202,14 @@ function ConceptDiagnosticResultView() {
       </PalRailSection>
 
       <PalRailSection title="Your journey">
-        <JourneyRail current="adaptive" completed={stagesBefore('adaptive')} orientation="vertical" />
+        <JourneyRail
+          current="adaptive"
+          completed={stagesBefore('adaptive')}
+          orientation="vertical"
+          chapterId={result.chapterId}
+          conceptId={conceptId}
+          conceptName={result.conceptName}
+        />
       </PalRailSection>
     </>
   );

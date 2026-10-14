@@ -38,7 +38,7 @@ export function useIntegrationManagement() {
     setMessage('')
     try {
       const response = await fetchIntegrationConfigs()
-      setConfigs(response.data.configs)
+      setConfigs(response)
     } catch (reason) {
       setError(toMessage(reason, "Couldn't load integration configs. Try again."))
     } finally {
@@ -63,10 +63,12 @@ export function useIntegrationManagement() {
       setError('')
       setMessage('')
       try {
-        const response = id
-          ? await updateIntegrationConfig(id, payload)
-          : await createIntegrationConfig(payload)
-        setMessage(response.message)
+        if (id) {
+          await updateIntegrationConfig(id, payload)
+        } else {
+          await createIntegrationConfig(payload)
+        }
+        setMessage(id ? 'Integration updated.' : 'Integration saved.')
         await load()
       } catch (reason) {
         setError(toMessage(reason, "Couldn't save the integration config. Try again."))
@@ -87,8 +89,8 @@ export function useIntegrationManagement() {
       setError('')
       setMessage('')
       try {
-        const response = await deleteIntegrationConfig(id)
-        setMessage(response.message)
+        await deleteIntegrationConfig(id)
+        setMessage('Integration removed.')
         await load()
       } catch (reason) {
         setError(toMessage(reason, "Couldn't remove the integration config. Try again."))
@@ -100,13 +102,22 @@ export function useIntegrationManagement() {
   )
 
   const testConnection = useCallback(
-    async (providerKey: string, config: Record<string, unknown>): Promise<{ success: boolean; message: string }> => {
+    async (providerKey: string, _values: Record<string, unknown>): Promise<{ success: boolean; message: string }> => {
       if (!session) {
         return { success: false, message: TASK_SESSION_ERROR }
       }
+      // The server tests the SAVED settings, because that is where the real
+      // secrets live (the form only ever holds them masked). So a saved row has
+      // to exist, and the message says so when it does not.
+      const saved = configs.find((row) => row.provider_key === providerKey)
+      if (!saved) {
+        return { success: false, message: 'Save this configuration first. A connection test runs against the saved settings.' }
+      }
       setTesting(true)
       try {
-        const response = await testIntegrationConnection(providerKey, config)
+        const response = await testIntegrationConnection(saved.id)
+        // The test records its own outcome on the row; show it.
+        await load()
         return { success: response.success, message: response.message }
       } catch (reason) {
         return { success: false, message: toMessage(reason, 'Connection test failed.') }
@@ -114,7 +125,7 @@ export function useIntegrationManagement() {
         setTesting(false)
       }
     },
-    [session],
+    [session, configs, load],
   )
 
   return {

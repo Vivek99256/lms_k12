@@ -17,18 +17,13 @@ installErpAuthFetch();
  * scrolling shell would leave it a fraction of the screen with two toolbars.
  * These routes still sit behind the same authentication gate.
  *
- * /mobile/custom and /mobile-bridge are the other reason this list exists at
- * all: they're what Flutter's WebView actually opens (see MobileWebHandoffApiController
- * / DynamicWebScreen), at phone width with no room to spare -- wrapping them
- * in the admin sidebar doesn't just look wrong, it makes the page unusable.
- * The Mobile Page Builder editor is the same phone-frame-canvas case as the
- * document-template editor above.
+ * /mobile-bridge is the other reason this list exists: it is what the mobile apps open
+ * (see MobileWebHandoffApiController), at phone width with no room to spare -- wrapping it
+ * in the admin sidebar makes the page unusable.
  */
 const FULL_BLEED_ROUTES = [
   '/document-templates/editor',
-  '/mobile/custom',
   '/mobile-bridge',
-  '/general/mobile_page_builder/',
 ];
 
 export default function ConditionalApp({ children }: { children: React.ReactNode }) {
@@ -43,6 +38,18 @@ export default function ConditionalApp({ children }: { children: React.ReactNode
 
   if (!mounted) {
     return null;
+  }
+
+  // The alumni portal is its own sign-in with its own tokens (see app/alumni-portal): it must not show the staff login, and it
+  // never gets the staff sidebar. Matched as an exact path prefix so no other route is affected.
+  if (pathname === '/alumni-portal' || pathname.startsWith('/alumni-portal/')) {
+    return <>{children}</>;
+  }
+
+  // Parents pay school fees from a link the school sends them (app/pay): no account exists for them, so this page
+  // is reachable signed out and never gets the staff sidebar. Matched as an exact path prefix, like the alumni portal.
+  if (pathname === '/pay' || pathname.startsWith('/pay/')) {
+    return <>{children}</>;
   }
 
   if (!isAuthenticated) {

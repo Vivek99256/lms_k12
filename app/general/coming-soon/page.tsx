@@ -17,7 +17,9 @@ import { useRouter } from 'next/navigation';
  * Keyed lowercase; the query string carries the display name ("Document").
  */
 const GRADUATED_MODULES: Record<string, string> = {
-  document: '/documents',
+  // Document resolves to the IDMS library. The older aggregation dashboard at
+  // /documents is still mounted, but it is not what the module advertises now.
+  document: '/documents_new',
   // Event Bus is a monitoring plane over the outbox, audit tables and send-logs
   // that already run — not an event bus, which this product does not have. It
   // lives beside the other Platform Services consoles.

@@ -179,6 +179,8 @@ function ChapterMasteryView() {
                 completed={COMPLETED_THROUGH_CHECK}
                 bypassed={['intervention']}
                 orientation="vertical"
+                chapterId={chapterId}
+                chapterName={data?.chapterName}
               />
             </PalRailSection>
           </>
@@ -225,6 +227,8 @@ function ChapterMasteryView() {
               completed={COMPLETED_THROUGH_CHECK}
               bypassed={['intervention']}
               orientation="vertical"
+              chapterId={chapterId}
+              chapterName={data.chapterName}
             />
           </PalRailSection>
 

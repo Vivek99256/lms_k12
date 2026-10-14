@@ -581,3 +581,37 @@ export const complianceLibraryService = {
       withContextParams(session),
     ),
 };
+
+/**
+ * Whether the logged-in user may manage compliance master data and delete
+ * records. The `is_admin` session flag alone is not reliable: school admins
+ * are identified by their profile (`user_profile_id` / "Admin" profile name)
+ * and often have `is_admin` empty, so the profile name is accepted too.
+ */
+export function isComplianceAdmin(): boolean {
+  const session = buildSessionContext();
+  if (['1', 'true', '1.0'].includes(session.isAdmin)) return true;
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const read = (key: string): Record<string, unknown> => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) ?? sessionStorage.getItem(key) ?? '{}') as unknown;
+        return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+      } catch {
+        return {};
+      }
+    };
+    const records = [read('userData'), read('menuContext'), read('sessionData')];
+    const keys = ['user_profile_name', 'userProfileName', 'profile_name', 'user_profile'];
+    for (const record of records) {
+      for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'string' && /admin|principal|super|management/i.test(value)) return true;
+      }
+    }
+  } catch {
+    // storage unavailable - fall through to non-admin
+  }
+  return false;
+}

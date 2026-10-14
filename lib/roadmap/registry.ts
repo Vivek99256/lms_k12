@@ -108,6 +108,16 @@ export interface RoadmapItem {
   audience: RoadmapAudience;
   /** Where the placeholder for this row is shown, when it has a home. */
   href?: string;
+  /**
+   * Frontend files that prove this row's status, relative to the repo root.
+   *
+   * A status is a claim about the codebase, so the claim carries its proof.
+   * `registry-evidence.test.ts` fails when a listed path disappears, and when a
+   * Platform services row marked live or in-progress lists none, so a status
+   * cannot outlive the code it describes. Backend-only proof goes in a comment
+   * beside the row: this repo cannot check another repo's files.
+   */
+  evidence?: readonly string[];
 }
 
 /**
@@ -624,6 +634,7 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     phase: 'Phase 2',
     status: 'live',
     audience: 'customer',
+    evidence: ['app/login/page.tsx', 'lib/security/session-token.ts'],
   },
   {
     id: 'platform.rbac',
@@ -633,6 +644,7 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     phase: 'Phase 2',
     status: 'live',
     audience: 'customer',
+    evidence: ['app/hooks/usePermission.ts'],
   },
   {
     id: 'platform.audit',
@@ -640,8 +652,15 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: 'Audit trail',
     blurb: 'A permanent record of who changed what, and when.',
     phase: 'Phase 2',
-    status: 'in-progress',
+    // Verified 2026-10-07: shared append-only platform_audit_log with a viewer
+    // (GET /api/platform/audit), written by AuditTrail::record. The platform
+    // services write to it today; other modules adopt it by calling the same
+    // service. Checked by calling the controllers against the database, not
+    // yet over HTTP with a session token.
+    status: 'live',
     audience: 'customer',
+    href: '/platform-services/audit',
+    evidence: ['app/platform-services/audit/page.tsx'],
   },
   {
     id: 'platform.workflow',
@@ -649,24 +668,30 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: 'Approval workflows',
     blurb: 'Approval chains, escalation and delegation, configured per module and component and shared by everything that needs a sign-off.',
     phase: 'Phase 2',
-    // Configuration is live: every approval point in the product is declared,
-    // and a school defines its own chains against them. The engine that runs a
-    // chain against a live record is the remaining half.
-    status: 'in-progress',
+    // Verified 2026-10-07: WorkflowEngine runs a configured chain against a
+    // record (start, approve, reject, delegate, SLA escalation) and the
+    // Approval requests screen drives it. Exercised against the database;
+    // modules start a run by calling the engine for their own approval point.
+    status: 'live',
     audience: 'customer',
     href: '/platform-services/workflow',
+    evidence: ['app/platform-services/workflow/page.tsx', 'app/platform-services/workflow/runs/page.tsx'],
   },
   {
     id: 'platform.notification',
     module: 'Platform services',
     title: 'Notifications',
-    blurb: 'Web, email, mobile, SMS and WhatsApp from one service — configured per module and component, with channels a school can switch off centrally.',
+    blurb: 'Web and email from one service, configured per module and component, with channels a school can switch off centrally. SMS, WhatsApp and mobile are logged as not sent until a provider is connected.',
     phase: 'Phase 2',
-    // Configuration is live. Delivery — the sending, the retries, the receipts —
-    // is the remaining half.
-    status: 'in-progress',
+    // Verified 2026-10-07: NotificationSender honours the channel switches and
+    // per-event settings, sends web and email, retries failures with backoff,
+    // and writes every outcome to a delivery log (Delivery log screen).
+    // SMS, WhatsApp and push have no provider driver yet, so they are recorded
+    // as skipped with the reason and never as sent.
+    status: 'live',
     audience: 'customer',
     href: '/platform-services/notification',
+    evidence: ['app/platform-services/notification/page.tsx', 'app/platform-services/notification/log/page.tsx'],
   },
   {
     id: 'platform.template',
@@ -674,20 +699,29 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: 'Templates and documents',
     blurb: 'Versioned templates with merge fields and PDF output, for receipts, letters and reports.',
     phase: 'Phase 2',
-    status: 'coming-soon',
+    // Verified 2026-10-07: versioned templates with a merge field catalogue,
+    // and a server-side PDF render (POST /api/platform/templates/{id}/pdf)
+    // exercised through the controller. Merge values are supplied by the
+    // caller; the gallery download leaves them blank.
+    status: 'live',
     audience: 'customer',
+    href: '/document-templates',
+    evidence: ['app/document-templates/page.tsx', 'app/document-templates/api.ts', 'lib/platform/client.ts'],
   },
   {
     id: 'platform.scheduler',
     module: 'Platform services',
     title: 'Scheduler',
-    blurb: 'Recurring jobs such as overdue checks and reminder runs, scheduled per module and component.',
+    blurb: 'Recurring jobs such as overdue checks and reminder runs, scheduled per module and component. A job runs once its module registers it.',
     phase: 'Phase 2',
-    // Configuration is live. The dispatcher that ticks and runs them is the
-    // remaining half.
-    status: 'in-progress',
+    // Verified 2026-10-07: platform:schedule-run ticks every minute, finds due
+    // tasks, locks, runs the registered job and records last run. Today one
+    // job is registered (notification retry); a configured task with no job
+    // is reported as not run, never as ok. Also escalates overdue approvals.
+    status: 'live',
     audience: 'customer',
     href: '/platform-services/scheduler',
+    evidence: ['app/platform-services/scheduler/page.tsx'],
   },
   {
     id: 'platform.document',
@@ -695,8 +729,14 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: 'File storage',
     blurb: 'Upload, version and attach files to any record.',
     phase: 'Phase 2',
-    status: 'coming-soon',
+    // Verified 2026-10-07: platform_file_attachments with versioning, tenant
+    // checked download and soft remove, exercised through the controller. Any
+    // screen attaches files by mounting AttachmentsPanel with a record type
+    // and id; it is mounted on the File storage screen.
+    status: 'live',
     audience: 'customer',
+    href: '/platform-services/files',
+    evidence: ['app/platform-services/files/page.tsx', 'app/platform-services/_components/AttachmentsPanel.tsx'],
   },
   {
     id: 'platform.integration',
@@ -704,8 +744,18 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: 'Integrations',
     blurb: 'One place to hold payment gateway, SMS and bank credentials, instead of one copy per module.',
     phase: 'Phase 2',
-    status: 'coming-soon',
+    // Verified 2026-10-07: configs are stored centrally in
+    // platform_integration_configs (secrets encrypted, masked in every
+    // response) through /api/platform/integrations, with a real connectivity
+    // test. The integration administration screen now reads and writes it.
+    status: 'live',
     audience: 'customer',
+    href: '/integration',
+    evidence: [
+      'app/integration/page.tsx',
+      'app/task-management/_lib/integration-management-api.ts',
+      'lib/platform/client.ts',
+    ],
   },
   {
     id: 'platform.reporting',
@@ -713,8 +763,31 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: 'Reporting engine',
     blurb: 'Shared queries, exports and scheduled reports across modules.',
     phase: 'Phase 3',
-    status: 'coming-soon',
+    // Verified 2026-10-07: ReportCatalog is a shared query layer (a module adds
+    // a report with one entry), with CSV export and scheduled runs that store the
+    // file in File storage and email the recipients. Exercised through the
+    // controller against the database. Four platform reports ship today; other
+    // modules add theirs the same way. The older dynamic report builder is
+    // separate and unchanged.
+    status: 'live',
     audience: 'customer',
+    href: '/platform-services/reports',
+    evidence: ['app/platform-services/reports/page.tsx', 'app/reports/dynamic-report-builder/page.tsx'],
+  },
+  {
+    id: 'platform.import',
+    module: 'Platform services',
+    title: 'Data import',
+    blurb: 'Bring records in from a spreadsheet, matching columns to fields once for every module.',
+    phase: 'Phase 2',
+    // Verified 2026-10-07: the backend import API (list tables, parse, match
+    // fields, process) is on this branch behind api.session. Listing the 39
+    // importable tables and parsing a real CSV against one were run through the
+    // controller. The final process step writes to real tables and was not run.
+    status: 'live',
+    audience: 'customer',
+    href: '/import-data',
+    evidence: ['app/import-data/page.tsx', 'app/api/import/process/route.ts'],
   },
   {
     id: 'platform.dashboard-engine',
@@ -722,8 +795,16 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: 'Dashboard engine',
     blurb: 'Modules register widgets; the platform handles layout, permissions and refresh.',
     phase: 'Phase 3',
-    status: 'coming-soon',
+    // Verified 2026-10-07: DashboardWidgets takes widget registrations from
+    // modules (key, title, right, data provider), filters them by the caller's
+    // rights, applies a saved per-user order and hiding, and reads data only for
+    // widgets that are shown. Five platform widgets ship today. The existing
+    // /dashboard role dashboards have their own widget settings and are not yet
+    // moved onto this engine.
+    status: 'live',
     audience: 'customer',
+    href: '/platform-services/dashboard',
+    evidence: ['app/platform-services/dashboard/page.tsx', 'app/dashboard/_lib/useDashboardPreferences.ts'],
   },
   {
     id: 'platform.evidence-engine',
@@ -731,7 +812,10 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: 'Student evidence store',
     blurb: 'One record of what each student has demonstrated, drawn from assessments, activity and teacher observation.',
     phase: 'Phase 2',
-    status: 'coming-soon',
+    // Verified 2026-10-07, backend only: App\Domain\AI\Evidence\EvidenceStore
+    // and the pal_learning_evidence table exist on the development branch. There
+    // is no screen or cross-module feed yet.
+    status: 'in-progress',
     audience: 'customer',
   },
   {
@@ -740,8 +824,12 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: 'Event bus',
     blurb: 'Modules publish business events that other services can react to.',
     phase: 'Exploring',
-    status: 'coming-soon',
+    // Verified 2026-10-07: what exists is a read-only monitor over the sync,
+    // audit, workflow and failed-job logs. Publishing and subscribing do not.
+    status: 'in-progress',
     audience: 'internal',
+    href: '/platform-services/event-bus',
+    evidence: ['app/platform-services/event-bus/page.tsx'],
   },
 
   // ── AI and intelligence ───────────────────────────────────────────────────

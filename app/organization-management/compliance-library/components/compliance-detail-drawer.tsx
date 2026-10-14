@@ -14,23 +14,15 @@
 
 import { useState } from 'react'
 import { CheckCircle2, Download, FileText, History, Paperclip, ShieldCheck, Trash2, XCircle } from 'lucide-react'
-import { Badge } from '@/components/ui/g2g/badge'
 import { Button } from '@/components/ui/g2g/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FileUpload } from '@/components/ui/file-upload'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { StatusBadge } from '@/components/ui/status-badge'
 import { Textarea } from '@/components/ui/g2g/textarea'
 import { cn } from '@/lib/utils'
 import { useComplianceDetail } from '../../_lib/use-compliance-extras'
 import { displayDate } from './compliance-library-management-shared'
-
-const PRIORITY_VARIANT: Record<string, 'default' | 'navy' | 'warning' | 'destructive'> = {
-  Low: 'default',
-  Medium: 'navy',
-  High: 'warning',
-  Critical: 'destructive',
-}
+import { PriorityPill, StatusPill } from './compliance-theme'
 
 export function ComplianceDetailDrawer({
   complianceId,
@@ -91,7 +83,7 @@ export function ComplianceDetailDrawer({
         </SheetHeader>
 
         {notice && (
-          <div className="mb-4 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">{notice}</div>
+          <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{notice}</div>
         )}
 
         {loading || !record ? (
@@ -118,11 +110,11 @@ export function ComplianceDetailDrawer({
               </div>
               <div>
                 <p className="text-muted-foreground">Priority</p>
-                <Badge variant={PRIORITY_VARIANT[record.priority ?? ''] ?? 'default'}>{record.priority ?? '-'}</Badge>
+                <PriorityPill priority={record.priority} />
               </div>
               <div>
                 <p className="text-muted-foreground">Status</p>
-                <StatusBadge status={record.derived_status ?? record.status ?? undefined} />
+                <StatusPill status={record.derived_status ?? record.status} />
               </div>
               <div>
                 <p className="text-muted-foreground">Frequency</p>
@@ -160,7 +152,7 @@ export function ComplianceDetailDrawer({
                       )}
                     >
                       <p className="font-medium text-foreground">{displayDate(cycle.due_date)}</p>
-                      <StatusBadge status={cycle.status} size="sm" />
+                      <StatusPill status={cycle.status} />
                     </div>
                   ))}
                 </div>
@@ -191,7 +183,7 @@ export function ComplianceDetailDrawer({
                           <p className="mt-1 text-xs text-destructive">Rejected: {item.rejection_reason}</p>
                         )}
                       </div>
-                      <StatusBadge status={item.verification_status} size="sm" />
+                      <StatusPill status={item.verification_status} />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {item.file_url && (
@@ -200,7 +192,7 @@ export function ComplianceDetailDrawer({
                         </Button>
                       )}
                       {isAdmin && item.verification_status !== 'Verified' && (
-                        <Button variant="outline" size="sm" className="gap-1 text-success" onClick={() => handleVerify(item.id)}>
+                        <Button variant="outline" size="sm" className="gap-1 text-emerald-600 hover:bg-emerald-50" onClick={() => handleVerify(item.id)}>
                           <CheckCircle2 className="size-3.5" /> Verify
                         </Button>
                       )}
@@ -242,7 +234,7 @@ export function ComplianceDetailDrawer({
                 <ol className="space-y-3 border-l border-border/70 pl-4">
                   {activity.map((entry, index) => (
                     <li key={index} className="relative text-sm">
-                      <span className="absolute -left-[21px] top-1 size-2.5 rounded-full bg-primary" />
+                      <span className="absolute -left-[21px] top-1 size-2.5 rounded-full bg-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-500/20" />
                       <p className="font-medium text-foreground">{entry.action.replaceAll('_', ' ')}</p>
                       <p className="text-xs text-muted-foreground">
                         {entry.actor_name ?? 'System'} - {new Date(entry.created_at).toLocaleString()}

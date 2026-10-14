@@ -15,6 +15,7 @@ import {
   type DiagnosticHistoryEntry,
 } from '@/app/pal/data/pal-diagnostic';
 import { LevelBadge } from '@/app/pal/_components/BandMeter';
+import { formatDate } from '@/app/pal/_lib/format';
 
 /**
  * Every submitted diagnostic for one chapter, newest first.
@@ -130,6 +131,11 @@ function DiagnosticHistoryView() {
                   <li key={attempt.attemptId} className="flex items-center justify-between gap-3 py-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
+                        {attempt.attemptNumber != null && (
+                          <span className="text-xs font-medium text-slate-500">
+                            Attempt #{attempt.attemptNumber}
+                          </span>
+                        )}
                         <span className="text-sm font-semibold tabular-nums text-slate-900">
                           {Math.round(attempt.percentage)}%
                         </span>
@@ -162,20 +168,12 @@ function DiagnosticHistoryView() {
       )}
 
       <div className="mt-5 flex justify-end">
-        <Link href={`/pal/diagnostic/chapter/${chapterId}`} className={buttonVariants({ variant: 'outline' })}>Retake chapter diagnostic</Link>
+        {/* ?retake=1 skips the "already attempted" gate on the diagnostic
+            entry screen - the learner just reviewed their history and
+            explicitly chose to retake, so showing the gate again would be a
+            redundant extra click. */}
+        <Link href={`/pal/diagnostic/chapter/${chapterId}?retake=1`} className={buttonVariants({ variant: 'outline' })}>Retake chapter diagnostic</Link>
       </div>
     </PalWorkspace>
   );
-}
-
-/** Laravel hands back "YYYY-MM-DD HH:MM:SS"; Safari will not parse that as-is. */
-function formatDate(value: string): string {
-  const parsed = new Date(value.replace(' ', 'T'));
-  if (Number.isNaN(parsed.getTime())) return value;
-
-  return parsed.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
 }

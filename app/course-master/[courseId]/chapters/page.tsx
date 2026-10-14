@@ -96,6 +96,15 @@ import {
   type ArithmeticQuizEditorState,
 } from '@/app/h5p/h5p_arithmetic_quiz/components/editor';
 import { ContentCard } from './ContentCard';
+import {
+  PRAYOGSHALA_EMPTY_MESSAGE,
+  PrayogshalaDetailDialog,
+  PrayogshalaEditorDialog,
+} from './PrayogshalaDialogs';
+import { filterCardAssets } from '@/lib/prayogshala/cardEligibility';
+import { PrayogshalaLab } from './PrayogshalaLab';
+import { PrayogshalaTopicPanel } from './PrayogshalaTopicPanel';
+import { deletePrayogshalaActivity, type PrayogshalaActivity } from '../../data/prayogshala';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
 import { extractGeneratedBodyHtml, sanitizeGeneratedHtml } from '@/app/course-master/data/generated-html';
@@ -112,9 +121,25 @@ import {
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import {
+  BLOOM_LEVEL_META,
+  allowedLevelMeta,
+  buildGenerateRequest,
+  defaultPointsFor,
+  evenSplitLabel,
+  orderSelectedFormats,
+  previewExtras,
+  pruneSelection,
+  suggestedBloomCounts,
+  toFormatCards,
+  totalCoversFormats,
+  type GeneratableFormat,
+} from '@/lib/question-generation/generatable-formats';
 import { type Course } from '../../data/courses';
 import {
   fetchChapterContent,
+  downloadStudyDeckPdf,
+  fetchGeneratableQuestionFormats,
   fetchSemanticIntelligenceResult,
   generateIntelligenceQuestions,
   type IntelligenceBloomLevel,
@@ -135,6 +160,7 @@ import {
   type ChapterContentAsset,
   type ChapterSemantic,
   type ConceptIntelEntry,
+  type GeneratedFormatResult,
   type GeneratedQuestionPreview,
   type SubjectWithChapters,
 } from '../../data/chapters';
@@ -160,7 +186,12 @@ import {
   type RunTelemetry,
   type StreamPhase,
 } from './GenerationPipeline';
+import { FormatMultiSelect } from './FormatMultiSelect';
 import { getRequestContext, getSyear } from '../../page';
+import { DocumentViewer, type DocumentViewerItem } from '@/components/study-document/DocumentViewer';
+import { documentKindOf } from '@/lib/study-document/document';
+import type { DocumentKind } from '@/lib/study-document/types';
+import { pdfFileNameFromTitle } from '@/lib/study-deck/pdf';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import { useCurriculumMeta } from '../../data/curriculum';
@@ -205,29 +236,10 @@ const UPLOAD_METHOD_TABS = ['Upload file', 'Add link'] as const;
 const QUESTION_TYPE_OPTIONS = ['MCQ', 'Narrative'] as const;
 
 /**
- * The Bloom ladder the generator works to, mirroring BLOOM_META in
- * App\Services\QuestionGenerationService. `weight` is that service's own default
- * distribution, used here only to seed the table when a teacher switches from
- * Auto to a custom mix, so "custom" starts from what the server would have done
- * rather than from zeros.
- *
- * Difficulty and marks are the server's defaults per level and are editable:
- * both are honoured when a quota is sent. MCQ marks are not - the service pins
- * every MCQ to 1 mark - so that column is hidden for MCQ.
+ * The Bloom ladder (BLOOM_LEVEL_META), the per-format level limits and the suggested
+ * split live in lib/question-generation/generatable-formats.ts, where they are tested.
+ * The formats themselves come from the backend, not from this file.
  */
-const BLOOM_LEVEL_META: ReadonlyArray<{
-  level: IntelligenceBloomLevel;
-  difficulty: string;
-  points: number;
-  weight: number;
-}> = [
-  { level: 'Remember', difficulty: 'Easy', points: 1, weight: 0.15 },
-  { level: 'Understand', difficulty: 'Easy', points: 2, weight: 0.3 },
-  { level: 'Apply', difficulty: 'Medium', points: 3, weight: 0.3 },
-  { level: 'Analyze', difficulty: 'Hard', points: 4, weight: 0.15 },
-  { level: 'Evaluate', difficulty: 'Hard', points: 5, weight: 0.1 },
-  { level: 'Create', difficulty: 'Hard', points: 5, weight: 0 },
-];
 
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard'] as const;
 
@@ -250,40 +262,7 @@ const DEFAULT_BLOOM_POINTS = BLOOM_LEVEL_META.reduce((map, meta) => {
   return map;
 }, {} as BloomPoints);
 
-/**
- * Split `total` across the Bloom levels by weight, largest-remainder style, so
- * the parts always add back up to the total instead of drifting on rounding.
- */
-function suggestedBloomCounts(total: number): BloomCounts {
-  if (!Number.isFinite(total) || total <= 0) return { ...EMPTY_BLOOM_COUNTS };
-
-  const exact = BLOOM_LEVEL_META.map((meta) => ({ level: meta.level, value: total * meta.weight }));
-  const counts = { ...EMPTY_BLOOM_COUNTS };
-  exact.forEach((entry) => {
-    counts[entry.level] = Math.floor(entry.value);
-  });
-
-  let remaining = total - Object.values(counts).reduce((sum, value) => sum + value, 0);
-  const byRemainder = [...exact]
-    .filter((entry) => entry.value > 0)
-    .sort((a, b) => b.value - Math.floor(b.value) - (a.value - Math.floor(a.value)));
-
-  let index = 0;
-  while (remaining > 0 && byRemainder.length > 0) {
-    counts[byRemainder[index % byRemainder.length].level] += 1;
-    remaining -= 1;
-    index += 1;
-  }
-
-  return counts;
-}
 const QUESTION_OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
-/** One-line explanation of what each type produces, shown on the type cards. */
-const QUESTION_TYPE_BLURBS: Record<(typeof QUESTION_TYPE_OPTIONS)[number], string> = {
-  MCQ: 'Four options with one correct answer. Distractors are built from the concept’s recorded misconceptions.',
-  Narrative: 'Open-response items with a model answer and marking points, weighted per Bloom level.',
-};
-
 /** Common run sizes, offered as chips beside the free-text total. */
 const QUESTION_COUNT_PRESETS = [5, 10, 15, 20] as const;
 
@@ -394,6 +373,9 @@ const CONTENT_LIBRARY_TABS = [
   'Lesson plan',
   'My course',
   'H5P Interactive',
+  // Merged into the chapter content list by the backend (like H5P), so it is counted
+  // and filtered like every other type and also appears under 'All content'.
+  'Prayogshala',
 ] as const;
 /**
  * Teacher Workspace tabs.
@@ -486,8 +468,9 @@ type ChapterContentType =
   | 'Worksheet'
   | 'Lesson plan'
   | 'My course'
-  | 'H5P Interactive';
-type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded';
+  | 'H5P Interactive'
+  | 'Prayogshala';
+type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded' | 'Authored';
 
 /**
  * content_master.source values written by the Generate Content flow. It has used
@@ -505,6 +488,8 @@ const GENERATED_CONTENT_SOURCES = ['gamma ai', 'aigenerated', 'claude ai'];
  */
 function resolveContentSource(source: string | null | undefined): ChapterContentSource {
   const normalized = (source ?? '').trim().toLowerCase();
+  // Prayogshala activities are written in the LMS: neither uploaded files nor generated.
+  if (normalized === 'authored') return 'Authored';
   if (!GENERATED_CONTENT_SOURCES.includes(normalized)) return 'Uploaded';
   // Name the provider that actually wrote the row. Anything generated but not
   // Claude keeps the historical 'Gamma AI' label, including the legacy
@@ -549,6 +534,20 @@ interface ChapterContentItem {
   bodyHtml: string | null;
   /** Route of the existing H5P editor this item opens in. Only set for H5P items. */
   deepLink?: string;
+  /** topic_master.name - set for Prayogshala items. */
+  topicName: string | null;
+  /** Short description shown on the card - set for Prayogshala items. */
+  summary: string | null;
+  /** The whole activity, for the detail view. Only set for Prayogshala items. */
+  prayogshala: PrayogshalaActivity | null;
+  /** The study deck's classroom PDF, reported by the backend. A second file of the same item; Open is unchanged. */
+  pdfUrl?: string;
+  /**
+   * Set (by the server) when this row is a study document: revision notes, a remedial class or classroom activities. Its PDF
+   * is its primary file and it opens in place in the document viewer, with an online practice beside the PDF.
+   */
+  studyDocKind?: DocumentKind | null;
+  chapterId?: string;
   slides: {
     id: string;
     number: number;
@@ -572,6 +571,7 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   if (contentCategory === 'worksheet') return 'Worksheet';
   if (contentCategory === 'lesson plan') return 'Lesson plan';
   if (contentCategory === 'my course') return 'My course';
+  if (contentCategory === 'prayogshala') return 'Prayogshala';
   // 'Teacher Training' is the bulk category (2,450 rows) and is distinct from
   // 'Teacher training presentation' (4 rows). Matched here rather than inside the
   // presentation branch below, because most of these rows are PDFs, not decks,
@@ -599,7 +599,7 @@ function buildApiChapterContentItems(
   categories: Record<string, ChapterContentAsset[]>
 ): ChapterContentItem[] {
   return Object.entries(categories).flatMap(([category, assets]) =>
-    (assets ?? []).map((asset) => {
+    filterCardAssets(assets, chapter.id).map((asset) => {
       const type = getApiContentType(category, asset);
       const contentUrl = resolveViewableContentUrl(asset);
       const updatedDate = asset.created_at?.split(' ')[0] ?? 'â€”';
@@ -623,7 +623,7 @@ function buildApiChapterContentItems(
         preview: getChapterContentPreview(type),
         actionLabel: type === 'Video' ? 'Play' : 'Open',
         slideCount: 0,
-        statValue: asset.file_type || category,
+        statValue: asset.prayogshala?.activity_type_label || asset.file_type || category,
         updatedDate,
         updatedAt: updatedDate === 'â€”' ? 'Date unavailable' : `updated ${updatedDate}`,
         contentUrl,
@@ -632,6 +632,12 @@ function buildApiChapterContentItems(
         // Where an H5P card opens. The existing /h5p/* editors keep all the CRUD,
         // which is what makes removing the top-level H5P button non-destructive.
         deepLink: asset.deep_link,
+        topicName: asset.topic_name?.trim() ? asset.topic_name.trim() : null,
+        summary: type === 'Prayogshala' ? (asset.prayogshala?.objective ?? asset.description ?? null) : null,
+        prayogshala: asset.prayogshala ?? null,
+        pdfUrl: asset.pdf_url,
+        studyDocKind: documentKindOf(asset),
+        chapterId: chapter.id,
       };
     })
   );
@@ -873,7 +879,7 @@ function getChapterContentPreview(type: ChapterContentType): ChapterContentPrevi
   if (type === 'Video') return 'video';
   if (type === 'Revision notes') return 'notes';
   if (type === 'PDF') return 'pdf';
-  if (type === 'Classroom activity') return 'activity';
+  if (type === 'Classroom activity' || type === 'Prayogshala') return 'activity';
   // Worksheets and remedial packs are things a class works through, so they
   // preview as activities; a lesson plan is a document.
   if (type === 'Worksheet' || type === 'Remedial class') return 'activity';
@@ -982,6 +988,9 @@ function buildChapterContentItems(
       // Demo rows have no stored document; only API-backed generated rows do.
       bodyHtml: null,
       slides: buildContentSlides(conceptTitle, chapter.title, type, slideCount),
+      topicName: null,
+      summary: null,
+      prayogshala: null,
     };
   });
 }
@@ -1034,6 +1043,8 @@ function contentMatchesTab(item: ChapterContentItem, tab: string): boolean {
       return item.type === 'Teacher training' || item.type === 'Teacher training presentation';
     case 'H5P Interactive':
       return item.type === 'H5P Interactive';
+    case 'Prayogshala':
+      return item.type === 'Prayogshala';
     default:
       return true;
   }
@@ -1277,12 +1288,22 @@ export default function ChapterListPage() {
   // tabs - 'Teacher training' exists only on the Teacher lane - so typing this
   // off the Classroom list alone makes the Teacher lane's own tabs unassignable.
   const [contentLibraryTab, setContentLibraryTab] = useState<ContentLibraryTab>('All content');
+  // Prayogshala: the activity open in the detail view, and the editor (null = closed;
+  // { activity: null } = adding a new one).
+  const [openPrayogshala, setOpenPrayogshala] = useState<PrayogshalaActivity | null>(null);
+  const [prayogshalaEditor, setPrayogshalaEditor] = useState<{ activity: PrayogshalaActivity | null } | null>(null);
+  const [prayogshalaActionError, setPrayogshalaActionError] = useState('');
+  // Bumped to force the chapter's content to be fetched again (retry, and after an
+  // activity is added, edited or removed).
+  const [contentReloadKey, setContentReloadKey] = useState(0);
   // Grouping follows the resource type: Classroom Resources is chapter-wise,
   // Teacher Workspace is concept-wise. Derived instead of stored, so the two can
   // never drift out of step and there is no toggle to leave in the wrong state.
   const contentGroupBy: 'Chapter wise' | 'Concept wise' =
     searchParams?.get('resourceType') === 'teacher' ? 'Concept wise' : 'Chapter wise';
   const [selectedContentItem, setSelectedContentItem] = useState<ChapterContentItem | null>(null);
+  // The study document open over the page, if any (revision notes, a remedial class, classroom activities).
+  const [openDocument, setOpenDocument] = useState<DocumentViewerItem | null>(null);
   const [chapterContentCategories, setChapterContentCategories] = useState<
     Record<string, Record<string, ChapterContentAsset[]>>
   >({});
@@ -1293,7 +1314,14 @@ export default function ChapterListPage() {
     conceptTitle: string;
     conceptIndex: number;
   } | null>(null);
-  const [questionType, setQuestionType] = useState('');
+  // The catalogue codes of the formats the teacher picked, in the order picked (empty
+  // until they pick). Several formats can be selected at once.
+  const [selectedFormatCodes, setSelectedFormatCodes] = useState<string[]>([]);
+  // The formats the backend offers: in question_type_catalog AND implemented by the
+  // generator. Loaded the first time the generate modal opens.
+  const [generatableFormats, setGeneratableFormats] = useState<GeneratableFormat[]>([]);
+  const [formatsStatus, setFormatsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [formatsError, setFormatsError] = useState('');
   const [totalQuestions, setTotalQuestions] = useState('');
   // Auto leaves the mix to the generator (which prefers the chapter's own
   // intelligence slice when there is one). Turning it off sends an explicit
@@ -1308,6 +1336,8 @@ export default function ChapterListPage() {
   const [questionGenerationError, setQuestionGenerationError] = useState('');
   const [questionGenerationSuccess, setQuestionGenerationSuccess] = useState('');
   const [generatedQuestionPreviews, setGeneratedQuestionPreviews] = useState<GeneratedQuestionPreview[]>([]);
+  // How each format of a multi-format run went (what it was asked for, what it saved).
+  const [generatedFormatResults, setGeneratedFormatResults] = useState<GeneratedFormatResult[]>([]);
   // Real per-run numbers off the generation response (model, batches, tokens,
   // duplicates dropped). The API already returned these; they were being
   // discarded before the pipeline panel had somewhere to show them.
@@ -1350,10 +1380,16 @@ export default function ChapterListPage() {
   // Widened to string[] on purpose: the two tab lists are different tuple types,
   // so includes() on the union narrows its argument to the shorter tuple's members
   // and rejects the very tabs this is meant to test for.
+  const prayogshalaRequested = searchParams?.get('tab') === 'prayogshala';
+  const requestedContentLibraryTab: string = prayogshalaRequested
+    ? 'Prayogshala'
+    : contentLibraryTab === 'Prayogshala'
+      ? 'All content'
+      : contentLibraryTab;
   const activeContentLibraryTab = (availableContentLibraryTabs as readonly string[]).includes(
-    contentLibraryTab
+    requestedContentLibraryTab
   )
-    ? contentLibraryTab
+    ? requestedContentLibraryTab
     : 'All content';
   const activeChapterId = searchParams?.get('chapterId') ?? '';
   const resourceChapter =
@@ -1418,6 +1454,18 @@ export default function ChapterListPage() {
     if (/^\d+$/.test(activeLibraryChapter.id)) return [];
     return buildChapterContentItems(course, activeLibraryChapter, activeLibraryChapterConcepts);
   }, [activeContentLibraryTab, activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, contentGroupBy, contentResourceType, course]);
+
+  // The lab named in the URL, if any, found in the chapter's own content list - so it can
+  // only ever open under the chapter (and institute) it belongs to.
+  const labActivityId = searchParams?.get('activityId') ?? '';
+  const labActivity = useMemo(
+    () => (labActivityId ? chapterContentItems.find((item) => item.prayogshala && String(item.prayogshala.id) === labActivityId)?.prayogshala ?? null : null),
+    [chapterContentItems, labActivityId]
+  );
+  const labContentLoaded =
+    !!activeLibraryChapter &&
+    !contentLoading &&
+    `${activeLibraryChapter.id}:${activeContentLibraryTab}:${contentGroupBy}:${contentResourceType}` in chapterContentCategories;
 
   /**
    * The chapter's content narrowed to the resource type currently on screen.
@@ -1805,21 +1853,39 @@ export default function ChapterListPage() {
   const canSaveUploadContent =
     Boolean(uploadChapterId) &&
     (uploadMethod === 'Upload file' ? Boolean(uploadFile) : uploadLink.trim().length > 0);
+  // Every selected format, in the order the backend lists them (the server splits the
+  // total in its own registry order, so click order never matters).
+  const selectedFormats = useMemo(
+    () => orderSelectedFormats(selectedFormatCodes, generatableFormats),
+    [generatableFormats, selectedFormatCodes]
+  );
+  // The one format that a custom Bloom mix and editable marks apply to. Null when none
+  // or several are selected: a level table cannot be honoured by every format.
+  const selectedFormat = selectedFormats.length === 1 ? selectedFormats[0] : null;
+  const formatCards = useMemo(() => toFormatCards(generatableFormats), [generatableFormats]);
+  // The Bloom levels the selected format can be written at (all six before one is picked).
+  const allowedLevels = useMemo(() => allowedLevelMeta(selectedFormat), [selectedFormat]);
   const totalQuestionsNumber = Number(totalQuestions);
   const isTotalQuestionsValid =
     totalQuestions.trim() !== '' &&
     Number.isInteger(totalQuestionsNumber) &&
     totalQuestionsNumber >= 1 &&
     totalQuestionsNumber <= 50;
-  const bloomCountTotal = BLOOM_LEVEL_META.reduce(
+  const bloomCountTotal = allowedLevels.reduce(
     (sum, meta) => sum + (bloomCounts[meta.level] || 0),
     0
   );
   // A custom mix has to add up: the server writes exactly the counts it is given,
   // so a table summing to 12 when the teacher asked for 10 would quietly produce 12.
-  const isQuotaValid = useAutoQuota || (isTotalQuestionsValid && bloomCountTotal === totalQuestionsNumber);
+  const isQuotaValid =
+    useAutoQuota ||
+    (selectedFormat !== null && isTotalQuestionsValid && bloomCountTotal === totalQuestionsNumber);
   const canGenerateQuestions =
-    questionType !== '' && isTotalQuestionsValid && isQuotaValid && !isGeneratingQuestions;
+    selectedFormats.length > 0 &&
+    isTotalQuestionsValid &&
+    totalCoversFormats(totalQuestionsNumber, selectedFormats.length) &&
+    isQuotaValid &&
+    !isGeneratingQuestions;
 
   /* ------------------------------------------------------------------ *
    * Generator transparency
@@ -1966,16 +2032,32 @@ export default function ChapterListPage() {
 
   /** The Bloom spread this run will ask for - auto split, or the teacher's own. */
   const questionBlueprint = useMemo(() => {
+    // Several formats split the total between them, each over its own allowed levels,
+    // so there is no single Bloom spread to preview.
+    if (selectedFormats.length > 1) return [];
+
     const counts = useAutoQuota
-      ? suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
+      ? suggestedBloomCounts(
+          isTotalQuestionsValid ? totalQuestionsNumber : 0,
+          selectedFormat?.allowed_bloom_levels
+        )
       : bloomCounts;
 
-    return BLOOM_LEVEL_META.map((meta) => ({
+    return allowedLevels.map((meta) => ({
       level: meta.level,
       count: counts[meta.level] ?? 0,
       difficulty: useAutoQuota ? meta.difficulty : bloomDifficulties[meta.level],
     }));
-  }, [bloomCounts, bloomDifficulties, isTotalQuestionsValid, totalQuestionsNumber, useAutoQuota]);
+  }, [
+    allowedLevels,
+    bloomCounts,
+    bloomDifficulties,
+    isTotalQuestionsValid,
+    selectedFormat,
+    selectedFormats.length,
+    totalQuestionsNumber,
+    useAutoQuota,
+  ]);
 
   const questionStreamPhase: StreamPhase = isGeneratingQuestions
     ? 'running'
@@ -1991,17 +2073,29 @@ export default function ChapterListPage() {
     questionRunId
   );
 
-  const generationBatchLabel = `${isTotalQuestionsValid ? totalQuestionsNumber : 0} ${
-    questionType || 'item'
-  } item${totalQuestionsNumber === 1 ? '' : 's'}`;
+  const generationBatchLabel =
+    selectedFormats.length > 1
+      ? `${isTotalQuestionsValid ? totalQuestionsNumber : 0} questions · ${selectedFormats.length} formats`
+      : `${isTotalQuestionsValid ? totalQuestionsNumber : 0} ${
+          selectedFormat?.label ?? 'item'
+        } item${totalQuestionsNumber === 1 ? '' : 's'}`;
 
-  const generationSummaryLabel = !questionType
-    ? 'Pick a question type to begin.'
-    : !isTotalQuestionsValid
-      ? 'Enter how many questions to generate (1-50).'
-      : `${totalQuestionsNumber} ${questionType} question${
-          totalQuestionsNumber === 1 ? '' : 's'
-        } · ${useAutoQuota ? 'auto' : 'custom'} Bloom mix · saved to this concept’s bank`;
+  // How the total divides across the chosen formats, in words ("5 each"). The server
+  // does the actual split and reports it back per format after the run.
+  const formatSplitLabel = evenSplitLabel(totalQuestionsNumber, selectedFormats.length);
+
+  const generationSummaryLabel =
+    selectedFormats.length === 0
+      ? 'Pick at least one question format to begin.'
+      : !isTotalQuestionsValid
+        ? 'Enter how many questions to generate (1-50).'
+        : !totalCoversFormats(totalQuestionsNumber, selectedFormats.length)
+          ? `Generate at least ${selectedFormats.length} questions – one for each selected format.`
+          : selectedFormats.length > 1
+            ? `${totalQuestionsNumber} questions across ${selectedFormats.length} formats (${formatSplitLabel}) · auto Bloom mix · saved to this concept’s bank`
+            : `${totalQuestionsNumber} ${selectedFormats[0].label} question${
+                totalQuestionsNumber === 1 ? '' : 's'
+              } · ${useAutoQuota ? 'auto' : 'custom'} Bloom mix · saved to this concept’s bank`;
 
   const groundingCoverageLabel = useMemo(() => {
     const measurable = questionGroundingSources.filter((source) => source.state !== 'server');
@@ -2017,9 +2111,61 @@ export default function ChapterListPage() {
   const handleToggleAutoQuota = (nextAuto: boolean) => {
     setUseAutoQuota(nextAuto);
     if (!nextAuto) {
-      setBloomCounts(suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0));
+      setBloomCounts(
+        suggestedBloomCounts(
+          isTotalQuestionsValid ? totalQuestionsNumber : 0,
+          selectedFormat?.allowed_bloom_levels
+        )
+      );
     }
   };
+
+  /**
+   * The format selection changed.
+   *
+   * With exactly one format, marks restart from that format's own default (a Short
+   * Answer from 3, not from the Understand rung's 2) and a custom mix is re-split over
+   * the levels it allows, so no count is left sitting on one it excludes. With several
+   * formats a custom mix makes no sense (each format allows different levels), so the
+   * mix returns to Auto.
+   */
+  const handleFormatsChange = (codes: string[]) => {
+    const next = pruneSelection(codes, generatableFormats);
+    setSelectedFormatCodes(next);
+
+    const picked = orderSelectedFormats(next, generatableFormats);
+    if (picked.length === 1) {
+      setBloomPoints(defaultPointsFor(picked[0]));
+      if (!useAutoQuota) {
+        setBloomCounts(
+          suggestedBloomCounts(
+            isTotalQuestionsValid ? totalQuestionsNumber : 0,
+            picked[0].allowed_bloom_levels
+          )
+        );
+      }
+    } else if (!useAutoQuota) {
+      setUseAutoQuota(true);
+      setBloomCounts({ ...EMPTY_BLOOM_COUNTS });
+    }
+  };
+
+  const loadGeneratableFormats = () => {
+    setFormatsStatus('loading');
+    setFormatsError('');
+    fetchGeneratableQuestionFormats()
+      .then((formats) => {
+        setGeneratableFormats(formats);
+        setFormatsStatus('ready');
+      })
+      .catch((error: unknown) => {
+        setFormatsError(
+          error instanceof Error ? error.message : 'Question formats could not be loaded.'
+        );
+        setFormatsStatus('error');
+      });
+  };
+
 
   const handleBloomCountChange = (level: IntelligenceBloomLevel, raw: string) => {
     const digits = raw.replace(/[^\d]/g, '');
@@ -2152,7 +2298,7 @@ export default function ChapterListPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeContentLibraryTab, activeLibraryChapter, contentGroupBy, contentResourceType, view, chapterContentCategories]);
+  }, [activeContentLibraryTab, activeLibraryChapter, contentGroupBy, contentResourceType, view, chapterContentCategories, contentReloadKey]);
 
   /**
    * Everything the current search, source and lane allow - before the tab
@@ -2213,11 +2359,28 @@ export default function ChapterListPage() {
       availableContentLibraryTabs.filter(
         (tab) =>
           tab === 'All content' ||
+          tab === 'Prayogshala' ||
           tab === activeContentLibraryTab ||
           (contentLibraryTabCounts[tab] ?? 0) > 0
       ),
     [availableContentLibraryTabs, activeContentLibraryTab, contentLibraryTabCounts]
   );
+
+  /**
+   * Switching tab. Prayogshala is carried in the URL (`tab=prayogshala`) and pushed, so
+   * a refresh, a shared link and the Back button all return to the same tab. Every
+   * other tab keeps its existing in-memory behaviour; leaving Prayogshala drops the
+   * param, and the existing view / resourceType / chapterId params are never touched.
+   */
+  const selectContentLibraryTab = (tab: ContentLibraryTab) => {
+    setContentLibraryTab(tab);
+    const next = new URLSearchParams(searchParams?.toString());
+    if (tab === 'Prayogshala') next.set('tab', 'prayogshala');
+    else next.delete('tab');
+    if (next.toString() !== (searchParams?.toString() ?? '')) {
+      router.push(`/course-master/${courseId}/chapters?${next.toString()}`);
+    }
+  };
 
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const presentationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2258,7 +2421,7 @@ export default function ChapterListPage() {
         setEditingQuestionBankItem(null);
         setManualQuestionError('');
         setQuestionModalConcept(null);
-        setQuestionType('');
+        setSelectedFormatCodes([]);
         setTotalQuestions('');
         setQuestionGenerationError('');
         setQuestionGenerationSuccess('');
@@ -2640,16 +2803,22 @@ export default function ChapterListPage() {
     // the panel would report "not extracted" for a chapter that simply had not
     // been opened yet.
     loadChapterIntelligence(chapter.id);
+    // The formats are fetched once, on first open (and again after a failed load);
+    // an opened modal never waits on a request an earlier open already made.
+    if (formatsStatus === 'idle' || formatsStatus === 'error') {
+      loadGeneratableFormats();
+    }
     setQuestionModalConcept({
       chapter,
       conceptTitle,
       conceptIndex,
     });
-    setQuestionType('');
+    setSelectedFormatCodes([]);
     setTotalQuestions('');
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setGeneratedFormatResults([]);
     setQuestionRunTelemetry(null);
     resetQuestionMix();
   };
@@ -2700,7 +2869,38 @@ export default function ChapterListPage() {
     </div>
   );
 
+  const handleDownloadPdf = (item: ChapterContentItem) => {
+    const requestContext = getRequestContext();
+    const chapterId = Number(item.chapterId);
+    const contentId = Number(item.id);
+    if (!requestContext || !Number.isFinite(chapterId) || !Number.isFinite(contentId)) {
+      setContentError('Course master session data is missing.');
+      return;
+    }
+    downloadStudyDeckPdf(chapterId, contentId, Number(requestContext.sub_institute_id), pdfFileNameFromTitle(item.title)).catch((error: unknown) => {
+      setContentError(error instanceof Error ? error.message : 'Couldn’t download the PDF.');
+    });
+  };
+
   const handleOpenContent = (item: ChapterContentItem) => {
+    // A Prayogshala activity is a structured document (objective, procedure, safety...),
+    // not a file or a route, so it opens in its own detail view. The activity came
+    // down with the list; nothing is fetched here.
+    if (item.prayogshala) {
+      setPrayogshalaActionError('');
+      // An interactive lab opens full-screen and is addressed by the URL (activityId), so
+      // a refresh, the Back button and a shared link all land on it. A plain activity
+      // opens in the detail dialog.
+      if (item.prayogshala.lab_config) {
+        const next = new URLSearchParams(searchParams?.toString());
+        next.set('activityId', String(item.prayogshala.id));
+        router.push(`/course-master/${courseId}/chapters?${next.toString()}`);
+      } else {
+        setOpenPrayogshala(item.prayogshala);
+      }
+      return;
+    }
+
     // An H5P item is not a file - it is a route. It opens in its existing editor
     // in-app, which is what keeps all the H5P CRUD reachable now that H5P is a
     // filter value rather than a top-level destination (tracker row 2).
@@ -2709,18 +2909,58 @@ export default function ChapterListPage() {
       return;
     }
 
+    // A study document is a PDF with an online practice beside it, and opens in place over this page: no route, no new tab.
+    if (item.studyDocKind && item.chapterId !== undefined && Number.isFinite(Number(item.chapterId)) && Number.isFinite(Number(item.id))) {
+      setOpenDocument({ chapterId: Number(item.chapterId), contentId: Number(item.id), title: item.title, kind: item.studyDocKind });
+      return;
+    }
+
     if (!item.contentUrl) return;
 
     window.open(item.contentUrl, '_blank', 'noopener,noreferrer');
   };
 
+  /** Open a topic's lab full-screen, addressed by the URL like any other Prayogshala activity. */
+  const openPrayogshalaLab = (activity: PrayogshalaActivity) => {
+    const next = new URLSearchParams(searchParams?.toString());
+    next.set('activityId', String(activity.id));
+    router.push(`/course-master/${courseId}/chapters?${next.toString()}`);
+  };
+
+  const closePrayogshalaLab = () => {
+    const next = new URLSearchParams(searchParams?.toString());
+    next.delete('activityId');
+    router.push(`/course-master/${courseId}/chapters?${next.toString()}`);
+  };
+
+  /** Forget the chapter's cached content and fetch it again. */
+  const reloadChapterContent = () => {
+    const chapterPrefix = `${activeLibraryChapter?.id ?? ''}:`;
+    setChapterContentCategories((current) =>
+      Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(chapterPrefix)))
+    );
+    setContentReloadKey((key) => key + 1);
+  };
+
+  const removePrayogshalaActivity = async (activity: PrayogshalaActivity) => {
+    if (!window.confirm(`Remove "${activity.title}" from this chapter's Prayogshala?`)) return;
+    try {
+      await deletePrayogshalaActivity(activity.id);
+      setOpenPrayogshala(null);
+      reloadChapterContent();
+    } catch (error: unknown) {
+      setPrayogshalaActionError(error instanceof Error ? error.message : 'Failed to remove the activity.');
+    }
+  };
+
   const closeGenerateQuestionsModal = () => {
     setQuestionModalConcept(null);
-    setQuestionType('');
+    setSelectedFormatCodes([]);
     setTotalQuestions('');
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setGeneratedFormatResults([]);
     setQuestionRunTelemetry(null);
     resetQuestionMix();
   };
@@ -3251,7 +3491,14 @@ export default function ChapterListPage() {
   };
 
   const submitGenerateQuestions = async () => {
-    if (!questionModalConcept || !isTotalQuestionsValid || !questionType) return;
+    if (
+      !questionModalConcept ||
+      !isTotalQuestionsValid ||
+      selectedFormats.length === 0 ||
+      !totalCoversFormats(totalQuestionsNumber, selectedFormats.length)
+    ) {
+      return;
+    }
 
     const requestContext = getRequestContext();
     if (!requestContext) {
@@ -3272,47 +3519,39 @@ export default function ChapterListPage() {
       return;
     }
 
-    const config = QUESTION_TYPE_API_CONFIG[questionType as (typeof QUESTION_TYPE_OPTIONS)[number]];
-    if (!config) {
-      setQuestionGenerationError('Please select a valid question type.');
-      return;
-    }
-
     setIsGeneratingQuestions(true);
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setGeneratedFormatResults([]);
     setQuestionRunTelemetry(null);
     setQuestionRunId((current) => current + 1);
 
     try {
-      const response = await generateIntelligenceQuestions({
-        chapter_id: chapterId,
-        subject_id: numericSubjectId,
-        standard_id: numericStandardId,
-        concept_id: conceptId,
-        question_type: config.question_type,
-        question_type_id: config.question_type_id,
-        total_questions: totalQuestionsNumber,
-        // sub_institute_id / created_by are no longer sent: the server reads
-        // both from the bearer token. requestContext is still checked above so
-        // the modal fails early when the user has no usable session at all.
-        // Omitted entirely on Auto, so the server keeps deciding the mix exactly
-        // as it did before this control existed. Zero-count levels are dropped:
-        // the server reads a row's presence as "generate at this level".
-        ...(useAutoQuota
-          ? {}
-          : {
-              quota: BLOOM_LEVEL_META.filter((meta) => (bloomCounts[meta.level] || 0) > 0).map(
-                (meta) => ({
-                  level: meta.level,
-                  count: bloomCounts[meta.level],
-                  difficulty: bloomDifficulties[meta.level],
-                  points: bloomPoints[meta.level],
-                })
-              ),
-            }),
-      });
+      // The request names the selected FORMAT and nothing else about type: no
+      // question_type_id (the server resolves it from the catalogue and ignores one
+      // that is sent) and no sub_institute_id / created_by (both come from the
+      // bearer token). requestContext is still checked above so the modal fails
+      // early when the user has no usable session at all. Auto sends no quota, so
+      // the server keeps deciding the mix over the levels the format allows;
+      // zero-count levels are dropped because the server reads a row's presence as
+      // "generate at this level".
+      const response = await generateIntelligenceQuestions(
+        buildGenerateRequest({
+          ids: {
+            chapter_id: chapterId,
+            subject_id: numericSubjectId,
+            standard_id: numericStandardId,
+            concept_id: conceptId,
+          },
+          formats: selectedFormats,
+          total: totalQuestionsNumber,
+          auto: useAutoQuota,
+          counts: bloomCounts,
+          difficulties: bloomDifficulties,
+          points: bloomPoints,
+        })
+      );
 
       const data = response.data;
       const inserted = data?.inserted;
@@ -3322,6 +3561,7 @@ export default function ChapterListPage() {
           : response.message
       );
       setGeneratedQuestionPreviews(data?.questions ?? []);
+      setGeneratedFormatResults(data?.formats ?? []);
       // Straight passthrough of what the service reports for this run - nothing
       // here is estimated on the client.
       setQuestionRunTelemetry({
@@ -3644,6 +3884,7 @@ export default function ChapterListPage() {
     const answer = question.answer ?? {};
     const options = answer.options ?? [];
     const markingPoints = answer.marking_points ?? [];
+    const extras = previewExtras(answer);
 
     return (
       <article
@@ -3654,6 +3895,9 @@ export default function ChapterListPage() {
           <span>Question {index + 1}</span>
           <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">
             ID {question.id}
+          </span>
+          <span className="rounded-full bg-indigo-50 px-2 py-1 font-mono text-[11px] normal-case tracking-normal text-indigo-700">
+            {question.question_type}
           </span>
           {answer.bloom_level ? (
             <span className="rounded-full bg-violet-50 px-2 py-1 text-[11px] text-violet-700">
@@ -3667,7 +3911,7 @@ export default function ChapterListPage() {
           ) : null}
         </div>
 
-        <h3 className="mt-3 text-[15px] font-semibold leading-6 text-slate-950">
+        <h3 className="mt-3 whitespace-pre-line text-[15px] font-semibold leading-6 text-slate-950">
           {question.question_title}
         </h3>
 
@@ -3697,8 +3941,49 @@ export default function ChapterListPage() {
           </div>
         ) : null}
 
+        {extras.pairs.length > 0 ? (
+          <div className="mt-3 rounded-[8px] border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Pairs
+            </p>
+            <ul className="mt-2 space-y-1 text-sm text-slate-700">
+              {extras.pairs.map((pair, pairIndex) => (
+                <li key={`${pair.left}-${pairIndex}`} className="leading-6">
+                  <span className="font-medium text-slate-900">{pair.left}</span>
+                  <span className="px-2 text-slate-400">→</span>
+                  {pair.right}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {extras.answers.length > 0 ? (
+          <p className="mt-3 text-sm text-slate-700">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              {extras.answers.length === 1 ? 'Answer' : 'Answers'}:{' '}
+            </span>
+            {extras.answers.join(' · ')}
+          </p>
+        ) : null}
+
+        {extras.steps.length > 0 ? (
+          <div className="mt-3 rounded-[8px] border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Working{extras.unit ? ` (answer in ${extras.unit})` : ''}
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
+              {extras.steps.map((step, stepIndex) => (
+                <li key={`${stepIndex}-${step}`} className="leading-6">
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
+
         {answer.model_answer ? (
-          <div className="mt-3 rounded-[8px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          <div className="mt-3 whitespace-pre-line rounded-[8px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">
               Model answer
             </p>
@@ -4339,37 +4624,49 @@ export default function ChapterListPage() {
             <div className="space-y-6">
               <div className="space-y-2.5">
                 <Label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Question type <span className="text-rose-500">*</span>
+                  Question format(s) <span className="text-rose-500">*</span>
                 </Label>
-                <div className="grid gap-2.5 sm:grid-cols-2">
-                  {QUESTION_TYPE_OPTIONS.map((option) => {
-                    const selected = questionType === option;
-                    return (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => setQuestionType(option)}
-                        aria-pressed={selected}
-                        className={cn(
-                          'rounded-[12px] border px-4 py-3 text-left transition-all',
-                          selected
-                            ? 'border-[#4f46e5] bg-[#eef2ff] shadow-[0_4px_14px_rgba(79,70,229,0.14)]'
-                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                        )}
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="text-[14px] font-semibold text-slate-900">{option}</span>
-                          {selected ? (
-                            <CheckCircle2 size={16} className="shrink-0 text-[#4f46e5]" />
-                          ) : null}
-                        </span>
-                        <span className="mt-1 block text-[12px] leading-[18px] text-slate-500">
-                          {QUESTION_TYPE_BLURBS[option]}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                {formatsStatus === 'idle' || formatsStatus === 'loading' ? (
+                  <div
+                    className="h-[50px] animate-pulse rounded-[7px] border border-slate-200 bg-slate-50"
+                    aria-busy="true"
+                    aria-live="polite"
+                  >
+                    <span className="sr-only">Loading question formats</span>
+                  </div>
+                ) : formatsStatus === 'error' ? (
+                  <div
+                    role="alert"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700"
+                  >
+                    <span>{formatsError || 'Question formats could not be loaded.'}</span>
+                    <button
+                      type="button"
+                      onClick={loadGeneratableFormats}
+                      className="font-semibold text-[#4f46e5] hover:text-[#4338ca]"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : formatCards.length === 0 ? (
+                  <p className="rounded-[12px] border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-600">
+                    No question formats are available to generate yet.
+                  </p>
+                ) : (
+                  <FormatMultiSelect
+                    cards={formatCards}
+                    value={selectedFormatCodes}
+                    onChange={handleFormatsChange}
+                    disabled={isGeneratingQuestions}
+                  />
+                )}
+                <p className="text-[12px] text-slate-500">
+                  {selectedFormats.length > 1
+                    ? isTotalQuestionsValid && totalCoversFormats(totalQuestionsNumber, selectedFormats.length)
+                      ? `The total is split evenly across the ${selectedFormats.length} selected formats (${formatSplitLabel}).`
+                      : `The total is split evenly across the ${selectedFormats.length} selected formats, so it must be at least ${selectedFormats.length}.`
+                    : 'Choose one or more formats. Each question is saved under the format it was written as.'}
+                </p>
               </div>
 
               <div className="space-y-2.5">
@@ -4419,7 +4716,11 @@ export default function ChapterListPage() {
                     </Label>
                     <p className="mt-1 text-[12px] leading-[18px] text-slate-500">
                       {useAutoQuota
-                        ? 'The generator weights Bloom levels from the concept intelligence.'
+                        ? selectedFormats.length > 1
+                          ? 'Several formats are selected, so each is written at the Bloom levels it allows and the mix is chosen for you.'
+                          : selectedFormat && allowedLevels.length < BLOOM_LEVEL_META.length
+                          ? `The generator weights Bloom levels from the concept intelligence, within the levels ${selectedFormat.label} allows.`
+                          : 'The generator weights Bloom levels from the concept intelligence.'
                         : 'You decide how many questions sit at each Bloom level.'}
                     </p>
                   </div>
@@ -4432,11 +4733,18 @@ export default function ChapterListPage() {
                         key={option.label}
                         type="button"
                         onClick={() => handleToggleAutoQuota(option.value)}
-                        className={
+                        disabled={!option.value && selectedFormat === null}
+                        title={
+                          !option.value && selectedFormat === null
+                            ? 'Choose a single format to set a custom Bloom mix.'
+                            : undefined
+                        }
+                        className={cn(
                           useAutoQuota === option.value
                             ? 'bg-[#4f46e5] px-4 py-1.5 text-white'
-                            : 'bg-white px-4 py-1.5 text-slate-600 hover:bg-slate-50'
-                        }
+                            : 'bg-white px-4 py-1.5 text-slate-600 hover:bg-slate-50',
+                          'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white'
+                        )}
                       >
                         {option.label}
                       </button>
@@ -4453,13 +4761,13 @@ export default function ChapterListPage() {
                             <th className="px-3 py-2">Bloom level</th>
                             <th className="px-3 py-2">Difficulty</th>
                             <th className="px-3 py-2 text-right">Questions</th>
-                            {questionType === 'Narrative' ? (
+                            {selectedFormat?.marks_editable ? (
                               <th className="px-3 py-2 text-right">Marks each</th>
                             ) : null}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {BLOOM_LEVEL_META.map((meta) => (
+                          {allowedLevels.map((meta) => (
                             <tr key={meta.level}>
                               <td className="px-3 py-2 font-medium text-slate-900">{meta.level}</td>
                               <td className="px-3 py-2">
@@ -4492,7 +4800,7 @@ export default function ChapterListPage() {
                                   className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#4f46e5]"
                                 />
                               </td>
-                              {questionType === 'Narrative' ? (
+                              {selectedFormat?.marks_editable ? (
                                 <td className="px-3 py-2 text-right">
                                   <input
                                     aria-label={`Marks per ${meta.level} question`}
@@ -4533,7 +4841,10 @@ export default function ChapterListPage() {
                         type="button"
                         onClick={() =>
                           setBloomCounts(
-                            suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
+                            suggestedBloomCounts(
+                              isTotalQuestionsValid ? totalQuestionsNumber : 0,
+                              selectedFormat?.allowed_bloom_levels
+                            )
                           )
                         }
                         className="text-[13px] font-semibold text-[#4f46e5] hover:text-[#4338ca]"
@@ -4542,10 +4853,18 @@ export default function ChapterListPage() {
                       </button>
                     </div>
 
-                    {questionType === 'MCQ' ? (
+                    {selectedFormat && !selectedFormat.marks_editable ? (
                       <p className="text-[11px] text-slate-500">
-                        MCQs are always scored at 1 mark each, so marks are not editable for this
-                        type.
+                        {selectedFormat.label} questions are always worth {selectedFormat.default_marks}{' '}
+                        mark{selectedFormat.default_marks === 1 ? '' : 's'} each, so marks are not
+                        editable for this format.
+                      </p>
+                    ) : null}
+                    {selectedFormat && allowedLevels.length < BLOOM_LEVEL_META.length ? (
+                      <p className="text-[11px] text-slate-500">
+                        {selectedFormat.label} can only be written at{' '}
+                        {allowedLevels.map((meta) => meta.level).join(', ')}, so those are the only
+                        levels listed.
                       </p>
                     ) : null}
                   </>
@@ -4563,6 +4882,29 @@ export default function ChapterListPage() {
                   <CheckCircle2 size={15} className="mt-px shrink-0" />
                   <span>{questionGenerationSuccess}</span>
                 </p>
+              ) : null}
+
+              {generatedFormatResults.length > 1 ? (
+                <ul className="space-y-1.5 rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-[12.5px]">
+                  {generatedFormatResults.map((result) => (
+                    <li
+                      key={result.question_format_code}
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5"
+                    >
+                      <span className="flex items-center gap-2 font-medium text-slate-800">
+                        {result.label}
+                        <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10.5px] font-normal text-slate-600">
+                          {result.question_format_code}
+                        </code>
+                      </span>
+                      <span className={result.status ? 'text-emerald-700' : 'text-rose-700'}>
+                        {result.status
+                          ? `${result.inserted} of ${result.requested} saved`
+                          : result.message}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
 
               {generatedQuestionPreviews.length > 0 ? (
@@ -5695,6 +6037,21 @@ export default function ChapterListPage() {
     );
   }
 
+  // A study document (revision notes, a remedial class, classroom activities) opens here, over whichever view is showing.
+  const documentViewer = (
+    <DocumentViewer
+      item={openDocument}
+      audience="teacher"
+      instituteId={Number(getRequestContext()?.sub_institute_id ?? NaN)}
+      userKey={(() => {
+        const context = getRequestContext();
+
+        return context ? `${context.sub_institute_id}-${context.user_id}` : 'guest';
+      })()}
+      onClose={() => setOpenDocument(null)}
+    />
+  );
+
   if (view === 'content' && contentChapter) {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
     const totalItems = resourceScopedContentItems.length;
@@ -5861,7 +6218,7 @@ export default function ChapterListPage() {
                   <button
                     key={tab}
                     type="button"
-                    onClick={() => setContentLibraryTab(tab)}
+                    onClick={() => selectContentLibraryTab(tab)}
                     className={`inline-flex items-center gap-2 border-b-2 px-1 py-3 font-medium transition-colors ${
                       isActive
                         ? 'border-[#4f46e5] text-[#4f46e5]'
@@ -5915,9 +6272,50 @@ export default function ChapterListPage() {
             {contentLoading ? 'Loading contentâ€¦' : `${filteredChapterContentItems.length} items in ${activeChapterTitle}`}
           </p>
 
+          {activeContentLibraryTab === 'Prayogshala' && canCreateContent !== false && !contentLoading && !contentError ? (
+            <div className="mb-4 flex justify-end">
+              <Button
+                type="button"
+                onClick={() => setPrayogshalaEditor({ activity: null })}
+                className="h-10 rounded-full bg-[#4f46e5] px-5 text-sm font-semibold text-white hover:bg-[#4338ca]"
+              >
+                <Plus size={15} className="mr-2" />
+                Add activity
+              </Button>
+            </div>
+          ) : null}
+
+          {prayogshalaActionError ? (
+            <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {prayogshalaActionError}
+            </div>
+          ) : null}
+
+          {activeContentLibraryTab === 'Prayogshala' && activeLibraryChapter && /^\d+$/.test(activeLibraryChapter.id) ? (
+            <PrayogshalaTopicPanel
+              key={activeLibraryChapter.id}
+              chapterId={Number(activeLibraryChapter.id)}
+              canManage={canCreateContent !== false}
+              reloadKey={contentReloadKey}
+              onOpenLab={openPrayogshalaLab}
+              onChanged={reloadChapterContent}
+            />
+          ) : null}
+
           {contentError ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {contentError}
+            <div className="flex flex-col items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
+              <span>{contentError}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setContentError('');
+                  setContentReloadKey((key) => key + 1);
+                }}
+                className="h-9 rounded-full bg-white px-4 text-rose-700"
+              >
+                Try again
+              </Button>
             </div>
           ) : contentLoading ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -5927,7 +6325,9 @@ export default function ChapterListPage() {
             </div>
           ) : filteredChapterContentItems.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500">
-              No content is available for this chapter.
+              {activeContentLibraryTab === 'Prayogshala'
+                ? PRAYOGSHALA_EMPTY_MESSAGE
+                : 'No content is available for this chapter.'}
             </div>
           ) : contentGroupBy === 'Concept wise' ? (() => {
               const groups = new Map<string, { title: string; items: ChapterContentItem[] }>();
@@ -5965,6 +6365,7 @@ export default function ChapterListPage() {
                             key={item.id}
                             item={item}
                             onOpen={() => handleOpenContent(item)}
+                            onDownloadPdf={() => handleDownloadPdf(item)}
                             hideChapter
                           />
                         ))}
@@ -5980,10 +6381,51 @@ export default function ChapterListPage() {
                     key={item.id}
                     item={item}
                     onOpen={() => handleOpenContent(item)}
+                    onDownloadPdf={() => handleDownloadPdf(item)}
                   />
                 ))}
               </div>
             )}
+
+          {labActivityId ? (
+            labActivity?.lab_config ? (
+              <PrayogshalaLab activity={labActivity} lab={labActivity.lab_config} onClose={closePrayogshalaLab} />
+            ) : (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gradient-to-br from-indigo-50 via-pink-50 to-cyan-50 px-6 text-center text-slate-800">
+                <div>
+                  <p className="text-lg font-semibold">
+                    {labContentLoaded ? 'This Prayogshala activity was not found in this chapter.' : 'Loading the lab…'}
+                  </p>
+                  {labContentLoaded || contentError ? (
+                    <button type="button" onClick={closePrayogshalaLab} className="mt-4 rounded-full bg-[#4f46e5] px-5 py-2 text-sm font-semibold text-white">
+                      Back to chapter
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            )
+          ) : null}
+          <PrayogshalaDetailDialog
+            activity={openPrayogshala}
+            canManage={canCreateContent !== false}
+            onClose={() => setOpenPrayogshala(null)}
+            onEdit={(activity) => {
+              setOpenPrayogshala(null);
+              setPrayogshalaEditor({ activity });
+            }}
+            onRemove={removePrayogshalaActivity}
+          />
+          {prayogshalaEditor && activeLibraryChapter && /^\d+$/.test(activeLibraryChapter.id) ? (
+            <PrayogshalaEditorDialog
+              chapterId={Number(activeLibraryChapter.id)}
+              activity={prayogshalaEditor.activity}
+              onClose={() => setPrayogshalaEditor(null)}
+              onSaved={() => {
+                setPrayogshalaEditor(null);
+                reloadChapterContent();
+              }}
+            />
+          ) : null}
 
           <div
             className={cn(
@@ -6156,6 +6598,7 @@ export default function ChapterListPage() {
             initialConcept={activeLibraryChapterConcepts?.concepts[0]?.title ?? ''}
             onSuccess={handleGenerateSuccess}
           />
+          {documentViewer}
         </div>
       </div>
     );
@@ -6722,6 +7165,8 @@ export default function ChapterListPage() {
           </div>
         </div>
       )}
+
+      {documentViewer}
     </div>
   );
 }

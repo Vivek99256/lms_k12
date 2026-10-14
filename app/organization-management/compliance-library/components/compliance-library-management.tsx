@@ -27,14 +27,12 @@
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Calendar, ClipboardList, Edit3, Eye, FileText, FolderKanban, Paperclip, Trash2, UploadCloud, User, CheckCircle2, AlertTriangle } from 'lucide-react'
-import { Badge } from '@/components/ui/g2g/badge'
 import { Button } from '@/components/ui/g2g/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/g2g/card'
 import { Select } from '@/components/ui/g2g/select'
-import { StatusBadge } from '@/components/ui/status-badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/g2g/table'
 import { cn } from '@/lib/utils'
-import { buildSessionContext } from '../../_lib/compliance-library-api'
+import { isComplianceAdmin } from '../../_lib/compliance-library-api'
 import { useComplianceLibrary } from '../../_lib/use-compliance-library'
 import { useComplianceDashboard } from '../../_lib/use-compliance-extras'
 import type { ComplianceApiRecord, ComplianceTemplateOption } from '../../_lib/compliance-library-api'
@@ -53,6 +51,7 @@ import {
   pageSizeOptions,
 } from './compliance-library-management-shared'
 import { ComplianceLibraryFiltersBar } from './compliance-library-filters-bar'
+import { FrequencyPill, IconTile, PriorityPill, StatusPill, TABLE_HEADER_CLASS, ToneBadge } from './compliance-theme'
 
 const LazyComplianceLibraryToolbar = lazy(() =>
   import('./compliance-library-management-toolbar').then((module) => ({ default: module.ComplianceLibraryToolbar })),
@@ -69,19 +68,12 @@ const LazyComplianceTemplates = lazy(() => import('./compliance-templates').then
 const LazyComplianceCategories = lazy(() => import('./compliance-categories').then((module) => ({ default: module.ComplianceCategories })))
 const LazyComplianceDashboard = lazy(() => import('./compliance-dashboard').then((module) => ({ default: module.ComplianceDashboard })))
 
-const PRIORITY_VARIANT: Record<string, 'default' | 'navy' | 'warning' | 'destructive'> = {
-  Low: 'default',
-  Medium: 'navy',
-  High: 'warning',
-  Critical: 'destructive',
-}
-
 type Tab = 'register' | 'calendar' | 'my' | 'overdue' | 'templates' | 'categories'
 
 const TABS: { key: Tab; label: string; icon: typeof ClipboardList }[] = [
   { key: 'register', label: 'Register', icon: ClipboardList },
   { key: 'calendar', label: 'Calendar', icon: Calendar },
-  { key: 'my', label: 'My Compliance', icon: User },
+  { key: 'my', label: 'My compliance', icon: User },
   { key: 'overdue', label: 'Overdue', icon: AlertTriangle },
   { key: 'templates', label: 'Templates', icon: FileText },
   { key: 'categories', label: 'Categories', icon: FolderKanban },
@@ -117,10 +109,7 @@ export function ComplianceLibraryManagement() {
   // DisciplinaryLibraryController gate any action beyond tenant scoping), so
   // Delete/Verify/Reject/Category/Template management are gated on this
   // flag rather than a finer-grained permission that does not exist yet.
-  const isAdmin = useMemo(() => {
-    const session = buildSessionContext()
-    return session.isAdmin === '1' || session.isAdmin === 'true' || session.isAdmin === '1.0'
-  }, [])
+  const isAdmin = useMemo(() => isComplianceAdmin(), [])
 
   const {
     records: apiRecords,
@@ -302,23 +291,23 @@ export function ComplianceLibraryManagement() {
           className={cn(
             'rounded-xl border px-4 py-3 text-sm shadow-sm',
             notice.toLowerCase().includes('required') || notice.toLowerCase().includes('fail')
-              ? 'border-destructive/20 bg-destructive/10 text-destructive'
-              : 'border-success/20 bg-success/10 text-success',
+              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-300'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300',
           )}
         >
           {notice}
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1 rounded-xl border border-border/70 bg-background/60 p-1">
+      <div className="flex flex-wrap gap-1.5 rounded-xl border border-indigo-100 bg-indigo-50/50 p-1 dark:border-indigo-400/20 dark:bg-indigo-500/5">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             type="button"
             onClick={() => setActiveTab(key)}
             className={cn(
-              'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              activeTab === key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+              'flex items-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-medium transition-colors',
+              activeTab === key ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200' : 'text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 dark:text-muted-foreground dark:hover:bg-indigo-500/10',
             )}
           >
             <Icon className="size-4" />
@@ -329,11 +318,13 @@ export function ComplianceLibraryManagement() {
 
       {activeTab === 'register' && (
         <>
-          <Card>
+          <Card className="overflow-hidden">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <UploadCloud className="size-5 text-primary" />
-                Compliance Creation Form
+              <CardTitle className="flex items-center gap-3 text-lg">
+                <IconTile tone="brand">
+                  <UploadCloud className="size-5" />
+                </IconTile>
+                Create compliance item
               </CardTitle>
               <CardDescription>
                 Register a compliance item, set ownership, attach evidence templates, and define its review cadence.
@@ -373,13 +364,13 @@ export function ComplianceLibraryManagement() {
           <Card className="overflow-hidden">
             <CardHeader className="gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <CardTitle className="text-lg">Compliance Records</CardTitle>
+                <CardTitle className="text-lg">Compliance records</CardTitle>
                 <CardDescription>
                   Search, filter, review assigned owners, and maintain the live compliance register.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-3">
-                <Badge variant="navy">{pagination.total} total</Badge>
+                <ToneBadge tone="brand" className="px-3 py-1 text-sm">{pagination.total} total</ToneBadge>
                 <Select
                   value={filters.per_page ?? '10'}
                   onChange={(value) => applyFilters({ per_page: value, page: '1' })}
@@ -394,7 +385,7 @@ export function ComplianceLibraryManagement() {
                 <>
                   <div className="max-h-[560px] overflow-auto">
                     <Table className="min-w-[1200px]">
-                      <TableHeader className="sticky top-0 z-10 bg-card shadow-sm">
+                      <TableHeader className={cn('sticky top-0 z-10 shadow-sm', TABLE_HEADER_CLASS)}>
                         <TableRow className="hover:bg-transparent">
                           <TableHead className="w-16">No.</TableHead>
                           <TableHead>Name</TableHead>
@@ -414,8 +405,8 @@ export function ComplianceLibraryManagement() {
                           <TableRow>
                             <TableCell colSpan={11} className="py-14 text-center">
                               <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
-                                <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
-                                  <FileText className="size-6 text-muted-foreground" />
+                                <div className="flex size-14 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-500/15">
+                                  <FileText className="size-7 text-indigo-600" />
                                 </div>
                                 <div>
                                   <p className="font-medium text-foreground">No compliance records found</p>
@@ -429,50 +420,52 @@ export function ComplianceLibraryManagement() {
                           </TableRow>
                         ) : (
                           records.map((record, index) => (
-                            <TableRow key={record.id} className="group">
+                            <TableRow key={record.id} className="group transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
                               <TableCell className="font-medium text-muted-foreground">
                                 {(pagination.current_page - 1) * pagination.per_page + index + 1}
                               </TableCell>
                               <TableCell className="max-w-[180px]">
-                                <p className="font-medium text-foreground">{record.name}</p>
+                                <p className="font-semibold text-foreground">{record.name}</p>
                               </TableCell>
-                              <TableCell>{record.categoryName || '-'}</TableCell>
+                              <TableCell>
+                                {record.categoryName ? <ToneBadge tone="brand">{record.categoryName}</ToneBadge> : '-'}
+                              </TableCell>
                               <TableCell>{record.department}</TableCell>
                               <TableCell>{record.assignedTo}</TableCell>
                               <TableCell>{displayDate(record.dueDate)}</TableCell>
                               <TableCell>
-                                <Badge variant={record.frequency === 'Custom' ? 'warning' : 'navy'}>{record.frequency}</Badge>
+                                <FrequencyPill frequency={record.frequency} />
                               </TableCell>
                               <TableCell>
-                                <Badge variant={PRIORITY_VARIANT[record.priority] ?? 'default'}>{record.priority}</Badge>
+                                <PriorityPill priority={record.priority} />
                               </TableCell>
                               <TableCell>
-                                <StatusBadge status={record.derivedStatus} size="sm" />
+                                <StatusPill status={record.derivedStatus} />
                               </TableCell>
                               <TableCell>
                                 {record.evidenceCount > 0 ? (
-                                  <span className="inline-flex items-center gap-1 text-primary">
-                                    <Paperclip className="size-3.5" /> {record.evidenceCount}
-                                  </span>
+                                  <ToneBadge tone="info">
+                                    <Paperclip className="size-3" /> {record.evidenceCount}
+                                  </ToneBadge>
                                 ) : (
                                   <span className="text-muted-foreground">None</span>
                                 )}
                               </TableCell>
                               <TableCell>
                                 <div className="flex justify-end gap-1">
-                                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`View ${record.name}`} onClick={() => setViewingId(record.id)}>
+                                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`View ${record.name}`} className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/10" onClick={() => setViewingId(record.id)}>
                                     <Eye className="size-4" />
                                   </Button>
-                                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit ${record.name}`} onClick={() => openEdit(record)}>
+                                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit ${record.name}`} className="text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-500/10" onClick={() => openEdit(record)}>
                                     <Edit3 className="size-4" />
                                   </Button>
                                   {record.derivedStatus !== 'Completed' && record.derivedStatus !== 'Not Applicable' && (
-                                    <Button type="button" variant="ghost" size="icon-sm" aria-label={`Complete ${record.name}`} className="text-success" onClick={() => setCompleteRecord(record)}>
+                                    <Button type="button" variant="ghost" size="icon-sm" aria-label={`Complete ${record.name}`} className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-500/10" onClick={() => setCompleteRecord(record)}>
                                       <CheckCircle2 className="size-4" />
                                     </Button>
                                   )}
                                   {isAdmin && (
-                                    <Button type="button" variant="destructive" size="icon-sm" aria-label={`Delete ${record.name}`} onClick={() => setDeleteRecord(record)}>
+                                    <Button type="button" variant="ghost" size="icon-sm" className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/10" aria-label={`Delete ${record.name}`} onClick={() => setDeleteRecord(record)}>
                                       <Trash2 className="size-4" />
                                     </Button>
                                   )}

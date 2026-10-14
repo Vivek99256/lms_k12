@@ -91,9 +91,22 @@ export function WorkflowConsole({ module: pinnedModule, breadcrumb, title, descr
   const mayCreate = permissions?.create ?? false;
   const mayUpdate = permissions?.update ?? false;
   const mayDelete = permissions?.delete ?? false;
-  const rightsReason = rights.authenticated
-    ? 'Your role cannot change approval workflows for this institute.'
-    : "Sign in again. We couldn't check your permissions.";
+  /**
+   * Whether the server actually answered for `platform.workflow`.
+   *
+   * `usePermission` collapses "denied" and "not asked" into `false`, and the two
+   * must not be confused here: telling an administrator "your role cannot change
+   * approval workflows" is a claim about THEIR role, and if the server had no
+   * entry for the key it has made no such claim. The banner below is suppressed
+   * in that case, and the controls stay disabled — refusing is still the safe
+   * answer, it just stops asserting a reason that was never given.
+   */
+  const rightsAnswered = !rights.unknownModules.includes(RBAC_KEY);
+  const rightsReason = !rights.authenticated
+    ? "Sign in again. We couldn't check your permissions."
+    : !rightsAnswered
+      ? 'This ERP does not report permissions for approval workflows yet, so they are read-only here. An administrator can enable changes in Group-wise Rights.'
+      : 'Your role cannot change approval workflows for this institute.';
 
   const load = useCallback(
     (isRefresh = false) => {
@@ -210,8 +223,15 @@ export function WorkflowConsole({ module: pinnedModule, breadcrumb, title, descr
     >
       {note && <Note tone={note.tone} text={note.text} onDismiss={() => setNote(null)} />}
 
-      {!mayUpdate && !rights.loading && (
+      {!mayUpdate && rightsAnswered && !rights.loading && (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <Lock size={14} className="mr-1.5 inline align-text-bottom" />
+          You can see these workflows but not change them. {rightsReason}
+        </div>
+      )}
+
+      {!mayUpdate && !rightsAnswered && !rights.loading && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <Lock size={14} className="mr-1.5 inline align-text-bottom" />
           You can see these workflows but not change them. {rightsReason}
         </div>

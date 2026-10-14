@@ -38,6 +38,7 @@ import {
   matchPairs,
   toBlanksPayload,
   toCoursePresentationPayload,
+  toDragDropPayload,
   toMemoryGamePayload,
   toSingleChoiceSetPayload,
   toTrueFalsePayload,
@@ -45,6 +46,7 @@ import {
   activityTitle,
   composedStem,
   type BankQuestion,
+  type DragDropPlayerPayload,
   type FeedbackBandInput,
   type H5pTargetKind,
   type TypeMapping,
@@ -226,6 +228,13 @@ export interface RuntimeMemoryCard {
   sort_order: number;
 }
 
+/**
+ * An image-based drag and drop, built from one question. The zones and draggables carry
+ * the same fields the manual player reads from `h5p_drag_drop`, so the scoring and the
+ * canvas code are shared; the difference is that nothing here was fetched or will be saved.
+ */
+export interface RuntimeDragDrop extends RowBase, Omit<DragDropPlayerPayload, 'title' | 'description'> {}
+
 export interface RuntimeMemoryGame extends RowBase {
   task_description: string | null;
   pairs_to_use: number;
@@ -349,6 +358,7 @@ export type RuntimeActivity =
   | { kind: 'drag_text'; item: RuntimeTextActivity }
   | { kind: 'mark_the_words'; item: RuntimeTextActivity }
   | { kind: 'memory_game'; item: RuntimeMemoryGame }
+  | { kind: 'drag_drop'; item: RuntimeDragDrop }
   | { kind: 'flashcards'; item: RuntimeFlashcards }
   | { kind: 'course_presentation'; item: RuntimeCoursePresentation }
   | { kind: 'essay'; item: RuntimeEssay };
@@ -653,7 +663,9 @@ export function mapQuestionToPlayerPayload(
     case 'drag_text':
     case 'mark_the_words':
     case 'fill_in_the_blanks': {
-      const asType = (as ?? 'fill_in_the_blanks') as RuntimeTextActivityType;
+      // Default to the row's OWN target (drag_text and mark_the_words rows have one of their
+      // own); it is fill_in_the_blanks for every row that predates those mappings.
+      const asType = (as ?? mapping.target.kind) as RuntimeTextActivityType;
       const { slots } = blanksPassage(question);
 
       if (slots === 0) {
@@ -697,7 +709,9 @@ export function mapQuestionToPlayerPayload(
             description: previewDescription(question),
             task_description: TEXT_ACTIVITY_TASK[asType],
             passage: payload.passage,
-            distractors: payload.distractors,
+            // Only Drag the words has a word bank; the other two types ignore it, and a
+            // drag_text row played as a blank must not carry one.
+            distractors: asType === 'drag_text' ? payload.distractors : '',
             media_image: payload.media_image,
             media_alt: payload.media_alt,
             enable_retry: payload.enable_retry,
@@ -794,6 +808,40 @@ export function mapQuestionToPlayerPayload(
             description: previewDescription(question),
             library: H5P_TARGETS.flashcards.library,
             cards,
+          },
+        },
+      };
+    }
+
+    case 'drag_drop': {
+      const payload = toDragDropPayload(question, context);
+
+      if (!payload) {
+        return { ok: false, mapping, reason: 'The picture, its drop zones or the answer key are missing or do not fit the picture, so the activity could not be played or marked.' };
+      }
+
+      return {
+        ok: true,
+        mapping,
+        activity: {
+          kind: 'drag_drop',
+          item: {
+            ...rowBase(question, scope, payload.title, payload.description, mapping.target.library),
+            task_description: payload.task_description,
+            background_image: payload.background_image,
+            image_alt: payload.image_alt,
+            image_fit: payload.image_fit,
+            canvas_width: payload.canvas_width,
+            canvas_height: payload.canvas_height,
+            zones: payload.zones,
+            elements: payload.elements,
+            attribution: payload.attribution,
+            pass_percentage: payload.pass_percentage,
+            apply_penalties: payload.apply_penalties,
+            single_point: payload.single_point,
+            enable_check: payload.enable_check,
+            enable_retry: payload.enable_retry,
+            enable_show_solution: payload.enable_show_solution,
           },
         },
       };

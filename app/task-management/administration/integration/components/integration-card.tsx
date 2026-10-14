@@ -4,6 +4,7 @@ import { Bell, CreditCard, Fingerprint, Mail, MessageCircle, MessageSquare, XCir
 
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { SampleBadge } from '@/app/platform-services/_components/shell'
 import { cn } from '@/lib/utils'
 import type { IntegrationConfig, IntegrationProviderDef } from '@/app/task-management/_lib/integration-types'
 
@@ -81,6 +82,12 @@ export function IntegrationCard({
           </span>
         </div>
         <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{provider.description}</p>
+
+        {config?.is_sample && (
+          <p className="mt-3">
+            <SampleBadge />
+          </p>
+        )}
 
         {configured && config?.last_updated_at && (
           <p className="mt-3 text-xs text-muted-foreground">

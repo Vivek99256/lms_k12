@@ -249,7 +249,7 @@ export default function TeacherActivityStreamPage() {
     <div className="min-h-full ">
       <div className="mx-auto w-full  space-y-6">
         {/* Top Header */}
-        <header className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+        {/* <header className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-4">
               <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-800 text-white shadow-lg shadow-indigo-200">
@@ -277,7 +277,7 @@ export default function TeacherActivityStreamPage() {
               </div>
             </div>
 
-            {/* Quick Action Shortcuts */}
+            
             <div className="flex flex-wrap items-center gap-2.5">
               <Link
                 href="/task-management/dashboard"
@@ -299,7 +299,7 @@ export default function TeacherActivityStreamPage() {
               </button>
             </div>
           </div>
-        </header>
+        </header> */}
 
         {/* Hero KPI Metric Widgets */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

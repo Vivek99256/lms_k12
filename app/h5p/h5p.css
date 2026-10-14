@@ -562,3 +562,99 @@
   .h5p-burst { display: none; }
   .h5p-celebrate-overlay__piece { display: none; }
 }
+
+/* =====================================================================
+   Branching Scenario
+   ===================================================================== */
+
+/* The body of a screen: HTML written by a teacher or the generator, reduced to
+   paragraphs, lists, emphasis and simple tables. Styled here once so a screen
+   reads the same wherever it is shown -- the player, the preview, the editor's
+   live view -- and so no player writes a colour. */
+.h5p-prose {
+  color: var(--h5p-ink);
+  font-size: 1rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.h5p-prose > * + * { margin-top: 0.85rem; }
+/* No margin on p, ul or ol here: the reset already zeroes them, and a rule of the
+   same kind below would out-rank the spacing between blocks above (a type
+   selector beats `> * + *`) and run every paragraph into the next. */
+.h5p-prose ul,
+.h5p-prose ol { padding-left: 1.3rem; }
+.h5p-prose ul { list-style: disc; }
+.h5p-prose ol { list-style: decimal; }
+.h5p-prose li + li { margin-top: 0.4rem; }
+.h5p-prose strong { font-weight: 650; }
+.h5p-prose h3 { font-size: 1.0625rem; font-weight: 600; }
+.h5p-prose h4 { font-size: 1rem; font-weight: 600; color: var(--h5p-ink-muted); }
+.h5p-prose blockquote {
+  border-left: 3px solid var(--h5p-accent-line);
+  padding-left: 0.9rem;
+  color: var(--h5p-ink-muted);
+}
+.h5p-prose a { color: var(--h5p-accent-deep); text-decoration: underline; }
+.h5p-prose img { max-width: 100%; height: auto; border-radius: var(--h5p-radius-sm); }
+.h5p-prose table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.h5p-prose th,
+.h5p-prose td {
+  border: 1px solid var(--h5p-line);
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+.h5p-prose th,
+.h5p-prose tr:first-child td {
+  background: var(--h5p-surface-sunken);
+  font-weight: 600;
+}
+
+/* What a choice led to. The tone is set by how sound the choice was, and never
+   by colour alone: the panel always carries a word and an icon as well. A weaker
+   choice is calm indigo, not red -- it is an invitation to rethink, not a
+   penalty. */
+.bs-feedback {
+  --bs-line: var(--h5p-accent-line);
+  --bs-soft: var(--h5p-accent-soft);
+  --bs-ink: var(--h5p-accent-deep);
+  border: 1.5px solid var(--bs-line);
+  background: var(--bs-soft);
+  border-radius: var(--h5p-radius-sm);
+  padding: 1rem 1.15rem;
+}
+.bs-feedback[data-quality="best"] {
+  --bs-line: var(--h5p-success-line);
+  --bs-soft: var(--h5p-success-soft);
+  --bs-ink: color-mix(in srgb, var(--h5p-success) 80%, #000);
+}
+.bs-feedback[data-quality="partial"] {
+  --bs-line: color-mix(in srgb, var(--h5p-warning) 40%, var(--h5p-surface));
+  --bs-soft: var(--h5p-reward-soft);
+  --bs-ink: color-mix(in srgb, var(--h5p-warning) 84%, #000);
+}
+.bs-feedback__label { color: var(--bs-ink); }
+
+/* A choice the learner has just picked, while its consequence is shown. */
+.bs-choice-picked {
+  border-color: var(--h5p-accent);
+  background: var(--h5p-accent-soft);
+}
+
+/* The ending dots: filled for an ending found on this visit. */
+.bs-dot {
+  display: inline-block;
+  height: 0.6rem;
+  width: 0.6rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--h5p-accent);
+  background: transparent;
+}
+.bs-dot.is-found { background: var(--h5p-accent); }

@@ -8,19 +8,12 @@
  */
 
 import { AlertTriangle, Eye } from 'lucide-react'
-import { Badge } from '@/components/ui/g2g/badge'
 import { Button } from '@/components/ui/g2g/button'
 import { Card, CardContent, CardHeader, CardDescription, CardTitle } from '@/components/ui/g2g/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/g2g/table'
 import { useOverdueCompliance } from '../../_lib/use-compliance-extras'
 import { displayDate, TableSkeleton } from './compliance-library-management-shared'
-
-const PRIORITY_VARIANT: Record<string, 'default' | 'navy' | 'warning' | 'destructive'> = {
-  Low: 'default',
-  Medium: 'navy',
-  High: 'warning',
-  Critical: 'destructive',
-}
+import { IconTile, PriorityPill, TABLE_HEADER_CLASS, ToneBadge } from './compliance-theme'
 
 export function OverdueCompliance({ onSelectRecord }: { onSelectRecord: (id: string) => void }) {
   const { records, loading } = useOverdueCompliance()
@@ -28,8 +21,11 @@ export function OverdueCompliance({ onSelectRecord }: { onSelectRecord: (id: str
   return (
     <Card className="overflow-hidden">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg text-destructive">
-          <AlertTriangle className="size-5" /> Overdue Compliance
+        <CardTitle className="flex items-center gap-3 text-lg">
+          <IconTile tone="error">
+            <AlertTriangle className="size-5" />
+          </IconTile>
+          Overdue compliance
         </CardTitle>
         <CardDescription>Compliance whose due date has passed without being completed or marked Not Applicable.</CardDescription>
       </CardHeader>
@@ -38,7 +34,7 @@ export function OverdueCompliance({ onSelectRecord }: { onSelectRecord: (id: str
           <TableSkeleton />
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className={TABLE_HEADER_CLASS}>
               <TableRow>
                 <TableHead>Compliance</TableHead>
                 <TableHead>Department</TableHead>
@@ -58,19 +54,19 @@ export function OverdueCompliance({ onSelectRecord }: { onSelectRecord: (id: str
                 </TableRow>
               ) : (
                 records.map((record) => (
-                  <TableRow key={record.id} className="bg-destructive/5">
+                  <TableRow key={record.id} className="hover:bg-slate-50 dark:hover:bg-white/5">
                     <TableCell className="font-medium text-foreground">{record.name}</TableCell>
                     <TableCell>{record.department ?? '-'}</TableCell>
                     <TableCell>{record.assigned_user ?? '-'}</TableCell>
                     <TableCell>{displayDate(record.due_date)}</TableCell>
                     <TableCell>
-                      <Badge variant="destructive">{record.days_overdue ?? '-'} days</Badge>
+                      <ToneBadge tone="error" dot>{record.days_overdue ?? '-'} days</ToneBadge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={PRIORITY_VARIANT[record.priority ?? ''] ?? 'default'}>{record.priority ?? '-'}</Badge>
+                      <PriorityPill priority={record.priority} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon-sm" aria-label={`View ${record.name}`} onClick={() => onSelectRecord(String(record.id))}>
+                      <Button variant="ghost" size="icon-sm" className="text-slate-600 hover:bg-slate-100 hover:text-slate-900" aria-label={`View ${record.name}`} onClick={() => onSelectRecord(String(record.id))}>
                         <Eye className="size-4" />
                       </Button>
                     </TableCell>

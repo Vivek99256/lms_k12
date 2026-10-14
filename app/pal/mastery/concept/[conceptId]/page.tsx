@@ -25,7 +25,7 @@ import {
   ConceptEvidence,
   ReadOnlyBadge,
 } from '@/app/pal/_components/CompletionState';
-import { COMPLETED_THROUGH_CHECK, JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -198,16 +198,17 @@ function ConceptMasteryView() {
             <PalRailStat label="Top level cleared" value={topCleared ? bandLabel(topCleared) : 'None recorded'} />
           </PalRailSection>
 
-          {completed && (
-            <PalRailSection title="Your journey">
-              <JourneyRail
-                current="mastery"
-                completed={COMPLETED_THROUGH_CHECK}
-                bypassed={['intervention']}
-                orientation="vertical"
-              />
-            </PalRailSection>
-          )}
+          <PalRailSection title="Your journey">
+            <JourneyRail
+              current="mastery"
+              completed={completed ? COMPLETED_THROUGH_CHECK : stagesBefore('mastery')}
+              bypassed={['intervention']}
+              orientation="vertical"
+              chapterId={chapterId}
+              conceptId={conceptId}
+              conceptName={result.conceptName || row?.name}
+            />
+          </PalRailSection>
         </>
       }
     >
