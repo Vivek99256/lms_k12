@@ -1587,7 +1587,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
       5: 'Fill in the Blank',
     };
 
-    return typeMap[Number(questionTypeId)] ?? '—';
+    return typeMap[Number(questionTypeId)] ?? '-';
   };
 
   const questionRows = useMemo<QuestionRecord[]>(() => {
@@ -1598,7 +1598,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         question.concept_name ||
         question.concept?.name ||
         conceptNameMap[Number(question.concept_id)] ||
-        '—',
+        '-',
       type:
         question.question_type_name ||
         question.question_type?.name ||
@@ -1607,12 +1607,12 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         question.bloom_name ||
         question.bloom_level ||
         question.bloom?.name ||
-        '—',
+        '-',
       difficulty:
         question.difficulty_name ||
         question.difficulty_level ||
         question.difficulty ||
-        '—',
+        '-',
       marks: Number(question.points ?? question.marks ?? 0),
     }));
   }, [conceptNameMap, questions]);
@@ -2398,21 +2398,6 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         <div className="mx-auto w-full max-w-[1540px]">
           <section className="rounded-[24px] border bg-white border-[#D9E3F1] p-4 shadow-[0_6px_18px_rgba(15,23,42,0.04)] sm:p-5">
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7A889D]">
-                  Academic year 2026-27 - Term 1
-                </p>
-                <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-[#172554] sm:text-[34px]">
-                  Learning management
-                </h1>
-                <p className="mt-2 max-w-3xl text-[14px] leading-6 text-[#5B6B82]">
-                  Plan lessons, manage concept-level content, and run mastery-based assessments.
-                </p>
-              </div>
-
-            </div>
-
             {audienceMode === 'Teacher' && !isStudentProfile ? (
               <div className="flex flex-col gap-4">
                 {!isScopedToOneType ? (
