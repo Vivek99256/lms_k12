@@ -227,6 +227,32 @@ function connectedFirst(a: CoherenceNode, b: CoherenceNode): number {
   return linksB - linksA || a.order - b.order || a.label.localeCompare(b.label);
 }
 
+/**
+ * What a card counts, by its OWN level - not what is recursively beneath it.
+ *
+ * A Unit card says how many Chapters it holds, a Chapter card how many Topics,
+ * and only a Topic (or a chapter with no topic step, shown as its concept list
+ * rather than a card) says how many Concepts. Counting concepts on every card
+ * regardless of level is what made Unit and Chapter cards both show the same
+ * recursive total.
+ */
+function cardCount(tree: TreeNode): { count: number; noun: string } {
+  switch (tree.node.type) {
+    case 'unit':
+      return {
+        count: tree.children.filter((c) => c.node.type === 'chapter').length,
+        noun: 'chapter',
+      };
+    case 'chapter':
+      return {
+        count: tree.children.filter((c) => c.node.type === 'topic').length,
+        noun: 'topic',
+      };
+    default:
+      return { count: conceptsUnder(tree).length, noun: 'concept' };
+  }
+}
+
 function CardGrid({
   heading,
   trees,
@@ -242,7 +268,7 @@ function CardGrid({
 
       <div className="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {trees.map((tree) => {
-          const concepts = conceptsUnder(tree).length;
+          const { count, noun } = cardCount(tree);
 
           return (
             <button
@@ -253,7 +279,7 @@ function CardGrid({
                 'flex h-36 flex-col items-center justify-center gap-1.5 rounded-2xl bg-[#4F46E5] px-4 text-center transition-[transform,box-shadow] duration-200',
                 'hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2',
                 'motion-reduce:transition-none motion-reduce:hover:translate-y-0',
-                stackShadow(concepts),
+                stackShadow(count),
               ].join(' ')}
             >
               <span className="text-[10px] font-medium uppercase tracking-wider text-white/70">
@@ -264,7 +290,8 @@ function CardGrid({
               </span>
               <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-white/70">
                 <Layers size={10} strokeWidth={2} aria-hidden />
-                {concepts} concept{concepts === 1 ? '' : 's'}
+                {count} {noun}
+                {count === 1 ? '' : 's'}
               </span>
             </button>
           );

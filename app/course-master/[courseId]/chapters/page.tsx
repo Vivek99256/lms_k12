@@ -96,6 +96,7 @@ import {
   type ArithmeticQuizEditorState,
 } from '@/app/h5p/h5p_arithmetic_quiz/components/editor';
 import { ContentCard } from './ContentCard';
+import { CourseMasterTabs } from '../../_components/CourseMasterTabs';
 import {
   PRAYOGSHALA_EMPTY_MESSAGE,
   PrayogshalaDetailDialog,
@@ -572,6 +573,10 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   if (contentCategory === 'lesson plan') return 'Lesson plan';
   if (contentCategory === 'my course') return 'My course';
   if (contentCategory === 'prayogshala') return 'Prayogshala';
+  // Authoritative for the same reason as the categories above: without it, a
+  // Revision Notes row whose file_type is 'pdf' matches the 'pdf' substring
+  // check below first and is mislabelled 'PDF' instead of 'Revision notes'.
+  if (contentCategory === 'revision notes') return 'Revision notes';
   // 'Teacher Training' is the bulk category (2,450 rows) and is distinct from
   // 'Teacher training presentation' (4 rows). Matched here rather than inside the
   // presentation branch below, because most of these rows are PDFs, not decks,
@@ -2196,6 +2201,19 @@ export default function ChapterListPage() {
     });
   }, [activeChapterId, allChapters, view]);
 
+  // The top-level Question bank tab links here with no chapterId, so the sync
+  // effect above never fires for it. Without this, a filter left over from an
+  // earlier chapter-scoped visit in the same session would silently carry over
+  // instead of landing on the full, unfiltered bank the tab implies.
+  useEffect(() => {
+    if (view !== 'question-bank' || activeChapterId) return;
+    questionBankChapterSyncedFromUrlRef.current = null;
+    setQuestionBankChapterFilter('all');
+    setQuestionBankConceptFilter('all');
+    setQuestionBankTypeFilter('all');
+    setQuestionBankCategoryFilter('all');
+  }, [view, activeChapterId]);
+
   const loadQuestionBankItems = useCallback(
     (filterValue: string) => {
       let cancelled = false;
@@ -2758,21 +2776,6 @@ export default function ChapterListPage() {
     nextParams.set('chapterId', chapter.id);
     nextParams.set('expandedChapterId', chapter.id);
 
-    router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
-  };
-
-  const openQuestionBankView = (chapter: Chapter) => {
-    const nextParams = new URLSearchParams(searchParams?.toString());
-    nextParams.set('view', 'question-bank');
-    nextParams.set('chapterId', chapter.id);
-    nextParams.set('expandedChapterId', chapter.id);
-
-    setQuestionBankChapterFilter(chapter.id);
-    setQuestionBankConceptFilter('all');
-    setQuestionBankTypeFilter('all');
-    // Categories differ from chapter to chapter, so a selection carried over
-    // from the last one can leave the bank looking empty rather than filtered.
-    setQuestionBankCategoryFilter('all');
     router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
   };
 
@@ -5598,6 +5601,8 @@ export default function ChapterListPage() {
             <span className="font-bold text-slate-950">Question bank</span>
           </div>
 
+          <CourseMasterTabs courseId={courseId} active="questionBank" />
+
           <div className="mb-6">
             <h1 className="text-[24px] font-bold tracking-tight text-slate-950">Question bank</h1>
             <p className="mt-2 text-[16px] leading-7 text-slate-700">
@@ -5754,6 +5759,8 @@ export default function ChapterListPage() {
           <ChevronRight size={14} className="text-slate-400" />
           <span className="font-semibold text-slate-900">Coherence map</span>
         </div>
+
+        <CourseMasterTabs courseId={courseId} active="coherenceMap" />
 
         <div className="min-h-0 flex-1">
           <CoherenceMapView
@@ -6091,42 +6098,13 @@ export default function ChapterListPage() {
                 </p>
               </div>
 
-              {contentResourceType === 'teacher' && (
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    type="button"
-                    onClick={openGeneratePresentationDrawer}
-                    title={contentCreationDenied ? CONTENT_CREATE_DENIED_HINT : undefined}
-                    className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-                  >
-                    <Sparkles size={16} className="mr-2" />
-                    Generate content
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => openUploadContentModal(activeLibraryChapter ?? contentChapter)}
-                    title={contentCreationDenied ? CONTENT_CREATE_DENIED_HINT : undefined}
-                    className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Upload size={16} className="mr-2" />
-                    Upload content
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm sm:px-5">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex min-w-0 flex-1 items-center gap-3 xl:flex-nowrap">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50 text-slate-500">
-                  <BookOpen size={17} />
-                </div>
-                <p className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Viewing Chapter
-                </p>
-                <div className="min-w-0 w-full max-w-[320px] shrink">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Moved up next to the page title. Styled to match the app
+                    header's own year/term pills (icon + value in a bordered
+                    rounded-xl button) rather than a boxed card, so it reads
+                    as a control next to the title instead of a separate
+                    section. */}
+                <div className="w-[270px] shrink-0">
                   <Select
                     value={selectedLibraryChapterId}
                     onValueChange={(value) => {
@@ -6140,7 +6118,7 @@ export default function ChapterListPage() {
                       }
                     }}
                   >
-                    <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 shadow-sm">
+                    <SelectTrigger size="sm" icon={<BookOpen size={14} />} className="w-full font-medium text-slate-700">
                       <span className="truncate">{activeChapterTitle}</span>
                     </SelectTrigger>
                     <SelectContent>
@@ -6152,29 +6130,45 @@ export default function ChapterListPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <p className="shrink-0 whitespace-nowrap text-sm text-slate-500">
-                  {filteredChapterContentItems.length} items in {activeChapterTitle}
-                </p>
-              </div>
 
-              <div className="flex items-center justify-between gap-3 xl:justify-end">
-                <p className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  
-                </p>
-                <span className="inline-flex items-center gap-2 rounded-2xl bg-slate-100/90 px-4 py-2 text-sm font-semibold text-[#4f46e5]">
+                <span className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200/50 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm">
                   {contentGroupBy === 'Concept wise' ? (
-                    <Brain size={15} />
+                    <Brain size={14} className="text-slate-500" />
                   ) : (
-                    <BookOpen size={15} />
+                    <BookOpen size={14} className="text-slate-500" />
                   )}
                   {contentGroupBy}
                 </span>
+
+                {contentResourceType === 'teacher' && (
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      type="button"
+                      onClick={openGeneratePresentationDrawer}
+                      title={contentCreationDenied ? CONTENT_CREATE_DENIED_HINT : undefined}
+                      className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                    >
+                      <Sparkles size={16} className="mr-2" />
+                      Generate content
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => openUploadContentModal(activeLibraryChapter ?? contentChapter)}
+                      title={contentCreationDenied ? CONTENT_CREATE_DENIED_HINT : undefined}
+                      className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Upload size={16} className="mr-2" />
+                      Upload content
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           <div className="mb-6 grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            {/* <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-slate-600">Content items</p>
@@ -6184,8 +6178,8 @@ export default function ChapterListPage() {
                   <FolderOpen size={18} />
                 </div>
               </div>
-            </div>
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            </div> */}
+            {/* <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-slate-600">Generated with AI</p>
@@ -6195,8 +6189,8 @@ export default function ChapterListPage() {
                   <Sparkles size={18} />
                 </div>
               </div>
-            </div>
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            </div> */}
+            {/* <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-slate-600">Uploaded</p>
@@ -6206,7 +6200,7 @@ export default function ChapterListPage() {
                   <Upload size={18} />
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
 
           <div className="mb-4 border-b border-slate-200/80">
@@ -6659,33 +6653,7 @@ export default function ChapterListPage() {
           </div>
         </div>
 
-        <div className="mb-6 border-b border-slate-200/80">
-          <div className="flex flex-wrap items-center gap-6 text-[15px]">
-            <button
-              type="button"
-              onClick={() => router.push(`/course-master/lesson-plan/${course.id}`)}
-              className="inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 font-medium text-slate-600 transition-colors hover:text-slate-900"
-            >
-              <BookOpen size={16} />
-              Lesson plans
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(`/course-master/lesson-plan/${course.id}/curriculum`)}
-              className="inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 font-medium text-slate-600 transition-colors hover:text-slate-900"
-            >
-              <FileText size={16} />
-              Curriculum
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 border-b-2 border-[#4f46e5] px-1 py-3 font-medium text-[#4f46e5]"
-            >
-              <BookOpen size={16} />
-              Chapters
-            </button>
-          </div>
-        </div>
+        <CourseMasterTabs courseId={courseId} active="chapters" />
 
         {subjectLoading && allChapters.length === 0 ? (
           <div className="space-y-4">
@@ -6764,15 +6732,6 @@ export default function ChapterListPage() {
                     >
                       <FolderOpen size={16} className="mr-2" />
                       Teacher Workspace
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => openQuestionBankView(chapter)}
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <Database size={16} className="mr-2" />
-                      Question Bank
                     </Button>
                     <Button
                       type="button"
