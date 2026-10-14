@@ -254,7 +254,7 @@ function OccupationField({
   );
 }
 
-function CareerCertaintyCard({ open, onOpenChange }: {
+export function CareerCertaintyCard({ open, onOpenChange }: {
   open: boolean; onOpenChange: (open: boolean) => void;
 }) {
   const [current, setCurrent] = useState<AspirationSnapshot | null>(null);

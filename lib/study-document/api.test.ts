@@ -43,11 +43,12 @@ test('a student opens the online practice first and a teacher the PDF', () => {
   assert.equal(defaultTab('teacher'), 'pdf');
 });
 
-test("a student is not offered a classroom activity's teacher edition; everything else is offered to everyone", () => {
+test("a student is not offered a classroom activity's teacher edition or a remedial class's teacher-guide copy; everything else is offered to everyone", () => {
   assert.deepEqual(variantsOffered('activities', 'student'), ['practice']);
+  assert.deepEqual(variantsOffered('remedial', 'student'), ['practice']);
   assert.deepEqual(variantsOffered('activities', 'teacher'), ['revision', 'practice']);
+  assert.deepEqual(variantsOffered('revision_notes', 'student'), ['revision', 'practice'], 'a learner revising may want the answers');
   for (const kind of ['revision_notes', 'remedial'] as const) {
-    assert.deepEqual(variantsOffered(kind, 'student'), ['revision', 'practice'], 'a learner revising may want the answers');
     assert.deepEqual(variantsOffered(kind, 'teacher'), ['revision', 'practice']);
   }
   // The copy a reader opens first is always one they are offered, and a student is never defaulted to a teacher edition.

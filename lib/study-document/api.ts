@@ -81,13 +81,14 @@ export function defaultTab(audience: Audience): ViewerTab {
 
 /**
  * Which copies the interface offers to a reader. Everyone is offered both, except that the student interface does not
- * offer a classroom activity's TEACHER edition (its steps for the teacher, its answer keys and its assessment): a student
- * has the student handout.
+ * offer a classroom activity's TEACHER edition (its steps for the teacher, its answer keys and its assessment) or a remedial
+ * class's answers-shown copy (which ends with the teacher's guide): a student has the student handout / answers-hidden copy.
  *
  * Like `defaultVariant` this shapes what is offered; it does not restrict what the server will send.
  */
 export function variantsOffered(kind: DocumentKind, audience: Audience): PdfVariant[] {
-  return kind === 'activities' && audience === 'student' ? ['practice'] : ['revision', 'practice'];
+  // The answers-shown copy of a remedial class ends with the teacher's guide, and an activities teacher edition is the teacher's.
+  return (kind === 'activities' || kind === 'remedial') && audience === 'student' ? ['practice'] : ['revision', 'practice'];
 }
 
 /** A file name from the item's title ("Chapter 1 Remedial Class" -> "chapter-1-remedial-class.pdf"), with the copy named when it is the other one. */
