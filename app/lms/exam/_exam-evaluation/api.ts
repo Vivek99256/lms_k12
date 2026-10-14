@@ -176,13 +176,26 @@ export async function uploadSheets(batchId: number, files: File[]): Promise<Batc
 }
 
 /**
- * One teacher pass over a sheet: who it belongs to, what the marks are, and
- * whether it is signed off. `approve` copies any untouched AI mark into the
- * teacher's own column on the server, so an approved sheet no longer moves.
+ * One teacher pass over a sheet: who it belongs to, what the marks and notes
+ * are, and whether it is signed off.
+ *
+ * The server refuses a mark outside 0..max (it does not clamp), refuses to
+ * approve while a flagged question has no teacher mark, and on approval copies
+ * the AI's mark into any other question the teacher left alone, so an approved
+ * sheet no longer moves. Its message comes back as the thrown Error's message.
  */
 export async function reviewSheet(
   sheetId: number,
-  input: { studentId?: number | null; marks?: MarkEdit[]; approve?: boolean; unapprove?: boolean }
+  input: {
+    studentId?: number | null;
+    /** "This is the right student": confirms the one already on the sheet. */
+    confirmIdentity?: boolean;
+    /** Why a sheet already confirmed or marked is being moved to another student. */
+    reason?: string;
+    marks?: MarkEdit[];
+    approve?: boolean;
+    unapprove?: boolean;
+  }
 ): Promise<SheetDetail> {
   const body: Record<string, unknown> = {};
 
@@ -190,10 +203,20 @@ export async function reviewSheet(
     body.student_id = input.studentId ?? 0;
   }
 
+  if (input.confirmIdentity) {
+    body.confirm_identity = true;
+  }
+
+  if (input.reason !== undefined && input.reason.trim() !== '') {
+    body.reason = input.reason.trim();
+  }
+
   if (input.marks) {
     body.marks = input.marks.map((mark) => ({
       question_no: mark.question_no,
       teacher_marks: mark.teacher_marks,
+      // Only when given: leaving it out means "do not touch the saved note".
+      ...(mark.teacher_feedback !== undefined ? { teacher_feedback: mark.teacher_feedback } : {}),
     }));
   }
 
@@ -206,6 +229,21 @@ export async function reviewSheet(
   }
 
   return post<SheetDetail>(`sheets/${sheetId}/review`, body, 'Couldn’t save this review.');
+}
+
+/**
+ * Confirms the suggested student on several sheets at once.
+ *
+ * The server only honours clean GR / roll-number matches with nothing flagged;
+ * any other sheet named here is skipped and reported back in `skipped`, not
+ * confirmed. Confirming is what starts marking.
+ */
+export async function confirmIdentities(batchId: number, sheetIds: number[]): Promise<BatchDetail> {
+  return post<BatchDetail>(
+    `batches/${batchId}/confirm-identities`,
+    { sheet_ids: sheetIds },
+    'Couldn’t confirm these students.'
+  );
 }
 
 export async function reprocessSheet(sheetId: number): Promise<SheetDetail> {
@@ -241,6 +279,35 @@ export async function publishBatch(batchId: number): Promise<{ published: number
   const data = unwrap<{ published: number; skipped: number }>(payload as never, 'Couldn’t publish this evaluation.');
 
   return { ...data, message: payload?.message || '' };
+}
+
+/**
+ * The marked-up PDF as it WOULD look with the marks typed so far, as an object URL.
+ *
+ * Nothing is saved: the server draws the stored answers with these teacher marks laid over
+ * them and sends the PDF back. A mark outside 0..max is refused with the server's message.
+ * The caller owns the URL and must revokeObjectURL() it when it is replaced.
+ */
+export async function fetchSheetPreviewUrl(
+  sheetId: number,
+  marks: Array<{ question_no: number; teacher_marks: number | null }>,
+  signal?: AbortSignal
+): Promise<string> {
+  const session = requireSession();
+  const response = await fetch(url(session, `sheets/${sheetId}/preview`), {
+    method: 'POST',
+    cache: 'no-store',
+    signal,
+    headers: createAuthHeaders(session, 'application/json'),
+    body: JSON.stringify({ ...baseBody(session), marks }),
+  });
+
+  if (!response.ok) {
+    const payload = await readJson(response).catch(() => null);
+    throw new Error(payload?.message || 'The marked-up preview couldn’t be drawn.');
+  }
+
+  return URL.createObjectURL(await response.blob());
 }
 
 /**
