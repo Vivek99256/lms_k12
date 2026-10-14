@@ -991,6 +991,13 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
   const [isLoadingLmsCourses, setIsLoadingLmsCourses] = useState(false);
   const [lmsCoursesError, setLmsCoursesError] = useState('');
   const [examInnerTab, setExamInnerTab] = useState<ExamInnerTab>('Exams');
+  // Coming back from reviewing an answer sheet: land on the evaluation tab, not the default one.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('examTab') === 'evaluation') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setExamInnerTab('Exam evaluation');
+    }
+  }, []);
   // Drives the template dropdown in the toolbar and the PDF action on each row.
   const examPaperPdf = useExamPaperPdf();
   const [studentLearningTab, setStudentLearningTab] = useState<StudentLearningTab>(defaultStudentLearningTab);
