@@ -254,3 +254,66 @@ test('shape check: what the player can draw, and why anything else is refused', 
   assert.match(String(interactionProblem({ ...reveal, items: [reveal.items[0], reveal.items[0]] }, false)), /repeats an item id/);
   assert.match(String(interactionProblem({ ...steps, kind: 'timeline' }, false)), /no date/);
 });
+
+import { lensView, nudge, LENS, ZOOM } from './loupe';
+import { teaserOf } from './interactions';
+
+test('a teaser is the start of the text, cut at a word, and says nothing the text does not', () => {
+  const text = 'Some organisms, such as bacteria or yeast, consist of only one cell.';
+  assert.equal(teaserOf(text), 'Some organisms, such as bacteria or yeast\u2026');
+  assert.equal(teaserOf('A short one.'), 'A short one.', 'nothing follows, so no ellipsis');
+  assert.equal(teaserOf('  spaced \n out   words  '), 'spaced out words');
+  assert.equal(teaserOf(''), '');
+  assert.ok(text.startsWith(teaserOf(text).replace(/\u2026$/, '')));
+});
+
+test('the magnifier centres the lens on the point it is over, whatever the picture\'s shape', () => {
+  for (const ratio of [16 / 9, 4 / 3, 1, 0.75]) {
+    for (const [x, y] of [[0.5, 0.5], [0.1, 0.9], [0.8, 0.2], [0, 0], [1, 1]]) {
+      const v = lensView(x, y, ratio);
+      // Draw it the way CSS does: a picture ZOOM times the size of the whole picture, inside a lens of LENS (by LENS*ratio) of the picture.
+      const pictureW = ZOOM;
+      const pictureH = ZOOM;
+      const lensW = LENS;
+      const lensH = LENS * ratio;
+      const offsetX = (v.positionX / 100) * (lensW - pictureW);
+      const offsetY = (v.positionY / 100) * (lensH - pictureH);
+      // The part of the picture at the lens's centre, as a share of the picture.
+      assert.ok(Math.abs((lensW / 2 - offsetX) / pictureW - x) < 1e-9, `x at ratio ${ratio}, point ${x}`);
+      assert.ok(Math.abs((lensH / 2 - offsetY) / pictureH - y) < 1e-9, `y at ratio ${ratio}, point ${y}`);
+      assert.equal(v.width, LENS * 100);
+    }
+  }
+});
+
+test('a point outside the picture is held to its edge, and a key press moves a point by a step but never off the picture', () => {
+  assert.equal(lensView(-4, 9, 1.5).left, lensView(0, 1, 1.5).left);
+  assert.deepEqual(nudge({ x: 0.98, y: 0.02 }, 0.05, -0.05), { x: 1, y: 0 });
+  assert.deepEqual(nudge({ x: 0.5, y: 0.5 }, 0.1, 0), { x: 0.6, y: 0.5 });
+  assert.ok(Number.isFinite(lensView(NaN, Infinity, NaN).left), 'bad numbers never reach the style');
+});
+
+test('markProblem: a mark needs a shape, a tone and enough points that all lie on the picture', async () => {
+  const { markProblem } = await import('./interactions');
+  const line = { shape: 'line', tone: 'primary', points: [[1, 2], [50, 60]] };
+  const area = { shape: 'area', tone: 'secondary', points: [[0, 0], [100, 0], [50, 100]] };
+
+  assert.equal(markProblem(undefined), false, 'a card with no marks is fine');
+  assert.equal(markProblem([line, area]), false);
+  assert.equal(markProblem([{ ...line, points: [[1, 2]] }]), true, 'a line needs two points');
+  assert.equal(markProblem([{ ...area, points: [[0, 0], [10, 10]] }]), true, 'an area needs three');
+  assert.equal(markProblem([{ ...line, points: [[1, 2], [101, 60]] }]), true, 'a point off the picture');
+  assert.equal(markProblem([{ ...line, points: [[1, 2], [-1, 60]] }]), true);
+  assert.equal(markProblem([{ ...line, tone: 'red' }]), true, 'an unknown tone');
+  assert.equal(markProblem([{ ...line, shape: 'blob' }]), true);
+  assert.equal(markProblem('x'), true);
+});
+
+test('interactionProblem: a card whose marks lie off the picture makes the interaction unusable', async () => {
+  const { interactionProblem } = await import('./interactions');
+  const item = (marks?: unknown) => ({ id: 'i1', label: 'A', text: 'a', marks });
+  const make = (marks?: unknown) => ({ kind: 'compare', intro: '', wrapup: '', reason: '', items: [item(marks), { id: 'i2', label: 'B', text: 'b' }] }) as never;
+
+  assert.equal(interactionProblem(make([{ shape: 'line', tone: 'primary', points: [[1, 1], [2, 2]] }]), false), null);
+  assert.match(String(interactionProblem(make([{ shape: 'line', tone: 'primary', points: [[1, 1], [200, 2]] }]), false)), /mark/);
+});

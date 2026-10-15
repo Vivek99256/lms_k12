@@ -345,18 +345,34 @@ export function exampleProgress(slide: DeckSlide, seen: readonly string[]): Exam
 // Shape check (used by parseDeck)
 // ---------------------------------------------------------------------------
 
+/** True when marks are missing paths, have too few points, or put a point outside the picture. Undefined marks are fine. */
+export function markProblem(marks: unknown): boolean {
+  if (marks === undefined || marks === null) return false;
+  if (!Array.isArray(marks)) return true;
+
+  return marks.some((m: { shape?: unknown; points?: unknown; tone?: unknown }) => {
+    if ((m?.shape !== 'line' && m?.shape !== 'area') || (m.tone !== 'primary' && m.tone !== 'secondary')) return true;
+    if (!Array.isArray(m.points) || m.points.length < (m.shape === 'area' ? 3 : 2)) return true;
+
+    return m.points.some((p) => !Array.isArray(p) || p.length !== 2 || p.some((n) => typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > 100));
+  });
+}
+
 /** What is wrong with an interaction's shape, or null when the player can draw it. */
+/** @param slideImageIsDiagram the slide's picture can carry hotspots: a drawn diagram, or a stored picture whose parts a person marked (`annotated`) */
 export function interactionProblem(value: unknown, slideImageIsDiagram: boolean): string | null {
   const i = value as Partial<DeckInteraction> | null;
   if (!i || typeof i !== 'object') return 'is not an object';
 
   switch (i.kind) {
     case 'hotspots': {
-      if (!slideImageIsDiagram) return 'asks for hotspots on a slide with no drawn diagram';
+      if (!slideImageIsDiagram) return 'asks for hotspots on a slide with no drawn diagram or marked picture';
       const spots = (i as HotspotsInteraction).spots;
       if (!Array.isArray(spots) || spots.length < 2) return 'has fewer than two hotspots';
       if (spots.some((s) => !s.id || typeof s.text !== 'string' || ![s.x, s.y, s.w, s.h].every((n) => typeof n === 'number'))) return 'has a malformed hotspot';
       if (new Set(spots.map((s) => s.id)).size !== spots.length) return 'repeats a hotspot id';
+      if ((i as HotspotsInteraction).lab !== undefined && ((i as HotspotsInteraction).lab !== 'osmosis' || spots.length !== 4)) return 'has a live model it cannot drive';
+      if (spots.some((s) => s.pin !== undefined && (typeof s.pin?.x !== 'number' || typeof s.pin?.y !== 'number' || s.pin.x < 0 || s.pin.x > 100 || s.pin.y < 0 || s.pin.y > 100))) return 'has a pin that is off the picture';
       return null;
     }
     case 'scenario': {
@@ -390,6 +406,7 @@ export function interactionProblem(value: unknown, slideImageIsDiagram: boolean)
       if (items.some((c) => !c.id || !c.label || !c.text)) return 'has a malformed item';
       if (new Set(items.map((c) => c.id)).size !== items.length) return 'repeats an item id';
       if (i.kind === 'timeline' && items.some((c) => !c.when)) return 'has a timeline event with no date';
+      if (items.some((c) => markProblem(c.marks) || markProblem(c.inset?.marks))) return 'has a mark that does not lie on the picture';
       return null;
     }
     case 'match': {
@@ -409,4 +426,15 @@ export function interactionProblem(value: unknown, slideImageIsDiagram: boolean)
     default:
       return `has an unknown kind "${String((i as { kind?: unknown }).kind)}"`;
   }
+}
+
+/**
+ * The first few words of a text, as a hook on a card that is still closed ("Some organisms, such as bacteria…"). Nothing is
+ * reworded: it is the start of the text, cut at a word, with an ellipsis when something follows.
+ */
+export function teaserOf(text: string, words = 7): string {
+  const all = text.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  if (all.length <= words) return all.join(' ');
+
+  return `${all.slice(0, words).join(' ').replace(/[,;:.\u2014-]+$/, '')}\u2026`;
 }

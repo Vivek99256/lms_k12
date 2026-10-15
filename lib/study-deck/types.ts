@@ -103,6 +103,11 @@ export interface DeckImage {
    * photograph of equipment makes a dull or busy texture). Absent means it may be.
    */
   backdrop?: boolean;
+  /**
+   * True for a stored picture (a photograph or a real labelled diagram) whose parts a person has marked: it may carry hotspots
+   * like a drawn diagram does. The marks sit where the person put them, so the picture is reviewed before it is stored.
+   */
+  annotated?: boolean;
 }
 
 /** A prompt for the class to talk about, with a possible answer for the teacher. Never marked. */
@@ -120,10 +125,16 @@ export interface HotspotSpot {
   w: number;
   h: number;
   text: string;
+  /** Where the numbered pin sits (share of the picture), chosen beside the structure so it does not cover it. */
+  pin?: { x: number; y: number };
+  /** A picture of this part by its name (for instance a labelled lipid bilayer), shown beside its name and in its explanation. */
+  image?: DeckImage | null;
 }
 
 export interface HotspotsInteraction {
   kind: 'hotspots';
+  /** A live model shown with the picture, driven by the same selected part (four parts: see components/study-deck/OsmosisLab.tsx). */
+  lab?: 'osmosis';
   reason: string;
   intro: string;
   spots: HotspotSpot[];
@@ -160,11 +171,38 @@ export interface ScenarioInteraction {
 }
 
 /** One thing in a list that is opened one at a time. `when` is the date of a timeline event. */
+/**
+ * A structure marked on a picture: a path in percent of the picture's width and height (0,0 is the top left corner), so it
+ * stays on the structure however large the picture is drawn. `line` is an open path (a wall, a membrane seen edge-on);
+ * `area` is a closed outline (the edge of a cell or its contents). `tone` picks one of two highlight colours so two
+ * structures shown together never look alike.
+ */
+export interface ImageMark {
+  shape: 'line' | 'area';
+  points: Array<[number, number]>;
+  tone: 'primary' | 'secondary';
+  /** Spoken to screen readers; the visible name is the card's own label. */
+  label?: string;
+}
+
+/** A small drawing shown beside the picture when the picture holds no example of the card's subject. */
+export interface MarkInset {
+  caption: string;
+  /** Marks in the inset's own square (percent of its width and height). */
+  marks: ImageMark[];
+}
+
 export interface ExploreItem {
   id: string;
   label: string;
   text: string;
   when?: string;
+  /** A picture of this item alone (a compare card can show its own). */
+  image?: DeckImage | null;
+  /** The structures of the slide's picture this card is about, highlighted while the card is open. */
+  marks?: ImageMark[];
+  /** Shown when the slide's picture has no example of this card's subject (for instance, no animal cell in a plant photograph). */
+  inset?: MarkInset;
 }
 
 /**

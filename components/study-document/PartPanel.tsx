@@ -6,7 +6,8 @@ import { ArrowRight, Eye, Lightbulb } from 'lucide-react';
 import { ActivityCard } from '@/components/study-deck/ActivityCard';
 import { VisualFigure } from '@/components/study-deck/VisualFigure';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
-import { partHeading, partLabel, partName, partTag, resolvePart, topicNameOf } from '@/lib/study-document/document';
+import { partHeading, partLabel, partName, partsOf, partTag, resolvePart, topicNameOf } from '@/lib/study-document/document';
+import { markTerms } from '@/lib/study-document/play';
 import {
   clinicCardsOf,
   discussionOf,
@@ -32,6 +33,7 @@ import {
   workedExampleInteraction,
   type GuidedQuestion,
 } from '@/lib/study-document/online';
+import { resultActions, retryActions, type BlockId } from '@/lib/study-document/journey';
 import type { ProgressAction } from '@/lib/study-document/progress';
 import type { BodyPart, ClinicPart, GapsPart, RevisionTopicPart, StudyDocument, TeacherPart } from '@/lib/study-document/types';
 import { Flashcards } from './Flashcards';
@@ -48,6 +50,12 @@ export interface PartPanelProps {
   dispatch: (action: ProgressAction) => void;
   /** Open another part (a "go back to" pointer). */
   onOpenPart: (n: number) => void;
+  /** Show only these blocks of the part (a stage of a journey). Unset shows the whole part. */
+  blocks?: readonly BlockId[];
+  /** For a unit: only the practice of these guided levels. */
+  levels?: readonly number[];
+  /** Leave out the heading: the journey around the part already has one. */
+  bare?: boolean;
 }
 
 function Block({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
@@ -103,8 +111,40 @@ function CellList({ items }: { items: string[] }) {
 }
 
 /** What a topic is about, concept by concept, and its comparison table when it has one. */
-function TopicTables({ part }: { part: RevisionTopicPart }) {
+/** A key term in a sentence, drawn as something to select: its meaning opens under the row. */
+function TermButton({ text, open, onToggle }: { text: string; open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onToggle}
+      className={`rounded-sm border-b-2 border-dotted px-0.5 font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent motion-reduce:transition-none ${
+        open ? 'border-sd-accent bg-sd-accent text-white' : 'border-sd-accent text-sd-strong hover:bg-sd-soft'
+      }`}
+    >
+      {text}
+    </button>
+  );
+}
+
+function TopicTables({ doc, part }: { doc: StudyDocument; part: RevisionTopicPart }) {
   const { rows, compare } = part.content;
+  // The term whose meaning is open: one at a time, in one row.
+  const [open, setOpen] = useState<{ row: number; term: string } | null>(null);
+  const glossary = useMemo(() => {
+    const g = partsOf(doc).find((p) => p.type === 'glossary');
+
+    return g && g.type === 'glossary' ? g.content.terms : [];
+  }, [doc]);
+  const glossaryTerms = useMemo(() => glossary.map((t) => t.term), [glossary]);
+  // A term means what the glossary says; a term the glossary does not list means what its concept says.
+  const meaningOf = (row: number, term: string) => glossary.find((t) => t.term.toLowerCase() === term.toLowerCase())?.meaning ?? doc.concepts[String(rows[row].concept_id)]?.definition ?? '';
+  const more = (row: number) => {
+    const definition = (doc.concepts[String(rows[row].concept_id)]?.definition ?? '').trim();
+
+    return definition && !definition.toLowerCase().includes(rows[row].essential.toLowerCase().slice(0, 40)) ? definition : '';
+  };
+  const toggle = (row: number, term: string) => setOpen((o) => (o && o.row === row && o.term === term ? null : { row, term }));
 
   return (
     <>
@@ -130,13 +170,42 @@ function TopicTables({ part }: { part: RevisionTopicPart }) {
                   <th scope="row" className="px-3 py-2 align-top font-medium">
                     {row.name}
                   </th>
-                  <td className="px-3 py-2 align-top">{row.essential}</td>
+                  <td className="px-3 py-2 align-top">
+                    <p>
+                      {markTerms(row.essential, [...row.terms, ...glossaryTerms]).map((piece, k) =>
+                        piece.term ? (
+                          <TermButton key={k} text={piece.text} open={open?.row === i && open.term === piece.term} onToggle={() => toggle(i, piece.term as string)} />
+                        ) : (
+                          <span key={k}>{piece.text}</span>
+                        )
+                      )}
+                    </p>
+                    {open?.row === i ? (
+                      <p role="note" className="mt-2 rounded-lg border border-sd-line bg-sd-softer p-2 text-sm text-slate-900 animate-in fade-in duration-200 motion-reduce:animate-none">
+                        <span className="font-semibold">{open.term}. </span>
+                        {meaningOf(i, open.term)}
+                      </p>
+                    ) : null}
+                    {more(i) ? (
+                      <details className="group mt-2 rounded-lg border border-slate-200 bg-white px-2 py-1">
+                        <summary className="cursor-pointer text-sm font-medium text-sd-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent">Why this matters</summary>
+                        <p className="mt-1 text-sm text-slate-800">{more(i)}</p>
+                      </details>
+                    ) : null}
+                  </td>
                   <td className="px-3 py-2 align-top">
                     {row.terms.length > 0 ? (
                       <ul className="flex flex-wrap gap-1.5">
                         {row.terms.map((term, j) => (
-                          <li key={j} className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-900">
-                            {term}
+                          <li key={j}>
+                            <button
+                              type="button"
+                              aria-expanded={open?.row === i && open.term === term}
+                              onClick={() => toggle(i, term)}
+                              className={`rounded-full border px-2 py-0.5 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent motion-reduce:transition-none ${open?.row === i && open.term === term ? 'border-sd-accent bg-sd-accent text-white' : 'border-sd-line bg-sd-soft text-sd-strong hover:border-sd-accent'}`}
+                            >
+                              {term}
+                            </button>
                           </li>
                         ))}
                       </ul>
@@ -471,13 +540,19 @@ function GuidedCard({ g, children, done }: { g: GuidedQuestion; children: ReactN
  *
  * Which parts a reader is given is decided before this (`partsFor`): the teacher guide never reaches a student.
  */
-export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }: PartPanelProps) {
+export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart, blocks, levels, bare = false }: PartPanelProps) {
+  const show = (id: BlockId) => !blocks || blocks.includes(id);
   const features = featuresOf(part);
   const progress = partProgress(part, done);
   const topic = topicNameOf(doc, part);
   const questions = useMemo(() => resolvePart(part, bank), [part, bank]);
   const memory = `p${part.n}`;
   const mark = (key: string) => () => dispatch({ type: 'done', key });
+  // A marked answer is remembered as right or not right (a diagnostic routes on it); a written one is only done.
+  const report = (key: string, result: { correct: boolean | null }) => resultActions(key, result.correct !== null, result.correct === true).forEach(dispatch);
+  // A practice question can be tried again; a diagnostic and an exit check judge, so they are answered once.
+  const retry = (key: string) => retryActions(key).forEach(dispatch);
+  const retryable = part.type === 'unit' || part.type === 'independent' || part.type === 'check' ? retry : undefined;
   const conceptName = (id: number | null) => (id !== null ? doc.concepts[String(id)]?.name ?? null : null);
 
   const orientation = orientationOf(part);
@@ -495,7 +570,8 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
         activityKey={q.key}
         done={done.has(q.key)}
         connects={conceptName(q.resolved.activity.connects_concept)}
-        onResult={(key) => dispatch({ type: 'done', key })}
+        onResult={report}
+        onRetry={retryable}
       />
     );
     const pointers = part.type === 'diagnostic' ? ifMissedFor(doc, part, index) : [];
@@ -526,7 +602,7 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
 
             return (
               <>
-                {guided.map((g) => {
+                {guided.filter((g) => !levels || levels.includes(g.level)).map((g) => {
                   const q = questions[g.index];
                   const isDone = done.has(g.key);
 
@@ -537,13 +613,14 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
                         activityKey={g.key}
                         done={isDone}
                         connects={conceptName(q.resolved.activity.connects_concept)}
-                        onResult={(key) => dispatch({ type: 'done', key })}
+                        onResult={report}
+                        onRetry={retryable}
                       />
                     </GuidedCard>
                   );
                 })}
                 {questions
-                  .filter((q) => !guidedKeys.has(q.key))
+                  .filter((q) => !guidedKeys.has(q.key) && (!levels || levels.includes(3)))
                   .map((q) => (
                     <ActivityCard
                       key={q.key}
@@ -551,7 +628,8 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
                       activityKey={q.key}
                       done={done.has(q.key)}
                       connects={conceptName(q.resolved.activity.connects_concept)}
-                      onResult={(key) => dispatch({ type: 'done', key })}
+                      onResult={report}
+                      onRetry={retryable}
                     />
                   ))}
               </>
@@ -568,26 +646,28 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
 
   return (
     <article aria-label={partLabel(doc, part)} className="space-y-4" data-testid={`part-${part.n}`}>
-      <header className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-wider text-indigo-700">
-          {partTag(doc, part)}
-          {topic && topic !== part.title ? ` · ${topic}` : ''}
-        </p>
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900">{partHeading(part)}</h2>
-        {orientation ? <p className="max-w-3xl text-sm leading-relaxed text-slate-700">{orientation}</p> : null}
-        {aside ? <p className="max-w-3xl text-sm leading-relaxed text-slate-700">{aside}</p> : null}
-        {progress.total > 0 ? (
-          <p className="text-xs text-slate-600" role="status">
-            {progress.done} of {progress.total} done
+      {bare ? null : (
+        <header className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-700">
+            {partTag(doc, part)}
+            {topic && topic !== part.title ? ` · ${topic}` : ''}
           </p>
-        ) : null}
-      </header>
+          <h2 className="text-xl font-semibold tracking-tight text-slate-900">{partHeading(part)}</h2>
+          {orientation ? <p className="max-w-3xl text-sm leading-relaxed text-slate-700">{orientation}</p> : null}
+          {aside ? <p className="max-w-3xl text-sm leading-relaxed text-slate-700">{aside}</p> : null}
+          {progress.total > 0 ? (
+            <p className="text-xs text-slate-600" role="status">
+              {progress.done} of {progress.total} done
+            </p>
+          ) : null}
+        </header>
+      )}
 
-      {features.length === 0 ? (
+      {features.length === 0 && !blocks ? (
         <p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">Everything in this part is in the PDF. There is nothing more to try online.</p>
       ) : null}
 
-      {part.type === 'activity' && part.content.student_steps.length > 0 ? (
+      {!blocks && part.type === 'activity' && part.content.student_steps.length > 0 ? (
         <Block title="What you do" hint={part.content.materials.length > 0 ? `You need: ${part.content.materials.join(', ')}.` : undefined}>
           <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-900">
             {part.content.student_steps.map((s, i) => (
@@ -597,9 +677,9 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
         </Block>
       ) : null}
 
-      {part.image && part.interaction?.kind !== 'hotspots' ? <VisualFigure image={part.image} assetBase={null} /> : null}
+      {show('figure') && part.image && part.interaction?.kind !== 'hotspots' ? <VisualFigure image={part.image} assetBase={null} /> : null}
 
-      {part.type === 'unit' && part.content.prerequisites.length > 0 ? (
+      {show('prereq') && part.type === 'unit' && part.content.prerequisites.length > 0 ? (
         <Block title="Remember first" hint="You need these ideas for this unit.">
           <ul className="space-y-2 text-sm text-slate-900">
             {part.content.prerequisites.map((p) => (
@@ -611,9 +691,9 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
         </Block>
       ) : null}
 
-      {part.type === 'topic' ? (
+      {show('tables') && part.type === 'topic' ? (
         <>
-          <TopicTables part={part} />
+          <TopicTables doc={doc} part={part} />
           {part.content.recall.length > 0 ? (
             <Block title="Remember this">
               <ul className="list-disc space-y-1 pl-5 text-sm text-slate-900">
@@ -626,7 +706,7 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
         </>
       ) : null}
 
-      {part.type === 'exit' && (part.content.criteria.length > 0 || readinessRule(part)) ? (
+      {show('criteria') && part.type === 'exit' && (part.content.criteria.length > 0 || readinessRule(part)) ? (
         <Block title="What you should be able to do" hint={readinessRule(part) ?? undefined}>
           {part.content.criteria.length > 0 ? (
             <ul className="list-disc space-y-1 pl-5 text-sm text-slate-900">
@@ -639,6 +719,8 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
       ) : null}
 
       {features.map((feature) => {
+        const block: BlockId = feature === 'term' ? 'terms' : feature === 'worked_example' ? 'example' : feature === 'diagram' || feature === 'interaction' ? 'explore' : feature === 'discussion' || feature === 'reflection' ? 'reading' : (feature as BlockId);
+        if (!show(block)) return null;
         switch (feature) {
           case 'term':
             return (
@@ -812,7 +894,7 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
         }
       })}
 
-      {revisit.length > 0 ? (
+      {show('after') && revisit.length > 0 ? (
         <Block title="If you are not ready yet" hint="Go back to these units, then try the check again.">
           <ul className="flex flex-wrap gap-2">
             {revisit.map((p) => (
@@ -824,7 +906,7 @@ export function PartPanel({ doc, part, bank, done, notes, dispatch, onOpenPart }
         </Block>
       ) : null}
 
-      {part.type === 'unit' ? (
+      {show('after') && part.type === 'unit' ? (
         <>
           {followUpOf(doc, part).length > 0 ? (
             <Block title="If that was hard">

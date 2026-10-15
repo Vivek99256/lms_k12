@@ -7,8 +7,8 @@ import { assetUrl, outlineOf, relatedConcepts, stageLabel, topicOfSlide } from '
 import { dockTabs, explanationInline } from '@/lib/study-deck/explain';
 import { exampleKey, interactionKey } from '@/lib/study-deck/interactions';
 import { conceptStatus, type DeckProgress, type ResultInput } from '@/lib/study-deck/progress';
-import { layoutOf, usesBleed, type LayoutKind, type StepKind } from '@/lib/study-deck/stage';
-import { backdropSlideOf, backdropUrl, THEMES, themeForTopic, themeOf } from '@/lib/study-deck/theme';
+import { layoutOf, type LayoutKind, type StepKind } from '@/lib/study-deck/stage';
+import { backdropUrl, THEMES, themeForTopic, themeOf } from '@/lib/study-deck/theme';
 import type { DeckImage, DeckSlide, StudyDeck } from '@/lib/study-deck/types';
 import { ExplainDock } from './ExplainDock';
 import { ExploreView } from './ExploreView';
@@ -52,10 +52,10 @@ export function SlideView(props: SlideViewProps) {
     () => onResult(exampleKey(slide), EXPLORED, slide.taught_concept_ids[0] ?? null, null),
     [onResult, slide]
   );
-  const { portrait } = useStage();
-  const bleed = usesBleed(slide, portrait);
-  // A photograph behind the slide: its own when the slide is made of one, else the nearest suitable photograph of its topic, faint.
-  const behind = bleed ? slide.image : (deck.slides.find((s) => s.n === backdropSlideOf(deck, slide))?.image ?? null);
+  // Pictures sit beside the text as figures, never as the background of the whole slide.
+  const bleed = false;
+  // No photograph is drawn behind a slide.
+  const behind = null as DeckImage | null;
   const photo = layout === 'cover' || !behind ? null : { src: assetUrl(behind.url, props.assetBase), led: bleed };
   const stage = { theme, number: slide.n, count: deck.slides.length, bare: layout === 'cover', photo };
 

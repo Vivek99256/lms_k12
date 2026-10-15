@@ -1,20 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
-import { CheckCircle2, Layers, ListChecks, Loader2, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
+import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 
 import { MemoryContext } from '@/components/study-deck/stage-ui';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import type { Audience } from '@/lib/study-document/api';
-import { KIND_LABEL, partLabel, partsFor } from '@/lib/study-document/document';
-import { checklistOf, featuresOf, flashcardsOf, interactionDoneKey, partProgress } from '@/lib/study-document/online';
+import { partsFor } from '@/lib/study-document/document';
+import { checklistOf, flashcardsOf } from '@/lib/study-document/online';
 import { doneSet, loadProgress, progressKey, progressReducer, saveProgress, type DocumentProgress, type ProgressAction, type StorageLike } from '@/lib/study-document/progress';
 import type { StudyDocument } from '@/lib/study-document/types';
-import { ChecklistPanel } from './ChecklistPanel';
+import { ActivityWorkspace } from './ActivityWorkspace';
 import { loadBank, loadStudyDocument } from './data';
-import { Flashcards } from './Flashcards';
-import { InteractionStage } from './InteractionStage';
-import { PartPanel } from './PartPanel';
+import { RemedialJourney } from './RemedialJourney';
+import { RevisionNotebook } from './RevisionNotebook';
 
 export interface OnlinePracticeProps {
   chapterId: number;
@@ -27,8 +26,6 @@ export interface OnlinePracticeProps {
 }
 
 type Loaded = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; doc: StudyDocument; bank: BankQuestion[] };
-
-type Selection = { kind: 'part'; n: number } | { kind: 'terms' } | { kind: 'checklist' };
 
 /** The reducer without its optional clock, so React sees the two-argument shape it expects. */
 const reduce = (state: DocumentProgress, action: ProgressAction): DocumentProgress => progressReducer(state, action);
@@ -102,7 +99,7 @@ export function OnlinePractice({ chapterId, contentId, instituteId, userKey, aud
 }
 
 function Practice({ doc, bank, contentId, userKey, audience }: { doc: StudyDocument; bank: BankQuestion[]; contentId: number; userKey: string; audience: Audience }) {
-  // Only the parts this reader may see are listed, counted and opened. The glossary has no entry of its own: "Key terms" below is it.
+  // Only the parts this reader may see are listed, counted and opened. The glossary has no screen of its own: "Key terms" is it.
   const parts = useMemo(() => partsFor(doc, audience).filter((p) => p.type !== 'glossary'), [doc, audience]);
   const bankMap = useMemo(() => new Map(bank.map((q) => [Number(q.id), q])), [bank]);
   const terms = useMemo(() => flashcardsOf(doc), [doc]);
@@ -115,132 +112,21 @@ function Practice({ doc, bank, contentId, userKey, audience }: { doc: StudyDocum
   // What the learner has opened on each screen, kept while this panel is open.
   const [memory] = useState(() => new Map<string, unknown>());
 
-  const firstWithWork = parts.find((p) => featuresOf(p).length > 0) ?? parts[0];
-  const [selected, setSelected] = useState<Selection>({ kind: 'part', n: firstWithWork?.n ?? 1 });
-
   useEffect(() => {
     saveProgress(browserStorage(), storeKey, progress);
   }, [storeKey, progress]);
 
-  const open = useCallback(
-    (n: number) => {
-      if (parts.some((p) => p.n === n)) setSelected({ kind: 'part', n });
-    },
-    [parts]
-  );
-  const current = selected.kind === 'part' ? parts.find((p) => p.n === selected.n) : undefined;
+  const shell = { doc, parts, glossary, bank: bankMap, done, notes: progress.notes, dispatch, terms, checklist, audience };
 
-  const items: Array<{ id: string; label: string; sub?: string; selection: Selection; muted?: boolean }> = [
-    ...(doc.kind === 'revision_notes' && terms.length > 0 ? [{ id: 'terms', label: 'Key terms', sub: `${terms.filter((t) => done.has(t.id)).length + (glossary?.interaction && done.has(interactionDoneKey(glossary)) ? 1 : 0)}/${terms.length + (glossary?.interaction ? 1 : 0)}`, selection: { kind: 'terms' } as Selection }] : []),
-    ...(doc.kind === 'revision_notes' && checklist.length > 0
-      ? [{ id: 'checklist', label: 'Revision checklist', sub: `${checklist.flatMap((g) => g.items).filter((i) => done.has(i.id)).length}/${checklist.flatMap((g) => g.items).length}`, selection: { kind: 'checklist' } as Selection }]
-      : []),
-    ...parts.map((p) => {
-      const progressOf = partProgress(p, done);
-      const hasWork = featuresOf(p).length > 0;
-
-      return {
-        id: `part-${p.n}`,
-        label: partLabel(doc, p),
-        sub: hasWork ? (progressOf.total > 0 ? `${progressOf.done}/${progressOf.total}` : '') : 'PDF only',
-        selection: { kind: 'part', n: p.n } as Selection,
-        muted: !hasWork,
-      };
-    }),
-  ];
-  const isSelected = (s: Selection) => (s.kind === 'part' ? selected.kind === 'part' && selected.n === s.n : selected.kind === s.kind);
-  const currentId = items.find((i) => isSelected(i.selection))?.id ?? '';
-
+  // Each kind of document is its own experience (its own look, steps and navigation) over the same stored document.
   return (
     <MemoryContext.Provider value={memory}>
-      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[17rem_minmax(0,1fr)] md:grid-rows-1" data-testid="online-practice">
-        <nav aria-label={`${KIND_LABEL[doc.kind]} parts`} className="border-b border-slate-200 bg-slate-50 md:overflow-y-auto md:border-b-0 md:border-r">
-          <div className="p-2 md:hidden">
-            <label htmlFor="part-select" className="sr-only">
-              Choose a part
-            </label>
-            <select
-              id="part-select"
-              value={currentId}
-              onChange={(event) => {
-                const item = items.find((i) => i.id === event.target.value);
-                if (item) setSelected(item.selection);
-              }}
-              className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"
-            >
-              {items.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.label}
-                  {i.sub ? ` (${i.sub})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <ul className="hidden space-y-0.5 p-2 md:block">
-            {items.map((i) => {
-              const active = isSelected(i.selection);
-              const Icon = i.id === 'terms' ? Layers : i.id === 'checklist' ? ListChecks : null;
-
-              return (
-                <li key={i.id}>
-                  <button
-                    type="button"
-                    aria-current={active ? 'true' : undefined}
-                    onClick={() => setSelected(i.selection)}
-                    className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 ${
-                      active ? 'bg-indigo-600 text-white' : i.muted ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    {Icon ? <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> : null}
-                    <span className="min-w-0 flex-1 leading-snug">{i.label}</span>
-                    {i.sub ? <span className={`shrink-0 text-xs ${active ? 'text-indigo-100' : 'text-slate-500'}`}>{i.sub}</span> : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        <div className="min-h-0 overflow-y-auto p-4 sm:p-6" data-testid="online-panel">
-          {selected.kind === 'terms' ? (
-            <div className="mx-auto max-w-2xl space-y-3">
-              <h2 className="text-xl font-semibold tracking-tight text-slate-900">Key terms</h2>
-              <p className="text-sm text-slate-700">The terms from the notes, with what each one means. Turn a card over to check yourself.</p>
-              <Flashcards cards={terms} known={done} onKnown={(key, known) => dispatch({ type: known ? 'done' : 'undone', key })} />
-              {glossary?.interaction ? (
-                <InteractionStage
-                  interaction={glossary.interaction}
-                  image={glossary.image}
-                  eyebrow="Try it"
-                  title="Match the key terms"
-                  done={done.has(interactionDoneKey(glossary))}
-                  onDone={() => dispatch({ type: 'done', key: interactionDoneKey(glossary) })}
-                  memoryKey="glossary:ix"
-                />
-              ) : null}
-            </div>
-          ) : selected.kind === 'checklist' ? (
-            <div className="mx-auto max-w-3xl space-y-3">
-              <h2 className="text-xl font-semibold tracking-tight text-slate-900">Revision checklist</h2>
-              <ChecklistPanel
-                groups={checklist}
-                ticked={done}
-                onToggle={(key) => dispatch({ type: 'toggle', key })}
-                onClear={(keys) => keys.forEach((key) => dispatch({ type: 'undone', key }))}
-                onOpenPart={open}
-              />
-            </div>
-          ) : current ? (
-            <div className="mx-auto max-w-4xl">
-              <PartPanel key={current.n} doc={doc} part={current} bank={bankMap} done={done} notes={progress.notes} dispatch={dispatch} onOpenPart={open} />
-            </div>
-          ) : null}
-
-          <p className="mx-auto mt-6 flex max-w-4xl items-center gap-2 text-xs text-slate-600">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
-            Your place and what you write are kept in this browser only.
-          </p>
-        </div>
+      <div className="flex h-full min-h-0 flex-col" data-testid="online-practice">
+        <div className="min-h-0 flex-1">{doc.kind === 'remedial' ? <RemedialJourney {...shell} /> : doc.kind === 'activities' ? <ActivityWorkspace {...shell} /> : <RevisionNotebook {...shell} />}</div>
+        <p className="flex items-center gap-2 border-t border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-600">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+          Your place and what you write are kept in this browser only.
+        </p>
       </div>
     </MemoryContext.Provider>
   );

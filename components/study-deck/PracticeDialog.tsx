@@ -8,6 +8,8 @@ import type { ResultInput } from '@/lib/study-deck/progress';
 import type { DeckProgress } from '@/lib/study-deck/progress';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import type { DeckSlide, StudyDeck } from '@/lib/study-deck/types';
+import { PlayGame } from '@/components/study-document/PlayGame';
+import { playKey, slidePlays } from '@/lib/study-document/play';
 import { ActivityCard } from './ActivityCard';
 
 export interface PracticeDialogProps {
@@ -29,6 +31,8 @@ export interface PracticeDialogProps {
 export function PracticeDialog({ deck, slide, bank, progress, onResult, onClose }: PracticeDialogProps) {
   const panel = useRef<HTMLDivElement>(null);
   const resolved: ResolvedActivity[] = useMemo(() => slide.activities.map((activity) => resolveActivity(activity, bank)), [slide, bank]);
+  // A quick check built from what the slide itself says (see slidePlays): the same four activities the study documents use.
+  const plays = useMemo(() => slidePlays(deck.concepts, slide), [deck.concepts, slide]);
   const nameOf = (id: number | null) => (id !== null ? deck.concepts[String(id)]?.name ?? null : null);
 
   useEffect(() => {
@@ -66,6 +70,25 @@ export function PracticeDialog({ deck, slide, bank, progress, onResult, onClose 
           </button>
         </div>
         <div className="space-y-3 overflow-y-auto p-4">
+          {plays.length > 0 ? (
+            <section aria-label="Quick check" className="space-y-3" data-testid="quick-check">
+              <p className="text-sm font-bold text-sd-strong">Quick check on this slide</p>
+              {plays.map((play, i) => {
+                const key = playKey(slide, play.kind);
+
+                return (
+                  <PlayGame
+                    key={key}
+                    play={play}
+                    done={Boolean(progress.activities[key]?.done)}
+                    onDone={() => onResult(key, { correct: true, score: 1, maxScore: 1 }, null, null)}
+                    seed={slide.n * 31 + i + 1}
+                    hints
+                  />
+                );
+              })}
+            </section>
+          ) : null}
           {resolved.map((r, index) => {
             const key = activityKey(slide, index);
 

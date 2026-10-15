@@ -66,7 +66,7 @@ export function parseDeck(raw: unknown): StudyDeck {
     slide.interaction_reason ??= '';
     slide.content.discussion ??= null;
     if (slide.interaction) {
-      const problem = interactionProblem(slide.interaction, slide.image?.type === 'diagram');
+      const problem = interactionProblem(slide.interaction, slide.image?.type === 'diagram' || slide.image?.annotated === true);
       if (problem) throw new DeckError(`Slide ${slide.n}'s interaction ${problem}.`);
     }
     slide.activities.forEach((activity) => {

@@ -11,7 +11,7 @@
 
 import { PLAYABLE_TARGETS, activityKey, resolveActivity, type ResolvedActivity } from '../study-deck/deck';
 import { interactionProblem } from '../study-deck/interactions';
-import { ACTIVITY_LABELS } from '../study-deck/types';
+import { ACTIVITY_LABELS, type DeckImage } from '../study-deck/types';
 import type { BankQuestion } from '../h5p/question-bank-h5p-map';
 import type { Audience } from './api';
 import { DOCUMENT_KINDS, STUDY_DOCUMENT_VERSION, type BodyPart, type DocumentKind, type DocumentPart, type StudyDocument } from './types';
@@ -137,7 +137,7 @@ export function parseDocument(raw: unknown): StudyDocument {
     if (!Array.isArray(part.activities)) throw new DocumentError(`Part ${index} is malformed.`);
 
     if (part.interaction) {
-      const problem = interactionProblem(part.interaction, part.image?.type === 'diagram');
+      const problem = interactionProblem(part.interaction, part.image?.type === 'diagram' || part.image?.annotated === true);
       if (problem) throw new DocumentError(`Part ${index}'s interaction ${problem}.`);
     }
     part.activities.forEach((activity) => {
@@ -174,6 +174,13 @@ export function parseDocument(raw: unknown): StudyDocument {
   doc.concept_questions ??= {};
 
   return doc as StudyDocument;
+}
+
+/** The picture of a concept, when the document has one with an address to load. */
+export function conceptImage(doc: StudyDocument, conceptId: number | string): DeckImage | null {
+  const image = doc.concept_images?.[String(conceptId)];
+
+  return image && typeof image.url === 'string' && image.url !== '' ? image : null;
 }
 
 /** The parts after the overview. */
