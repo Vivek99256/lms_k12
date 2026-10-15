@@ -342,7 +342,7 @@ export const LMS_PAL_MODULE: SopModule = {
         ['6.3.3', 'Publish the book list and reference material', 'teacher'],
         ['6.3.4', 'Author an H5P flashcard set', 'teacher'],
         ['6.3.5', 'Author an H5P multiple-choice set', 'teacher_ai'],
-        ['6.3.6', 'Author an H5P interactive video with timed interactions', 'teacher'],
+        ['6.3.6', 'Author an interactive video with timed interactions', 'teacher'],
         ['6.3.7', 'Author scenario-based (hotspot) content', 'teacher_ai'],
         ['6.3.8', 'Generate content descriptions and summaries with AI assistance', 'teacher_ai'],
         ['6.3.9', 'Tag content with metadata, difficulty and pedagogy', 'teacher_ai'],

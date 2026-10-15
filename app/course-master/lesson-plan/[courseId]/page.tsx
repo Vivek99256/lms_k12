@@ -2507,11 +2507,13 @@ export default function LessonPlanPage() {
           subjectId={subjectId}
           standardId={standardId ?? ''}
           chapters={courseChapters}
-          chapterId={chapterId}
+          chapterId={selectedChapter?.id ?? ''}
           onChapterIdChange={(nextChapterId) =>
             router.push(`/course-master/lesson-plan/${course.id}?chapterId=${nextChapterId}`)
           }
-          onEdit={() => router.push(`/course-master/lesson-plan-doc/${course.id}/edit?chapterId=${chapterId}`)}
+          onEdit={() =>
+            router.push(`/course-master/lesson-plan-doc/${course.id}/edit?chapterId=${selectedChapter?.id ?? ''}`)
+          }
         />
 
         <CreateLessonPlanDialog

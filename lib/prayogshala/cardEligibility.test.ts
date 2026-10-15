@@ -60,7 +60,7 @@ test('filterCardAssets leaves every non-Prayogshala resource exactly as it was: 
   const others = [
     { id: 1, title: 'Deck', content_category: 'Classroom Presentation', chapter_id: 999, generation_status: 'failed', lab_config: null },
     { id: 2, title: 'Notes', content_category: 'Revision Notes', prayogshala: null },
-    { id: 3, title: 'H5P', content_category: 'H5P Interactive', prayogshala: undefined, chapter_id: 0 },
+    { id: 3, title: 'H5P', content_category: 'Interactive', prayogshala: undefined, chapter_id: 0 },
     { id: 4, title: 'Remedial', content_category: 'Remedial Class' },
   ];
 
