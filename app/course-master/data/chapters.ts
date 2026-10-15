@@ -529,6 +529,9 @@ export interface NewChapterMasterResponse {
   status?: boolean;
   status_code?: number;
   message?: string;
+  /** The names behind the ids in the request, from the subject and standard tables. */
+  subject_name?: string | null;
+  standard_name?: string | null;
   pagination?: {
     current_page: number;
     per_page: number;
@@ -1148,6 +1151,8 @@ export async function fetchNewChapterMaster(
     status: (raw.status as boolean) ?? true,
     status_code: raw.status_code as number | undefined,
     message: raw.message as string | undefined,
+    subject_name: typeof raw.subject_name === 'string' && raw.subject_name.trim() ? raw.subject_name : null,
+    standard_name: typeof raw.standard_name === 'string' && raw.standard_name.trim() ? raw.standard_name : null,
     pagination: raw.pagination as NewChapterMasterResponse['pagination'] | undefined,
     data: (raw.data as ApiChapterSource[]) ?? [],
   };
@@ -1545,8 +1550,13 @@ export async function getSubjectAndChapters(
     const firstChapter = response.data[0];
     const subject: LmsSubject | null = firstChapter
       ? {
-          standard_name: matchedCourse?.standard_name ?? String(firstChapter.standard_id ?? numericStandardId),
-          subject_name: matchedCourse?.subject_name ?? String(firstChapter.subject_id ?? numericSubjectId),
+          // The catalog is scoped to the signed-in user, so it can lack a row for a
+          // subject that exists; the chapter API's own names come next, and the id
+          // is only the last resort.
+          standard_name:
+            matchedCourse?.standard_name ?? response.standard_name ?? String(firstChapter.standard_id ?? numericStandardId),
+          subject_name:
+            matchedCourse?.subject_name ?? response.subject_name ?? String(firstChapter.subject_id ?? numericSubjectId),
           subject_id: firstChapter.subject_id ?? numericSubjectId,
           standard_id: firstChapter.standard_id ?? numericStandardId,
           section_id: matchedCourse?.section_id,
