@@ -7,6 +7,7 @@ import { ConceptRoadmapNode } from './ConceptRoadmapNode';
 import { RoadmapPath } from './RoadmapPath';
 import { ConceptDetailPopover } from './ConceptDetailPopover';
 import type { AdaptiveConcept } from '@/app/pal/data/pal-diagnostic';
+import { LockModeToggle, useUnlockAll } from '@/app/pal/_components/LockModeToggle';
 
 interface ConceptDiagnosticRoadmapProps {
   concepts: AdaptiveConcept[];
@@ -20,6 +21,7 @@ export function ConceptDiagnosticRoadmap({
   completedConceptIds,
 }: ConceptDiagnosticRoadmapProps) {
   const router = useRouter();
+  const [unlockAll] = useUnlockAll('concept');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [showAll, setShowAll] = useState<boolean>(false);
   const [colsPerRow, setColsPerRow] = useState<number>(3);
@@ -118,7 +120,8 @@ export function ConceptDiagnosticRoadmap({
     if (completedConceptIds.has(String(concept.conceptId))) {
       return 'completed';
     }
-    if (index === firstUncompletedIndex) {
+    // Unlock mode opens every concept that is not already completed.
+    if (unlockAll || index === firstUncompletedIndex) {
       return 'available';
     }
     return 'locked';
@@ -126,6 +129,9 @@ export function ConceptDiagnosticRoadmap({
 
   return (
     <div className="relative rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-sm">
+      <div className="mb-2 flex justify-end">
+        <LockModeToggle scope="concept" />
+      </div>
       {/* Roadmap Container with SVG Paths */}
       <div ref={containerRef} className="relative w-full space-y-9 sm:space-y-11 py-2">
         {/* SVG Inter-Row Dashed Loops */}

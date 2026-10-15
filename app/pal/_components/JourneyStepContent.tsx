@@ -54,6 +54,7 @@ import {
 } from './H5PJourneyCollage';
 import { Compass } from 'lucide-react';
 import { ExperimentStepView } from './ExperimentStepView';
+import { ExplanationLabStepView } from './ExplanationLabStepView';
 
 export interface JourneyStepContentProps {
   stepId: JourneyStepId;
@@ -117,6 +118,16 @@ export function JourneyStepContent({
       case 'adaptive':
         return (
           <ConceptDiagnosticStepView
+            chapterId={chapterId}
+            chapterName={chapterName}
+            onStepComplete={onStepComplete}
+            onNextStep={onNextStep}
+          />
+        );
+
+      case 'explanation_lab':
+        return (
+          <ExplanationLabStepView
             chapterId={chapterId}
             chapterName={chapterName}
             onStepComplete={onStepComplete}
@@ -804,10 +815,10 @@ function PracticeStepView({
                 className="gap-2 bg-emerald-700 text-white hover:bg-emerald-800"
                 onClick={() => {
                   onStepComplete?.('practice');
-                  onNextStep?.('feedback');
+                  onNextStep?.('explanation_lab');
                 }}
               >
-                <span>Continue to Step 6: Feedback</span>
+                <span>Continue to Step 6: Explanation Lab</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -1010,18 +1021,18 @@ function PracticeStepView({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
         <div>
           <p className="text-xs font-bold text-emerald-950">Adaptive Practice Finished?</p>
-          <p className="mt-0.5 text-xs text-emerald-800">Advance to Step 6: Feedback & Review to evaluate your performance.</p>
+          <p className="mt-0.5 text-xs text-emerald-800">Advance to Step 6: Explanation Lab for experiments on the concepts you found hardest.</p>
         </div>
         <Button
           size="sm"
           className="gap-2 bg-emerald-700 text-xs font-semibold text-white hover:bg-emerald-800"
           onClick={() => {
             onStepComplete?.('practice');
-            onNextStep?.('feedback');
+            onNextStep?.('explanation_lab');
           }}
         >
           <CheckCircle2 className="h-3.5 w-3.5" />
-          <span>Complete Step & Continue to Feedback</span>
+          <span>Complete Step & Continue to Explanation Lab</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </div>
@@ -1191,7 +1202,7 @@ function FeedbackStepView({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
         <div>
           <p className="text-xs font-bold text-blue-950">Feedback Reviewed?</p>
-          <p className="mt-0.5 text-xs text-blue-800">Advance to Step 7: Understanding Check to prove your knowledge.</p>
+          <p className="mt-0.5 text-xs text-blue-800">Advance to Step 8: Understanding Check to prove your knowledge.</p>
         </div>
         <Button
           size="sm"
@@ -1414,7 +1425,7 @@ function CheckStepView({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
         <div>
           <p className="text-xs font-bold text-indigo-950">Checkpoints Completed?</p>
-          <p className="mt-0.5 text-xs text-indigo-800">Confirm checkpoint pass to advance to Step 9: Chapter Mastery.</p>
+          <p className="mt-0.5 text-xs text-indigo-800">Confirm checkpoint pass to advance to Step 10: Chapter Mastery.</p>
         </div>
         <Button
           size="sm"
@@ -1572,7 +1583,7 @@ function MasteryStepView({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-purple-100 bg-purple-50/70 p-4">
         <div>
           <p className="text-xs font-bold text-purple-950">Put your mastery to work with an experiment?</p>
-          <p className="mt-0.5 text-xs text-purple-800">Advance to Step 10 to try the idea hands-on.</p>
+          <p className="mt-0.5 text-xs text-purple-800">Advance to Step 11 to try the idea hands-on.</p>
         </div>
         <Button
           size="sm"
@@ -1582,7 +1593,7 @@ function MasteryStepView({
             onNextStep?.('experiment');
           }}
         >
-          <span>Continue to Step 10: Experiment</span>
+          <span>Continue to Step 11: Application Lab</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </div>
