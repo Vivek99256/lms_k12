@@ -414,3 +414,44 @@ test('A bare tab request is not navigation without a module, and a data question
   assert.equal(evaluateChatbotIntent('Which students are pending in class 7?', '/students/search_student').type, 'standard');
   assert.equal(evaluateChatbotIntent('How many students are enrolled?', '/students/search_student').type, 'standard');
 });
+
+test('LMS + PAL pages resolve to their own module, not Student or Exam', () => {
+  const expect = (path: string, name: string) => assert.equal(getCurrentModule(path).name, name, path);
+
+  expect('/lms/homework', 'exam_assessment');
+  expect('/lms/homework/submission', 'exam_assessment');
+  expect('/exam/online', 'exam_assessment');
+  expect('/exam/progress-report', 'exam_assessment');
+  expect('/lms/lmsAssignment', 'exam_assessment');
+  expect('/lms/worksheet', 'exam_assessment');
+  expect('/lms/curriculum-planning/', 'curriculum_planning');
+  expect('/lms/lesson-plan/', 'curriculum_planning');
+  expect('/lms/teacher-diary', 'curriculum_planning');
+  expect('/lmsLeaderboard', 'engagement');
+  expect('/lms/student-analysis', 'interactions');
+  expect('/lms/dashboard', 'interactions');
+  expect('/new_pal/content_model', 'new_pal');
+  // Unchanged neighbours.
+  expect('/exam/marks_entry', 'exam');
+  expect('/students/search_student', 'students');
+  expect('/course-master', 'teach_learn');
+});
+
+test('Teach/Learn tab requests navigate to its own tab pages without the live registry', () => {
+  const nav = (q: string) => evaluateChatbotIntent(q, '/course-master');
+
+  for (const [q, route] of [
+    ['Open operation in Teach/Learn.', '/teach-learn/operations'],
+    ['Open Master Setup in Teach/Learn', '/teach-learn/master-setup'],
+    ['Show me master setup in Teach/Learn.', '/teach-learn/master-setup'],
+    ['Take me to process builder in Teach/Learn', '/teach-learn/process-builder'],
+  ]) {
+    const result = nav(q);
+    assert.equal(result.type, 'navigation', q);
+    assert.equal(result.route, route, q);
+  }
+
+  // A data question is never turned into navigation.
+  assert.equal(nav('How many courses are there for Grade 8?').type, 'standard');
+  assert.equal(nav('Summarise the chapters and lesson plan for this course.').type, 'standard');
+});
