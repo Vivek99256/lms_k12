@@ -71,6 +71,11 @@ const MODULE_ALIASES: Record<string, string[]> = {
   hostel: ['hostel', 'hostel management', 'boarding', 'dormitory'],
   library: ['library', 'library management', 'books', 'book management'],
   teach_learn: ['teach', 'learn', 'teach/learn', 'teaching', 'learning', 'lms', 'lesson', 'lessons', 'course', 'courses'],
+  exam_assessment: ['exam & assessment', 'exam and assessment', 'online exam', 'online exams', 'homework', 'assignment', 'assignments', 'worksheet', 'worksheets'],
+  curriculum_planning: ['curriculum', 'curriculum planning', 'lesson plan', 'lesson planning', 'syllabus', 'syllabus plan', 'teacher diary', 'monthly plan'],
+  engagement: ['engagement', 'leaderboard', 'leader board', 'portfolio', 'virtual classroom'],
+  interactions: ['interactions', 'interaction', 'activity stream'],
+  new_pal: ['new pal', 'personalised learning', 'personalized learning', 'coherence map', 'content model'],
   hr: ['hr', 'human resources', 'staff', 'staff management', 'employee', 'employees', 'payroll'],
   exam: ['exam', 'exams', 'examination', 'examinations', 'test', 'tests', 'assessment', 'assessments', 'result', 'results'],
   inventory: ['inventory', 'stock', 'items', 'assets', 'asset management'],
@@ -105,6 +110,11 @@ const MODULE_DEFAULT_ROUTES: Record<string, string> = {
   hostel: '/hostel',
   library: '/library',
   teach_learn: '/course-master',
+  exam_assessment: '/lms/homework',
+  curriculum_planning: '/lms/curriculum-planning',
+  engagement: '/engagement',
+  interactions: '/interactions',
+  new_pal: '/new_pal',
   hr: '/hr',
   exam: '/exam',
   inventory: '/inventory',
@@ -120,6 +130,11 @@ const MODULE_DISPLAY_NAMES: Record<string, string> = {
   hostel: 'Hostel',
   library: 'Library',
   teach_learn: 'Teach/Learn',
+  exam_assessment: 'Exam & Assessment',
+  curriculum_planning: 'Curriculum Planning',
+  engagement: 'Engagement',
+  interactions: 'Interactions',
+  new_pal: 'New PAL',
   hr: 'HR',
   exam: 'Exam',
   inventory: 'Inventory',
@@ -293,6 +308,7 @@ const STATIC_MODULES: StaticModule[] = [
   { slug: 'complaint', label: 'Complaint', aliasKeys: [] },
   { slug: 'utility', label: 'Utility', aliasKeys: ['migration-modules'] },
   { slug: 'document-templates', label: 'Document Templates', aliasKeys: [] },
+  { slug: 'teach_learn', label: 'Teach/Learn', aliasKeys: ['teach-learn'], tabBase: '/teach-learn', aiStackRoute: '/teach-learn/ai-stack' },
 ];
 
 /** The static module a path or module key belongs to, if it is one of them. */
@@ -419,6 +435,13 @@ function containsPhrase(haystack: string, needle: string): boolean {
   return regex.test(haystack);
 }
 
+// LMS + PAL page families, matched on route prefixes (lower-cased path).
+const EXAM_ASSESSMENT_PATH = /\/(lms\/(homework|lmsassignment|lmsannotate_assignment|worksheet|project|question-wise-report)|exam\/(online|progress-report)|question_paper|lmsassignment_submission|exam-assessment)/;
+const CURRICULUM_PATH = /\/(lms\/(curriculum-planning|monthly-plan|lesson-plan|teacher-diary|book-list|syllabus-plan)|curriculum-planning)/;
+const ENGAGEMENT_PATH = /\/(engagement|lmsleaderboard|lmssocialcollabrotive|lmsportfolio|lmsvirtualclassroom)/;
+const INTERACTIONS_PATH = /\/(interactions|lmsactivitystream|lmscommunication|lb_master|lms\/student-analysis|lms\/dashboard)/;
+const NEW_PAL_PATH = /\/(new_pal|new-pal|coherence)/;
+
 export function getCurrentModule(
   pathnameOrName?: string | null,
   workspaceModule?: string | null
@@ -427,6 +450,23 @@ export function getCurrentModule(
 
   if (path.includes('/fees') || path === 'fees' || path === 'fee') {
     return { name: 'fees', label: 'Fees' };
+  }
+  // LMS + PAL pages come before the generic `/student`, `/exam` and `/result` tests below:
+  // `/lms/student-analysis` and `/exam/online` would otherwise be claimed by Student and Exam.
+  if (EXAM_ASSESSMENT_PATH.test(path) || path === 'exam_assessment') {
+    return { name: 'exam_assessment', label: 'Exam & Assessment' };
+  }
+  if (CURRICULUM_PATH.test(path) || path === 'curriculum_planning') {
+    return { name: 'curriculum_planning', label: 'Curriculum Planning' };
+  }
+  if (ENGAGEMENT_PATH.test(path) || path === 'engagement') {
+    return { name: 'engagement', label: 'Engagement' };
+  }
+  if (INTERACTIONS_PATH.test(path) || path === 'interactions') {
+    return { name: 'interactions', label: 'Interactions' };
+  }
+  if (NEW_PAL_PATH.test(path) || path === 'new_pal') {
+    return { name: 'new_pal', label: 'New PAL' };
   }
   if (path.includes('/students') || path.includes('/student') || path === 'students' || path === 'student') {
     return { name: 'students', label: 'Student' };
@@ -668,8 +708,17 @@ function hasNavigationIntent(text: string): boolean {
   if (NAVIGATION_VERBS.some((verb) => containsPhrase(text, verb))) return true;
   return (
     SOFT_NAVIGATION_VERBS.some((verb) => containsPhrase(text, verb)) &&
-    DESTINATION_WORDS.some((word) => containsPhrase(text, word))
+    (DESTINATION_WORDS.some((word) => containsPhrase(text, word)) || namesATabOutright(text))
   );
+}
+
+// "Show me master setup" is a request for the Master Setup screen, not a question: a tab named by a
+// phrase of two or more words ("master setup", "process builder") is not something a data question
+// says. One-word tabs ("reports", "operations") stay ambiguous and still need a destination word.
+function namesATabOutright(text: string): boolean {
+  return Object.values(CATEGORY_ALIASES)
+    .flat()
+    .some((alias) => alias.includes(' ') && containsPhrase(text, alias));
 }
 
 export function detectNavigationIntent(

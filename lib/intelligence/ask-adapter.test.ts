@@ -698,3 +698,34 @@ test("the language an answer was written in travels with it, so the right voice 
 test("an answer from a backend that does not report a language carries none", () => {
   assert.equal(toChatShapedReply(result(), "m4").response.data.language, undefined);
 });
+
+test("a preview that is waiting for approval is a source with data, not 'no data returned'", () => {
+  // Fee reminders and parent messages preview first. That call listed who would be messaged and changed
+  // nothing; showing it as "no data returned" called a correct preview empty.
+  const reply = toChatShapedReply(
+    result({
+      lifecycle_trace: [
+        stage("laravel_mcp", {
+          data: {
+            tools: ["fees.send_reminders"],
+            calls: [
+              { tool: "fees.send_reminders", status: "awaiting_confirmation" },
+              { tool: "fees.send_reminders", status: "completed" },
+              { tool: "fees.reminder_history", status: "blocked", error: "Not allowed." },
+            ],
+          },
+        }),
+      ],
+      module: { key: "fees", label: "Fees", entity_key: null, capabilities: {}, mcp_tools: [], agent_key: null, workflow_key: null, case_type: null, reaches_recommendation: false, reaches_action: false },
+    }),
+    "msg-preview"
+  );
+
+  const [preview, executed, refused] = reply.response.citations;
+
+  assert.equal(preview.available, true);
+  assert.equal(preview.state, "awaiting_approval");
+  assert.equal(executed.available, true);
+  assert.equal(executed.state, undefined);
+  assert.equal(refused.available, false);
+});

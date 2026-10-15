@@ -16,6 +16,7 @@ export type UiLabelKey =
   | 'view'
   | 'sources'
   | 'noDataReturned'
+  | 'awaitingApproval'
   | 'notRecorded'
   | 'showDetails'
   | 'hideDetails'
@@ -31,6 +32,7 @@ export const UI_LABELS: Record<UiLanguage, Record<UiLabelKey, string>> = {
     view: 'View',
     sources: 'Sources',
     noDataReturned: 'no data returned',
+    awaitingApproval: 'preview — awaiting your approval',
     notRecorded: 'not recorded',
     showDetails: 'Show details',
     hideDetails: 'Hide details',
@@ -45,6 +47,7 @@ export const UI_LABELS: Record<UiLanguage, Record<UiLabelKey, string>> = {
     view: 'देखें',
     sources: 'स्रोत',
     noDataReturned: 'कोई डेटा नहीं मिला',
+    awaitingApproval: 'पूर्वावलोकन — आपकी मंज़ूरी की प्रतीक्षा',
     notRecorded: 'दर्ज नहीं',
     showDetails: 'विवरण दिखाएँ',
     hideDetails: 'विवरण छिपाएँ',
@@ -59,6 +62,7 @@ export const UI_LABELS: Record<UiLanguage, Record<UiLabelKey, string>> = {
     view: 'જુઓ',
     sources: 'સ્રોત',
     noDataReturned: 'કોઈ ડેટા મળ્યો નથી',
+    awaitingApproval: 'પૂર્વાવલોકન — તમારી મંજૂરીની રાહ',
     notRecorded: 'નોંધાયેલ નથી',
     showDetails: 'વિગતો બતાવો',
     hideDetails: 'વિગતો છુપાવો',

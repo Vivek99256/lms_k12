@@ -955,8 +955,14 @@ export default function ChatbotPanel({
                           {message.citations.map((citation, citationIndex) => (
                             <li key={`${citation.tool}-${citationIndex}`} className="text-[11px] leading-snug text-gray-500">
                               <span className={citation.available ? '' : 'text-amber-600'}>
-                                {citation.module || citation.tool}
-                                {citation.available ? '' : ` — ${uiLabel(answerLanguageOf(message), 'noDataReturned')}`}
+                                {citation.module && citation.tool && citation.tool !== citation.module
+                                  ? `${citation.module} · ${citation.tool}`
+                                  : citation.module || citation.tool}
+                                {citation.state === 'awaiting_approval'
+                                  ? ` — ${uiLabel(answerLanguageOf(message), 'awaitingApproval')}`
+                                  : citation.available
+                                    ? ''
+                                    : ` — ${uiLabel(answerLanguageOf(message), 'noDataReturned')}`}
                               </span>
                               {citation.unavailableSignals?.length ? (
                                 <span className="text-amber-600">

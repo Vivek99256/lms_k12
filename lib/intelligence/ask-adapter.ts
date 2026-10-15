@@ -55,6 +55,12 @@ export interface ChatShapedReply {
       module?: string;
       available: boolean;
       unavailableSignals?: string[];
+      /**
+       * Present only when the call is not a plain completed read. A confirmable tool's preview is a
+       * real answer — it listed who would be messaged — that deliberately changed nothing and is
+       * waiting for a person, which is not the same as "no data returned".
+       */
+      state?: 'awaiting_approval';
     }>;
     data: {
       module?: string;
@@ -230,13 +236,16 @@ function citationsFrom(trace: TraceStage[], moduleKey?: string) {
 
   return calls.map((raw) => {
     const call = raw as { tool?: string; status?: string; error?: string };
-    const available = call.status === "completed";
+    // A preview that offered a confirmation token did return data; it is waiting for approval, not empty.
+    const awaiting = call.status === "awaiting_confirmation";
+    const available = call.status === "completed" || awaiting;
 
     return {
       tool: call.tool ?? "unknown",
       module: moduleKey,
       available,
       unavailableSignals: available || !call.error ? undefined : [call.error],
+      ...(awaiting ? { state: "awaiting_approval" as const } : {}),
     };
   });
 }
