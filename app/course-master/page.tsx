@@ -16,7 +16,6 @@ import {
   Library,
   ListTree,
   Music,
-  Network,
   NotebookText,
   Palette,
   PenTool,
@@ -94,9 +93,6 @@ function getCourseRoutes(courseId: number | string, standardId?: number | string
     chapters: `/course-master/${id}/chapters`,
     lessonPlan: `/course-master/lesson-plan/${id}`,
     curriculum: `/course-master/lesson-plan/${id}/curriculum`,
-    // A view of the chapters screen rather than its own route, matching the other
-    // sub-views there (question-bank, concept-intelligence, content).
-    coherenceMap: `/course-master/${id}/chapters?view=coherence-map`,
     // A view of the chapters screen rather than its own route, matching the other
     // sub-views there (question-bank, concept-intelligence, content).
     // Read-only chapter-wise Lesson Plan document (lms_lesson_plan). Deliberately a

@@ -210,12 +210,17 @@ export async function fetchCoherenceMap(
     include_cross_grade: options.includeCrossGrade === false ? '0' : '1',
   });
 
-  // syear is optional server-side: omitted, the backend takes the newest
-  // curriculum for the subject rather than guessing a year the tenant is not on.
-  // An explicit `options.syear` overrides the session's, which is how the empty
-  // state offers "show me the year that does have curriculum" without making the
-  // teacher go and change the global academic-year selector first.
-  const syear = options.syear ?? session.academicYearId;
+  // Deliberately NOT defaulting to the session's global academic-year selector.
+  // That selector tracks whatever year the rest of the LMS is pointed at, which
+  // routinely lags the curriculum's actual authored year (e.g. selector on 2022,
+  // curriculum authored for 2026) - sending it turned a normal open of this screen
+  // into a "Nothing to map for 2022 / This subject has curriculum for 2026" dead
+  // end. The Coherence Map is a direct view of the curriculum, not scoped to the
+  // app's current year, so omitted here the backend picks the newest curriculum
+  // for the subject outright. An explicit `options.syear` (the "Show <year>"
+  // button in the empty state, for a subject that genuinely has more than one
+  // authored year) still overrides it.
+  const syear = options.syear;
   if (syear) query.set('syear', String(syear));
 
   const response = await fetch(`${baseUrl(session)}/api/lms/coherence-map?${query.toString()}`, {
