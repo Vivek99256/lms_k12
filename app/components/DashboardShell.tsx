@@ -10,6 +10,7 @@ import type { StuckPromptContext } from '@/lib/ai/stuck-assist-types';
 import { PageAiContextProvider } from '@/contexts/PageAiContext';
 import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
+import ModuleToolStrip, { isToolStripCategory } from '@/app/components/ModuleToolStrip';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import { useResizablePanel } from '@/hooks/use-resizable-panel';
@@ -277,6 +278,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const hasLoadedRef = useRef(false);
 
   const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(null);
+  // The tool strip is closed until the header arrow is pressed.
+  const [toolStripOpen, setToolStripOpen] = useState(false);
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
   // How wide the user has decided the assistant should be, remembered across sessions.
@@ -797,7 +800,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // New PAL brings its own sub-nav. Every other route — including the legacy
     // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
     // menu-driven resolution below and gets whatever its own menu defines.
-    const newPalItems = newPalLevel3Items(pathname, displayedMenuItems);
+    //
+    // The exception is Engagement, whose landing screen is New PAL Gamification:
+    // arriving from Engagement keeps Engagement's own category bar, since that
+    // is the module the user chose, and New PAL's bar would read as a different
+    // module's navigation over it.
+    const arrivedFromEngagement =
+      normalizeMenuLabel(selectedL2?.label ?? '') === 'engagement' && Boolean(moduleLevel3Menu.navigation);
+    const newPalItems = arrivedFromEngagement ? null : newPalLevel3Items(pathname, displayedMenuItems);
     if (newPalItems) {
       return { parentLabel: 'New PAL', items: newPalItems };
     }
@@ -819,7 +829,19 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return found;
   })();
 
-  const showSubheader = Boolean(level3Menu?.items.length || fetchedMasterMenuItems.length > 0 || masterMenuGroups.length > 0);
+  // The module's setup/support categories (Onboarding, Master Setup, …) move out
+  // of the category bar into their own tool strip, so the bar keeps only the
+  // module's working screens.
+  const toolStripItems = (level3Menu?.items ?? []).filter(isToolStripCategory);
+  // The bar's tabs open their own pages; the screens under a category are reached
+  // from the header menu or the category page, so `children` is not passed down.
+  const barItems = (level3Menu?.items ?? [])
+    .filter((item) => !isToolStripCategory(item))
+    .map(({ children: _children, ...item }) => item);
+
+  // The Master button is gone, so a bar with no tabs has nothing left to show and
+  // is not drawn at all rather than left as an empty strip.
+  const showSubheader = barItems.length > 0;
 
   return (
     /*
@@ -844,16 +866,46 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           isChatbotOpen={isChatbotOpen}
           menuItems={menuItems}
           onMenuSearchNavigate={handleMenuSearchNavigate}
+          toolStrip={
+            toolStripItems.length > 0
+              ? {
+                  label: level3Menu?.parentLabel ?? '',
+                  open: toolStripOpen,
+                  onToggle: () => setToolStripOpen((current) => !current),
+                }
+              : null
+          }
         />
         <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
           <main
             className="min-w-0 flex-1 overflow-auto scrollbar-hide"
           >
             <ChatbotLayoutContext.Provider value={{ isChatbotOpen }}>
+              {toolStripItems.length > 0 && (
+                // Always mounted so it can animate: the row grows from 0fr to 1fr
+                // while it fades in, and `invisible` keeps a closed strip out of
+                // the tab order once the fade has finished.
+                <div
+                  aria-hidden={!toolStripOpen}
+                  className={`grid transition-[grid-template-rows,opacity,visibility] duration-300 ease-out ${
+                    toolStripOpen ? 'visible grid-rows-[1fr] opacity-100' : 'invisible grid-rows-[0fr] opacity-0'
+                  }`}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="pb-4">
+                      <ModuleToolStrip
+                        label={level3Menu?.parentLabel ?? ''}
+                        items={toolStripItems}
+                        visible={toolStripOpen}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
               {showSubheader && (
                 <div className="pb-4">
                   <Level3Subheader
-                    items={level3Menu?.items ?? []}
+                    items={barItems}
                     parentLabel={level3Menu?.parentLabel ?? ''}
                     mainMenuId={selectedL1?.id}
                     menuId={selectedL2?.id}
@@ -861,7 +913,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     masterLoading={masterMenuLoading}
                     masterMenuGroups={masterMenuGroups}
                     userProfileName={userProfileName}
-                    hideMaster={(level3Menu?.hideMaster ?? false) || isStudent}
+                    hideMaster
                   />
                 </div>
               )}

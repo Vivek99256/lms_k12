@@ -5,10 +5,13 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Level3Item } from '@/app/data/menuItems';
 import {
   fetchModuleCategoryRegistry,
+  fetchModuleMenuCounts,
   fetchModuleMenuCategories,
   type ModuleCategory,
   type ModuleRegistryEntry,
 } from '@/app/_lib/module-categories-api';
+import { mapApiLinkToRoute } from '@/app/data/routeMapper';
+import { getModuleScreenRegistry } from '@/app/_lib/module-screen-registry';
 import { getFeesSession, type FeesSession } from '@/app/fees/_lib/fees-api';
 
 /**
@@ -60,7 +63,7 @@ export type ModuleLevel3NavResult = {
   /** The bar for the current context, or null when this context has none. */
   navigation: ModuleLevel3Nav | null;
   /**
-   * Category count per level-2 menu label, for the sidebar's "does this menu
+   * Menu count per level-2 menu label (categories as a fallback), for the sidebar's "does this menu
    * have anything under it" indicator. Keyed by normalized label because that
    * is what the sidebar has to hand at render time.
    *
@@ -98,6 +101,23 @@ function loadRegistry(session: FeesSession): Promise<ModuleRegistryEntry[]> {
   }
 
   return registryCache;
+}
+
+let menuCountsCacheKey = '';
+let menuCountsCache: Promise<Record<string, number>> | null = null;
+
+function loadMenuCounts(session: FeesSession): Promise<Record<string, number>> {
+  const key = `${session.subInstituteId}:${session.userId}`;
+
+  if (menuCountsCacheKey !== key || !menuCountsCache) {
+    menuCountsCacheKey = key;
+    menuCountsCache = fetchModuleMenuCounts(session).catch((error: unknown) => {
+      if (menuCountsCacheKey === key) menuCountsCache = null;
+      throw error;
+    });
+  }
+
+  return menuCountsCache;
 }
 
 function normalizeLabel(label: string | null | undefined) {
@@ -178,6 +198,7 @@ export function useModuleLevel3Nav({
   const [registryState, setRegistryState] = useState<LoadState>('idle');
   const [categories, setCategories] = useState<ModuleCategory[]>([]);
   const [state, setState] = useState<LoadState>('idle');
+  const [menuCounts, setMenuCounts] = useState<Record<string, number>>({});
 
   // Session lives in browser storage, so it can only be read after mount.
   useEffect(() => {
@@ -204,6 +225,23 @@ export function useModuleLevel3Nav({
         setRegistry([]);
         setRegistryState('error');
       });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  // Badge numbers only: a failure leaves the category counts in place.
+  useEffect(() => {
+    if (!session?.subInstituteId || !session.userId) return;
+
+    let cancelled = false;
+
+    void loadMenuCounts(session)
+      .then((counts) => {
+        if (!cancelled) setMenuCounts(counts);
+      })
+      .catch(() => {});
 
     return () => {
       cancelled = true;
@@ -247,11 +285,15 @@ export function useModuleLevel3Nav({
     for (const entry of registry) {
       const key = normalizeLabel(entry.label);
       if (!key || entry.categoryCount <= 0) continue;
-      counts[key] = entry.categoryCount;
+      // The menus under the bar are what the user will find to open, so that
+      // is the figure shown; a module whose categories hold no menu for this
+      // user (a console-only bar) still falls back to its category count.
+      const menus = menuCounts[entry.moduleName];
+      counts[key] = menus && menus > 0 ? menus : entry.categoryCount;
     }
 
     return counts;
-  }, [registry]);
+  }, [registry, menuCounts]);
 
   const navigation = useMemo<ModuleLevel3Nav | null>(() => {
     // The registry has not answered yet, so whether this context even has a
@@ -284,14 +326,39 @@ export function useModuleLevel3Nav({
 
     return {
       parentLabel,
-      items: categories.map<Level3Item>((category) => ({
-        id: `${activeModule.moduleName}-category-${category.key}`,
-        label: category.label,
-        // `route` is configured per row and is already correct for every
-        // seeded module, including the two that predate the /modules/<slug>
-        // convention. The fallback only covers a row seeded without one.
-        href: category.route || `/modules/${activeModule.moduleName}/${category.key}`,
-      })),
+      items: categories.map<Level3Item>((category) => {
+        const href = category.route || `/modules/${activeModule.moduleName}/${category.key}`;
+        const screens = getModuleScreenRegistry(activeModule.moduleName);
+
+        return {
+          id: `${activeModule.moduleName}-category-${category.key}`,
+          label: category.label,
+          // `route` is configured per row and is already correct for every
+          // seeded module, including the two that predate the /modules/<slug>
+          // convention. The fallback only covers a row seeded without one.
+          href,
+          // The category's own menus, for the drill-down arrow. A menu that
+          // renders inline opens as a tab on its category page, exactly as a
+          // click on that tab would; one with a page of its own goes there. A
+          // menu pointing at no real route is left out rather than shown dead.
+          children: category.items.flatMap<Level3Item>((item) => {
+            const route = mapApiLinkToRoute(item.link);
+            if (!route || route === '#' || (route.split('?')[0].split('/').pop() ?? '').includes('.')) {
+              return [];
+            }
+
+            return [
+              {
+                id: item.id,
+                label: item.label,
+                href: screens.isEmbeddable(route)
+                  ? `${href}${href.includes('?') ? '&' : '?'}tab=${encodeURIComponent(String(item.id))}`
+                  : route,
+              },
+            ];
+          }),
+        };
+      }),
       hideMaster: true,
     };
   }, [activeModule, state, categories]);

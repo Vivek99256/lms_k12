@@ -93,6 +93,13 @@ export type ModuleRegistryEntry = {
    */
   categoryCount: number;
   /**
+   * How many menus sit under this module's bar for the signed-in user, summed
+   * across every category — the number the sidebar shows beside the module.
+   * Null when the server did not count (no user on the request), in which case
+   * the sidebar falls back to `categoryCount`.
+   */
+  menuCount?: number | null;
+  /**
    * Dominant prefix of this module's category routes, e.g. '/fees' or
    * '/modules/inventory'. Used to recognise a deep link as belonging to the
    * module on a cold load, before any level-2 selection exists.
@@ -215,6 +222,10 @@ function readRegistry(payload: unknown): ModuleRegistryEntry[] {
         level2MenuId: Number.isFinite(level2MenuId) && level2MenuId > 0 ? level2MenuId : null,
         label: readString(record.label),
         categoryCount: Number(record.category_count) || 0,
+        menuCount:
+          record.menu_count === null || record.menu_count === undefined || !Number.isFinite(Number(record.menu_count))
+            ? null
+            : Number(record.menu_count),
         baseRoute: readString(record.base_route),
         routes: Array.isArray(record.routes)
           ? record.routes.map(readString).filter((route) => route !== '')
@@ -273,4 +284,31 @@ export async function fetchModuleCategoryRegistry(
   });
 
   return readRegistry(await readJson(response, 'module category registry'));
+}
+
+/**
+ * Menus under each module's bar for this user, keyed by module slug.
+ *
+ * A separate request from the registry on purpose: counting runs the rights
+ * query for every module and is much slower, while the registry decides whether
+ * the category bar can draw at all. The sidebar badge can arrive late; the bar
+ * must not.
+ */
+export async function fetchModuleMenuCounts(
+  session: FeesSession,
+  signal?: AbortSignal
+): Promise<Record<string, number>> {
+  const response = await fetch(`${REGISTRY_PATH}?include_menu_counts=1`, {
+    method: 'GET',
+    headers: buildHeaders(session),
+    cache: 'no-store',
+    signal,
+  });
+
+  const counts: Record<string, number> = {};
+  for (const entry of readRegistry(await readJson(response, 'module menu counts'))) {
+    if (typeof entry.menuCount === 'number') counts[entry.moduleName] = entry.menuCount;
+  }
+
+  return counts;
 }

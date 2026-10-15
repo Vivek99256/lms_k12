@@ -282,8 +282,13 @@ export default function CourseMasterPage() {
     return Array.from(standards).sort((a, b) => Number(a) - Number(b));
   }, [data]);
 
+  // "My Course" is the learner's own list, so its chip sits first, next to
+  // "All categories"; the rest keep the order the API gave them.
   const categoryOptions = useMemo(() => {
-    return data?.categories ?? [];
+    const categories = data?.categories ?? [];
+    const isMine = (name: string) => name.trim().toLowerCase() === 'my course';
+
+    return [...categories.filter(isMine), ...categories.filter((name) => !isMine(name))];
   }, [data]);
 
   const studentSubjects = useMemo(() => {
@@ -613,11 +618,11 @@ export default function CourseMasterPage() {
             </div>
           </div>
 
-          <div className="absolute right-5 top-5 flex items-center gap-1.5">
-            <button type="button" title="Lesson Plan" aria-label={`Open ${subject.subject_name} lesson plan`} onClick={(event) => { event.stopPropagation(); router.push(routes.planDocument); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#FBCFE8] bg-[#FDF2F8] text-[#DB2777] transition hover:bg-[#FCE7F3]"><NotebookText className="h-4 w-4" strokeWidth={1.9} /></button>
-            <button type="button" title="Curriculum" aria-label={`Open ${subject.subject_name} curriculum`} onClick={(event) => { event.stopPropagation(); router.push(routes.curriculum); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BAE6FD] bg-[#ECF9FF] text-[#0284C7] transition hover:bg-[#DDF4FF]"><ListTree className="h-4 w-4" strokeWidth={1.9} /></button>
-            <button type="button" title="Chapters" aria-label={`Open ${subject.subject_name} chapters`} onClick={(event) => { event.stopPropagation(); router.push(routes.chapters); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BBF7D0] bg-[#ECFDF3] text-[#16A34A] transition hover:bg-[#DCFBE8]"><BookOpen className="h-4 w-4" strokeWidth={1.9} /></button>
-            <button type="button" title="Coherence map" aria-label={`Open ${subject.subject_name} coherence map`} onClick={(event) => { event.stopPropagation(); router.push(routes.coherenceMap); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#FDE68A] bg-[#FFFBEB] text-[#D97706] transition hover:bg-[#FEF3C7]"><Network className="h-4 w-4" strokeWidth={1.9} /></button>
+          <div className="absolute inset-x-0 top-4 flex items-center justify-center gap-1">
+            <button type="button" title="Lesson Plan" aria-label={`Open ${subject.subject_name} lesson plan`} onClick={(event) => { event.stopPropagation(); router.push(routes.planDocument); }} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#FBCFE8] bg-[#FDF2F8] text-[#DB2777] transition hover:bg-[#FCE7F3]"><NotebookText className="h-3.5 w-3.5" strokeWidth={1.9} /></button>
+            <button type="button" title="Curriculum" aria-label={`Open ${subject.subject_name} curriculum`} onClick={(event) => { event.stopPropagation(); router.push(routes.curriculum); }} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#BAE6FD] bg-[#ECF9FF] text-[#0284C7] transition hover:bg-[#DDF4FF]"><ListTree className="h-3.5 w-3.5" strokeWidth={1.9} /></button>
+            <button type="button" title="Chapters" aria-label={`Open ${subject.subject_name} chapters`} onClick={(event) => { event.stopPropagation(); router.push(routes.chapters); }} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#BBF7D0] bg-[#ECFDF3] text-[#16A34A] transition hover:bg-[#DCFBE8]"><BookOpen className="h-3.5 w-3.5" strokeWidth={1.9} /></button>
+            <button type="button" title="Coherence map" aria-label={`Open ${subject.subject_name} coherence map`} onClick={(event) => { event.stopPropagation(); router.push(routes.coherenceMap); }} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#FDE68A] bg-[#FFFBEB] text-[#D97706] transition hover:bg-[#FEF3C7]"><Network className="h-3.5 w-3.5" strokeWidth={1.9} /></button>
           </div>
         </div>
 
@@ -923,7 +928,7 @@ export default function CourseMasterPage() {
                                   </h3>
                                   <span className="h-px flex-1 bg-[#D9E2EE]" aria-hidden="true" />
                                 </div>
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+                                <div className="grid grid-cols-[repeat(auto-fill,154px)] justify-start gap-4">
                                   {category.subjects.map((subject) => renderSubjectCard(subject))}
                                 </div>
                               </div>
@@ -950,7 +955,7 @@ export default function CourseMasterPage() {
                   No subjects found for the selected filters.
                 </div>
               ) : (
-                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+                <div className="mt-6 grid grid-cols-[repeat(auto-fill,154px)] justify-start gap-4">
                   {filteredStudentSubjects.map((subject) => renderStudentSubjectCard(subject))}
                 </div>
               )

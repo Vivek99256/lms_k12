@@ -10,6 +10,11 @@ export interface Level3Item {
   label: string;
   href: string;
   link?: string | null;
+  /**
+   * The screens under this tab. A tab with children shows a dropdown arrow and
+   * drills down into them; the tab itself still opens its own page.
+   */
+  children?: Level3Item[];
 }
 
 export interface SubmenuItem {
