@@ -152,7 +152,7 @@ const TYPE_STYLES: Record<
     ring: 'ring-stone-300',
     icon: FileText,
   },
-  'H5P Interactive': {
+  'Interactive': {
     band: 'from-cyan-100 via-cyan-50/60 to-transparent',
     chip: 'bg-cyan-100 text-cyan-700',
     text: 'text-cyan-700',
@@ -228,43 +228,43 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
           onOpen(item);
         }
       }}
-      className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-[0_10px_30px_rgba(15,23,42,0.10)]"
+      className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_4px_14px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-[0_8px_20px_rgba(15,23,42,0.10)]"
     >
       {/* Header band, tinted by type. The tint is the scanning cue - one grey
           gradient for every type is what made the grid unreadable.
           The gradient runs strong at the top and fades to transparent by the
           bottom, so there is no hard colour edge cutting across the icon that
           overlaps it. It previously ran the other way, which put the densest
-          colour exactly where the icon sits. `pb-12` leaves room for the icon
+          colour exactly where the icon sits. `pb-8` leaves room for the icon
           to hang into the faded tail rather than into solid colour. */}
       <div
-        className={`flex items-start justify-between bg-gradient-to-b ${style.band} px-4 pb-12 pt-3`}
+        className={`flex items-start justify-between bg-gradient-to-b ${style.band} px-3 pb-8 pt-2`}
       >
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${style.chip}`}
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${style.chip}`}
         >
-          <TypeIcon size={12} />
+          <TypeIcon size={10} />
           {item.type}
         </span>
-      
+
       </div>
 
       {/* `relative z-10` is load-bearing. The band above is an earlier sibling,
           and a positioned element paints over a static one regardless of DOM
           order - so while the band carried `relative` and this did not, the band
           painted across the icon. The icon must sit forward of the tint. */}
-      <div className="relative z-10 -mt-10 flex justify-center px-4">
+      <div className="relative z-10 -mt-7 flex justify-center px-3">
         <div
-          className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-[0_4px_14px_rgba(15,23,42,0.10)] ring-1 ${style.ring} ${style.text}`}
+          className={`flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-[0_4px_14px_rgba(15,23,42,0.10)] ring-1 ${style.ring} ${style.text}`}
         >
-          <TypeIcon size={26} />
+          <TypeIcon size={18} />
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
+      <div className="flex flex-1 flex-col px-3 pb-3 pt-2">
         {(!hideChapter || item.conceptName || item.topicName) && (
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
-           
+          <div className="mb-1.5 flex flex-wrap items-center gap-1">
+              
             {/* Concept exists on very few rows. Shown when present, omitted
                 otherwise - never replaced by a placeholder like "General",
                 which reads as real data that happens to be wrong. */}
@@ -286,9 +286,11 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
             )} */}
           </div>
         )}
+    <h3 className="line-clamp-2 text-[13px] font-semibold leading-[18px] text-slate-950">
+          {item.title}
+        </h3>
 
-       
-{/* 
+{/*
         {item.summary ? (
           <p className="mt-1.5 line-clamp-3 text-[13px] leading-5 text-slate-600">{item.summary}</p>
         ) : null} */}
@@ -296,7 +298,7 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
         {/* The line that separates two cards sharing a title. file_type is set
             on 99% of rows and the date on all of them, so this is the reliable
             differentiator - and updatedAt was already computed and thrown away. */}
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500">
           {fileLabel && <span className="font-medium text-slate-600">{fileLabel}</span>}
         </div>
 
@@ -306,7 +308,7 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
             buttons themselves. */}
         <div
           onClick={(event) => event.stopPropagation()}
-          className="mt-auto flex items-center justify-between border-t border-slate-200/80 pt-3"
+          className="mt-auto flex items-center justify-between gap-2 border-t border-slate-200/80 pt-2"
         >
           <Button
             type="button"
@@ -315,14 +317,10 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
               event.stopPropagation();
               onOpen(item);
             }}
-            className="h-9 rounded-full bg-slate-100 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-200 hover:text-slate-900"
+            aria-label={item.actionLabel === 'Play' ? `Play: ${item.title}` : `${item.pdfUrl ? 'Open PDF' : 'Open'}: ${item.title}`}
+            className="h-7 w-7 shrink-0 rounded-full bg-slate-100 p-0 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
           >
-            {item.actionLabel === 'Play' ? (
-              <Play size={14} className="mr-2" />
-            ) : (
-              <Eye size={14} className="mr-2" />
-            )}
-            {item.actionLabel}
+            {item.actionLabel === 'Play' ? <Play size={13} /> : <Eye size={13} />}
           </Button>
           {item.pdfUrl && onDownloadPdf ? (
             <Button
@@ -333,10 +331,9 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
                 onDownloadPdf(item);
               }}
               aria-label={`Download PDF: ${item.title}`}
-              className="h-9 rounded-full px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              className="h-7 w-7 shrink-0 rounded-full p-0 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             >
-              <Download size={14} className="mr-2" />
-              Download PDF
+              <Download size={13} />
             </Button>
           ) : null}
         </div>

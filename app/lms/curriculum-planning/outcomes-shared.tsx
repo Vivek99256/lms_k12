@@ -29,7 +29,7 @@ export const RESOURCE_TYPE_LABEL: Record<string, string> = {
   link: 'Link / video',
   jpg: 'Image',
   png: 'Image',
-  h5p: 'H5P interactive',
+  h5p: 'interactive',
   ppt: 'Presentation',
   pptx: 'Presentation',
   other: 'Other',

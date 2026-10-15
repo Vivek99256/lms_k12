@@ -373,7 +373,7 @@ const CONTENT_LIBRARY_TABS = [
   'Worksheet',
   'Lesson plan',
   'My course',
-  'H5P Interactive',
+  'Interactive',
   // Merged into the chapter content list by the backend (like H5P), so it is counted
   // and filtered like every other type and also appears under 'All content'.
   'Prayogshala',
@@ -392,7 +392,7 @@ const TEACHER_CONTENT_LIBRARY_TABS = [
   'All content',
   'Presentations',
   'Teacher training',
-  'H5P Interactive',
+  'Interactive',
 ] as const;
 
 /** Any tab either lane can show. */
@@ -469,7 +469,7 @@ type ChapterContentType =
   | 'Worksheet'
   | 'Lesson plan'
   | 'My course'
-  | 'H5P Interactive'
+  | 'Interactive'
   | 'Prayogshala';
 type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded' | 'Authored';
 
@@ -590,7 +590,7 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   }
   // H5P assets are merged in by H5PContentAdapter with format='h5p' and their own
   // category, so they are identified by that rather than by guessing from a filename.
-  if (asset.format === 'h5p' || contentCategory === 'h5p interactive') return 'H5P Interactive';
+  if (asset.format === 'h5p' || contentCategory === 'interactive') return 'Interactive';
   if (contentLabel.includes('classroom activity')) return 'Classroom activity';
   if (contentLabel.includes('remedial')) return 'Remedial class';
   if (contentLabel.includes('worksheet')) return 'Worksheet';
@@ -880,7 +880,7 @@ function getChapterContentType(index: number): ChapterContentType {
 }
 
 function getChapterContentPreview(type: ChapterContentType): ChapterContentPreview {
-  if (type === 'H5P Interactive') return 'video';
+  if (type === 'Interactive') return 'video';
   if (type === 'Video') return 'video';
   if (type === 'Revision notes') return 'notes';
   if (type === 'PDF') return 'pdf';
@@ -1046,8 +1046,8 @@ function contentMatchesTab(item: ChapterContentItem, tab: string): boolean {
     // no teacher-training row is unreachable from this lane.
     case 'Teacher training':
       return item.type === 'Teacher training' || item.type === 'Teacher training presentation';
-    case 'H5P Interactive':
-      return item.type === 'H5P Interactive';
+    case 'Interactive':
+      return item.type === 'Interactive';
     case 'Prayogshala':
       return item.type === 'Prayogshala';
     default:
@@ -2337,7 +2337,7 @@ export default function ChapterListPage() {
       // H5P carries no audience signal in any h5p_* table, and the tracker asks for it
       // to be reachable "inside Classroom Resource AND Teacher Resource". So it is shown
       // on both surfaces rather than being assigned an audience we cannot evidence.
-      const isAudienceNeutral = item.type === 'H5P Interactive';
+      const isAudienceNeutral = item.type === 'Interactive';
       const isTeacherTraining = isTeacherTrainingContent(item);
       // Teacher Workspace only ever shows Teacher Training content; Classroom
       // Resources never shows it.
@@ -6167,42 +6167,6 @@ export default function ChapterListPage() {
             </div>
           </div>
 
-          <div className="mb-6 grid gap-4 md:grid-cols-3">
-            {/* <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-slate-600">Content items</p>
-                  <p className="mt-3 text-4xl font-bold tracking-tight text-slate-950">{totalItems}</p>
-                </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4f46e5]">
-                  <FolderOpen size={18} />
-                </div>
-              </div>
-            </div> */}
-            {/* <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-slate-600">Generated with AI</p>
-                  <p className="mt-3 text-4xl font-bold tracking-tight text-slate-950">{gammaItems}</p>
-                </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4f46e5]">
-                  <Sparkles size={18} />
-                </div>
-              </div>
-            </div> */}
-            {/* <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-slate-600">Uploaded</p>
-                  <p className="mt-3 text-4xl font-bold tracking-tight text-slate-950">{uploadedItems}</p>
-                </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4f46e5]">
-                  <Upload size={18} />
-                </div>
-              </div>
-            </div> */}
-          </div>
-
           <div className="mb-4 border-b border-slate-200/80">
             <div className="flex flex-wrap items-center gap-6 text-[15px]">
               {visibleContentLibraryTabs.map((tab) => {
@@ -6262,9 +6226,7 @@ export default function ChapterListPage() {
             </Select>
           </div>
 
-          <p className="mb-5 text-sm text-slate-500">
-            {contentLoading ? 'Loading contentâ€¦' : `${filteredChapterContentItems.length} items in ${activeChapterTitle}`}
-          </p>
+         
 
           {activeContentLibraryTab === 'Prayogshala' && canCreateContent !== false && !contentLoading && !contentError ? (
             <div className="mb-4 flex justify-end">
@@ -6312,9 +6274,9 @@ export default function ChapterListPage() {
               </Button>
             </div>
           ) : contentLoading ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {[1, 2, 3, 4].map((item) => (
-                <div key={item} className="h-72 animate-pulse rounded-2xl bg-slate-100" />
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
+              {[1, 2, 3, 4, 5, 6].map((item) => (
+                <div key={item} className="h-56 animate-pulse rounded-xl bg-slate-100" />
               ))}
             </div>
           ) : filteredChapterContentItems.length === 0 ? (
@@ -6351,7 +6313,7 @@ export default function ChapterListPage() {
                           {group.items.length} item{group.items.length === 1 ? '' : 's'}
                         </span>
                       </div>
-                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
                         {group.items.map((item) => (
                           // hideChapter: the group heading above this grid already
                           // names it, so a chapter pill on each card is noise.
@@ -6369,7 +6331,7 @@ export default function ChapterListPage() {
                 </div>
               );
             })() : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
                 {filteredChapterContentItems.map((item) => (
                   <ContentCard
                     key={item.id}
@@ -6695,7 +6657,7 @@ export default function ChapterListPage() {
                   key={chapter.id}
                   className="overflow-hidden rounded-[14px] border border-slate-200/90 bg-white shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
                 >
-                  <div className="flex items-start justify-between gap-4 px-6 py-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5">
                     <button
                       type="button"
                       onClick={() => updateExpandedChapter(isExpanded ? null : chapter.id)}
@@ -6741,6 +6703,15 @@ export default function ChapterListPage() {
                     >
                       <Network size={16} className="mr-2" />
                       Coherence map
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => router.push('/lms/homework')}
+                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                    >
+                      <ClipboardList size={16} className="mr-2" />
+                      Homework/Assignment
                     </Button>
                   </div>
 

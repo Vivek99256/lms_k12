@@ -293,8 +293,7 @@ export default function CurriculumPlanningPage() {
           <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">{headerTitle}</h1>
           <p className="mt-1 text-sm text-[#706b64]">{headerSubtitle}</p>
         </div>
-
-        <div className="flex flex-wrap gap-2">
+</div>        {/* <div className="flex flex-wrap gap-2">
           {activeTab === 'overview' && prefs.ready && (
             <CustomizeDashboard widgets={OVERVIEW_WIDGETS} {...prefs.customizeProps} size="lg" className="h-10" />
           )}
@@ -323,7 +322,7 @@ export default function CurriculumPlanningPage() {
             Add topic
           </button>
         </div>
-      </div>
+      </div> */}
 
       {dialogs}
 

@@ -15,7 +15,8 @@
 // renders literally as "Data not available", not a 0.
 
 import { useEffect, useMemo, useState } from 'react';
-import { FilterBar } from '@/components/ui/g2g/filter-bar';
+import { Select, type SelectOption } from '@/components/ui/g2g/select';
+import { cn } from '@/lib/utils';
 import type { ApiCurriculum } from './types';
 import { NotProvided } from './shared';
 import { useOutcomeSummary, type OutcomeFilters } from './useOutcomeAnalytics';
@@ -29,9 +30,48 @@ type SubTabKey = 'overview' | 'analysis' | 'students';
 
 const SUB_TABS: Array<{ key: SubTabKey; label: string }> = [
   { key: 'overview', label: 'Overview' },
-  { key: 'analysis', label: 'LO / LI analysis' },
+  { key: 'analysis', label: 'CG / LO analysis' },
   { key: 'students', label: 'Student analysis' },
 ];
+
+/**
+ * One segment of the Standard/Subject/Curriculum toolbar: a small caption
+ * above a borderless select, so the picked value sits inline with its label
+ * instead of needing a separate "Standard: 6" chip underneath to say the
+ * same thing again.
+ */
+function ScopeField({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+  ...selectProps
+}: {
+  label: string;
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+  className?: string;
+} & Pick<React.ComponentProps<typeof Select>, 'wrapOptionLabels' | 'minPanelWidthPx' | 'panelClassName'>) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 px-2.5 py-1">
+      <span className="shrink-0 text-[10.5px] font-semibold uppercase tracking-wide text-[#9a958e]">{label}</span>
+      <Select
+        value={value}
+        onChange={onChange}
+        options={options}
+        size="sm"
+        aria-label={label}
+        className={cn(
+          'min-w-0 border-transparent bg-transparent px-1.5 font-medium text-[#3c3833] hover:bg-[#f7f6f4]',
+          className
+        )}
+        {...selectProps}
+      />
+    </div>
+  );
+}
 
 export function OutcomesTab({ curricula }: { curricula: ApiCurriculum[] }) {
   const [standardId, setStandardId] = useState<number | null>(null);
@@ -101,15 +141,33 @@ export function OutcomesTab({ curricula }: { curricula: ApiCurriculum[] }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {data ? <Pill tone={HEALTH_TONE[data.health_status]} className="px-3 py-1.5 text-xs">{HEALTH_LABEL[data.health_status]}</Pill> : <span />}
-        <FilterBar
-          filters={[
-            { id: 'standard', label: 'Standard', type: 'select', value: standardId !== null ? String(standardId) : '', options: standardOptions, onChange: (v) => handleStandardChange(v as string) },
-            { id: 'subject', label: 'Subject', type: 'select', value: subjectId !== null ? String(subjectId) : '', options: subjectOptions, onChange: (v) => handleSubjectChange(v as string) },
-            { id: 'curriculum', label: 'Curriculum', type: 'select', value: curriculumId !== null ? String(curriculumId) : '', options: curriculumOptions, triggerClassName: 'w-56', onChange: (v) => setCurriculumId(Number(v) || null) },
-          ]}
-        />
+        <div className="flex flex-wrap items-center divide-x divide-[#e5e1da] rounded-lg border border-[#e5e1da] bg-white shadow-sm">
+          <ScopeField
+            label="Standard"
+            value={standardId !== null ? String(standardId) : ''}
+            options={standardOptions}
+            onChange={handleStandardChange}
+            className="w-14"
+          />
+          <ScopeField
+            label="Subject"
+            value={subjectId !== null ? String(subjectId) : ''}
+            options={subjectOptions}
+            onChange={handleSubjectChange}
+            className="w-28"
+          />
+          <ScopeField
+            label="Curriculum"
+            value={curriculumId !== null ? String(curriculumId) : ''}
+            options={curriculumOptions}
+            onChange={(v) => setCurriculumId(Number(v) || null)}
+            className="w-56 sm:w-72"
+            wrapOptionLabels
+            minPanelWidthPx={320}
+          />
+        </div>
       </div>
 
       <nav className="flex gap-1 border-b border-[#ddd9d2]" role="tablist" aria-label="Outcomes report sections">
