@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, X } from 'lucide-react';
+import { divisibilityRule, layoutGroups, multiplesUpTo } from '@/lib/prayogshala/mathrules';
 import type {
   ClassifyParams,
   ClassifyState,
@@ -68,6 +69,7 @@ const MOTION_CSS = `
 @keyframes pg-drift { 0% { transform: translateX(-8px); } 50% { transform: translateX(8px); } 100% { transform: translateX(-8px); } }
 @keyframes pg-orbit { to { transform: rotate(360deg); } }
 @keyframes pg-swing { 0%, 100% { transform: rotate(calc(var(--amp) * -1)); } 50% { transform: rotate(var(--amp)); } }
+@keyframes pg-pop { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.25); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes pg-shine { 0%, 100% { transform: scale(1); opacity: .35; } 50% { transform: scale(1.12); opacity: .55; } }
 @keyframes pg-glow { 0%, 100% { opacity: var(--glow); } 50% { opacity: calc(var(--glow) * .85); } }
 .pg-fluid { transition: all .35s ease; }
@@ -108,8 +110,24 @@ export function SliderRow({
           {label}
           {note ? <span className="ml-2 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide" style={{ background: C.panel2, color: C.muted }}>{note}</span> : null}
         </span>
-        <span className="font-semibold tabular-nums" style={{ color: C.accent }}>
-          {value} <span style={{ color: C.muted }}>{unit}</span>
+        <span className="flex items-center gap-1 font-semibold tabular-nums" style={{ color: C.accent }}>
+          {/* A typed value drives the same state as the slider; the engine clamps and snaps it. */}
+          <input
+            type="number"
+            inputMode="decimal"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            aria-label={`${label}, type a value`}
+            onChange={(event) => {
+              const typed = Number(event.target.value);
+              if (event.target.value !== '' && Number.isFinite(typed)) onChange(Math.min(max, Math.max(min, typed)));
+            }}
+            className="w-16 rounded-md border px-1.5 py-0.5 text-right text-[13px]"
+            style={{ borderColor: C.line, background: C.panel, color: C.accent }}
+          />
+          <span style={{ color: C.muted }}>{unit}</span>
         </span>
       </div>
       <input
@@ -568,6 +586,281 @@ function PendulumVisual({ v, animate }: { v: VisualState; animate: boolean }) {
   );
 }
 
+
+const fmtInt = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100));
+
+function NumberLineVisual({ v, animate }: { v: VisualState; animate: boolean }) {
+  const lo = Math.round(Math.min(v.values.lo ?? -10, (v.values.hi ?? 10) - 1));
+  const hi = Math.round(Math.max(v.values.hi ?? 10, lo + 1));
+  const start = clamp(Math.round(v.values.start ?? 0), lo, hi);
+  const move = Math.round(v.values.move ?? 0);
+  const end = clamp(start + move, lo, hi);
+  const clipped = start + move !== end;
+  const span = hi - lo;
+  const x = (n: number) => 20 + ((n - lo) / span) * 280;
+  const labelEvery = span > 24 ? 5 : span > 14 ? 2 : 1;
+  const ticks = Array.from({ length: span + 1 }, (_, i) => lo + i);
+  const up = end >= start;
+  const mid = (x(start) + x(end)) / 2;
+  const hop = Math.min(46, 14 + Math.abs(x(end) - x(start)) * 0.25);
+
+  return (
+    <svg viewBox="0 0 320 150" className="w-full rounded-xl" style={{ background: C.panel2 }} role="img" aria-label={`Number line from ${lo} to ${hi}. The marker starts at ${start} and ${move >= 0 ? 'moves right' : 'moves left'} ${Math.abs(move)} to ${end}.${clipped ? ' It stops at the end of the line.' : ''}`}>
+      <line x1="16" y1="96" x2="304" y2="96" stroke={C.muted} strokeWidth="3" strokeLinecap="round" />
+      {ticks.map((n) => (
+        <g key={n}>
+          <line x1={x(n)} y1={n === 0 ? 86 : 90} x2={x(n)} y2={n === 0 ? 106 : 102} stroke={n === 0 ? C.text : C.muted} strokeWidth={n === 0 ? 3 : 1.5} />
+          {n % labelEvery === 0 ? (
+            <text x={x(n)} y="122" fontSize={n === 0 ? 12 : 10} textAnchor="middle" fontWeight={n === 0 ? 700 : 400} fill={n === 0 ? C.text : C.muted}>{n}</text>
+          ) : null}
+        </g>
+      ))}
+      {move !== 0 ? (
+        <path d={`M ${x(start)} 86 Q ${mid} ${86 - hop * 2} ${x(end)} 86`} fill="none" stroke={up ? C.good : C.bad} strokeWidth="3.5" strokeLinecap="round" strokeDasharray="1 7" className="pg-fluid" />
+      ) : null}
+      <circle cx={x(start)} cy="96" r="7" fill="#38bdf8" stroke="#0369a1" strokeWidth="2" className="pg-fluid" />
+      <g className="pg-fluid" style={{ transform: `translateX(${x(end)}px)` }}>
+        <circle cx="0" cy="96" r="10" fill={up ? C.good : C.bad} stroke="#fff" strokeWidth="2.5" className={animate ? 'pg-anim' : undefined} style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: animate && move !== 0 ? 'pg-pop .5s ease-out' : undefined }} />
+        <text x="0" y="62" fontSize="22" textAnchor="middle" fontWeight="800" fill={up ? C.good : C.bad}>{fmtInt(end)}</text>
+      </g>
+      <text x="12" y="22" fontSize="13" fill={C.muted}>start <tspan fontWeight="700" fill="#0369a1">{fmtInt(start)}</tspan>   move <tspan fontWeight="700" fill={up ? C.good : C.bad}>{move > 0 ? '+' : ''}{fmtInt(move)}</tspan></text>
+      {clipped ? <text x="160" y="142" fontSize="10" textAnchor="middle" fill={C.warn}>The marker stops at the end of this line.</text> : null}
+    </svg>
+  );
+}
+
+function ArrayVisual({ v, animate }: { v: VisualState; animate: boolean }) {
+  const groups = Math.round(clamp(v.values.groups ?? 0, 0, 12));
+  const size = Math.round(clamp(v.values.size ?? 0, 0, 12));
+  const extra = Math.round(clamp(v.values.extra ?? 0, 0, 12));
+  const negative = (v.values.sign ?? 1) < 0;
+  const fill = negative ? '#ef4444' : '#2563eb';
+  const edge = negative ? '#b91c1c' : '#1d4ed8';
+  const total = groups * size * (negative ? -1 : 1);
+  const perRow = groups > 6 ? 4 : 3;
+  const cols = Math.min(6, Math.max(1, Math.ceil(Math.sqrt(size))));
+  const dot = 7;
+  const gap = 4;
+  const boxW = cols * (dot * 2 + gap) + gap;
+  const boxH = Math.ceil(Math.max(size, 1) / cols) * (dot * 2 + gap) + gap;
+  const cellW = boxW + 12;
+  const cellH = boxH + 12;
+
+  return (
+    <svg viewBox="0 0 320 220" className="w-full rounded-xl" style={{ background: C.panel2 }} role="img" aria-label={`${groups} groups of ${size}${extra ? ` and ${extra} left over` : ''}, ${negative ? 'negative' : 'positive'}: total ${fmtInt(total)}.`}>
+      {Array.from({ length: groups }).map((_, g) => {
+        const gx = 12 + (g % perRow) * cellW;
+        const gy = 12 + Math.floor(g / perRow) * cellH;
+        return (
+          <g key={g}>
+            <rect x={gx} y={gy} width={boxW} height={boxH} rx="8" fill="#fff" stroke={edge} strokeOpacity="0.45" strokeWidth="1.5" />
+            {Array.from({ length: size }).map((__, i) => (
+              <circle
+                key={i}
+                cx={gx + gap + dot + (i % cols) * (dot * 2 + gap)}
+                cy={gy + gap + dot + Math.floor(i / cols) * (dot * 2 + gap)}
+                r={dot}
+                fill={fill}
+                className={animate ? 'pg-anim' : undefined}
+                style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: animate ? `pg-pop .35s ease-out ${(g * size + i) * 0.015}s both` : undefined }}
+              />
+            ))}
+          </g>
+        );
+      })}
+      {extra > 0 ? (
+        <g>
+          <rect x="236" y="12" width="72" height={Math.ceil(extra / 3) * 20 + 14} rx="8" fill="#fff" stroke="#94a3b8" strokeDasharray="4 3" />
+          {Array.from({ length: extra }).map((_, i) => (
+            <circle key={i} cx={252 + (i % 3) * 20} cy={30 + Math.floor(i / 3) * 20} r="7" fill="#94a3b8" className={animate ? 'pg-anim' : undefined} style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: animate ? 'pg-pop .35s ease-out both' : undefined }} />
+          ))}
+          <text x="272" y={Math.ceil(extra / 3) * 20 + 38} fontSize="10" textAnchor="middle" fill={C.muted}>left over</text>
+        </g>
+      ) : null}
+      <text x="160" y="206" fontSize="15" textAnchor="middle" fontWeight="700" fill={negative ? C.bad : C.text}>
+        {groups} groups of {negative ? '−' : ''}{size} = {fmtInt(total)}{extra ? `  (+${extra} left over)` : ''}
+      </text>
+    </svg>
+  );
+}
+
+
+function MultiplesVisual({ v, animate }: { v: VisualState; animate: boolean }) {
+  const m = Math.max(1, Math.round(v.values.m ?? 2));
+  const n = Math.max(1, Math.round(v.values.n ?? 3));
+  const common = Math.round(v.values.common ?? 0);
+  const limit = Math.max(Math.round(v.values.limit ?? 0), Math.max(m, n));
+  const x = (value: number) => 24 + (value / limit) * 272;
+  const rowM = multiplesUpTo(m, limit);
+  const rowN = multiplesUpTo(n, limit);
+  const inBoth = new Set(rowM.filter((value) => rowN.includes(value)));
+  const labelAll = rowM.length <= 14 && rowN.length <= 14;
+  const drawRow = (values: number[], y: number, colour: string, edge: string, label: string) => (
+    <g>
+      <line x1="20" y1={y} x2="300" y2={y} stroke={C.line} strokeWidth="3" strokeLinecap="round" />
+      <text x="20" y={y - 24} fontSize="12" fontWeight="700" fill={edge}>{label}</text>
+      {values.map((value, i) => {
+        const both = inBoth.has(value);
+        const first = value === common;
+        return (
+          <g key={value}>
+            <circle
+              cx={x(value)}
+              cy={y}
+              r={first ? 10 : both ? 8 : 6}
+              fill={both ? C.good : colour}
+              stroke={first ? '#065f46' : '#fff'}
+              strokeWidth={first ? 3 : 1.5}
+              className={animate ? 'pg-anim' : undefined}
+              style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: animate ? `pg-pop .35s ease-out ${i * 0.05}s both` : undefined }}
+            />
+            {labelAll || both ? <text x={x(value)} y={y + 24} fontSize={first ? 12 : 9} fontWeight={both ? 700 : 400} textAnchor="middle" fill={both ? '#047857' : C.muted}>{value}</text> : null}
+          </g>
+        );
+      })}
+    </g>
+  );
+
+  return (
+    <svg viewBox="0 0 320 200" className="w-full rounded-xl" style={{ background: C.panel2 }} role="img" aria-label={`Multiples of ${m} and of ${n} up to ${limit}. ${common > 0 && common <= limit ? `They first meet at ${common}.` : 'They do not meet in this range.'}`}>
+      {Array.from(inBoth).map((value) => (
+        <line key={value} x1={x(value)} y1="58" x2={x(value)} y2="128" stroke={value === common ? C.good : C.line} strokeWidth={value === common ? 2.5 : 1.5} strokeDasharray="4 4" />
+      ))}
+      {drawRow(rowM, 70, '#38bdf8', '#0369a1', `multiples of ${m}`)}
+      {drawRow(rowN, 126, '#fb923c', '#c2410c', `multiples of ${n}`)}
+      <text x="160" y="186" fontSize="14" fontWeight="800" textAnchor="middle" fill={C.good}>
+        {common > 0 && common <= limit ? `First meeting point: ${common}` : 'No common multiple in this range yet'}
+      </text>
+    </svg>
+  );
+}
+
+function GroupingVisual({ v, animate }: { v: VisualState; animate: boolean }) {
+  const a = Math.round(clamp(v.values.a ?? 0, 0, 72));
+  const b = Math.round(clamp(v.values.b ?? 0, 0, 72));
+  const g = Math.round(clamp(v.values.g ?? 1, 1, 72));
+  const best = Math.round(v.values.best ?? 0);
+  const rows = [
+    { total: a, layout: layoutGroups(a, g), fill: '#2563eb', edge: '#1d4ed8', y: 26, name: 'A' },
+    { total: b, layout: layoutGroups(b, g), fill: '#ea580c', edge: '#c2410c', y: 140, name: 'B' },
+  ];
+  const bothEqual = rows.every((r) => r.layout.leftover === 0);
+
+  return (
+    <svg viewBox="0 0 320 268" className="w-full rounded-xl" style={{ background: C.panel2 }} role="img" aria-label={`${a} split into groups of ${g} leaves ${a % g}; ${b} split into groups of ${g} leaves ${b % g}. ${bothEqual ? `${g} is a common factor.` : `${g} is not a common factor.`} The highest common factor is ${best}.`}>
+      {rows.map((r) => {
+        const scale = Math.min(1, 92 / Math.max(r.layout.height, 1));
+        return (
+          <g key={r.name}>
+            <text x="12" y={r.y - 8} fontSize="12" fontWeight="700" fill={r.edge}>
+              {r.total} = {r.layout.groups} × {g}{r.layout.leftover ? ` + ${r.layout.leftover}` : ''}
+              <tspan fill={r.layout.leftover === 0 ? C.good : C.bad}>  {r.layout.leftover === 0 ? '✓ equal groups' : '✗ left over'}</tspan>
+            </text>
+            <g transform={`translate(12 ${r.y}) scale(${scale})`}>
+              {r.layout.boxes.map((box, bi) => (
+                <g key={bi}>
+                  <rect x={box.x} y={box.y} width={box.w} height={box.h} rx="6" fill="#fff" stroke={r.edge} strokeOpacity="0.5" />
+                  {box.dots.map((dot, di) => (
+                    <circle key={di} cx={dot.x} cy={dot.y} r="4" fill={r.fill} className={animate ? 'pg-anim' : undefined} style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: animate ? `pg-pop .3s ease-out ${(bi * g + di) * 0.01}s both` : undefined }} />
+                  ))}
+                </g>
+              ))}
+              {r.layout.loose.map((dot, li) => (
+                <circle key={li} cx={dot.x} cy={dot.y} r="4" fill="#94a3b8" />
+              ))}
+            </g>
+          </g>
+        );
+      })}
+      <text x="160" y="256" fontSize="13" fontWeight="800" textAnchor="middle" fill={bothEqual ? C.good : C.muted}>
+        {bothEqual ? `${g} is a common factor` : `${g} is not a common factor`} · highest common factor = {best}
+      </text>
+    </svg>
+  );
+}
+
+function DivisibilityVisual({ v, animate }: { v: VisualState; animate: boolean }) {
+  const n = Math.max(0, Math.round(v.values.n ?? 0));
+  const d = Math.max(2, Math.round(v.values.d ?? 2));
+  const rule = divisibilityRule(n, d);
+  const actually = n % d === 0;
+  const tile = Math.min(46, 270 / Math.max(rule.digits.length, 1) - 6);
+
+  return (
+    <svg viewBox="0 0 320 220" className="w-full rounded-xl" style={{ background: C.panel2 }} role="img" aria-label={`Is ${n} divisible by ${d}? ${rule.title}. ${rule.steps.join('. ')}. ${actually ? 'Yes' : 'No'}.`}>
+      <text x="160" y="22" fontSize="12" fontWeight="700" textAnchor="middle" fill={C.muted}>{rule.title}</text>
+      {rule.digits.map((digit, i) => {
+        const hot = rule.highlight.includes(i);
+        const cx = 160 + (i - (rule.digits.length - 1) / 2) * (tile + 6);
+        return (
+          <g key={i} className={animate ? 'pg-anim' : undefined} style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: animate ? `pg-pop .35s ease-out ${i * 0.06}s both` : undefined }}>
+            <rect x={cx - tile / 2} y="42" width={tile} height={tile + 6} rx="9" fill={hot ? '#fde68a' : '#fff'} stroke={hot ? '#d97706' : C.line} strokeWidth={hot ? 3 : 1.5} />
+            <text x={cx} y={42 + tile * 0.78} fontSize={tile * 0.7} fontWeight="800" textAnchor="middle" fill={C.text}>{digit}</text>
+          </g>
+        );
+      })}
+      {rule.steps.map((line, i) => (
+        <text key={i} x="160" y={118 + i * 22} fontSize="14" textAnchor="middle" fill={C.text}>{line}</text>
+      ))}
+      <rect x="70" y="164" width="180" height="38" rx="19" fill={actually ? 'rgba(15,157,116,0.14)' : 'rgba(214,69,93,0.12)'} stroke={actually ? C.good : C.bad} strokeWidth="2" className="pg-fluid" />
+      <text x="160" y="189" fontSize="15" fontWeight="800" textAnchor="middle" fill={actually ? C.good : C.bad}>
+        {actually ? `✓ ${n} is divisible by ${d}` : `✗ ${n} is not divisible by ${d}`}
+      </text>
+    </svg>
+  );
+}
+
+function CubesVisual({ v, animate }: { v: VisualState; animate: boolean }) {
+  const side = Math.round(clamp(v.values.side ?? 1, 0, 8));
+  const layers = Math.round(clamp(v.values.layers ?? 1, 1, 8));
+  const extra = Math.round(clamp(v.values.extra ?? 0, 0, 120));
+  const cell = side > 0 ? Math.min(26, 150 / side) : 20;
+  const shift = layers > 1 ? Math.min(14, 72 / layers) : 0;
+  const total = side * side * layers;
+  const hues = ['#38bdf8', '#2dd4bf', '#a3e635', '#facc15', '#fb923c', '#f87171', '#c084fc', '#818cf8'];
+  const ox = 18;
+  const oy = 28 + (layers - 1) * shift;
+
+  return (
+    <svg viewBox="0 0 320 240" className="w-full rounded-xl" style={{ background: C.panel2 }} role="img" aria-label={`${side} by ${side}${layers > 1 ? ` by ${layers}` : ''} blocks make ${total}${extra ? `, and ${extra} loose blocks are left over` : ''}.`}>
+      {Array.from({ length: layers }).map((_, back) => {
+        const layer = layers - 1 - back; // draw the back layer first
+        return (
+          <g key={layer} transform={`translate(${ox + layer * shift} ${oy - layer * shift})`}>
+            {Array.from({ length: side * side }).map((__, i) => (
+              <rect
+                key={i}
+                x={(i % side) * cell}
+                y={Math.floor(i / side) * cell}
+                width={cell - 1.5}
+                height={cell - 1.5}
+                rx="3"
+                fill={hues[layer % hues.length]}
+                stroke="#fff"
+                strokeWidth="1.2"
+                className={animate ? 'pg-anim' : undefined}
+                style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: animate ? `pg-pop .3s ease-out ${(layers - 1 - layer) * 0.12 + (i % 7) * 0.01}s both` : undefined }}
+              />
+            ))}
+          </g>
+        );
+      })}
+      {extra > 0 ? (
+        <g transform="translate(238 30)">
+          <rect x="-6" y="-6" width="84" height={Math.ceil(extra / 4) * 17 + 24} rx="8" fill="#fff" stroke="#94a3b8" strokeDasharray="4 3" />
+          {Array.from({ length: extra }).map((_, i) => (
+            <rect key={i} x={(i % 4) * 17} y={Math.floor(i / 4) * 17} width="14" height="14" rx="2.5" fill="#94a3b8" />
+          ))}
+          <text x="36" y={Math.ceil(extra / 4) * 17 + 12} fontSize="10" textAnchor="middle" fill={C.muted}>{extra} left over</text>
+        </g>
+      ) : null}
+      <text x="160" y="228" fontSize="15" fontWeight="800" textAnchor="middle" fill={C.text}>
+        {side} × {side}{layers > 1 ? ` × ${layers}` : ''} = {total}
+      </text>
+    </svg>
+  );
+}
+
 export function ModelVisual({ visual, animate }: { visual: VisualState; animate: boolean }) {
   switch (visual.kind) {
     case 'heating':
@@ -596,6 +889,18 @@ export function ModelVisual({ visual, animate }: { visual: VisualState; animate:
       return <MixtureVisual v={visual} animate={animate} />;
     case 'pendulum':
       return <PendulumVisual v={visual} animate={animate} />;
+    case 'numberline':
+      return <NumberLineVisual v={visual} animate={animate} />;
+    case 'array':
+      return <ArrayVisual v={visual} animate={animate} />;
+    case 'multiples':
+      return <MultiplesVisual v={visual} animate={animate} />;
+    case 'grouping':
+      return <GroupingVisual v={visual} animate={animate} />;
+    case 'divisibility':
+      return <DivisibilityVisual v={visual} animate={animate} />;
+    case 'cubes':
+      return <CubesVisual v={visual} animate={animate} />;
     default:
       return null;
   }

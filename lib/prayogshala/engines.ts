@@ -79,6 +79,8 @@ export interface Engine<S> {
 // ------------------------------------------------------------------------------- helpers
 
 export function formatNumber(value: number, decimals = 0): string {
+  // Never show "-0": a product like 0 x -4, or -0.002 rounded to 0 places, is plain 0.
+  if (Number(value.toFixed(Math.min(decimals, 20))) === 0) value = 0;
   return value.toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
@@ -282,7 +284,7 @@ export const osmosisEngine: Engine<OsmosisState> = {
 
 // ------------------------------------------------------------------------ variable model
 
-export const VISUAL_KINDS = ['heating', 'particles', 'ray', 'circuit', 'bars', 'rectangle', 'motion', 'wave', 'lever', 'atom', 'scenery', 'mixture', 'pendulum'] as const;
+export const VISUAL_KINDS = ['heating', 'particles', 'ray', 'circuit', 'bars', 'rectangle', 'motion', 'wave', 'lever', 'atom', 'scenery', 'mixture', 'pendulum', 'numberline', 'array', 'multiples', 'grouping', 'divisibility', 'cubes'] as const;
 export type VisualKind = (typeof VISUAL_KINDS)[number];
 
 export interface ModelControl {
@@ -336,6 +338,18 @@ const VISUAL_BIND_KEYS: Record<string, string[]> = {
   scenery: ['sun', 'clouds', 'rain', 'water', 'plants'],
   mixture: ['separated', 'energy'],
   pendulum: ['length', 'swing'],
+  // The marker starts at `start`, hops by `move`, on a line from `lo` to `hi`.
+  numberline: ['start', 'move', 'lo', 'hi'],
+  // `groups` groups of `size` dots, coloured by `sign` (-1 negative, 1 positive); `extra` are left over.
+  array: ['groups', 'size', 'sign', 'extra'],
+  // Two rows of multiples of m and n up to `limit`; `common` is the first value in both rows.
+  multiples: ['m', 'n', 'limit', 'common'],
+  // Totals a and b split into groups of g; `best` is the highest group size that works for both.
+  grouping: ['a', 'b', 'g', 'best'],
+  // The digits of n worked through the divisibility rule for d.
+  divisibility: ['n', 'd'],
+  // side x side blocks in `layers` layers (layers = 1 is a flat square); `extra` loose blocks.
+  cubes: ['side', 'layers', 'extra'],
 };
 
 export const variableModelEngine: Engine<VariableModelState> = {
@@ -369,7 +383,7 @@ export const variableModelEngine: Engine<VariableModelState> = {
         outputs.push({ id: d.id, label: d.label, unit: d.unit ?? '', text: '?', primary: false });
         continue;
       }
-      scope[d.id] = value;
+      scope[d.id] = value === 0 ? 0 : value; // never carry -0 into facts or the picture
       text[d.id] = formatNumber(value, d.decimals ?? 0);
       outputs.push({ id: d.id, label: d.label, unit: d.unit ?? '', text: text[d.id], primary: false });
     }
@@ -388,7 +402,7 @@ export const variableModelEngine: Engine<VariableModelState> = {
       for (const key of VISUAL_BIND_KEYS[params.visual.kind] ?? []) {
         const raw = bind[key];
         const v = typeof raw === 'string' ? evaluate(raw, scope) : typeof raw === 'number' ? raw : null;
-        visual.values[key] = v === null ? 0 : v;
+        visual.values[key] = v === null || v === 0 ? 0 : v;
       }
     }
 

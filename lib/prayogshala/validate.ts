@@ -1,4 +1,4 @@
-import { evaluate } from './expr';
+import { evaluate, FUNCTION_NAMES } from './expr';
 import { correctPredictionIds, getEngine, type LabConfig } from './engines';
 
 /**
@@ -17,7 +17,17 @@ const STEP_KEYS = ['mission', 'predict', 'do', 'observe', 'explain', 'concept', 
 
 function unknownNames(expr: string | undefined, known: Set<string>): string[] {
   if (!expr) return [];
-  return [...new Set(expr.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? [])].filter((name) => !known.has(name));
+  const out = new Set<string>();
+  for (const m of expr.matchAll(/([A-Za-z_][A-Za-z0-9_]*)(\s*\()?/g)) {
+    const name = m[1];
+    if (m[2]) {
+      // A name followed by "(" must be a whitelisted function; it is never a fact.
+      if (!FUNCTION_NAMES.includes(name)) out.add(`${name}(`);
+    } else if (!known.has(name)) {
+      out.add(name);
+    }
+  }
+  return [...out];
 }
 
 /** Problems with the lab, in plain words. An empty list means it is safe to run. */

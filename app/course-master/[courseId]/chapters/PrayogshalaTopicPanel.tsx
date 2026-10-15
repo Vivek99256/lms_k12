@@ -44,6 +44,13 @@ const STATE_STYLE: Record<PrayogshalaTopicState, string> = {
   needs_content: 'bg-orange-100 text-orange-800',
 };
 
+/** Failures that repeat until someone fixes the AI provider configuration (not a transient error). */
+const PROVIDER_BLOCKING_CODES = new Set(['quota_exhausted', 'invalid_key', 'no_provider', 'model_not_found']);
+
+function providerBlocked(entry: PrayogshalaTopicEntry): boolean {
+  return entry.state === 'failed' && PROVIDER_BLOCKING_CODES.has(entry.activity?.generation_error_code ?? '');
+}
+
 interface Props {
   chapterId: number;
   canManage: boolean;
@@ -168,8 +175,8 @@ export function PrayogshalaTopicPanel({ chapterId, canManage, reloadKey, onOpenL
                 ) : null}
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATE_STYLE[entry.state]}`}>
-                  {busy ? 'Working…' : STATE_LABEL[entry.state]}
+                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${providerBlocked(entry) ? 'bg-orange-100 text-orange-800' : STATE_STYLE[entry.state]}`}>
+                  {busy ? 'Working…' : providerBlocked(entry) ? 'Provider setup needed' : STATE_LABEL[entry.state]}
                 </span>
                 {hasLab && activity ? (
                   <Button type="button" onClick={() => onOpenLab(activity)} className="h-9 rounded-full bg-[#4f46e5] px-4 text-xs font-semibold text-white hover:bg-[#4338ca]">

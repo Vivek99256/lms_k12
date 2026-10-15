@@ -55,6 +55,14 @@ export interface PrayogshalaActivity {
   generated_at: string | null;
   /** Provider / validation message for staff; always null for learners. */
   generation_error: string | null;
+  /**
+   * Safe machine-readable reason for a failed generation (staff only): rate_limited,
+   * provider_unavailable, timeout, quota_exhausted, invalid_key, no_provider, model_not_found,
+   * bad_request, invalid_output, needs_content, unknown.
+   */
+  generation_error_code: string | null;
+  /** Seconds the provider asked to wait before retrying, when it said. */
+  generation_retry_after: number | null;
   /** Every concept of the topic this one activity covers. */
   concept_ids: number[];
   concept_names: string[];
@@ -245,6 +253,8 @@ export type PrayogshalaGenerateOutcome =
 
 export interface PrayogshalaGenerateResult {
   outcome: PrayogshalaGenerateOutcome;
+  error_code?: string | null;
+  retry_after?: number | null;
   activity?: PrayogshalaActivity | null;
 }
 
