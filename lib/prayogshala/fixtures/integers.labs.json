@@ -1,0 +1,1359 @@
+[
+ {
+  "topic_id": 23734,
+  "title": "Hop along the number line: add and subtract integers",
+  "activity_type": "experiment",
+  "description": "Pick a start, choose add or subtract, pick a number, and watch the marker hop along a number line.",
+  "objective": "Add and subtract positive and negative integers on a number line, see subtraction as adding the inverse, and check answers by estimating.",
+  "materials_required": [
+   "Virtual number line",
+   "Notebook"
+  ],
+  "procedure_steps": [
+   "Predict where the marker will land.",
+   "Choose a start, Add or Subtract, and a number.",
+   "Watch which way the marker hops.",
+   "Try the challenge."
+  ],
+  "observation": "Write the expression and the place the marker landed for three different settings.",
+  "result": "Adding a positive number moves the marker right and adding a negative number moves it left. Subtracting a number gives the same result as adding its inverse.",
+  "safety_instructions": "Nothing physical is handled in this virtual activity.",
+  "teacher_instructions": "Ask students to predict before moving the sliders. Highlight that subtracting a negative moves the marker right.",
+  "student_instructions": "Say the expression out loud before you check the answer.",
+  "estimated_minutes": 15,
+  "lab_config": {
+   "version": 1,
+   "simulation": {
+    "type": "variable_model",
+    "params": {
+     "controls": [
+      {
+       "id": "start",
+       "label": "Start at",
+       "unit": "",
+       "kind": "slider",
+       "min": -10,
+       "max": 10,
+       "step": 1,
+       "default": 3
+      },
+      {
+       "id": "op",
+       "label": "Subtract instead of add",
+       "kind": "toggle",
+       "min": 0,
+       "max": 1,
+       "step": 1,
+       "default": 0
+      },
+      {
+       "id": "k",
+       "label": "Number",
+       "unit": "",
+       "kind": "slider",
+       "min": -10,
+       "max": 10,
+       "step": 1,
+       "default": -5
+      }
+     ],
+     "derived": [
+      {
+       "id": "move",
+       "label": "Movement",
+       "unit": "",
+       "formula": "k*(1-2*op)",
+       "decimals": 0
+      },
+      {
+       "id": "result",
+       "label": "Lands on",
+       "unit": "",
+       "formula": "start+move",
+       "decimals": 0
+      },
+      {
+       "id": "negk",
+       "label": "Inverse of the number",
+       "unit": "",
+       "formula": "0-k",
+       "decimals": 0
+      }
+     ],
+     "visual": {
+      "kind": "numberline",
+      "bind": {
+       "start": "start",
+       "move": "move",
+       "lo": "-20",
+       "hi": "20"
+      }
+     },
+     "observations": [
+      {
+       "when": "k==0",
+       "text": "Adding or subtracting 0 changes nothing: the marker stays on {result}."
+      },
+      {
+       "when": "op==0 && k>0",
+       "text": "{start} + ({k}) = {result}: adding a positive number moves the marker right."
+      },
+      {
+       "when": "op==0 && k<0",
+       "text": "{start} + ({k}) = {result}: adding a negative number moves the marker left."
+      },
+      {
+       "when": "op==1 && k>0",
+       "text": "{start} - ({k}) = {result}: subtracting a positive number moves the marker left."
+      },
+      {
+       "when": "op==1 && k<0",
+       "text": "{start} - ({k}) = {result}: subtracting a negative is adding its inverse, {negk}, so the marker moves right."
+      }
+     ]
+    }
+   },
+   "steps": {
+    "mission": {
+     "scenario": "A marker sits on a number line. You decide how far it hops and which way.",
+     "task": "Predict where it lands, then test it.",
+     "tags": [
+      "Integers",
+      "Number line"
+     ]
+    },
+    "predict": {
+     "question": "The marker starts at 3. You add -5. Where does it land?",
+     "scenario": {
+      "start": 3,
+      "op": 0,
+      "k": -5
+     },
+     "options": [
+      {
+       "id": "a",
+       "label": "-2",
+       "when": "result==-2"
+      },
+      {
+       "id": "b",
+       "label": "8",
+       "when": "result==8"
+      },
+      {
+       "id": "c",
+       "label": "-8",
+       "when": "result==-8"
+      }
+     ]
+    },
+    "do": {
+     "instructions": [
+      "Pick a start number.",
+      "Switch between Add and Subtract and change the number.",
+      "Watch the marker hop."
+     ],
+     "materials": [
+      "Virtual number line"
+     ],
+     "safety": "Nothing physical is handled in this virtual activity."
+    },
+    "observe": {
+     "prompt": "Which way did the marker hop, and where did it land?"
+    },
+    "explain": {
+     "text": "The marker moves along the number line.",
+     "cases": [
+      {
+       "when": "op==1",
+       "text": "Subtracting a number is the same as adding its inverse: a - b = a + (-b)."
+      },
+      {
+       "when": "op==0",
+       "text": "Adding a positive number moves right. Adding a negative number moves left."
+      }
+     ]
+    },
+    "concept": {
+     "text": "Integers are positive numbers, negative numbers and zero.",
+     "points": [
+      "Positive numbers are right of 0 and negative numbers are left of 0.",
+      "a - b = a + (-b)",
+      "To estimate, round first: 48 - 19 is about 50 - 20 = 30."
+     ]
+    },
+    "apply": {
+     "question": "Challenge: what is (-4) - (-6)?",
+     "options": [
+      {
+       "id": "a",
+       "label": "2",
+       "correct": true,
+       "feedback": "Yes: subtracting -6 is adding 6, and -4 + 6 = 2."
+      },
+      {
+       "id": "b",
+       "label": "-10",
+       "correct": false,
+       "feedback": "That treats it as -4 + -6. Subtracting a negative moves right."
+      },
+      {
+       "id": "c",
+       "label": "-2",
+       "correct": false,
+       "feedback": "Check the direction: subtracting a negative moves the marker right."
+      }
+     ]
+    },
+    "reflect": {
+     "prompts": [
+      "Which move surprised you most? Explain why in one sentence."
+     ]
+    }
+   },
+   "outcomes": [
+    "Add and subtract integers on a number line.",
+    "Explain subtraction as adding the inverse."
+   ]
+  }
+ },
+ {
+  "topic_id": 23735,
+  "title": "Groups of signs: multiply and divide integers",
+  "activity_type": "experiment",
+  "description": "Build groups of dots to see why the sign of a product depends on the signs of the factors, and check division with multiplication.",
+  "objective": "Multiply and divide integers using the sign rules, see multiplication as repeated groups, and see division as the inverse of multiplication.",
+  "materials_required": [
+   "Virtual dot groups",
+   "Notebook"
+  ],
+  "procedure_steps": [
+   "Predict the product.",
+   "Change the two numbers.",
+   "Switch to Divide and check the answer.",
+   "Try the challenge."
+  ],
+  "observation": "Record the signs of the two numbers and the sign of the answer for four settings.",
+  "result": "Same signs give a positive product and different signs give a negative product. Dividing undoes multiplying, and dividing by 0 is not allowed.",
+  "safety_instructions": "Nothing physical is handled in this virtual activity.",
+  "teacher_instructions": "Let students find the sign pattern themselves before you state it. Ask why dividing by 0 has no answer.",
+  "student_instructions": "Look at the colour of the dots: red means a negative result.",
+  "estimated_minutes": 15,
+  "lab_config": {
+   "version": 1,
+   "simulation": {
+    "type": "variable_model",
+    "params": {
+     "controls": [
+      {
+       "id": "a",
+       "label": "First number",
+       "unit": "",
+       "kind": "slider",
+       "min": -9,
+       "max": 9,
+       "step": 1,
+       "default": -3
+      },
+      {
+       "id": "b",
+       "label": "Second number",
+       "unit": "",
+       "kind": "slider",
+       "min": -9,
+       "max": 9,
+       "step": 1,
+       "default": 4
+      },
+      {
+       "id": "mode",
+       "label": "Divide (switch off to multiply)",
+       "kind": "toggle",
+       "min": 0,
+       "max": 1,
+       "step": 1,
+       "default": 0
+      }
+     ],
+     "derived": [
+      {
+       "id": "p",
+       "label": "Product",
+       "unit": "",
+       "formula": "a*b",
+       "decimals": 0
+      },
+      {
+       "id": "absa",
+       "label": "Groups",
+       "unit": "",
+       "formula": "a*(1-2*(a<0))",
+       "decimals": 0
+      },
+      {
+       "id": "absb",
+       "label": "In each group",
+       "unit": "",
+       "formula": "b*(1-2*(b<0))",
+       "decimals": 0
+      },
+      {
+       "id": "neg",
+       "label": "Negative product?",
+       "unit": "",
+       "formula": "(p<0)",
+       "decimals": 0
+      },
+      {
+       "id": "dz",
+       "label": "Dividing by zero?",
+       "unit": "",
+       "formula": "(b==0)*mode",
+       "decimals": 0
+      },
+      {
+       "id": "q",
+       "label": "Product divided by the second number",
+       "unit": "",
+       "formula": "p/b",
+       "decimals": 0
+      }
+     ],
+     "visual": {
+      "kind": "array",
+      "bind": {
+       "groups": "absa",
+       "size": "absb",
+       "sign": "1-2*neg",
+       "extra": "0"
+      }
+     },
+     "observations": [
+      {
+       "when": "dz==1",
+       "text": "You cannot divide by 0, so there is no answer."
+      },
+      {
+       "when": "mode==1",
+       "text": "{p} / ({b}) = {q}. Check: ({q}) x ({b}) = {p}, so division undoes multiplication."
+      },
+      {
+       "when": "a==0 || b==0",
+       "text": "({a}) x ({b}) = 0: anything times 0 is 0."
+      },
+      {
+       "when": "p>0",
+       "text": "({a}) x ({b}) = {p}: the same signs make a positive product."
+      },
+      {
+       "when": "p<0",
+       "text": "({a}) x ({b}) = {p}: different signs make a negative product."
+      }
+     ],
+     "warnings": [
+      {
+       "when": "dz==1",
+       "text": "Division by 0 is not allowed."
+      }
+     ]
+    }
+   },
+   "steps": {
+    "mission": {
+     "scenario": "Dots come in groups. Red dots are a negative result and blue dots are positive.",
+     "task": "Find the sign rule for multiplying, then use it to divide.",
+     "tags": [
+      "Multiplying integers",
+      "Dividing integers"
+     ]
+    },
+    "predict": {
+     "question": "What is (-3) x 4?",
+     "scenario": {
+      "a": -3,
+      "b": 4,
+      "mode": 0
+     },
+     "options": [
+      {
+       "id": "a",
+       "label": "-12",
+       "when": "p==-12"
+      },
+      {
+       "id": "b",
+       "label": "12",
+       "when": "p==12"
+      },
+      {
+       "id": "c",
+       "label": "-7",
+       "when": "p==-7"
+      }
+     ]
+    },
+    "do": {
+     "instructions": [
+      "Change both numbers and watch the dots.",
+      "Look at the colour and the answer.",
+      "Switch to Divide and check the answer."
+     ],
+     "materials": [
+      "Virtual dot groups"
+     ],
+     "safety": "Nothing physical is handled in this virtual activity."
+    },
+    "observe": {
+     "prompt": "What do you notice about the signs of the numbers and the colour of the dots?"
+    },
+    "explain": {
+     "text": "The signs of the numbers decide the sign of the answer.",
+     "cases": [
+      {
+       "when": "mode==1",
+       "text": "Division is the inverse of multiplication: if (-3) x 4 = -12, then -12 / 4 = -3."
+      },
+      {
+       "when": "p<0",
+       "text": "One negative number: the product is negative."
+      },
+      {
+       "when": "p>0",
+       "text": "Two negatives or two positives: the product is positive."
+      }
+     ]
+    },
+    "concept": {
+     "text": "Multiplying is repeated addition, and the sign follows a pattern.",
+     "points": [
+      "Same signs: positive. Different signs: negative.",
+      "Division is the inverse of multiplication.",
+      "Brackets keep the signs clear: (-2) x (-5) = 10."
+     ]
+    },
+    "apply": {
+     "question": "Challenge: what is (-24) / 6?",
+     "options": [
+      {
+       "id": "a",
+       "label": "-4",
+       "correct": true,
+       "feedback": "Yes: one negative sign gives a negative answer, and 24 / 6 = 4."
+      },
+      {
+       "id": "b",
+       "label": "4",
+       "correct": false,
+       "feedback": "Different signs give a negative answer."
+      },
+      {
+       "id": "c",
+       "label": "-18",
+       "correct": false,
+       "feedback": "That subtracts. Division asks how many 6s fit in 24."
+      }
+     ]
+    },
+    "reflect": {
+     "prompts": [
+      "Why do you think dividing by 0 has no answer?"
+     ]
+    }
+   },
+   "outcomes": [
+    "Use the sign rules for multiplication and division.",
+    "Explain division as the inverse of multiplication."
+   ]
+  }
+ },
+ {
+  "topic_id": 23736,
+  "title": "When do the markers meet? Lowest common multiple",
+  "activity_type": "experiment",
+  "description": "Two rows of markers hop in steps of two different numbers. Find the first place they land together.",
+  "objective": "Find multiples and common multiples of two numbers and identify the lowest common multiple by listing multiples.",
+  "materials_required": [
+   "Virtual multiples rows",
+   "Notebook"
+  ],
+  "procedure_steps": [
+   "Predict where the rows first meet.",
+   "Change the two numbers.",
+   "Find the first green marker.",
+   "Try the challenge."
+  ],
+  "observation": "Write the two numbers and the first common multiple for four pairs.",
+  "result": "The first value that appears in both rows is the lowest common multiple (LCM). If the two numbers share no factor, it is their product.",
+  "safety_instructions": "Nothing physical is handled in this virtual activity.",
+  "teacher_instructions": "Ask students to predict the meeting point before moving the sliders, then check it against the rows.",
+  "student_instructions": "Look for the green markers: they are in both rows.",
+  "estimated_minutes": 15,
+  "lab_config": {
+   "version": 1,
+   "simulation": {
+    "type": "variable_model",
+    "params": {
+     "controls": [
+      {
+       "id": "m",
+       "label": "First number",
+       "unit": "",
+       "kind": "slider",
+       "min": 2,
+       "max": 12,
+       "step": 1,
+       "default": 4
+      },
+      {
+       "id": "n",
+       "label": "Second number",
+       "unit": "",
+       "kind": "slider",
+       "min": 2,
+       "max": 12,
+       "step": 1,
+       "default": 6
+      }
+     ],
+     "derived": [
+      {
+       "id": "l",
+       "label": "First common multiple (LCM)",
+       "unit": "",
+       "formula": "lcm(m,n)",
+       "decimals": 0
+      },
+      {
+       "id": "tm",
+       "label": "Hops of the first row",
+       "unit": "",
+       "formula": "l/m",
+       "decimals": 0
+      },
+      {
+       "id": "tn",
+       "label": "Hops of the second row",
+       "unit": "",
+       "formula": "l/n",
+       "decimals": 0
+      }
+     ],
+     "visual": {
+      "kind": "multiples",
+      "bind": {
+       "m": "m",
+       "n": "n",
+       "limit": "l*2",
+       "common": "l"
+      }
+     },
+     "observations": [
+      {
+       "when": "m==n",
+       "text": "Both rows are the same, so they meet straight away at {l}."
+      },
+      {
+       "when": "gcd(m,n)==1",
+       "text": "These numbers share no common factor, so they first meet at their product: {l}."
+      },
+      {
+       "when": "m>0",
+       "text": "The markers first land together at {l}: {m} x {tm} = {l} and {n} x {tn} = {l}. That is the lowest common multiple."
+      }
+     ]
+    }
+   },
+   "steps": {
+    "mission": {
+     "scenario": "Two rows of markers hop along a line, one in steps of the first number and one in steps of the second.",
+     "task": "Find the first number where both rows land together.",
+     "tags": [
+      "Multiples",
+      "LCM"
+     ]
+    },
+    "predict": {
+     "question": "One row hops in 4s and the other in 6s. Where do they first land on the same number?",
+     "scenario": {
+      "m": 4,
+      "n": 6
+     },
+     "options": [
+      {
+       "id": "a",
+       "label": "12",
+       "when": "l==12"
+      },
+      {
+       "id": "b",
+       "label": "24",
+       "when": "l==24"
+      },
+      {
+       "id": "c",
+       "label": "10",
+       "when": "l==10"
+      }
+     ]
+    },
+    "do": {
+     "instructions": [
+      "Change the two numbers.",
+      "Find the first green marker.",
+      "Try numbers that share no factor, like 5 and 7."
+     ],
+     "materials": [
+      "Virtual multiples rows"
+     ],
+     "safety": "Nothing physical is handled in this virtual activity."
+    },
+    "observe": {
+     "prompt": "Where is the first green marker? What do the two hop counts tell you?"
+    },
+    "explain": {
+     "text": "A common multiple is in both rows.",
+     "cases": [
+      {
+       "when": "gcd(m,n)==1",
+       "text": "With no common factor, the rows do not meet until the product of the numbers."
+      },
+      {
+       "when": "m>0",
+       "text": "The first common multiple is the lowest common multiple. Later green markers are more common multiples."
+      }
+     ]
+    },
+    "concept": {
+     "text": "The lowest common multiple (LCM) is the smallest number both numbers divide into.",
+     "points": [
+      "A multiple is in the times table of a number.",
+      "List multiples of each and find the first shared one.",
+      "LCM of 4 and 6 is 12."
+     ]
+    },
+    "apply": {
+     "question": "Challenge: one bus returns every 6 minutes and another every 8 minutes. They leave together. When are they next together?",
+     "options": [
+      {
+       "id": "a",
+       "label": "24 minutes",
+       "correct": true,
+       "feedback": "Yes: the LCM of 6 and 8 is 24."
+      },
+      {
+       "id": "b",
+       "label": "48 minutes",
+       "correct": false,
+       "feedback": "48 is a common multiple but not the first."
+      },
+      {
+       "id": "c",
+       "label": "14 minutes",
+       "correct": false,
+       "feedback": "Adding the numbers does not give a common multiple."
+      }
+     ]
+    },
+    "reflect": {
+     "prompts": [
+      "When would the LCM equal one of the two numbers?"
+     ]
+    }
+   },
+   "outcomes": [
+    "List multiples and find common multiples.",
+    "Find the LCM of two numbers."
+   ]
+  }
+ },
+ {
+  "topic_id": 23737,
+  "title": "Equal groups: find the highest common factor",
+  "activity_type": "experiment",
+  "description": "Split two totals into equal groups of the same size and find the biggest group size that leaves nothing over.",
+  "objective": "Find common factors and the highest common factor of two numbers using equal groups, and use the HCF to simplify a fraction.",
+  "materials_required": [
+   "Virtual dot groups",
+   "Notebook"
+  ],
+  "procedure_steps": [
+   "Predict whether groups of 6 work.",
+   "Change the two totals and the group size.",
+   "Find the biggest size that leaves none over for both.",
+   "Try the challenge."
+  ],
+  "observation": "Write the group sizes that left nothing over for both totals, and the largest of them.",
+  "result": "A group size that leaves nothing over for both totals is a common factor. The biggest one is the highest common factor (HCF).",
+  "safety_instructions": "Nothing physical is handled in this virtual activity.",
+  "teacher_instructions": "Have students find all the common factors before naming the HCF. Link the HCF to simplifying a fraction.",
+  "student_instructions": "A tick means equal groups. A cross means some are left over.",
+  "estimated_minutes": 15,
+  "lab_config": {
+   "version": 1,
+   "simulation": {
+    "type": "variable_model",
+    "params": {
+     "controls": [
+      {
+       "id": "a",
+       "label": "Total A",
+       "unit": "",
+       "kind": "slider",
+       "min": 6,
+       "max": 48,
+       "step": 1,
+       "default": 24
+      },
+      {
+       "id": "b",
+       "label": "Total B",
+       "unit": "",
+       "kind": "slider",
+       "min": 6,
+       "max": 48,
+       "step": 1,
+       "default": 36
+      },
+      {
+       "id": "g",
+       "label": "Group size",
+       "unit": "",
+       "kind": "slider",
+       "min": 1,
+       "max": 24,
+       "step": 1,
+       "default": 4
+      }
+     ],
+     "derived": [
+      {
+       "id": "h",
+       "label": "Highest common factor",
+       "unit": "",
+       "formula": "gcd(a,b)",
+       "decimals": 0
+      },
+      {
+       "id": "ra",
+       "label": "Left over from A",
+       "unit": "",
+       "formula": "mod(a,g)",
+       "decimals": 0
+      },
+      {
+       "id": "rb",
+       "label": "Left over from B",
+       "unit": "",
+       "formula": "mod(b,g)",
+       "decimals": 0
+      },
+      {
+       "id": "ok",
+       "label": "Common factor?",
+       "unit": "",
+       "formula": "(ra==0)*(rb==0)",
+       "decimals": 0
+      },
+      {
+       "id": "sa",
+       "label": "A simplified",
+       "unit": "",
+       "formula": "a/h",
+       "decimals": 0
+      },
+      {
+       "id": "sb",
+       "label": "B simplified",
+       "unit": "",
+       "formula": "b/h",
+       "decimals": 0
+      }
+     ],
+     "visual": {
+      "kind": "grouping",
+      "bind": {
+       "a": "a",
+       "b": "b",
+       "g": "g",
+       "best": "h"
+      }
+     },
+     "observations": [
+      {
+       "when": "ok==1 && g==h",
+       "text": "{g} is the highest common factor of {a} and {b}. So {a}/{b} simplifies to {sa}/{sb}."
+      },
+      {
+       "when": "ok==1",
+       "text": "{g} is a common factor, but a bigger one works too: the highest is {h}."
+      },
+      {
+       "when": "ra==0",
+       "text": "{a} splits into equal groups of {g}, but {b} leaves {rb} over, so {g} is not a common factor."
+      },
+      {
+       "when": "rb==0",
+       "text": "{b} splits into equal groups of {g}, but {a} leaves {ra} over, so {g} is not a common factor."
+      },
+      {
+       "when": "ra>0",
+       "text": "{a} leaves {ra} over and {b} leaves {rb} over, so {g} is not a common factor."
+      }
+     ]
+    }
+   },
+   "steps": {
+    "mission": {
+     "scenario": "You have two piles of counters and want to share each into equal groups of the same size.",
+     "task": "Find the biggest group size that works for both piles.",
+     "tags": [
+      "Factors",
+      "HCF"
+     ]
+    },
+    "predict": {
+     "question": "Can 24 and 36 both be split into equal groups of 6, with none left over?",
+     "scenario": {
+      "a": 24,
+      "b": 36,
+      "g": 6
+     },
+     "options": [
+      {
+       "id": "a",
+       "label": "Yes, both",
+       "when": "ok==1"
+      },
+      {
+       "id": "b",
+       "label": "Only 24",
+       "when": "ra==0 && rb>0"
+      },
+      {
+       "id": "c",
+       "label": "Only 36",
+       "when": "rb==0 && ra>0"
+      },
+      {
+       "id": "d",
+       "label": "Neither",
+       "when": "ra>0 && rb>0"
+      }
+     ]
+    },
+    "do": {
+     "instructions": [
+      "Change the totals and the group size.",
+      "Look for a tick on both rows.",
+      "Find the biggest size that gets a tick on both."
+     ],
+     "materials": [
+      "Virtual dot groups"
+     ],
+     "safety": "Nothing physical is handled in this virtual activity."
+    },
+    "observe": {
+     "prompt": "Which group sizes get a tick on both rows? Which is the biggest?"
+    },
+    "explain": {
+     "text": "Equal groups mean the group size is a factor.",
+     "cases": [
+      {
+       "when": "ok==1",
+       "text": "Both totals split into equal groups, so this size is a common factor of both."
+      },
+      {
+       "when": "ra>0 || rb>0",
+       "text": "Something is left over, so this size is not a factor of both totals."
+      }
+     ]
+    },
+    "concept": {
+     "text": "The highest common factor (HCF) is the largest factor shared by two numbers.",
+     "points": [
+      "A factor divides a number exactly.",
+      "Common factors divide both numbers.",
+      "Divide the top and bottom of a fraction by the HCF to simplify it."
+     ]
+    },
+    "apply": {
+     "question": "Challenge: what is the HCF of 18 and 30, and what does 18/30 simplify to?",
+     "options": [
+      {
+       "id": "a",
+       "label": "HCF 6, fraction 3/5",
+       "correct": true,
+       "feedback": "Yes: 18 / 6 = 3 and 30 / 6 = 5."
+      },
+      {
+       "id": "b",
+       "label": "HCF 3, fraction 6/10",
+       "correct": false,
+       "feedback": "3 is a common factor but not the highest, so 6/10 is not fully simplified."
+      },
+      {
+       "id": "c",
+       "label": "HCF 9, fraction 2/3",
+       "correct": false,
+       "feedback": "9 does not divide 30."
+      }
+     ]
+    },
+    "reflect": {
+     "prompts": [
+      "How can the HCF help you simplify a fraction quickly?"
+     ]
+    }
+   },
+   "outcomes": [
+    "Find common factors using equal groups.",
+    "Find the HCF and use it to simplify a fraction."
+   ]
+  }
+ },
+ {
+  "topic_id": 23738,
+  "title": "The divisibility lab: test it, then check the rule",
+  "activity_type": "experiment",
+  "description": "Choose a number and a divisor, make a guess, and watch the digit rule decide.",
+  "objective": "Use the tests for divisibility by 2 to 11 to decide whether a number divides exactly, and explain why the test works.",
+  "materials_required": [
+   "Virtual digit tiles",
+   "Notebook"
+  ],
+  "procedure_steps": [
+   "Predict whether 132 is divisible by 3.",
+   "Choose a number and a divisor.",
+   "Make a guess, then read the rule on the tiles.",
+   "Try the challenge."
+  ],
+  "observation": "For five numbers, write the divisor, the rule you used and whether you were right.",
+  "result": "Each divisor has a quick test on the digits. The tiles show the rule, and the remainder confirms it.",
+  "safety_instructions": "Nothing physical is handled in this virtual activity.",
+  "teacher_instructions": "Ask students to guess first, then use the highlighted tiles. Discuss why the digit-sum rule works for 3 and 9.",
+  "student_instructions": "The gold tiles are the digits the rule looks at.",
+  "estimated_minutes": 15,
+  "lab_config": {
+   "version": 1,
+   "simulation": {
+    "type": "variable_model",
+    "params": {
+     "controls": [
+      {
+       "id": "n",
+       "label": "Number",
+       "unit": "",
+       "kind": "slider",
+       "min": 10,
+       "max": 999,
+       "step": 1,
+       "default": 132
+      },
+      {
+       "id": "d",
+       "label": "Divisor",
+       "unit": "",
+       "kind": "slider",
+       "min": 2,
+       "max": 11,
+       "step": 1,
+       "default": 3
+      },
+      {
+       "id": "guess",
+       "label": "I think it IS divisible",
+       "kind": "toggle",
+       "min": 0,
+       "max": 1,
+       "step": 1,
+       "default": 0
+      }
+     ],
+     "derived": [
+      {
+       "id": "r",
+       "label": "Remainder",
+       "unit": "",
+       "formula": "mod(n,d)",
+       "decimals": 0
+      },
+      {
+       "id": "ok",
+       "label": "Divisible?",
+       "unit": "",
+       "formula": "(r==0)",
+       "decimals": 0
+      },
+      {
+       "id": "right",
+       "label": "Guess correct?",
+       "unit": "",
+       "formula": "(guess==ok)",
+       "decimals": 0
+      },
+      {
+       "id": "ds",
+       "label": "Digit sum",
+       "unit": "",
+       "formula": "digitsum(n)",
+       "decimals": 0
+      }
+     ],
+     "visual": {
+      "kind": "divisibility",
+      "bind": {
+       "n": "n",
+       "d": "d"
+      }
+     },
+     "observations": [
+      {
+       "when": "right==1 && ok==1",
+       "text": "Correct! {n} is divisible by {d}: the remainder is {r}."
+      },
+      {
+       "when": "right==1",
+       "text": "Correct! {n} is not divisible by {d}: it leaves a remainder of {r}."
+      },
+      {
+       "when": "ok==1",
+       "text": "Not quite: {n} is divisible by {d}, with remainder {r}. Check the rule on the tiles."
+      },
+      {
+       "when": "ok==0",
+       "text": "Not quite: {n} is not divisible by {d}, with remainder {r}. Check the rule on the tiles."
+      }
+     ]
+    }
+   },
+   "steps": {
+    "mission": {
+     "scenario": "Each divisor has a quick digit test, so you do not need long division.",
+     "task": "Guess, then let the digit rule decide.",
+     "tags": [
+      "Divisibility",
+      "Digit rules"
+     ]
+    },
+    "predict": {
+     "question": "Is 132 divisible by 3?",
+     "scenario": {
+      "n": 132,
+      "d": 3,
+      "guess": 1
+     },
+     "options": [
+      {
+       "id": "a",
+       "label": "Yes",
+       "when": "ok==1"
+      },
+      {
+       "id": "b",
+       "label": "No",
+       "when": "ok==0"
+      }
+     ]
+    },
+    "do": {
+     "instructions": [
+      "Pick a number and a divisor.",
+      "Switch the guess on or off, then check the result.",
+      "Try every divisor from 2 to 11."
+     ],
+     "materials": [
+      "Virtual digit tiles"
+     ],
+     "safety": "Nothing physical is handled in this virtual activity."
+    },
+    "observe": {
+     "prompt": "Which digits did the rule use? Was your guess right?"
+    },
+    "explain": {
+     "text": "A number divides exactly when the digit rule says so.",
+     "cases": [
+      {
+       "when": "ok==1",
+       "text": "The rule gives a multiple of the divisor, so the number divides exactly."
+      },
+      {
+       "when": "ok==0",
+       "text": "The rule does not give a multiple of the divisor, so there is a remainder."
+      }
+     ]
+    },
+    "concept": {
+     "text": "A number is divisible by another when it divides with no remainder.",
+     "points": [
+      "By 2, 5 or 10: look at the last digit.",
+      "By 3 or 9: add the digits.",
+      "By 4 or 8: look at the last two or three digits.",
+      "By 11: add and subtract the digits in turn."
+     ]
+    },
+    "apply": {
+     "question": "Challenge: is 4215 divisible by 3?",
+     "options": [
+      {
+       "id": "a",
+       "label": "Yes: the digit sum 12 is a multiple of 3",
+       "correct": true,
+       "feedback": "Yes: 4 + 2 + 1 + 5 = 12."
+      },
+      {
+       "id": "b",
+       "label": "No: it ends in 5",
+       "correct": false,
+       "feedback": "The last digit matters for 2, 5 and 10, not for 3."
+      },
+      {
+       "id": "c",
+       "label": "Only if it is even",
+       "correct": false,
+       "feedback": "Evenness is the rule for 2, not for 3."
+      }
+     ]
+    },
+    "reflect": {
+     "prompts": [
+      "Which rule is quickest for you? Why?"
+     ]
+    }
+   },
+   "outcomes": [
+    "Use divisibility tests for 2 to 11.",
+    "Explain why a divisibility test works."
+   ]
+  }
+ },
+ {
+  "topic_id": 23739,
+  "title": "Squares and cubes: build them, then find the root",
+  "activity_type": "experiment",
+  "description": "Build a flat square or a stack of layers from blocks and see how the side length is the root.",
+  "objective": "Relate square and cube numbers to their roots using blocks, and estimate the root of a number that is not a perfect square or cube.",
+  "materials_required": [
+   "Virtual blocks",
+   "Notebook"
+  ],
+  "procedure_steps": [
+   "Predict the square root of 49.",
+   "Choose Square or Cube and a number.",
+   "Check whether the blocks fit exactly.",
+   "Try the challenge."
+  ],
+  "observation": "Write three perfect squares, three perfect cubes and one number that is neither, with its estimated root.",
+  "result": "A perfect square fills a square array and its side is the square root. A perfect cube fills a cube of layers and its edge is the cube root. Other numbers leave blocks over and their root lies between two whole numbers.",
+  "safety_instructions": "Nothing physical is handled in this virtual activity.",
+  "teacher_instructions": "Let students find the perfect squares and cubes themselves, then discuss the leftover blocks for the other numbers.",
+  "student_instructions": "Grey blocks are the ones left over.",
+  "estimated_minutes": 15,
+  "lab_config": {
+   "version": 1,
+   "simulation": {
+    "type": "variable_model",
+    "params": {
+     "controls": [
+      {
+       "id": "kind",
+       "label": "Cube (switch off for square)",
+       "kind": "toggle",
+       "min": 0,
+       "max": 1,
+       "step": 1,
+       "default": 0
+      },
+      {
+       "id": "v",
+       "label": "Number",
+       "unit": "",
+       "kind": "slider",
+       "min": 1,
+       "max": 150,
+       "step": 1,
+       "default": 49
+      }
+     ],
+     "derived": [
+      {
+       "id": "r",
+       "label": "Whole-number root",
+       "unit": "",
+       "formula": "isqrt(v)*(1-kind)+icbrt(v)*kind",
+       "decimals": 0
+      },
+      {
+       "id": "k",
+       "label": "Power",
+       "unit": "",
+       "formula": "2+kind",
+       "decimals": 0
+      },
+      {
+       "id": "rp",
+       "label": "Blocks that fit",
+       "unit": "",
+       "formula": "pow(r,k)",
+       "decimals": 0
+      },
+      {
+       "id": "perfect",
+       "label": "Perfect?",
+       "unit": "",
+       "formula": "(rp==v)",
+       "decimals": 0
+      },
+      {
+       "id": "extra",
+       "label": "Blocks left over",
+       "unit": "",
+       "formula": "v-rp",
+       "decimals": 0
+      },
+      {
+       "id": "r1",
+       "label": "Next whole number",
+       "unit": "",
+       "formula": "r+1",
+       "decimals": 0
+      },
+      {
+       "id": "nextp",
+       "label": "Next one up",
+       "unit": "",
+       "formula": "pow(r1,k)",
+       "decimals": 0
+      }
+     ],
+     "visual": {
+      "kind": "cubes",
+      "bind": {
+       "side": "r",
+       "layers": "1+kind*(r-1)",
+       "extra": "extra"
+      }
+     },
+     "observations": [
+      {
+       "when": "perfect==1 && kind==0",
+       "text": "{v} = {r} x {r}, so the square root of {v} is {r}. A perfect square!"
+      },
+      {
+       "when": "perfect==1",
+       "text": "{v} = {r} x {r} x {r}, so the cube root of {v} is {r}. A perfect cube!"
+      },
+      {
+       "when": "kind==0",
+       "text": "{v} is not a perfect square. {r} x {r} = {rp} is too small and {r1} x {r1} = {nextp} is too big, so the square root is between {r} and {r1}."
+      },
+      {
+       "when": "kind==1",
+       "text": "{v} is not a perfect cube. {r} cubed = {rp} is too small and {r1} cubed = {nextp} is too big, so the cube root is between {r} and {r1}."
+      }
+     ]
+    }
+   },
+   "steps": {
+    "mission": {
+     "scenario": "Blocks can make a square or a cube. The length of one side tells you the root.",
+     "task": "Find which numbers fit exactly and estimate the rest.",
+     "tags": [
+      "Square roots",
+      "Cube roots"
+     ]
+    },
+    "predict": {
+     "question": "What is the square root of 49?",
+     "scenario": {
+      "kind": 0,
+      "v": 49
+     },
+     "options": [
+      {
+       "id": "a",
+       "label": "7",
+       "when": "r==7"
+      },
+      {
+       "id": "b",
+       "label": "6",
+       "when": "r==6"
+      },
+      {
+       "id": "c",
+       "label": "8",
+       "when": "r==8"
+      }
+     ]
+    },
+    "do": {
+     "instructions": [
+      "Pick Square, then change the number.",
+      "Switch to Cube and try 8, 27 and 64.",
+      "Try a number that is not perfect and read the estimate."
+     ],
+     "materials": [
+      "Virtual blocks"
+     ],
+     "safety": "Nothing physical is handled in this virtual activity."
+    },
+    "observe": {
+     "prompt": "Which numbers made a perfect fit? Which left blocks over?"
+    },
+    "explain": {
+     "text": "The root is the side of the shape that fits.",
+     "cases": [
+      {
+       "when": "perfect==1",
+       "text": "The blocks fit exactly, so the root is a whole number."
+      },
+      {
+       "when": "perfect==0",
+       "text": "Blocks are left over, so the root is not a whole number. It lies between two whole numbers."
+      }
+     ]
+    },
+    "concept": {
+     "text": "Square roots and cube roots undo squaring and cubing.",
+     "points": [
+      "A perfect square fills a square: 36 = 6 x 6.",
+      "A perfect cube stacks n layers of n x n: 27 = 3 x 3 x 3.",
+      "For other numbers, estimate between two whole numbers."
+     ]
+    },
+    "apply": {
+     "question": "Challenge: which of these is a perfect cube?",
+     "options": [
+      {
+       "id": "a",
+       "label": "27",
+       "correct": true,
+       "feedback": "Yes: 3 x 3 x 3 = 27."
+      },
+      {
+       "id": "b",
+       "label": "30",
+       "correct": false,
+       "feedback": "30 is neither a perfect square nor a perfect cube."
+      },
+      {
+       "id": "c",
+       "label": "36",
+       "correct": false,
+       "feedback": "36 is a perfect square (6 x 6), not a perfect cube."
+      }
+     ]
+    },
+    "reflect": {
+     "prompts": [
+      "How would you estimate the square root of 40?"
+     ]
+    }
+   },
+   "outcomes": [
+    "Relate squares and cubes to their roots.",
+    "Estimate roots of numbers that are not perfect."
+   ]
+  }
+ }
+]
