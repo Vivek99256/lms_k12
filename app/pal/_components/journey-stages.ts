@@ -7,6 +7,7 @@ import {
   Lightbulb,
   ListChecks,
   MessageSquareText,
+  Microscope,
   NotebookPen,
   Repeat,
   Star,
@@ -51,6 +52,7 @@ export type JourneyStageKey =
   | 'plan'
   | 'learn'
   | 'practice'
+  | 'explanation_lab'
   | 'feedback'
   | 'check'
   | 'intervention'
@@ -118,6 +120,12 @@ export const JOURNEY_STAGES: JourneyStage[] = [
     blurb: 'More questions on this concept, getting harder as you get them right.',
   },
   {
+    key: 'explanation_lab',
+    label: 'Explanation Lab',
+    icon: Microscope,
+    blurb: 'Experiments picked for the concepts you found hardest.',
+  },
+  {
     key: 'feedback',
     label: 'Feedback',
     icon: MessageSquareText,
@@ -143,7 +151,7 @@ export const JOURNEY_STAGES: JourneyStage[] = [
   },
   {
     key: 'experiment',
-    label: 'Experiment',
+    label: 'Application Lab',
     icon: FlaskConical,
     blurb: "The chapter's Prayogshala experiments, to see the ideas work hands-on.",
   },
@@ -165,7 +173,7 @@ export const JOURNEY_STAGES: JourneyStage[] = [
  * so a node the learner never needed is dimmed rather than drawn as a step
  * they skipped.
  */
-export const CONDITIONAL_STAGES: readonly JourneyStageKey[] = ['intervention'];
+export const CONDITIONAL_STAGES: readonly JourneyStageKey[] = ['intervention', 'explanation_lab'];
 
 /**
  * Every stage a learner necessarily passed to be standing on `stage`.

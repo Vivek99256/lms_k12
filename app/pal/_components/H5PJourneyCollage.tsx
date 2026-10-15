@@ -13,6 +13,7 @@ import {
   Lightbulb,
   Loader2,
   Lock,
+  Microscope,
   MessageSquareText,
   Plus,
   Repeat,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { JourneyStageKey } from './journey-stages';
+import { LockModeToggle, useUnlockAll } from './LockModeToggle';
 
 export type JourneyStepId = JourneyStageKey;
 
@@ -31,6 +33,7 @@ export const STEP_SEQUENCE: JourneyStepId[] = [
   'plan',
   'learn',
   'practice',
+  'explanation_lab',
   'feedback',
   'check',
   'intervention',
@@ -106,8 +109,17 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     gridClass: 'w-full',
   },
   {
-    id: 'feedback',
+    id: 'explanation_lab',
     stepNumber: 6,
+    label: 'Explanation Lab',
+    shortDescription: 'Experiments For You',
+    detail: 'Practical Prayogshala experiments chosen from the concepts you found hardest.',
+    icon: Microscope,
+    gridClass: 'w-full',
+  },
+  {
+    id: 'feedback',
+    stepNumber: 7,
     label: 'Feedback & Review',
     shortDescription: 'Performance Analysis',
     detail: 'Detailed breakdown of what went well and what concepts to revisit.',
@@ -116,7 +128,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
   },
   {
     id: 'check',
-    stepNumber: 7,
+    stepNumber: 8,
     label: 'Understanding Check',
     shortDescription: 'Timed Assessment',
     detail: 'Understanding assessment determining if you have cleared this concept.',
@@ -125,7 +137,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
   },
   {
     id: 'intervention',
-    stepNumber: 8,
+    stepNumber: 9,
     label: 'Extra Support',
     shortDescription: 'Teacher Guidance',
     detail: 'Targeted scaffolding and teacher-assisted support when extra help is needed.',
@@ -134,7 +146,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
   },
   {
     id: 'mastery',
-    stepNumber: 9,
+    stepNumber: 10,
     label: 'Concept Mastery',
     shortDescription: 'Milestone Achievement',
     detail: 'Official sign-off and recognition of mastery across the curriculum.',
@@ -143,8 +155,8 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
   },
   {
     id: 'experiment',
-    stepNumber: 10,
-    label: 'Experiment',
+    stepNumber: 11,
+    label: 'Application Lab',
     shortDescription: 'Prayogshala Labs',
     detail: 'Practical experiments from Prayogshala for this chapter, to see the ideas work hands-on.',
     icon: FlaskConical,
@@ -152,7 +164,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
   },
   {
     id: 'recall',
-    stepNumber: 11,
+    stepNumber: 12,
     label: 'Spaced Recall',
     shortDescription: 'Memory Retention',
     detail: 'Scheduled refresher practice to ensure lasting retention and retrieval.',
@@ -174,6 +186,11 @@ export const DEFAULT_STAGE_IMAGES: Record<JourneyStepId, JourneyImageInfo> = {
   adaptive: {
     url: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=1000&q=80',
     title: 'Concept Diagnostic Drills',
+    provider: 'educational-library',
+  },
+  explanation_lab: {
+    url: 'https://images.unsplash.com/photo-1576086213369-97a306d36557?auto=format&fit=crop&w=1000&q=80',
+    title: 'Explanation Lab Experiments',
     provider: 'educational-library',
   },
   plan: {
@@ -242,24 +259,34 @@ export function getStageImage(
  */
 export function isStepUnlocked(
   stepId: JourneyStepId,
-  completedSteps?: Set<JourneyStepId> | readonly JourneyStepId[]
+  completedSteps?: Set<JourneyStepId> | readonly JourneyStepId[],
+  unlockAll = false
 ): boolean {
+  if (unlockAll) return true;
   if (stepId === 'diagnostic') return true;
   if (!completedSteps) return false;
   const completedSet = completedSteps instanceof Set ? completedSteps : new Set(completedSteps);
   if (completedSet.has(stepId)) return true;
 
-  // Mastery (Step 9) is unlocked if Check (Step 7) or Extra Support (Step 8) is completed
+  // Explanation Lab (Step 6) is unlocked once Adaptive Practice (Step 5) is
+  // completed, because its recommendations are built from those results.
+  // It is optional: Feedback (Step 7) opens on Practice alone, so a learner
+  // with nothing weak or no experiments is never held at this step.
+  if (stepId === 'feedback') {
+    return completedSet.has('practice');
+  }
+
+  // Mastery (Step 10) is unlocked if Check (Step 8) or Extra Support (Step 9) is completed
   if (stepId === 'mastery') {
     return completedSet.has('check') || completedSet.has('intervention');
   }
 
-  // Experiment (Step 10) is unlocked if Mastery (Step 9) is completed
+  // Application Lab (Step 11) is unlocked if Mastery (Step 10) is completed
   if (stepId === 'experiment') {
     return completedSet.has('mastery');
   }
 
-  // Recall (Step 11) is unlocked if Experiment (Step 10) is completed
+  // Recall (Step 12) is unlocked if Application Lab (Step 11) is completed
   if (stepId === 'recall') {
     return completedSet.has('experiment');
   }
@@ -282,45 +309,49 @@ export function getNextStep(stepId: JourneyStepId): JourneyStepId | null {
  *
  * Col 1: Step 1 (height 6), Step 2 (height 6)
  * Col 2: Step 3 (height 8, tall portrait), Step 4 (height 4)
- * Col 3: Step 5 (height 7, tall portrait), Step 6 (height 3), Step 7 (height 2)
- * Col 4: Step 8 (height 3), Step 9 (height 4, mastery hero), Step 10 (height 3), Step 11 (height 2)
+ * Col 3: Steps 5, 6 (Explanation Lab), 7, 8 (height 3 each)
+ * Col 4: Steps 9, 10, 11, 12 (height 3 each)
+ *
+ * No tile is shorter than 3 rows: the title bar needs that much height, and a
+ * 2-row tile (as Check and Recall used to be) hides its name.
  */
 const DESKTOP_MOSAIC_AREAS: Record<JourneyStepId, { gridColumn: string; gridRow: string }> = {
   diagnostic: { gridColumn: '1 / 4', gridRow: '1 / 7' },
   adaptive: { gridColumn: '1 / 4', gridRow: '7 / 13' },
   plan: { gridColumn: '4 / 7', gridRow: '1 / 9' },
   learn: { gridColumn: '4 / 7', gridRow: '9 / 13' },
-  practice: { gridColumn: '7 / 10', gridRow: '1 / 8' },
-  feedback: { gridColumn: '7 / 10', gridRow: '8 / 11' },
-  check: { gridColumn: '7 / 10', gridRow: '11 / 13' },
+  practice: { gridColumn: '7 / 10', gridRow: '1 / 4' },
+  explanation_lab: { gridColumn: '7 / 10', gridRow: '4 / 7' },
+  feedback: { gridColumn: '7 / 10', gridRow: '7 / 10' },
+  check: { gridColumn: '7 / 10', gridRow: '10 / 13' },
   intervention: { gridColumn: '10 / 13', gridRow: '1 / 4' },
-  mastery: { gridColumn: '10 / 13', gridRow: '4 / 8' },
-  experiment: { gridColumn: '10 / 13', gridRow: '8 / 11' },
-  recall: { gridColumn: '10 / 13', gridRow: '11 / 13' },
+  mastery: { gridColumn: '10 / 13', gridRow: '4 / 7' },
+  experiment: { gridColumn: '10 / 13', gridRow: '7 / 10' },
+  recall: { gridColumn: '10 / 13', gridRow: '10 / 13' },
 };
 
 /**
- * 2-column mobile mosaic layout (12 columns x 14 rows).
- * Col 1: Steps 1, 3, 5, 7, 9
- * Col 2: Steps 2, 4, 6, 8, 10
- * Full width underneath: Step 11 (an odd tile out, so it spans both columns)
+ * 2-column mobile mosaic layout (12 columns x 12 rows), six pairs of tiles.
+ * Col 1: Steps 1, 3, 5, 7, 9, 11
+ * Col 2: Steps 2, 4, 6, 8, 10, 12
  */
 const MOBILE_MOSAIC_AREAS: Record<JourneyStepId, { gridColumn: string; gridRow: string }> = {
   diagnostic: { gridColumn: '1 / 7', gridRow: '1 / 3' },
-  adaptive: { gridColumn: '7 / 13', gridRow: '1 / 4' },
-  plan: { gridColumn: '1 / 7', gridRow: '3 / 6' },
-  learn: { gridColumn: '7 / 13', gridRow: '4 / 6' },
-  practice: { gridColumn: '1 / 7', gridRow: '6 / 8' },
-  feedback: { gridColumn: '7 / 13', gridRow: '6 / 8' },
-  check: { gridColumn: '1 / 7', gridRow: '8 / 10' },
-  intervention: { gridColumn: '7 / 13', gridRow: '8 / 10' },
-  mastery: { gridColumn: '1 / 7', gridRow: '10 / 12' },
-  experiment: { gridColumn: '7 / 13', gridRow: '10 / 12' },
-  recall: { gridColumn: '1 / 13', gridRow: '12 / 15' },
+  adaptive: { gridColumn: '7 / 13', gridRow: '1 / 3' },
+  plan: { gridColumn: '1 / 7', gridRow: '3 / 5' },
+  learn: { gridColumn: '7 / 13', gridRow: '3 / 5' },
+  practice: { gridColumn: '1 / 7', gridRow: '5 / 7' },
+  explanation_lab: { gridColumn: '7 / 13', gridRow: '5 / 7' },
+  feedback: { gridColumn: '1 / 7', gridRow: '7 / 9' },
+  check: { gridColumn: '7 / 13', gridRow: '7 / 9' },
+  intervention: { gridColumn: '1 / 7', gridRow: '9 / 11' },
+  mastery: { gridColumn: '7 / 13', gridRow: '9 / 11' },
+  experiment: { gridColumn: '1 / 7', gridRow: '11 / 13' },
+  recall: { gridColumn: '7 / 13', gridRow: '11 / 13' },
 };
 
 const DESKTOP_MOSAIC_ROWS = 12;
-const MOBILE_MOSAIC_ROWS = 14;
+const MOBILE_MOSAIC_ROWS = 12;
 
 export interface H5PJourneyCollageProps {
   subjectName: string;
@@ -344,6 +375,7 @@ export function H5PJourneyCollage({
   const [images, setImages] = useState<Record<string, JourneyImageInfo>>(propImages || {});
   const [loading, setLoading] = useState(!propImages || Object.keys(propImages).length === 0);
   const [isDesktop, setIsDesktop] = useState(true);
+  const [unlockAll] = useUnlockAll('journey');
 
   // Responsive screen-size tracking for mosaic grid
   useEffect(() => {
@@ -445,6 +477,8 @@ export function H5PJourneyCollage({
             </span>
           </div>
 
+          <LockModeToggle scope="journey" />
+
           <div className="hidden sm:flex items-center gap-3 text-xs text-slate-600">
             <div className="flex items-center gap-1">
               <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white text-[9px] font-bold">✓</span>
@@ -477,7 +511,7 @@ export function H5PJourneyCollage({
           const imageInfo = getStageImage(images, step.id);
           const hasImage = Boolean(imageInfo?.url);
           const isSelected = activeStep === step.id;
-          const isUnlocked = isStepUnlocked(step.id, completedSteps);
+          const isUnlocked = isStepUnlocked(step.id, completedSteps, unlockAll);
           const isCompleted = completedSteps?.has(step.id);
           const gridArea = isDesktop ? DESKTOP_MOSAIC_AREAS[step.id] : MOBILE_MOSAIC_AREAS[step.id];
 

@@ -16,6 +16,7 @@ import {
 } from '@/app/pal/data/pal-diagnostic';
 import { defaultLearnerId, fetchNextAction, type EsoAction } from '@/app/pal/data/pal-eso';
 import { fetchChapterExperiments } from '@/app/pal/data/pal-experiments';
+import { buildExplanationLabPlan } from '@/app/pal/data/pal-explanation-lab';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -191,6 +192,8 @@ async function loadStageBody(
         : conceptId
           ? conceptResultBody(conceptId, signal)
           : missingId('this chapter or concept');
+    case 'explanation_lab':
+      return chapterId ? explanationLabBody(chapterId, signal) : missingId('this chapter');
     case 'plan':
       return chapterId ? planBody(chapterId, signal) : missingId('this chapter');
     case 'learn':
@@ -484,6 +487,33 @@ async function experimentBody(chapterId: string | number) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/** The concepts the Explanation Lab would recommend experiments for, by name. */
+async function explanationLabBody(chapterId: string | number, signal: AbortSignal) {
+  const adaptive = await fetchAdaptiveConcepts(chapterId, signal);
+  const plan = buildExplanationLabPlan(adaptive.concepts, [], adaptive.hasDiagnostic);
+
+  if (plan.recommendations.length === 0) {
+    return (
+      <p className="text-sm text-slate-600">
+        {plan.hasResults
+          ? 'No concept is below the recommendation threshold, so no experiments are suggested.'
+          : 'Take the concept diagnostic to get experiments recommended for the concepts you find hardest.'}
+      </p>
+    );
+  }
+
+  return (
+    <ul className="space-y-1.5">
+      {plan.recommendations.slice(0, 6).map(({ concept, score }) => (
+        <li key={concept.conceptId} className="flex items-baseline justify-between gap-3 text-sm">
+          <span className="text-slate-900">{concept.name}</span>
+          <span className="shrink-0 text-xs tabular-nums text-slate-600">{Math.round(score)}%</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

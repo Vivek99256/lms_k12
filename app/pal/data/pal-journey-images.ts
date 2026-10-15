@@ -112,8 +112,8 @@ export interface JourneyImageMapPayload {
 /**
  * Every stage, in journey order. Mirrors `JOURNEY_STAGES`.
  *
- * The server's `STAGES` has not learned `experiment` yet, so its payload simply
- * omits that key: `fetchJourneyImages` only reads keys that are present, and the
+ * The server's `STAGES` has not learned `experiment` or `explanation_lab` yet, so
+ * its payload simply omits those keys: `fetchJourneyImages` only reads keys that are present, and the
  * map draws the stage's icon (or the collage's default picture) for the gap.
  */
 export const JOURNEY_MAP_STAGE_ORDER: JourneyStageKey[] = [
@@ -122,6 +122,7 @@ export const JOURNEY_MAP_STAGE_ORDER: JourneyStageKey[] = [
   'plan',
   'learn',
   'practice',
+  'explanation_lab',
   'feedback',
   'check',
   'intervention',

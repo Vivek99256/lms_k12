@@ -24,6 +24,7 @@ import {
   type JourneyStepId,
 } from './H5PJourneyCollage';
 import { stageHref } from './journey-stages';
+import { useUnlockAll } from './LockModeToggle';
 
 export interface SelectedJourneyStepRailProps {
   selectedStep: JourneyStepId;
@@ -54,6 +55,7 @@ export function SelectedJourneyStepRail({
 }: SelectedJourneyStepRailProps) {
   const router = useRouter();
   const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [unlockAll] = useUnlockAll('journey');
 
   // Derive effective chapter id from prop, session storage, or route
   const effectiveChapterId =
@@ -182,13 +184,13 @@ export function SelectedJourneyStepRail({
           <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             Journey Steps
           </h4>
-          <span className="text-[10px] text-slate-400">Sequential</span>
+          <span className="text-[10px] text-slate-400">{unlockAll ? 'Any order' : 'Sequential'}</span>
         </div>
 
         <div className="space-y-1">
           {JOURNEY_STEPS.map((step) => {
             const isCurrent = step.id === selectedStep;
-            const isUnlocked = isStepUnlocked(step.id, completedSet);
+            const isUnlocked = isStepUnlocked(step.id, completedSet, unlockAll);
             const isDone = completedSet.has(step.id);
             const stepImg = getStageImage(images, step.id);
 
