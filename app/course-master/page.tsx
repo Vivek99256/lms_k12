@@ -16,6 +16,7 @@ import {
   Library,
   ListTree,
   Music,
+  Network,
   NotebookText,
   Palette,
   PenTool,
@@ -95,6 +96,7 @@ function getCourseRoutes(courseId: number | string, standardId?: number | string
     curriculum: `/course-master/lesson-plan/${id}/curriculum`,
     // A view of the chapters screen rather than its own route, matching the other
     // sub-views there (question-bank, concept-intelligence, content).
+    coherenceMap: `/course-master/${id}/chapters?view=coherence-map`,
     // Read-only chapter-wise Lesson Plan document (lms_lesson_plan). Deliberately a
     // different route from `lessonPlan` above, which is the AI Lesson Intelligence
     // calendar - two unrelated features that happen to share the words "lesson plan".
