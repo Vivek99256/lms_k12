@@ -585,20 +585,30 @@ export default function CourseMasterPage() {
               100
           )
         : 0;
+    const isEmpty = chapterCount === 0;
 
     return (
       <div
         key={subject.subject_id}
         role="button"
-        tabIndex={0}
-        onClick={() => router.push(routes.chapters)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            router.push(routes.chapters);
-          }
-        }}
-        className="relative cursor-pointer rounded-[22px] border border-[#DCE3ED] bg-white p-5 shadow-[0_2px_5px_rgba(15,23,42,0.12)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5648E8] focus-visible:ring-offset-2"
+        aria-disabled={isEmpty || undefined}
+        tabIndex={isEmpty ? -1 : 0}
+        onClick={isEmpty ? undefined : () => router.push(routes.chapters)}
+        onKeyDown={
+          isEmpty
+            ? undefined
+            : (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  router.push(routes.chapters);
+                }
+              }
+        }
+        className={`relative rounded-[22px] border border-[#DCE3ED] bg-white p-5 shadow-[0_2px_5px_rgba(15,23,42,0.12)] transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5648E8] focus-visible:ring-offset-2 ${
+          isEmpty
+            ? 'cursor-not-allowed'
+            : 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.12)]'
+        }`}
       >
         <div className="flex items-start justify-between">
           <div className="flex min-w-0 flex-1 flex-col items-start gap-3">
@@ -609,7 +619,7 @@ export default function CourseMasterPage() {
               <SubjectIcon className="h-6 w-6" strokeWidth={1.8} />
             </div> */}
             <div className="min-w-0 ">
-              <h3 className="min-h-10 text-center line-clamp-2 mt-10 text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[#1E293B]">
+              <h3 className={`min-h-10 text-center line-clamp-2 mt-10 text-[17px] font-semibold leading-5 tracking-[-0.02em] ${isEmpty ? 'text-[#94A3B8]' : 'text-[#1E293B]'}`}>
                 {subject.subject_name}
               </h3>
               <p className="mt-2 flex items-center gap-1.5 text-[13px] font-medium text-[#94A3B8]"><BookOpen className="h-3.5 w-3.5" strokeWidth={1.8} />{chapterCount} chapters</p>

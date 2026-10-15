@@ -58,6 +58,7 @@ import {
   type JourneyStepId,
 } from '@/app/pal/_components/H5PJourneyCollage';
 import { SelectedJourneyStepRail } from '@/app/pal/_components/SelectedJourneyStepRail';
+import { useUnlockAll } from '@/app/pal/_components/LockModeToggle';
 import { JourneyStepContent } from '@/app/pal/_components/JourneyStepContent';
 
 /**
@@ -158,8 +159,9 @@ function MainJourneyOverview({
   completedSteps: Set<JourneyStepId>;
   onStartNextStep: () => void;
 }) {
+  const [unlockAll] = useUnlockAll('journey');
   const nextStep = JOURNEY_STEPS.find(
-    (step) => isStepUnlocked(step.id, completedSteps) && !completedSteps.has(step.id)
+    (step) => isStepUnlocked(step.id, completedSteps, unlockAll) && !completedSteps.has(step.id)
   ) || JOURNEY_STEPS[0];
 
   const allCompleted = completedSteps.size >= JOURNEY_STEPS.length;
@@ -493,9 +495,11 @@ function DiagnosticExam() {
     [chapterId, router]
   );
 
+  const [unlockAll] = useUnlockAll('journey');
+
   const handleSelectStep = useCallback(
     (stepId: JourneyStepId) => {
-      if (!isStepUnlocked(stepId, completedSteps)) {
+      if (!isStepUnlocked(stepId, completedSteps, unlockAll)) {
         return;
       }
       if (stepId === 'adaptive') {
@@ -508,7 +512,7 @@ function DiagnosticExam() {
       }
       setSelectedStep(stepId);
     },
-    [completedSteps, chapterId, router]
+    [completedSteps, unlockAll, chapterId, router]
   );
 
   const goTo = useCallback(
@@ -862,7 +866,7 @@ function DiagnosticExam() {
             completedSteps={completedSteps}
             onStartNextStep={() => {
               for (const step of JOURNEY_STEPS) {
-                if (isStepUnlocked(step.id, completedSteps) && !completedSteps.has(step.id)) {
+                if (isStepUnlocked(step.id, completedSteps, unlockAll) && !completedSteps.has(step.id)) {
                   handleSelectStep(step.id);
                   return;
                 }

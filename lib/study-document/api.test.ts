@@ -38,9 +38,9 @@ test('a teacher opens the full copy first; a student opens the copy without answ
   assert.equal(defaultVariant('student'), 'revision', 'a kind that is not named is the revision notes, the default');
 });
 
-test('a student opens the online practice first and a teacher the PDF', () => {
+test('everyone opens the interactive version first, and the PDF is one click away', () => {
   assert.equal(defaultTab('student'), 'online');
-  assert.equal(defaultTab('teacher'), 'pdf');
+  assert.equal(defaultTab('teacher'), 'online', 'a teacher or admin who only looked at the PDF never saw the interactive version');
 });
 
 test("a student is not offered a classroom activity's teacher edition or a remedial class's teacher-guide copy; everything else is offered to everyone", () => {

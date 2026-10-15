@@ -36,13 +36,13 @@ export function StuckNudgePopup({
       role="alertdialog"
       aria-live="polite"
       aria-label="Assistant suggestion"
-      className={`fixed bottom-4 right-4 z-[80] w-[min(90vw,17rem)] transition-all duration-300 ease-out sm:bottom-6 sm:right-6 ${
+      className={`fixed bottom-4 right-4 z-[80] w-[min(42vw,8rem)] min-w-[7rem] transition-all duration-300 ease-out sm:bottom-6 sm:right-6 ${
         visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
       }`}
     >
-      <div className="relative overflow-hidden rounded-2xl border border-gray-200/70 bg-white/95 p-3 shadow-[0_22px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+      <div className="relative overflow-hidden rounded-xl border border-gray-200/70 bg-white/95 p-1.5 shadow-[0_22px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl">
         <div
-          className="absolute inset-x-0 top-0 h-1"
+          className="absolute inset-x-0 top-0 h-1.5"
           style={{ background: 'var(--accent-gradient, linear-gradient(90deg,#0D6EFD,#4f46e5))' }}
           aria-hidden="true"
         />
@@ -50,43 +50,38 @@ export function StuckNudgePopup({
           type="button"
           onClick={onNo}
           aria-label="Dismiss"
-          className="absolute right-2.5 top-2.5 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          className="absolute right-1 top-1 rounded-full p-0.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
         >
-          <X className="size-3.5" aria-hidden="true" />
+          <X className="size-2.5" aria-hidden="true" />
         </button>
 
-        <div className="flex items-start gap-2.5 pr-5">
+        <div className="flex justify-center">
           <div className="relative mt-0.5 shrink-0">
             <span
               className="absolute inset-0 animate-ping rounded-full bg-[#0D6EFD]/30"
               aria-hidden="true"
             />
-            <div className="relative flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-[#0D6EFD] to-indigo-600 text-white shadow-[0_8px_18px_rgba(13,110,253,0.3)]">
-              <Bot className="size-4" aria-hidden="true" />
+            <div className="relative flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-[#0D6EFD] to-indigo-600 text-white shadow-[0_8px_18px_rgba(13,110,253,0.3)]">
+              <Bot className="size-6" aria-hidden="true" />
             </div>
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs leading-5 text-gray-600">
-              Are you stuck on this step, or would you like me to assist you?
-            </p>
           </div>
         </div>
 
-        <div className="mt-3 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onNo}
-            className="rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-100"
-          >
-            No, I&apos;m fine
-          </button>
+        <div className="mt-1.5 flex flex-col items-center gap-1">
           <button
             type="button"
             onClick={onYes}
             autoFocus
-            className="rounded-full bg-[#0D6EFD] px-3 py-1 text-[11px] font-semibold text-white shadow-[0_6px_14px_rgba(13,110,253,0.3)] transition-colors hover:bg-[#0b5ed7]"
+            className="w-4/5 rounded-full bg-[#0D6EFD] px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-[0_6px_14px_rgba(13,110,253,0.3)] transition-colors hover:bg-[#0b5ed7]"
           >
             Yes, help me
+          </button>
+          <button
+            type="button"
+            onClick={onNo}
+            className="w-4/5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 shadow-sm transition-colors hover:bg-blue-100"
+          >
+            No, I&apos;m fine
           </button>
         </div>
       </div>

@@ -2,11 +2,12 @@
 
 import { createContext, useContext, useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type Dispatch, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Atom, BookOpen, CheckCircle2, Dna, Droplets, Leaf, Microscope, Shapes, ShieldCheck, Split, Sprout, Target, X, Zap, type LucideIcon } from 'lucide-react';
+import { Atom, BookOpen, CheckCircle2, Dna, Droplets, Leaf, Microscope, Search, Shapes, ShieldCheck, Split, Sprout, Target, X, Zap, type LucideIcon } from 'lucide-react';
 
 import { cameraTransform, type Camera } from '@/lib/study-deck/camera';
 import { assetUrl } from '@/lib/study-deck/deck';
 import { glyphOf, type Glyph } from '@/lib/study-deck/glyph';
+import { lensView, nudge } from '@/lib/study-deck/loupe';
 import { backdropUrl, THEMES, themeVars, type StageTheme } from '@/lib/study-deck/theme';
 import type { DeckImage } from '@/lib/study-deck/types';
 import styles from './stage.module.css';
@@ -297,6 +298,11 @@ export interface VisualFigureProps {
   className?: string;
   /** Where the camera is pointed (see lib/study-deck/camera.ts): moving focus from one part of a visual to another. */
   camera?: Camera | null;
+  /**
+   * Show only a horizontal band of the picture (top and bottom as shares of its height). Children keep their positions as shares of the
+   * WHOLE picture, so hotspots on a cropped band still line up. For a wide process drawn in the middle of a mostly empty picture.
+   */
+  crop?: { top: number; bottom: number } | null;
 }
 
 /**
@@ -308,25 +314,97 @@ export interface VisualFigureProps {
 /** Design pixels kept under a picture for its caption line. */
 const CAPTION_ROOM = 40;
 
-export function VisualFigure({ image, assetBase, children, className = '', camera = null }: VisualFigureProps) {
+export function VisualFigure({ image, assetBase, children, className = '', camera = null, crop = null }: VisualFigureProps) {
   const ratio = image.width > 0 && image.height > 0 ? image.width / image.height : 16 / 9;
+  const band = crop && crop.bottom > crop.top ? (crop.bottom - crop.top) / 100 : 1;
+  const frameRatio = ratio / band;
   const photo = image.type === 'photo' && Boolean(image.source_url);
   const still = useReducedMotion();
 
   const transform = cameraTransform(still ? null : camera);
+  // The magnifier: off until asked for. While on, a round lens follows the pointer (or a finger, or the arrow keys) over the picture.
+  const [magnify, setMagnify] = useState(false);
+  const [lens, setLens] = useState<{ x: number; y: number } | null>(null);
+  const picture = useRef<HTMLImageElement>(null);
+  const at = (clientX: number, clientY: number) => {
+    const box = picture.current?.getBoundingClientRect();
+    if (!box || box.width === 0 || box.height === 0) return;
+    setLens({ x: (clientX - box.left) / box.width, y: (clientY - box.top) / box.height });
+  };
+  const view = lens ? lensView(lens.x, lens.y, ratio) : null;
 
   return (
     <div className="h-full min-h-0 w-full min-w-0">
       <div className="h-full min-h-0">
-        <FitFrame ratio={ratio} reserve={CAPTION_ROOM} className={`overflow-visible ${className}`}>
+        <FitFrame ratio={frameRatio} reserve={CAPTION_ROOM} className={`overflow-visible ${className}`}>
           {/* A white mat, a hairline in the topic's colour and a soft shadow: the picture sits on the slide like a printed figure. */}
           <div className="absolute inset-0 overflow-hidden rounded-[0.9em] border-[0.15em] border-white bg-white shadow-[0_0.3em_1.1em_rgba(15,23,42,0.18),0_0_0_0.06em_var(--sd-line)]">
-            <div className={`absolute inset-0 ${styles.camera}`} style={{ transform, transformOrigin: '50% 50%' }}>
+            <div
+              className={`absolute inset-x-0 ${crop ? '' : 'inset-y-0'} ${styles.camera}`}
+              style={{ transform, transformOrigin: '50% 50%', ...(crop ? { top: `${(-crop.top / (band * 100)) * 100}%`, height: `${100 / band}%` } : {}) }}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies */}
-              <img src={assetUrl(image.url, assetBase)} alt={image.alt} width={image.width} height={image.height} className="block h-full w-full object-fill" />
+              <img ref={picture} src={assetUrl(image.url, assetBase)} alt={image.alt} width={image.width} height={image.height} className="block h-full w-full object-fill" />
               {children}
+              {magnify && view ? (
+                <span
+                  aria-hidden="true"
+                  data-testid="magnifier-lens"
+                  className="pointer-events-none absolute z-30 aspect-square rounded-full border-[0.2em] border-white bg-no-repeat shadow-[0_0.3em_1.2em_rgba(15,23,42,0.45),0_0_0_0.08em_var(--sd-accent)]"
+                  style={{
+                    left: `${view.left}%`,
+                    top: `${view.top}%`,
+                    width: `${view.width}%`,
+                    backgroundImage: `url("${assetUrl(image.url, assetBase)}")`,
+                    backgroundSize: `${view.backgroundSize}% auto`,
+                    backgroundPosition: `${view.positionX}% ${view.positionY}%`,
+                  }}
+                />
+              ) : null}
             </div>
+            {magnify ? (
+              // Catches the pointer only while the magnifier is on (it sits over the markers then, so the lens can go anywhere); switch the magnifier off to press a marker again.
+              <div
+                role="application"
+                aria-label="Magnifier. Move the pointer, drag a finger, or use the arrow keys over the picture to look closer. Press Escape to put it away."
+                tabIndex={0}
+                className="absolute inset-0 z-[25] cursor-zoom-in touch-none outline-none focus-visible:ring-[0.2em] focus-visible:ring-sd-accent"
+                onPointerMove={(e) => at(e.clientX, e.clientY)}
+                onPointerDown={(e) => at(e.clientX, e.clientY)}
+                onPointerLeave={() => setLens(null)}
+                onFocus={() => setLens((l) => l ?? { x: 0.5, y: 0.5 })}
+                onKeyDown={(e) => {
+                  const step = e.shiftKey ? 0.1 : 0.04;
+                  const move: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+                  if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    setMagnify(false);
+                    setLens(null);
+                  } else if (move[e.key]) {
+                    // The arrow keys also move the lesson from slide to slide; while the magnifier has focus they belong to the lens.
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const [dx, dy] = move[e.key];
+                    setLens((l) => nudge(l ?? { x: 0.5, y: 0.5 }, dx, dy));
+                  }
+                }}
+              />
+            ) : null}
           </div>
+          <button
+            type="button"
+            aria-pressed={magnify}
+            onClick={() => {
+              setMagnify((v) => !v);
+              setLens(null);
+            }}
+            className={`absolute right-[0.6em] top-[0.6em] z-[26] inline-flex items-center gap-[0.35em] rounded-full border px-[0.7em] py-[0.25em] text-[0.62em] font-semibold shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent motion-reduce:transition-none ${
+              magnify ? 'border-sd-accent bg-sd-accent text-white' : 'border-sd-line bg-white/95 text-sd-strong hover:border-sd-accent'
+            }`}
+          >
+            <Search className="h-[1.1em] w-[1.1em]" aria-hidden="true" />
+            {magnify ? 'Magnifier on' : 'Magnify'}
+          </button>
           <p className="absolute left-0 right-0 top-full flex items-start justify-between gap-[0.8em] px-[0.3em] pt-[0.45em] text-[0.55em] leading-tight text-slate-700">
             <span className="line-clamp-2 min-w-0">
               {image.caption ? <span className="font-semibold text-sd-strong">{trimStop(image.caption)}. </span> : null}

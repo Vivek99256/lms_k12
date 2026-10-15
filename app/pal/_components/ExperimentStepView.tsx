@@ -94,7 +94,7 @@ export function ExperimentStepView({
       <div className="rounded-xl border border-sky-100 bg-sky-50/60 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Experiment</h2>
+            <h2 className="text-lg font-bold text-slate-900">Application Lab</h2>
             <p className="mt-0.5 text-xs text-slate-600">
               {subjectName ? `${subjectName} › ` : ''}
               {chapterName} — practical experiments from Prayogshala.
@@ -166,7 +166,7 @@ export function ExperimentStepView({
         <div>
           <p className="text-xs font-bold text-sky-950">Finished your experiment?</p>
           <p className="mt-0.5 text-xs text-sky-900">
-            Move on to Step 11 to lock it in with Spaced Recall.
+            Move on to Step 12 to lock it in with Spaced Recall.
           </p>
         </div>
         <Button
@@ -177,7 +177,7 @@ export function ExperimentStepView({
             onNextStep?.('recall');
           }}
         >
-          <span>Continue to Step 11: Spaced Recall</span>
+          <span>Continue to Step 12: Spaced Recall</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </div>

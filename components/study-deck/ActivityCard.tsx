@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useCallback, useState } from 'react';
-import { CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, RotateCcw } from 'lucide-react';
 
 import { NotPlayable, QuestionPlayer } from '@/components/h5p/players';
 import type { Question, QuestionResult } from '@/components/h5p/players/types';
@@ -17,6 +17,12 @@ export interface ActivityCardProps {
   /** Name of the other concept this question connects to, when it does. */
   connects: string | null;
   onResult: (key: string, result: ResultInput, conceptId: number | null, questionId: number | null) => void;
+  /**
+   * Offer "Try again" after a marked answer was wrong, and call this so the owner can forget the old answer (the question is then
+   * not done, so its explanation is hidden until it is answered again). Unset for a check that judges: a diagnostic or an exit
+   * check is answered once.
+   */
+  onRetry?: (key: string) => void;
 }
 
 /**
@@ -46,9 +52,12 @@ const PlayerSlot = memo(function PlayerSlot({
  *
  * Nothing is written. `onResult` is the only thing that leaves this component.
  */
-function ActivityCardImpl({ resolved, activityKey, done, connects, onResult }: ActivityCardProps) {
+function ActivityCardImpl({ resolved, activityKey, done, connects, onResult, onRetry }: ActivityCardProps) {
   const { activity } = resolved;
   const [answerShown, setAnswerShown] = useState(false);
+  // Whether the last marked answer was wrong, and how many fresh tries the learner has asked for (a new try remounts the player).
+  const [missed, setMissed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   // The stored explanation, shown only AFTER the learner has answered. In the embedded one-question
   // mode the choice player's own verdict says "review the solution" without showing one, and a flashcard
@@ -64,6 +73,7 @@ function ActivityCardImpl({ resolved, activityKey, done, connects, onResult }: A
   // which would send the learner back to the first card mid-answer.
   const report = useCallback(
     (result: QuestionResult) => {
+      setMissed(result.correct === false);
       onResult(
         activityKey,
         { correct: result.correct, score: result.score, maxScore: result.maxScore },
@@ -96,10 +106,27 @@ function ActivityCardImpl({ resolved, activityKey, done, connects, onResult }: A
       </header>
 
       {resolved.ok ? (
-        <PlayerSlot question={resolved.question as unknown as Question} as={resolved.as} onResult={report} />
+        <PlayerSlot key={attempt} question={resolved.question as unknown as Question} as={resolved.as} onResult={report} />
       ) : (
         <NotPlayable reason={resolved.reason} />
       )}
+
+      {onRetry && missed ? (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => {
+              setMissed(false);
+              setAttempt((n) => n + 1);
+              onRetry(activityKey);
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-sd-line bg-white px-3 py-1.5 text-sm font-semibold text-sd-strong hover:bg-sd-softer focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            Try again
+          </button>
+        </div>
+      ) : null}
 
       {flashAnswer ? (
         <div className="mt-3">
