@@ -20,6 +20,7 @@ import { nextPosition, pendingHint, previousPosition, stepsOf } from '@/lib/stud
 import { THEMES, themeOf, themeVars } from '@/lib/study-deck/theme';
 import type { StudyDeck } from '@/lib/study-deck/types';
 import { OutlineDrawer } from './OutlinePanel';
+import { slidePlays } from '@/lib/study-document/play';
 import { PracticeDialog } from './PracticeDialog';
 import { SlideView } from './SlideView';
 import { FitCanvas, MemoryContext, motion, SlideStage } from './stage-ui';
@@ -186,10 +187,11 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
         </button>
         <p className="min-w-0 flex-1 truncate text-sm font-semibold text-sd-strong">{deck.chapter.name}</p>
         <p className="shrink-0 text-xs font-medium text-slate-700">{finished ? 'Finished' : `Slide ${slide.n} of ${deck.slides.length}`}</p>
-        {!finished && slide.activities.length > 0 ? (
+        {!finished && (slide.activities.length > 0 || slidePlays(deck.concepts, slide).length > 0) ? (
           <button
             type="button"
             onClick={() => setPracticeOpen(true)}
+            aria-label="Practice"
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
           >
             <Dumbbell className="h-4 w-4" aria-hidden="true" />

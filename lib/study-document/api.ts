@@ -65,18 +65,21 @@ export function defaultVariant(audience: Audience, kind: DocumentKind = 'revisio
   return kind === 'revision_notes' ? 'revision' : 'practice';
 }
 
-/** What a reader sees first in the viewer: the PDF for a teacher, "Try it online" for a student. */
+/** What a reader sees first in the viewer. */
 export type ViewerTab = 'pdf' | 'online';
 
 /**
- * Which tab opens first. A student opens the online practice (diagrams to explore, cards to turn, questions that are
- * marked) and has the PDF one click away; a teacher opens the PDF, as they print and hand it out.
+ * Which tab opens first: the interactive version ("Try it online") for everyone, with the PDF one click away. A teacher or
+ * admin used to open the PDF first and could easily never see the interactive version; they still print and hand out the PDF,
+ * which is one tab over.
  *
- * Whatever is not shown first is not fetched until it is asked for, so a student who stays on the online tab never makes the
+ * Whatever is not shown first is not fetched until it is asked for, so a reader who stays on the online tab never makes the
  * server draw a PDF.
  */
-export function defaultTab(audience: Audience): ViewerTab {
-  return audience === 'student' ? 'online' : 'pdf';
+// The audience is kept in the signature so a caller can pass it and a future rule can use it.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function defaultTab(_audience: Audience): ViewerTab {
+  return 'online';
 }
 
 /**

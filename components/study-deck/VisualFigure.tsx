@@ -1,6 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
 import { assetUrl } from '@/lib/study-deck/deck';
 import type { DeckImage } from '@/lib/study-deck/types';
@@ -22,6 +23,8 @@ export interface VisualFigureProps {
  */
 export function VisualFigure({ image, assetBase, children }: VisualFigureProps) {
   const isDiagram = image.type === 'diagram';
+  // A photograph can be shown larger, in place: no dialog, so nothing steals focus from the viewer around it.
+  const [large, setLarge] = useState(false);
 
   return (
     <figure className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -34,10 +37,21 @@ export function VisualFigure({ image, assetBase, children }: VisualFigureProps) 
             alt={image.alt}
             width={image.width}
             height={image.height}
-            className={isDiagram ? 'block h-auto w-full' : 'block max-h-[28rem] w-auto max-w-full object-contain'}
+            className={isDiagram ? 'block h-auto w-full' : `block w-auto max-w-full object-contain transition-[max-height] duration-300 motion-reduce:transition-none ${large ? 'max-h-[44rem]' : 'max-h-[16rem] sm:max-h-[28rem]'}`}
             loading="lazy"
           />
           {children}
+          {isDiagram ? null : (
+            <button
+              type="button"
+              aria-pressed={large}
+              onClick={() => setLarge((v) => !v)}
+              className="absolute right-2 top-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white/95 px-2 py-1 text-xs font-semibold text-slate-800 shadow-sm hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+            >
+              {large ? <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />}
+              {large ? 'Smaller' : 'Larger'}
+            </button>
+          )}
         </div>
       </div>
       {isDiagram ? <p className="px-4 pt-2 text-xs text-slate-500 sm:hidden">Swipe sideways to see the whole diagram.</p> : null}

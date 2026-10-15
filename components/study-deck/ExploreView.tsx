@@ -3,8 +3,10 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { ArrowRight, CheckCircle2, Columns2, History, Layers, Lightbulb, MousePointerClick } from 'lucide-react';
 
-import { INTERACTION_HEADING, itemsProgress, nextItem, selectItem } from '@/lib/study-deck/interactions';
+import { INTERACTION_HEADING, itemsProgress, nextItem, selectItem, teaserOf } from '@/lib/study-deck/interactions';
 import type { DeckImage, ExploreItem, ItemsInteraction } from '@/lib/study-deck/types';
+import { BeforeAfter } from './BeforeAfter';
+import { ImageMarks, MarkInsetView, MarkLegend } from './ImageMarks';
 import { CompletedSlot, GlyphIcon, motion, PANEL, PhotoCredit, Tag, TONES, useRememberedReducer, useStage, VisualFigure } from './stage-ui';
 
 export interface ExploreViewProps {
@@ -22,6 +24,8 @@ export interface ExploreViewProps {
   /** The slide's photograph is the background of the whole slide (see `usesBleed`): the items go in a translucent panel over it. */
   bleed?: boolean;
 }
+
+const NO_MARK_NOTE = 'This part is not marked on the picture: the picture does not show it clearly enough to point to.';
 
 const ICON = { reveal: Lightbulb, steps: Layers, timeline: History, compare: Columns2 } as const;
 
@@ -50,6 +54,12 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
   const open = items.find((item) => item.id === state.open) ?? null;
   const Icon = ICON[kind as keyof typeof ICON] ?? Lightbulb;
   const withImage = Boolean(image);
+  // Cards that point at structures in the picture: the open card's marks are drawn on the picture at once, and the explanation
+  // sits beside or under the picture instead of over it, so nothing it explains is hidden.
+  const marked = withImage && items.some((item) => (item.marks?.length ?? 0) > 0 || item.inset);
+  const openMarks = open?.marks ?? [];
+  // On a slide where some cards point at the picture, a card that does not says so, instead of leaving the picture unchanged without a word.
+  const noMark = (item: ExploreItem) => marked && !(item.marks?.length ?? 0) && !item.inset;
 
   useEffect(() => {
     if (progress.done && !reported.current) {
@@ -69,6 +79,11 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
         </Tag>
         <span role="status" className="text-[0.72em] font-medium text-slate-600">
           {finished ? 'All explored' : `Explore ${progress.opened} / ${progress.total}`}
+        </span>
+        <span aria-hidden="true" className="flex gap-[0.25em]">
+          {items.map((item) => (
+            <span key={item.id} className={`h-[0.5em] w-[0.9em] rounded-full transition-colors duration-300 ${seen(item.id) ? 'bg-emerald-600' : 'bg-slate-300'}`} />
+          ))}
         </span>
       </div>
       <p className="text-[0.75em] text-slate-600">{interaction.intro}</p>
@@ -157,8 +172,10 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
     return (
       <section aria-label={INTERACTION_HEADING[kind]} className="flex h-full min-h-0 flex-col gap-[0.6em] p-[1.1em]">
         {lead}
-        <div className="min-h-0 flex-1">
-          <VisualFigure image={image} assetBase={assetBase} />
+        <div className="min-h-[9em] flex-1">
+          <VisualFigure image={image} assetBase={assetBase}>
+            {openMarks.length > 0 ? <ImageMarks key={open?.id} marks={openMarks} /> : null}
+          </VisualFigure>
         </div>
         <ul className="flex flex-wrap gap-[0.35em]" aria-label="Items to explore">
           {items.map((item, index) => (
@@ -177,11 +194,13 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
             </li>
           ))}
         </ul>
-        <div role="region" aria-label="Explanation" aria-live="polite" className={`min-h-[4.6em] rounded-[0.9em] border-2 p-[0.7em] ${open ? 'border-sd-accent bg-white shadow-md' : 'border-dashed border-sd-line bg-white/60'}`}>
+        <div role="region" aria-label="Explanation" aria-live="polite" className={`max-h-[40%] min-h-[4.6em] overflow-y-auto rounded-[0.9em] border-2 p-[0.7em] ${open ? 'border-sd-accent bg-white shadow-md' : 'border-dashed border-sd-line bg-white/60'}`}>
           {open ? (
             <div key={open.id} className={motion.fadeUp}>
               <h3 className="text-[1.05em] font-semibold text-slate-900">{open.label}</h3>
               <p className="mt-[0.2em] text-[0.9em] leading-snug text-slate-800">{open.text}</p>
+              {open.inset ? <div className="mt-[0.4em]"><MarkInsetView inset={open.inset} /></div> : null}
+              {noMark(open) ? <p className="mt-[0.3em] text-[0.8em] italic text-slate-600">{NO_MARK_NOTE}</p> : null}
             </div>
           ) : (
             <p className="text-[0.8em] text-slate-600">{finished ? interaction.wrapup : 'Select a name to read about it.'}</p>
@@ -218,6 +237,32 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
           </ul>
           {doneBanner}
         </div>
+        {marked ? (
+          <div className="flex min-h-0 min-w-0 flex-col gap-[0.6em]">
+            <div className="relative min-h-0 flex-1">
+              <VisualFigure image={image} assetBase={assetBase}>
+                {openMarks.length > 0 ? <ImageMarks key={open?.id} marks={openMarks} /> : null}
+              </VisualFigure>
+            </div>
+            <div role="region" aria-label="Explanation" aria-live="polite" className={`min-h-[10.5em] shrink-0 rounded-[0.9em] border-2 p-[0.8em] ${open ? 'border-sd-accent bg-white shadow-md' : 'border-dashed border-sd-line bg-white/60'}`}>
+              {open ? (
+                <div key={open.id} className={`flex items-start gap-[1em] ${motion.fadeUp}`}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-[1em]">
+                      <h3 className="text-[1.05em] font-semibold text-slate-900">{open.label}</h3>
+                      {openMarks.length > 0 ? <MarkLegend marks={openMarks} label={open.label} /> : null}
+                    </div>
+                    <p className="mt-[0.2em] text-[0.95em] leading-snug text-slate-800">{open.text}</p>
+                    {noMark(open) ? <p className="mt-[0.3em] text-[0.8em] italic text-slate-600">{NO_MARK_NOTE}</p> : null}
+                  </div>
+                  {open.inset ? <div className="max-w-[45%] shrink-0"><MarkInsetView inset={open.inset} /></div> : null}
+                </div>
+              ) : (
+                <p className="text-[0.85em] text-slate-600">Select a card to see where it is on the picture.</p>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="relative min-h-0 min-w-0">
           <VisualFigure image={image} assetBase={assetBase} />
           {open ? (
@@ -227,6 +272,7 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
             </div>
           ) : null}
         </div>
+        )}
       </section>
     );
   }
@@ -241,6 +287,9 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
     const cols = items.length === 3 ? 'grid-cols-3' : 'grid-cols-2';
     explorer = (
       <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-[0.7em]">
+        {items.length === 2 ? (
+          <BeforeAfter items={[items[0], items[1]]} openId={state.open} seen={seen} onSelect={select} portrait={portrait} assetBase={assetBase} />
+        ) : (
         <ul className={`relative grid min-h-0 gap-[0.8em] ${portrait ? 'grid-cols-1' : cols}`}>
           {items.map((item, index) => {
             const t = TONES[index % TONES.length];
@@ -278,13 +327,10 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
               </li>
             );
           })}
-          {items.length === 2 && !portrait ? (
-            <li aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex h-[2.7em] w-[2.7em] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-slate-900 text-[0.85em] font-extrabold text-white ring-[0.25em] ring-white">
-              VS
-            </li>
-          ) : null}
         </ul>
-        {finished ? (
+        )}
+        {/* On a phone the open card needs the room, so the summary waits until the cards are closed. */}
+        {finished && !(portrait && state.open !== null) ? (
           <div className={`rounded-[0.9em] border border-sd-line bg-sd-softer p-[0.8em] text-[1em] leading-snug text-sd-strong ${motion.fadeUp}`}>
             <span className="text-[0.7em] font-semibold uppercase tracking-wider text-sd-strong">How they compare </span>
             <br />
@@ -364,6 +410,7 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
                 </span>
                 <span className={`font-semibold leading-tight text-slate-900 ${portrait ? 'text-[1.05em]' : 'text-[1.3em]'}`}>{item.label}</span>
               </span>
+              {portrait || kind === 'timeline' ? null : <span className={`line-clamp-4 text-[0.95em] italic leading-snug ${seen(item.id) ? 'text-slate-700' : 'text-slate-600'}`}>&ldquo;{teaserOf(item.text, 9)}&rdquo;</span>}
               {portrait ? null : <span aria-hidden="true" className="pointer-events-none" style={WATERMARK}>{index + 1}</span>}
               {portrait ? null : <span className="text-[0.75em] font-medium text-sd-strong">{seen(item.id) ? 'Opened. Select to read it again' : kind === 'steps' ? 'Select to see this step' : kind === 'timeline' ? 'Select to see this event' : 'Select to open'}</span>}
             </button>

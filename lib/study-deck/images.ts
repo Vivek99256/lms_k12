@@ -16,9 +16,22 @@ const PARTS = ['slides', 'sections'] as const;
 
 interface HasImage {
   image?: { url?: string | null } | null;
+  /** A slide's interaction, whose items may each carry a picture. */
+  interaction?: object | null;
 }
 
-type Pictured = { [part in (typeof PARTS)[number]]?: HasImage[] };
+/** The items (or hotspot parts) of a slide's interaction that can carry their own picture. */
+function itemsOf(part: HasImage): HasImage[] {
+  const interaction = part.interaction as { items?: unknown; spots?: unknown } | null | undefined;
+  const items = interaction?.items ?? interaction?.spots;
+
+  return Array.isArray(items) ? (items as HasImage[]) : [];
+}
+
+type Pictured = { [part in (typeof PARTS)[number]]?: HasImage[] } & {
+  /** A study document's picture for each concept, by concept id. */
+  concept_images?: Record<string, { url?: string | null }> | null;
+};
 
 /** The id inside a `study-deck-image:<id>` reference, or null when the value is anything else. */
 export function imageRefId(value: unknown): number | null {
@@ -35,7 +48,15 @@ export function pendingImageIds(deck: Pictured): number[] {
     for (const item of deck[part] ?? []) {
       const id = imageRefId(item.image?.url);
       if (id !== null) ids.add(id);
+      for (const card of itemsOf(item)) {
+        const cardId = imageRefId(card.image?.url);
+        if (cardId !== null) ids.add(cardId);
+      }
     }
+  }
+  for (const image of Object.values(deck.concept_images ?? {})) {
+    const id = imageRefId(image?.url);
+    if (id !== null) ids.add(id);
   }
 
   return Array.from(ids);
@@ -51,7 +72,17 @@ export function applyImageUrls<T extends Pictured>(deck: T, urls: Readonly<Recor
       const id = imageRefId(item.image?.url);
       const url = id === null ? undefined : urls[String(id)];
       if (item.image && url) item.image.url = url;
+      for (const card of itemsOf(item)) {
+        const cardId = imageRefId(card.image?.url);
+        const cardUrl = cardId === null ? undefined : urls[String(cardId)];
+        if (card.image && cardUrl) card.image.url = cardUrl;
+      }
     }
+  }
+  for (const image of Object.values(deck.concept_images ?? {})) {
+    const id = imageRefId(image?.url);
+    const url = id === null ? undefined : urls[String(id)];
+    if (image && url) image.url = url;
   }
 
   return deck;

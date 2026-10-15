@@ -252,6 +252,8 @@ interface DocumentBase<K extends DocumentKind, Overview, Part> {
   section_count: number;
   outline: DocumentOutlineTopic[];
   concepts: Record<string, DeckConcept>;
+  /** A picture for individual concepts, by concept id, when the document has them. Absent otherwise. */
+  concept_images?: Record<string, DeckImage>;
   /** Part 0 (the overview) first, then the parts in teaching order. */
   sections: [Overview, ...Part[]];
   /** Concept id -> the numbers of the parts that teach it. */

@@ -5,6 +5,7 @@ import { Download, FileText, Sparkles, X } from 'lucide-react';
 
 import { defaultTab, defaultVariant, documentFileName, variantLabels, variantsOffered, type Audience, type PdfVariant, type ViewerTab } from '@/lib/study-document/api';
 import { KIND_LABEL } from '@/lib/study-document/document';
+import { JOURNEYS } from '@/lib/study-document/journey';
 import type { DocumentKind } from '@/lib/study-document/types';
 import { loadDocumentPdf, saveBlob } from './data';
 import { OnlinePractice } from './OnlinePractice';
@@ -177,7 +178,10 @@ function Viewer({ item, audience, instituteId, userKey, onClose }: DocumentViewe
       >
         <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 px-4 py-3">
           <div className="min-w-0 basis-full sm:flex-1 sm:basis-0">
-            <p className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+            <p
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+              style={{ backgroundColor: JOURNEYS[item.kind].theme.soft, color: JOURNEYS[item.kind].theme.strong }}
+            >
               <FileText className="h-3.5 w-3.5" aria-hidden="true" />
               {KIND_LABEL[item.kind]}
             </p>
