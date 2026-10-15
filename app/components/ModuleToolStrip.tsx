@@ -110,11 +110,15 @@ export default function ModuleToolStrip({
   }, [open]);
 
   // A different module's strip must not inherit an open list, and a folded-away
-  // strip must not leave one hanging.
+  // strip must not leave one hanging. Keyed on the tools' ids rather than the
+  // array: the shell builds a fresh array on every render, which would close the
+  // list the moment it opened.
+  const itemsKey = items.map((item) => String(item.id ?? '')).join('|');
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpen(null);
-  }, [items, pathname, visible]);
+  }, [itemsKey, pathname, visible]);
 
   if (items.length === 0) return null;
 
