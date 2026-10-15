@@ -11,7 +11,6 @@ import {
   type ModuleRegistryEntry,
 } from '@/app/_lib/module-categories-api';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
-import { getModuleScreenRegistry } from '@/app/_lib/module-screen-registry';
 import { getFeesSession, type FeesSession } from '@/app/fees/_lib/fees-api';
 
 /**
@@ -328,7 +327,6 @@ export function useModuleLevel3Nav({
       parentLabel,
       items: categories.map<Level3Item>((category) => {
         const href = category.route || `/modules/${activeModule.moduleName}/${category.key}`;
-        const screens = getModuleScreenRegistry(activeModule.moduleName);
 
         return {
           id: `${activeModule.moduleName}-category-${category.key}`,
@@ -337,10 +335,12 @@ export function useModuleLevel3Nav({
           // seeded module, including the two that predate the /modules/<slug>
           // convention. The fallback only covers a row seeded without one.
           href,
-          // The category's own menus, for the drill-down arrow. A menu that
-          // renders inline opens as a tab on its category page, exactly as a
-          // click on that tab would; one with a page of its own goes there. A
-          // menu pointing at no real route is left out rather than shown dead.
+          // The category's own menus, for the drill-down arrow. Each opens as a tab
+          // on its category page; the page itself sends a menu that lives on its own
+          // route there. Deciding that here would need the module screen registry —
+          // 540 lazily imported pages — in the layout's module graph, which every
+          // route would then pay for at build time. A menu pointing at no real
+          // route is left out rather than shown dead.
           children: category.items.flatMap<Level3Item>((item) => {
             const route = mapApiLinkToRoute(item.link);
             if (!route || route === '#' || (route.split('?')[0].split('/').pop() ?? '').includes('.')) {
@@ -351,9 +351,7 @@ export function useModuleLevel3Nav({
               {
                 id: item.id,
                 label: item.label,
-                href: screens.isEmbeddable(route)
-                  ? `${href}${href.includes('?') ? '&' : '?'}tab=${encodeURIComponent(String(item.id))}`
-                  : route,
+                href: `${href}${href.includes('?') ? '&' : '?'}tab=${encodeURIComponent(String(item.id))}`,
               },
             ];
           }),
