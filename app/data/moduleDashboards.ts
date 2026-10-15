@@ -29,6 +29,9 @@ export const MODULE_DASHBOARD_ROUTES: Record<string, string> = {
   // aggregation view, not what the module advertises.
   document: '/documents_new',
   documents: '/documents_new',
+  // Engagement lands on New PAL Gamification: staff are asked to pick a learner
+  // there, a student sees their own record straight away.
+  engagement: '/pal/new/gamification',
 };
 
 export function resolveModuleDashboardRoute(label: string | null | undefined): string | undefined {

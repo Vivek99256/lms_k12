@@ -19,7 +19,7 @@
  * instead of competing with the question itself for attention.
  */
 import { useState } from 'react';
-import { CheckCircle2, ImageOff, AlertTriangle, Sparkles, Info } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ImageOff, AlertTriangle, Sparkles, Info } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { isLikelyJson, type QuestionBankItem } from '@/app/course-master/data/questionBank';
@@ -99,16 +99,28 @@ function DetailsButton({ question }: { question: QuestionBankItem }) {
 
 export function QuestionBankQuestionCard({
   question,
-  visibleNumber,
   actions,
 }: {
   question: QuestionBankItem;
-  visibleNumber: number;
+  /** No longer shown on the card; still accepted so existing callers need no change. */
+  visibleNumber?: number;
   actions?: React.ReactNode;
 }) {
   const held = question.status === 0;
   const isAssertionReason = Boolean(question.assertion || question.reason);
   const isAiGenerated = question.source !== 'extracted';
+  const hasModelAnswer = Boolean(question.modelAnswer) && !isLikelyJson(question.modelAnswer ?? '');
+  // Where the question is filed: the chapter and concept it is mapped to, and its
+  // learning-flow category. Only what the row actually carries is listed.
+  const mappingRows: Array<[string, string]> = [];
+  if (question.chapterTitle && question.chapterTitle !== 'Unknown Chapter') {
+    mappingRows.push(['Chapter', question.chapterTitle]);
+  }
+  if (question.conceptTitle) mappingRows.push(['Concept', question.conceptTitle]);
+  if (question.palCategory) mappingRows.push(['Category', question.palCategory]);
+  const hasOptions = Boolean(question.options && question.options.length > 0);
+  const hasExtras = hasOptions || hasModelAnswer || mappingRows.length > 0;
+  const [showAnswer, setShowAnswer] = useState(false);
 
   return (
     <article
@@ -120,7 +132,6 @@ export function QuestionBankQuestionCard({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 gap-4">
           <h3 className="min-w-0 text-[18px] font-bold leading-7 text-slate-950">
-            <span className="mr-1.5">{visibleNumber}.</span>
             {isAssertionReason ? (
               <span className="text-slate-500">Assertion &amp; Reason</span>
             ) : (
@@ -179,6 +190,20 @@ export function QuestionBankQuestionCard({
               Held for review
             </Pill>
           )}
+
+          {/* Opens the options, model answer and mapping below; all stay folded until pressed. */}
+          {hasExtras ? (
+            <button
+              type="button"
+              onClick={() => setShowAnswer((current) => !current)}
+              aria-expanded={showAnswer}
+              aria-label={showAnswer ? 'Hide answer details' : 'Show answer details'}
+              title={showAnswer ? 'Hide answer details' : 'Show answer details'}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+            >
+              <ChevronDown size={14} className={cn('transition-transform duration-300', showAnswer && 'rotate-180')} />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -217,50 +242,104 @@ export function QuestionBankQuestionCard({
 
       <QuestionFigures question={question} />
 
-      {question.options ? (
-        <div className="mt-4 space-y-2">
-          {question.options.map((option) => (
-            <div
-              key={`${question.id}-${option.label}`}
-              className={cn(
-                'flex min-h-11 items-center gap-3 rounded-[6px] border px-3 text-[16px] transition-colors',
-                option.isCorrect
-                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                  : 'border-slate-200 bg-white text-slate-900'
-              )}
-            >
-              <span className="shrink-0 font-mono text-sm font-semibold text-slate-600">
-                {option.label}.
-              </span>
-              <RichText
-                as="span"
-                value={option.text}
-                className="min-w-0 flex-1 [&_img]:max-w-full [&_img]:rounded-lg [&_p]:inline"
-              />
-              {option.isCorrect ? (
-                <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
-              ) : null}
+      {hasExtras ? (
+        <QuestionExtras
+          modelAnswer={hasModelAnswer ? question.modelAnswer ?? '' : ''}
+          mappingRows={mappingRows}
+          open={showAnswer}
+        >
+          {hasOptions ? (
+            <div className="mt-4 space-y-2">
+              {(question.options ?? []).map((option) => (
+                <div
+                  key={`${question.id}-${option.label}`}
+                  className={cn(
+                    'flex min-h-11 items-center gap-3 rounded-[6px] border px-3 text-[16px] transition-colors',
+                    option.isCorrect
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                      : 'border-slate-200 bg-white text-slate-900'
+                  )}
+                >
+                  <span className="shrink-0 font-mono text-sm font-semibold text-slate-600">
+                    {option.label}.
+                  </span>
+                  <RichText
+                    as="span"
+                    value={option.text}
+                    className="min-w-0 flex-1 [&_img]:max-w-full [&_img]:rounded-lg [&_p]:inline"
+                  />
+                  {option.isCorrect ? (
+                    <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
+                  ) : null}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      ) : null}
-
-      {question.modelAnswer && !isLikelyJson(question.modelAnswer) ? (
-        <div className="mt-4 rounded-[6px] border border-slate-200 border-l-4 border-l-[#4f46e5] bg-[#f3f7fc] px-4 py-3">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-            Model answer
-          </p>
-          <RichText
-            value={question.modelAnswer}
-            className="mt-2 text-[16px] leading-7 text-slate-700 [&_img]:max-w-full [&_img]:rounded-lg [&_table]:mt-2 [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:px-2 [&_td]:py-1"
-          />
-        </div>
+          ) : null}
+        </QuestionExtras>
       ) : null}
 
       {actions ? (
         <div className="mt-4 flex justify-end gap-3 border-t border-slate-200/80 pt-3">{actions}</div>
       ) : null}
     </article>
+  );
+}
+
+/**
+ * The options, model answer and mapping, folded away until the arrow beside
+ * the question's badges is pressed. The body animates open (row height 0fr → 1fr
+ * with a fade); `invisible` keeps the folded text out of the tab order and away
+ * from screen readers, and the top margin lives inside the fold so a closed
+ * block leaves no gap.
+ */
+function QuestionExtras({
+  modelAnswer,
+  mappingRows,
+  open,
+  children,
+}: {
+  modelAnswer: string;
+  mappingRows: Array<[string, string]>;
+  open: boolean;
+  /** The MCQ options, shown first. */
+  children?: React.ReactNode;
+}) {
+  return (
+    <div
+      aria-hidden={!open}
+      className={cn(
+        'grid transition-[grid-template-rows,opacity,visibility] duration-300 ease-out',
+        open ? 'visible grid-rows-[1fr] opacity-100' : 'invisible grid-rows-[0fr] opacity-0'
+      )}
+    >
+      <div className="min-h-0 overflow-hidden">
+        {children}
+
+        {modelAnswer ? (
+          <div className="mt-4 rounded-[6px] border border-slate-200 border-l-4 border-l-[#4f46e5] bg-[#f3f7fc] px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Model answer</p>
+            <RichText
+              value={modelAnswer}
+              className="mt-2 text-[16px] leading-7 text-slate-700 [&_img]:max-w-full [&_img]:rounded-lg [&_table]:mt-2 [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:px-2 [&_td]:py-1"
+            />
+          </div>
+        ) : null}
+
+        {mappingRows.length > 0 ? (
+          <div className="mt-3 rounded-[6px] border border-slate-200 border-l-4 border-l-emerald-500 bg-emerald-50/40 px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Mapping</p>
+            <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-[14px] sm:grid-cols-[max-content_1fr]">
+              {mappingRows.map(([label, value]) => (
+                <div key={label} className="contents">
+                  <dt className="font-medium text-slate-500">{label}</dt>
+                  <dd className="font-semibold text-slate-800">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

@@ -75,7 +75,7 @@ export function StatusPanel({
 
   return (
     <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-14 shadow-sm">
-      <div className="mx-auto max-w-2xl text-center">
+      <div className="mx-auto text-center">
         <div
           className={`mx-auto flex h-16 w-16 items-center justify-center rounded-3xl ${
             kind === 'error' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'

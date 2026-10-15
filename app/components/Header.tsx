@@ -202,12 +202,18 @@ export default function Header({
   isChatbotOpen,
   menuItems = [],
   onMenuSearchNavigate,
+  toolStrip,
 }: {
   onToggleChatbot: () => void;
   isChatbotOpen: boolean;
   /** The shell's rights-filtered menu tree — what the top-bar search searches. */
   menuItems?: MenuItem[];
   onMenuSearchNavigate?: (entry: MenuSearchEntry) => void;
+  /**
+   * The open module's tool strip (Onboarding, Master Setup, …). Closed until this
+   * arrow is pressed; absent when the module has none.
+   */
+  toolStrip?: { label: string; open: boolean; onToggle: () => void } | null;
 }) {
   const { user, logout, refreshAcademicTerms, academicTerms, academicYears } = useAuth();
   const router = useRouter();
@@ -546,6 +552,19 @@ const logoUrl = (() => {
       </div>
 
       <div className="flex items-center gap-3">
+        {toolStrip ? (
+          <button
+            type="button"
+            onClick={toolStrip.onToggle}
+            aria-expanded={toolStrip.open}
+            aria-label={`${toolStrip.open ? 'Hide' : 'Show'} ${toolStrip.label} tools`}
+            title={`${toolStrip.label} tools`}
+            className="flex items-center rounded-xl border border-gray-200/50 bg-white px-3 py-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+          >
+            <ChevronDown size={16} className={`transition-transform ${toolStrip.open ? 'rotate-180' : ''}`} />
+          </button>
+        ) : null}
+
         <button
           ref={yearButtonRef}
           onClick={handleYearToggle}

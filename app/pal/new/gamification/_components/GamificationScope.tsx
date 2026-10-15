@@ -103,24 +103,39 @@ export function LearnerRequiredPanel({
   // unexpectedly — the client stays defense-in-depth here, not just the server.
   const isStaff = !isStudentSession();
 
+  if (!isStaff) {
+    return (
+      <PageShell>
+        <StatusPanel
+          kind="empty"
+          title="Pick a student"
+          message="Couldn’t load your gamification data right now."
+        />
+      </PageShell>
+    );
+  }
+
+  // Icon and heading share one row; the picker then runs the full card width
+  // underneath, so nothing is left empty below the icon.
   return (
     <PageShell>
-      <StatusPanel
-        kind="empty"
-        title="Pick a student"
-        message={
-          isStaff
-            ? message ||
-              'Gamification follows one learner\'s own journey, so it needs a student. Choose one below — you will keep viewing that learner across PAL.'
-            : 'Couldn’t load your gamification data right now.'
-        }
-      >
-        {isStaff && (
-          <div className="mx-auto max-w-3xl text-left">
-            <StudentPicker audience="Teacher" onSelect={onSelect} />
+      <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-start gap-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <UserRound className="h-7 w-7" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold text-slate-900">Pick a student</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {message ||
+                'Gamification follows one learner\'s own journey, so it needs a student. Choose one below — you will keep viewing that learner across PAL.'}
+            </p>
           </div>
-        )}
-      </StatusPanel>
+        </div>
+        <div className="mt-5 text-left">
+          <StudentPicker audience="Teacher" onSelect={onSelect} />
+        </div>
+      </div>
     </PageShell>
   );
 }

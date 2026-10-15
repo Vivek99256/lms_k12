@@ -19,5 +19,7 @@ export async function GET(request: NextRequest) {
   return proxyCategoryRequest(request, {
     laravelPath: '/api/modules/menu-categories/registry',
     label: 'module category registry',
+    // Opt-in: the sidebar's menu counts, requested separately from the bar itself.
+    forwardParams: ['include_menu_counts'],
   });
 }

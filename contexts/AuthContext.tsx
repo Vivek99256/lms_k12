@@ -39,10 +39,24 @@ const STORAGE_KEY_AUTH = 'auth';
 const STORAGE_KEY_MENU = 'menuContext';
 const STORAGE_KEY_USER = 'userData';
 const STORAGE_SESSION_DATE = 'sessionDate';
+/** Last user activity in ANY tab of this origin, as epoch ms. */
+const STORAGE_LAST_ACTIVITY = 'lastActivityAt';
 const INACTIVITY_TIMEOUT_MINUTES = 30;
 
+/**
+ * Today's date on the user's own clock.
+ *
+ * Not `toISOString()`: that is the UTC date, which turns over at 05:30 in India,
+ * so someone workin3
+ * g early in the morning was signed out mid-task by the daily
+ * reset below for a "new day" that had not started where they are.
+ */
 function getToday() {
-  return new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${now.getFullYear()}-${month}-${day}`;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -98,36 +112,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const inactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const lastActivityWrittenRef = useRef(0);
+
+  /**
+   * Record activity where every tab can see it. Throttled: mousemove fires many
+   * times a second and a storage write per event would be pointless.
+   */
+  const markActivity = useCallback(() => {
+    const now = Date.now();
+    if (now - lastActivityWrittenRef.current < 10_000) return;
+    lastActivityWrittenRef.current = now;
+    try {
+      localStorage.setItem(STORAGE_LAST_ACTIVITY, String(now));
+    } catch {}
+  }, []);
+
+  const signOutForInactivity = useCallback(() => {
+    localStorage.setItem(STORAGE_SESSION_DATE, '');
+    setIsAuthenticated(false);
+    setUser(null);
+    setMenuContext(null);
+    setAcademicTerms([]);
+    setAcademicYears([]);
+    localStorage.removeItem(STORAGE_KEY_AUTH);
+    localStorage.removeItem(STORAGE_KEY_MENU);
+    localStorage.removeItem(STORAGE_KEY_USER);
+    localStorage.removeItem(STORAGE_SESSION_DATE);
+    localStorage.removeItem(STORAGE_LAST_ACTIVITY);
+  }, []);
+
   const resetInactivityTimer = useCallback(() => {
     if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-    inactivityTimeoutRef.current = setTimeout(() => {
-      localStorage.setItem(STORAGE_SESSION_DATE, '');
-      setIsAuthenticated(false);
-      setUser(null);
-      setMenuContext(null);
-      setAcademicTerms([]);
-      setAcademicYears([]);
-      localStorage.removeItem(STORAGE_KEY_AUTH);
-      localStorage.removeItem(STORAGE_KEY_MENU);
-      localStorage.removeItem(STORAGE_KEY_USER);
-      localStorage.removeItem(STORAGE_SESSION_DATE);
-    }, INACTIVITY_TIMEOUT_MINUTES * 60 * 1000);
-  }, []);
+
+    const limit = INACTIVITY_TIMEOUT_MINUTES * 60 * 1000;
+
+    const arm = (delay: number) => {
+      inactivityTimeoutRef.current = setTimeout(() => {
+        // This tab saw nothing for the whole window, but the session is shared:
+        // signing out clears storage for every tab. If the user was active in
+        // another tab (or another window entirely, with this one left in the
+        // background), the session is not idle — wait out the rest of it.
+        const lastActivity = Number(localStorage.getItem(STORAGE_LAST_ACTIVITY)) || 0;
+        const idleFor = Date.now() - lastActivity;
+
+        if (lastActivity > 0 && idleFor < limit) {
+          arm(limit - idleFor);
+          return;
+        }
+
+        signOutForInactivity();
+      }, delay);
+    };
+
+    arm(limit);
+  }, [signOutForInactivity]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
-    const handler = () => resetInactivityTimer();
+    const events = ['mousemove', 'mousedown', 'keydown', 'click', 'scroll', 'wheel', 'touchstart'];
+    const handler = () => {
+      markActivity();
+      resetInactivityTimer();
+    };
 
-    events.forEach(event => window.addEventListener(event, handler));
-    resetInactivityTimer();
+    // Capture: a scroll does not bubble, and this app scrolls inside its own
+    // panes rather than the window, so a bubbling listener never saw it.
+    events.forEach((event) => window.addEventListener(event, handler, { capture: true, passive: true }));
+    lastActivityWrittenRef.current = 0;
+    handler();
 
     return () => {
-      events.forEach(event => window.removeEventListener(event, handler));
+      events.forEach((event) => window.removeEventListener(event, handler, { capture: true }));
       if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     };
-  }, [isAuthenticated, resetInactivityTimer]);
+  }, [isAuthenticated, resetInactivityTimer, markActivity]);
 
   const enforceDailyReset = useCallback(() => {
     if (typeof window === 'undefined') return;
