@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { clearTeachAssistantStorage } from '@/lib/chatbot-storage';
 import { purgeClientState, recordBuildId, syncAppBuild } from '@/lib/app-version';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
@@ -38,26 +38,6 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const STORAGE_KEY_AUTH = 'auth';
 const STORAGE_KEY_MENU = 'menuContext';
 const STORAGE_KEY_USER = 'userData';
-const STORAGE_SESSION_DATE = 'sessionDate';
-/** Last user activity in ANY tab of this origin, as epoch ms. */
-const STORAGE_LAST_ACTIVITY = 'lastActivityAt';
-const INACTIVITY_TIMEOUT_MINUTES = 30;
-
-/**
- * Today's date on the user's own clock.
- *
- * Not `toISOString()`: that is the UTC date, which turns over at 05:30 in India,
- * so someone workin3
- * g early in the morning was signed out mid-task by the daily
- * reset below for a "new day" that had not started where they are.
- */
-function getToday() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-
-  return `${now.getFullYear()}-${month}-${day}`;
-}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getStoredAuth = () => {
@@ -110,108 +90,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return [];
   });
 
-  const inactivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const lastActivityWrittenRef = useRef(0);
-
-  /**
-   * Record activity where every tab can see it. Throttled: mousemove fires many
-   * times a second and a storage write per event would be pointless.
-   */
-  const markActivity = useCallback(() => {
-    const now = Date.now();
-    if (now - lastActivityWrittenRef.current < 10_000) return;
-    lastActivityWrittenRef.current = now;
-    try {
-      localStorage.setItem(STORAGE_LAST_ACTIVITY, String(now));
-    } catch {}
-  }, []);
-
-  const signOutForInactivity = useCallback(() => {
-    localStorage.setItem(STORAGE_SESSION_DATE, '');
-    setIsAuthenticated(false);
-    setUser(null);
-    setMenuContext(null);
-    setAcademicTerms([]);
-    setAcademicYears([]);
-    localStorage.removeItem(STORAGE_KEY_AUTH);
-    localStorage.removeItem(STORAGE_KEY_MENU);
-    localStorage.removeItem(STORAGE_KEY_USER);
-    localStorage.removeItem(STORAGE_SESSION_DATE);
-    localStorage.removeItem(STORAGE_LAST_ACTIVITY);
-  }, []);
-
-  const resetInactivityTimer = useCallback(() => {
-    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-
-    const limit = INACTIVITY_TIMEOUT_MINUTES * 60 * 1000;
-
-    const arm = (delay: number) => {
-      inactivityTimeoutRef.current = setTimeout(() => {
-        // This tab saw nothing for the whole window, but the session is shared:
-        // signing out clears storage for every tab. If the user was active in
-        // another tab (or another window entirely, with this one left in the
-        // background), the session is not idle — wait out the rest of it.
-        const lastActivity = Number(localStorage.getItem(STORAGE_LAST_ACTIVITY)) || 0;
-        const idleFor = Date.now() - lastActivity;
-
-        if (lastActivity > 0 && idleFor < limit) {
-          arm(limit - idleFor);
-          return;
-        }
-
-        signOutForInactivity();
-      }, delay);
-    };
-
-    arm(limit);
-  }, [signOutForInactivity]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const events = ['mousemove', 'mousedown', 'keydown', 'click', 'scroll', 'wheel', 'touchstart'];
-    const handler = () => {
-      markActivity();
-      resetInactivityTimer();
-    };
-
-    // Capture: a scroll does not bubble, and this app scrolls inside its own
-    // panes rather than the window, so a bubbling listener never saw it.
-    events.forEach((event) => window.addEventListener(event, handler, { capture: true, passive: true }));
-    lastActivityWrittenRef.current = 0;
-    handler();
-
-    return () => {
-      events.forEach((event) => window.removeEventListener(event, handler, { capture: true }));
-      if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-    };
-  }, [isAuthenticated, resetInactivityTimer, markActivity]);
-
-  const enforceDailyReset = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    const storedDate = localStorage.getItem(STORAGE_SESSION_DATE);
-    const today = getToday();
-    if (storedDate && storedDate !== today) {
-      localStorage.setItem(STORAGE_SESSION_DATE, '');
-      setIsAuthenticated(false);
-      setUser(null);
-      setMenuContext(null);
-      setAcademicTerms([]);
-      setAcademicYears([]);
-      localStorage.removeItem(STORAGE_KEY_AUTH);
-      localStorage.removeItem(STORAGE_KEY_MENU);
-      localStorage.removeItem(STORAGE_KEY_USER);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const interval = setInterval(() => {
-      enforceDailyReset();
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [enforceDailyReset]);
+  // There is deliberately no idle timeout and no daily reset: a session ends when
+  // the user signs out or the server rejects it, never because time passed. Both
+  // timers used to sign people out in the middle of their work.
 
   /**
    * Catch a browser that is still holding the previous frontend build.
@@ -255,7 +136,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       setIsAuthenticated(true);
       localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(userData));
-      localStorage.setItem(STORAGE_SESSION_DATE, getToday());
 
       const sessionPayload: Record<string, unknown> = {
         ...(payload as Record<string, unknown>),
@@ -272,9 +152,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // along with everything else, so without this the first startup after a login
       // would look like a fresh browser and the next deploy would go unnoticed.
       recordBuildId();
-      resetInactivityTimer();
     },
-    [resetInactivityTimer]
+    []
   );
 
   const login = useCallback(async (email: string, password: string) => {
@@ -381,7 +260,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMenuContext(null);
     setAcademicTerms([]);
     setAcademicYears([]);
-    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     clearTeachAssistantStorage();
 
     void purgeClientState().finally(() => {
