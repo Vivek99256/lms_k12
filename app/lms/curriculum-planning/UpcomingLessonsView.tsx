@@ -12,12 +12,14 @@ export function AllUpcomingLessonsView({
   onBack,
   onFilter,
   onAddLesson,
+  onEditLesson,
 }: {
   lessons: UpcomingLessonRow[];
   gradeLabel: string;
   onBack: () => void;
   onFilter: () => void;
   onAddLesson: () => void;
+  onEditLesson: (lesson: UpcomingLessonRow) => void;
 }) {
   return (
     <div className="min-h-full px-4 py-4 text-[#26231f] sm:px-6 lg:px-7">
@@ -150,7 +152,12 @@ export function AllUpcomingLessonsView({
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-4">
-                    <button type="button" className="text-sm font-medium text-[#706b64] transition-colors hover:text-[#2f7dd9]">
+                    <button
+                      type="button"
+                      onClick={() => onEditLesson(lesson)}
+                      aria-label={`Edit ${lesson.topic} on ${lesson.date}`}
+                      className="text-sm font-medium text-[#706b64] transition-colors hover:text-[#2f7dd9]"
+                    >
                       Edit
                     </button>
                   </td>

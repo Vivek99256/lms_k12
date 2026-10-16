@@ -1,4 +1,3 @@
-import { headers } from 'next/headers';
 import {
   fetchSemanticIntelligenceChapters,
   fetchSemanticIntelligenceResult,
@@ -1051,30 +1050,37 @@ function buildUluModules(
   };
 }
 
-async function fetchSemanticRecord(chapterId: string): Promise<SemanticResultRecord | null> {
+async function fetchSemanticRecord(chapterId: string, init?: RequestInit): Promise<SemanticResultRecord | null> {
   if (!chapterId.trim()) return null;
-  return (await fetchSemanticIntelligenceResult(chapterId)) as SemanticResultRecord | null;
+  return (await fetchSemanticIntelligenceResult(chapterId, init)) as SemanticResultRecord | null;
 }
 
-async function fetchLatestSemanticRecord(): Promise<{ record: SemanticResultRecord | null; sourceId: string }> {
-  const chapters = await fetchSemanticIntelligenceChapters();
+async function fetchLatestSemanticRecord(init?: RequestInit): Promise<{ record: SemanticResultRecord | null; sourceId: string }> {
+  const chapters = await fetchSemanticIntelligenceChapters(init);
   const processed = chapters.find((item) => Boolean(item?.is_processed)) ?? chapters[0];
   const sourceId = asText(processed?.id);
   if (!sourceId) return { record: null, sourceId: '' };
-  const record = await fetchSemanticRecord(sourceId);
+  const record = await fetchSemanticRecord(sourceId, init);
   return { record, sourceId };
 }
 
-export async function buildPalContentModelPayload(input: { chapterId?: string; concept?: string }): Promise<PalContentModelResponse> {
+/**
+ * `init` carries the caller's Authorization header: semantic-intelligence is behind
+ * the ERP's api_guard, and a server-side fetch has no browser session to add it.
+ */
+export async function buildPalContentModelPayload(
+  input: { chapterId?: string; concept?: string },
+  init?: RequestInit,
+): Promise<PalContentModelResponse> {
   try {
     let chapterId = asText(input.chapterId);
     const conceptParam = asText(input.concept) || '0';
 
     let record: SemanticResultRecord | null = null;
     if (chapterId) {
-      record = await fetchSemanticRecord(chapterId);
+      record = await fetchSemanticRecord(chapterId, init);
     } else {
-      const fallback = await fetchLatestSemanticRecord();
+      const fallback = await fetchLatestSemanticRecord(init);
       record = fallback.record;
       chapterId = asText(record?.chapter_id) || fallback.sourceId;
     }
@@ -1114,42 +1120,3 @@ export async function buildPalContentModelPayload(input: { chapterId?: string; c
   }
 }
 
-function buildApiQuery(input: { chapterId?: string; concept?: string }) {
-  const query = new URLSearchParams();
-  if (input.chapterId) query.set('chapterId', input.chapterId);
-  if (input.concept) query.set('concept', input.concept);
-  const queryString = query.toString();
-  return queryString ? `?${queryString}` : '';
-}
-
-async function resolveLocalApiUrl(path: string) {
-  const headerStore = await headers();
-  const proto = headerStore.get('x-forwarded-proto') ?? 'http';
-  const host =
-    headerStore.get('x-forwarded-host') ??
-    headerStore.get('host') ??
-    'localhost:3000';
-
-  return `${proto}://${host}${path}`;
-}
-
-export async function getPalContentModel(input: { chapterId?: string; concept?: string }): Promise<PalContentModelResponse> {
-  const apiUrl = await resolveLocalApiUrl(`/api/pal/content-model${buildApiQuery(input)}`);
-  const res = await fetch(apiUrl, {
-    method: 'GET',
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    return {
-      context: null,
-      frameworkModules: {} as Record<FrameworkSlug, PalModuleView>,
-      uluModules: {} as Record<UluSlug, PalModuleView>,
-      error: 'We couldn’t load the content structure. Please try again.',
-      isReady: false,
-    };
-  }
-
-  const payload = (await res.json()) as PalContentModelResponse;
-  return payload;
-}

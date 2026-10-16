@@ -8,7 +8,11 @@ export async function GET(request: NextRequest) {
   const concept = request.nextUrl.searchParams.get('concept') ?? undefined;
 
   try {
-    const payload = await buildPalContentModelPayload({ chapterId, concept });
+    const authorization = request.headers.get('authorization');
+    const payload = await buildPalContentModelPayload(
+      { chapterId, concept },
+      authorization ? { headers: { Authorization: authorization, Accept: 'application/json' } } : undefined,
+    );
     return NextResponse.json(payload, { status: 200 });
   } catch (error) {
     return NextResponse.json(
