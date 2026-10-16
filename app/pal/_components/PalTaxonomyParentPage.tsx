@@ -1,14 +1,12 @@
+'use client';
+
 import {
   PalContextHero,
   PalEmptyState,
   PalModuleGrid,
   type PalSurfaceVariant,
 } from '@/app/pal/_components/PalContentView';
-import {
-  getPalContentModel,
-  type PalContentModelResponse,
-  type PalModuleView,
-} from '@/app/pal/data/pal-content-model';
+import { usePalContentModel } from '@/app/pal/_components/usePalContentModel';
 import {
   firstValue,
   queryStringFromSearchParams,
@@ -40,11 +38,9 @@ export interface TaxonomyParentPageProps {
   basePath: string;
   /** Styling variant understood by PalContextHero and PalModuleGrid. */
   variant: PalSurfaceVariant;
-  /** Which slice of the loaded model this taxonomy lists. */
-  selectModules: (model: PalContentModelResponse) => Record<string, PalModuleView>;
 }
 
-export default async function PalTaxonomyParentPage({
+export default function PalTaxonomyParentPage({
   searchParams,
   emptyTitle,
   eyebrow,
@@ -52,13 +48,16 @@ export default async function PalTaxonomyParentPage({
   description,
   basePath,
   variant,
-  selectModules,
 }: TaxonomyParentPageProps) {
   const queryString = queryStringFromSearchParams(searchParams);
   const chapterId = firstValue(searchParams.chapterId);
   const concept = firstValue(searchParams.concept);
 
-  const model = await getPalContentModel({ chapterId, concept });
+  const model = usePalContentModel(chapterId, concept);
+
+  if (!model) {
+    return <div className="px-6 py-10 text-sm text-slate-500">Loading…</div>;
+  }
 
   if (!model.isReady || !model.context) {
     return (
@@ -69,7 +68,7 @@ export default async function PalTaxonomyParentPage({
     );
   }
 
-  const modules = Object.values(selectModules(model));
+  const modules = Object.values(variant === 'framework' ? model.frameworkModules : model.uluModules);
 
   return (
     <div className="min-h-full px-4 py-5 sm:px-6">

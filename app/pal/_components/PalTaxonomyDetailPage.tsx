@@ -1,3 +1,5 @@
+'use client';
+
 import { notFound } from 'next/navigation';
 
 import {
@@ -6,11 +8,8 @@ import {
   PalModuleDetail,
   type PalSurfaceVariant,
 } from '@/app/pal/_components/PalContentView';
-import {
-  getPalContentModel,
-  type PalContentModelResponse,
-  type PalModuleView,
-} from '@/app/pal/data/pal-content-model';
+import { usePalContentModel } from '@/app/pal/_components/usePalContentModel';
+import type { PalModuleView } from '@/app/pal/data/pal-content-model';
 import {
   firstValue,
   queryStringFromSearchParams,
@@ -34,8 +33,6 @@ import {
 export interface TaxonomyDetailPageProps {
   slug: string;
   searchParams: RouteSearchParams;
-  /** The taxonomy's slug map. Membership decides whether the route exists. */
-  meta: Record<string, unknown>;
   /** Shown when no semantic intelligence is available for this taxonomy. */
   emptyTitle: string;
   eyebrow: string;
@@ -43,31 +40,26 @@ export interface TaxonomyDetailPageProps {
   /** Where "back" goes, before the query string is appended. */
   basePath: string;
   variant: PalSurfaceVariant;
-  selectModules: (model: PalContentModelResponse) => Record<string, PalModuleView>;
 }
 
-export default async function PalTaxonomyDetailPage({
+/** The route page 404s an unknown slug against the taxonomy's slug map before rendering this. */
+export default function PalTaxonomyDetailPage({
   slug,
   searchParams,
-  meta,
   emptyTitle,
   eyebrow,
   description,
   basePath,
   variant,
-  selectModules,
 }: TaxonomyDetailPageProps) {
-  // An unknown slug is a 404 before anything is loaded — a taxonomy's slug map
-  // is the definition of which detail routes exist.
-  if (!(slug in meta)) notFound();
-
   const queryString = queryStringFromSearchParams(searchParams);
   const backHref = queryString ? `${basePath}?${queryString}` : basePath;
 
-  const model = await getPalContentModel({
-    chapterId: firstValue(searchParams.chapterId),
-    concept: firstValue(searchParams.concept),
-  });
+  const model = usePalContentModel(firstValue(searchParams.chapterId), firstValue(searchParams.concept));
+
+  if (!model) {
+    return <div className="px-6 py-10 text-sm text-slate-500">Loading…</div>;
+  }
 
   if (!model.isReady || !model.context) {
     return (
@@ -79,7 +71,8 @@ export default async function PalTaxonomyDetailPage({
     );
   }
 
-  const selectedModule = selectModules(model)[slug];
+  const modules: Record<string, PalModuleView> = variant === 'framework' ? model.frameworkModules : model.uluModules;
+  const selectedModule = modules[slug];
 
   // The slug is registered but this concept's extraction has nothing behind it.
   if (!selectedModule) notFound();
