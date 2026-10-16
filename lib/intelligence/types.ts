@@ -422,7 +422,23 @@ export interface EvidenceItem {
   is_generated: boolean;
 }
 
+/**
+ * One exam question answered for a student: the question, the answer key's answer, and why.
+ * Only `title` and `type` are always present; a hint-only answer (teacher hides answers) has no `value`.
+ */
+export interface ExamAnswerSection {
+  type: "exam_answer";
+  title: string;
+  description?: string;
+  label?: string;
+  value?: string;
+  heading?: string;
+  text?: string;
+  note?: string;
+}
+
 export type AnswerSection =
+  | ExamAnswerSection
   | { type: "text"; title: string; body: string }
   | { type: "records"; title: string; items: Array<Record<string, unknown>> }
   | { type: "key_values"; title: string; items: KeyValueItem[] }

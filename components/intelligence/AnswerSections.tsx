@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Circle, Clock, Info, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, BookOpen, CheckCircle2, Circle, Clock, Info, Lightbulb, ShieldAlert } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { uiLabel } from '@/lib/voice/ui-labels';
@@ -191,6 +191,60 @@ function Card({
         {title ? <h4 className="text-sm font-semibold text-slate-900">{title}</h4> : null}
       </header>
       {children}
+    </section>
+  );
+}
+
+/**
+ * One exam question answered for a student: what was asked, the answer, and why - in that order, and nothing else.
+ *
+ * The answer is the visual centre (green, with a tick and the words "Correct Answer" - never colour alone);
+ * the reason is plain readable text under a lightbulb; a doubt about the key is an amber note. The wording
+ * (`label`, `heading`, `note`) arrives from the backend so it is translated with the rest of the answer.
+ */
+function ExamAnswer({ section }: { section: Extract<AnswerSection, { type: 'exam_answer' }> }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm">
+      <header className="flex items-start gap-2 bg-indigo-50/70 px-3.5 py-2.5 sm:px-4">
+        <BookOpen className="mt-0.5 size-4 shrink-0 text-indigo-500" aria-hidden />
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-500">{section.title}</p>
+          {section.description ? (
+            <p className="mt-0.5 break-words text-[13px] leading-5 text-slate-600">{section.description}</p>
+          ) : null}
+        </div>
+      </header>
+
+      <div className="space-y-3 px-3.5 py-3.5 sm:px-4">
+        {section.value ? (
+          <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3">
+            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">
+                {section.label ?? 'Correct Answer'}
+              </p>
+              <p className="mt-0.5 break-words text-[15px] font-semibold leading-6 text-emerald-950">{section.value}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {section.text ? (
+          <div className="flex items-start gap-2.5">
+            <Lightbulb className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold text-slate-900">{section.heading}</p>
+              <p className="mt-1 whitespace-pre-wrap break-words text-[13.5px] leading-6 text-slate-700">{section.text}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {section.note ? (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden />
+            <p className="break-words text-[12.5px] leading-5 text-amber-900">{section.note}</p>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -446,6 +500,8 @@ export function AnswerSections({
     <div className={cn('space-y-2.5', className)}>
       {sections.map((section, index) => {
         switch (section.type) {
+          case 'exam_answer':
+            return <ExamAnswer key={index} section={section} />;
           case 'text':
             return <TextSection key={index} section={section} />;
           case 'key_values':

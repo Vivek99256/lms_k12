@@ -4,6 +4,7 @@ import React, { createContext, useMemo, useState, useEffect, useRef, useCallback
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
+import { ASK_ASSISTANT_EVENT, type AskAssistantDetail } from '@/lib/exam-help';
 import { StuckUserAssistant } from '@/components/ai/StuckUserAssistant';
 import { StuckNudgePopup } from '@/components/ai/StuckNudgePopup';
 import type { StuckPromptContext } from '@/lib/ai/stuck-assist-types';
@@ -637,6 +638,23 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const handleNudgeNo = useCallback(() => setShowStuckNudge(false), []);
 
+  // A question put to the assistant from elsewhere on the page - today the "Ask AI" button on an exam
+  // question. Opens the panel and hands it the prompt; the panel sends it once and clears it here.
+  const [assistantPrompt, setAssistantPrompt] = useState<AskAssistantDetail | null>(null);
+
+  useEffect(() => {
+    const onAsk = (event: Event) => {
+      const detail = (event as CustomEvent<AskAssistantDetail>).detail;
+      if (!detail?.prompt) return;
+      setShowStuckNudge(false);
+      setIsChatbotOpen(true);
+      setIsRightToolbarOpen(false);
+      setAssistantPrompt(detail);
+    };
+    window.addEventListener(ASK_ASSISTANT_EVENT, onAsk);
+    return () => window.removeEventListener(ASK_ASSISTANT_EVENT, onAsk);
+  }, []);
+
   const handleLevel1Select = (item: MenuItem) => {
     setSelectedBranch((current) => {
       const key = getMenuKey(item);
@@ -953,6 +971,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                   onToggleChatbot={toggleChatbot}
                   stuckPrompt={pendingStuckPrompt}
                   onStuckPromptHandled={() => setPendingStuckPrompt(null)}
+                  assistantPrompt={assistantPrompt}
+                  onAssistantPromptHandled={() => setAssistantPrompt(null)}
                 />
               </div>
             </>
