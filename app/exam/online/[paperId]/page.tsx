@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, Clock, Info, Loader2, Send } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock, Info, Loader2, Send, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,7 @@ import {
   submitOnlineExam,
   type OnlineExamPaper,
 } from '@/app/exam/data/onlineExam';
+import { askAssistant, setExamHelpFocus } from '@/lib/exam-help';
 
 export default function OnlineExamAttemptPage() {
   const router = useRouter();
@@ -42,6 +43,9 @@ export default function OnlineExamAttemptPage() {
       cancelled = true;
     };
   }, []);
+
+  // The chat panel reads which question the student is on from here; it only applies on this screen.
+  useEffect(() => () => setExamHelpFocus(null), []);
 
   // --- load the paper ------------------------------------------------------
   useEffect(() => {
@@ -238,6 +242,8 @@ export default function OnlineExamAttemptPage() {
               <section
                 key={question.id}
                 className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+                onFocusCapture={() => setExamHelpFocus({ paperId, questionId: question.id })}
+                onPointerDownCapture={() => setExamHelpFocus({ paperId, questionId: question.id })}
               >
                 <div className="flex items-start gap-3">
                   <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-600">
@@ -246,7 +252,18 @@ export default function OnlineExamAttemptPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-medium text-slate-900">{question.title}</p>
-                      <span className="shrink-0 text-xs text-slate-400">
+                      <span className="flex shrink-0 items-center gap-3 text-xs text-slate-400">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExamHelpFocus({ paperId, questionId: question.id });
+                            askAssistant('Show me the answer to this question and explain it.');
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 font-medium text-indigo-700 hover:bg-indigo-100"
+                        >
+                          <Sparkles className="size-3.5" />
+                          Ask AI
+                        </button>
                         {question.points} mark{question.points === 1 ? '' : 's'}
                       </span>
                     </div>
