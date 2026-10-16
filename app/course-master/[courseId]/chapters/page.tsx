@@ -6688,41 +6688,41 @@ export default function ChapterListPage() {
                       </button>
                     </div>
 
-                    <div className="flex w-1/2 flex-wrap items-center justify-end gap-2">
+                    <div className="flex w-1/2 items-stretch gap-1.5">
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => openChapterContentView(chapter, 'classroom')}
-                        className="h-8 shrink-0 rounded-lg border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                        className="h-auto min-h-8 flex-1 shrink basis-0 flex-col gap-0.5 whitespace-normal break-words rounded-lg border-slate-300 bg-white px-1 py-1.5 text-center text-[11px] leading-tight font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                       >
-                        <FolderOpen size={14} className="mr-1.5" />
+                        <FolderOpen size={14} className="shrink-0" />
                         Classroom Resource
                       </Button>
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => openChapterContentView(chapter, 'teacher')}
-                        className="h-8 shrink-0 rounded-lg border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                        className="h-auto min-h-8 flex-1 shrink basis-0 flex-col gap-0.5 whitespace-normal break-words rounded-lg border-slate-300 bg-white px-1 py-1.5 text-center text-[11px] leading-tight font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                       >
-                        <FolderOpen size={14} className="mr-1.5" />
+                        <FolderOpen size={14} className="shrink-0" />
                         Teacher Workspace
                       </Button>
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => openChapterCoherenceMapView(chapter)}
-                        className="h-8 shrink-0 rounded-lg border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                        className="h-auto min-h-8 flex-1 shrink basis-0 flex-col gap-0.5 whitespace-normal break-words rounded-lg border-slate-300 bg-white px-1 py-1.5 text-center text-[11px] leading-tight font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                       >
-                        <Network size={14} className="mr-1.5" />
+                        <Network size={14} className="shrink-0" />
                         Coherence map
                       </Button>
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => router.push('/lms/homework')}
-                        className="h-8 shrink-0 rounded-lg border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                        className="h-auto min-h-8 flex-1 shrink basis-0 flex-col gap-0.5 whitespace-normal break-words rounded-lg border-slate-300 bg-white px-1 py-1.5 text-center text-[11px] leading-tight font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                       >
-                        <ClipboardList size={14} className="mr-1.5" />
+                        <ClipboardList size={14} className="shrink-0" />
                         Homework/Assignment
                       </Button>
                     </div>
