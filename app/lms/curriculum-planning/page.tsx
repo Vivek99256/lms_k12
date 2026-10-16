@@ -50,6 +50,7 @@ export default function CurriculumPlanningPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<UpcomingLessonRow | null>(null);
   const [isAddTopicDialogOpen, setIsAddTopicDialogOpen] = useState(false);
   const [isUpcomingLessonsViewOpen, setIsUpcomingLessonsViewOpen] = useState(false);
   const [isSubjectProgressViewOpen, setIsSubjectProgressViewOpen] = useState(false);
@@ -188,6 +189,11 @@ export default function CurriculumPlanningPage() {
         room: item.teacher_name,
         period: item.period_slot,
         status: upcomingStatusLabel(item.status),
+        periodId: item.period_id,
+        subjectName: item.subject_name ?? undefined,
+        standardName: item.standard_name ?? undefined,
+        // slice(0, 3): newer ICU renders September as "Sept"; editMonths uses "Sep".
+        month: new Date(`${item.scheduled_date}T00:00:00`).toLocaleDateString('en-GB', { month: 'short' }).slice(0, 3),
       };
     });
   }, [apiData]);
@@ -250,7 +256,15 @@ export default function CurriculumPlanningPage() {
   const dialogs = (
     <>
       {isFilterDialogOpen && <FilterSyllabusDialog onClose={() => setIsFilterDialogOpen(false)} />}
-      {isEditDialogOpen && <EditTopicDialog onClose={() => setIsEditDialogOpen(false)} />}
+      {isEditDialogOpen && (
+        <EditTopicDialog
+          lesson={editingLesson}
+          onClose={() => {
+            setIsEditDialogOpen(false);
+            setEditingLesson(null);
+          }}
+        />
+      )}
       {isAddTopicDialogOpen && <AddTopicDialog onClose={() => setIsAddTopicDialogOpen(false)} />}
     </>
   );
@@ -265,6 +279,10 @@ export default function CurriculumPlanningPage() {
           onBack={() => setIsUpcomingLessonsViewOpen(false)}
           onFilter={() => setIsFilterDialogOpen(true)}
           onAddLesson={() => setIsAddTopicDialogOpen(true)}
+          onEditLesson={(lesson) => {
+            setEditingLesson(lesson);
+            setIsEditDialogOpen(true);
+          }}
         />
       </RequireStaff>
     );

@@ -15,6 +15,12 @@ import {
   primaryActionClassName,
   quickTags,
 } from "./shared";
+import type { UpcomingLessonRow } from "./types";
+
+// A prefilled value the static option list doesn't carry is still shown, not silently swapped for the first option.
+function withOption(options: string[], value: string | undefined) {
+  return value && !options.includes(value) ? [value, ...options] : options;
+}
 
 export function FilterCheckCard({
   children,
@@ -348,7 +354,19 @@ export function FilterSyllabusDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function EditTopicDialog({ onClose }: { onClose: () => void }) {
+export function EditTopicDialog({
+  onClose,
+  lesson = null,
+}: {
+  onClose: () => void;
+  lesson?: UpcomingLessonRow | null;
+}) {
+  const subject = lesson ? lesson.subjectName : "Mathematics";
+  const grade = lesson ? (lesson.standardName ? `Grade ${lesson.standardName}` : undefined) : "Grade 8";
+  const month = lesson ? lesson.month : "May";
+  const period = lesson ? lesson.period : "Period 2";
+  const status = lesson ? lesson.status : "In progress";
+
   return (
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/35 px-4 py-6 backdrop-blur-[3px]"
@@ -382,49 +400,44 @@ export function EditTopicDialog({ onClose }: { onClose: () => void }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-[#77716b]">Subject</span>
-            <select defaultValue="Mathematics" className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
-              <option>Mathematics</option>
-              <option>Science</option>
-              <option>English</option>
-              <option>History</option>
-              <option>Geography</option>
-              <option>Art</option>
+            <select defaultValue={subject} className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
+              {withOption(["Mathematics", "Science", "English", "History", "Geography", "Art"], subject).map((option) => (
+                <option key={option}>{option}</option>
+              ))}
             </select>
           </label>
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-[#77716b]">Grade / Class</span>
-            <select defaultValue="Grade 8" className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
-              <option>Grade 6</option>
-              <option>Grade 7</option>
-              <option>Grade 8</option>
-              <option>Grade 9</option>
-              <option>Grade 10</option>
+            <select defaultValue={grade} className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
+              {withOption(["Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10"], grade).map((option) => (
+                <option key={option}>{option}</option>
+              ))}
             </select>
           </label>
 
           <label className="block sm:col-span-2">
             <span className="mb-1.5 block text-xs font-semibold text-[#77716b]">Topic name</span>
             <input
-              defaultValue="Calculus - Introduction to derivatives"
+              defaultValue={lesson ? lesson.topic : "Calculus - Introduction to derivatives"}
               className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15"
             />
           </label>
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-[#77716b]">Start month</span>
-            <select defaultValue="May" className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
-              {editMonths.map((month) => (
-                <option key={month}>{month}</option>
+            <select defaultValue={month} className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
+              {editMonths.map((option) => (
+                <option key={option}>{option}</option>
               ))}
             </select>
           </label>
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-[#77716b]">End month</span>
-            <select defaultValue="May" className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
-              {editMonths.map((month) => (
-                <option key={month}>{month}</option>
+            <select defaultValue={month} className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
+              {editMonths.map((option) => (
+                <option key={option}>{option}</option>
               ))}
             </select>
           </label>
@@ -432,25 +445,23 @@ export function EditTopicDialog({ onClose }: { onClose: () => void }) {
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-[#77716b]">Room / Location</span>
             <input
-              defaultValue="Room 14"
+              defaultValue={lesson ? "" : "Room 14"}
               className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15"
             />
           </label>
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-[#77716b]">Period</span>
-            <select defaultValue="Period 2" className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
-              <option>Period 1</option>
-              <option>Period 2</option>
-              <option>Period 3</option>
-              <option>Period 4</option>
-              <option>Period 5</option>
+            <select defaultValue={period} className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
+              {withOption(["Period 1", "Period 2", "Period 3", "Period 4", "Period 5"], period).map((option) => (
+                <option key={option}>{option}</option>
+              ))}
             </select>
           </label>
 
           <label className="block sm:col-span-2">
             <span className="mb-1.5 block text-xs font-semibold text-[#77716b]">Status</span>
-            <select defaultValue="In progress" className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
+            <select defaultValue={status} className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15">
               <option>In progress</option>
               <option>Upcoming</option>
               <option>Ready</option>
@@ -461,7 +472,7 @@ export function EditTopicDialog({ onClose }: { onClose: () => void }) {
           <label className="block sm:col-span-2">
             <span className="mb-1.5 block text-xs font-semibold text-[#77716b]">Notes</span>
             <textarea
-              defaultValue={'Begin with a recap of limits. Introduce instantaneous rate of change.\nWalk through formal definition with worked examples.'}
+              defaultValue={lesson ? "" : 'Begin with a recap of limits. Introduce instantaneous rate of change.\nWalk through formal definition with worked examples.'}
               className="min-h-20 w-full resize-y rounded-lg border border-[#d7d3cd] bg-white px-3 py-2.5 text-sm leading-5 text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15"
             />
           </label>
