@@ -208,7 +208,7 @@ export function QuestionBankQuestionCard({
           modelAnswer={hasModelAnswer ? question.modelAnswer ?? '' : ''}
           mappingRows={mappingRows}
           detailRows={detailRows}
-          attribution={question.attribution}
+          attribution={question.attribution ?? undefined}
           open={showAnswer}
         >
           {hasOptions ? (
