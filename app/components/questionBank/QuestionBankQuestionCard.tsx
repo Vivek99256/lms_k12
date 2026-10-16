@@ -14,12 +14,14 @@
  * LaTeX verbatim and trust markup that came out of a PDF.
  *
  * Only AI-generated questions wear their Bloom and difficulty tags on the
- * card. For a question taken from a published book those are inferred rather
- * than authored, so they sit behind the info button next to the question type
- * instead of competing with the question itself for attention.
+ * card face. Every question that has them carries Bloom/Difficulty (plus
+ * Chapter/Concept/Category mapping and source attribution) behind the
+ * drilldown chevron instead, so that metadata doesn't compete with the
+ * question itself for attention and isn't split across a hover popup and a
+ * click target.
  */
 import { useState } from 'react';
-import { CheckCircle2, ChevronDown, ImageOff, AlertTriangle, Sparkles, Info } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ImageOff, AlertTriangle, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { isLikelyJson, type QuestionBankItem } from '@/app/course-master/data/questionBank';
@@ -48,55 +50,6 @@ function Pill({
   );
 }
 
-/** The metadata that no longer sits on the card face, revealed on hover. */
-function DetailsButton({ question }: { question: QuestionBankItem }) {
-  const [open, setOpen] = useState(false);
-
-  const rows: Array<[string, string]> = [];
-  if (question.bloom) rows.push(['Bloom', question.bloom]);
-  if (question.difficulty) rows.push(['Difficulty', question.difficulty]);
-  if (question.conceptTitle) rows.push(['Concept', question.conceptTitle]);
-
-  if (rows.length === 0) return null;
-
-  return (
-    <span
-      className="relative inline-flex"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
-      <button
-        type="button"
-        aria-label="Show question details"
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
-      >
-        <Info size={13} />
-      </button>
-
-      {open ? (
-        <span
-          role="tooltip"
-          className="absolute right-0 top-full z-30 mt-1.5 w-max min-w-[190px] max-w-[300px] rounded-[8px] border border-slate-200 bg-white p-2.5 text-left shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
-        >
-          {rows.map(([label, value]) => (
-            <span key={label} className="flex justify-between gap-4 py-0.5 text-[11px]">
-              <span className="font-medium text-slate-500">{label}</span>
-              <span className="font-bold text-slate-800">{value}</span>
-            </span>
-          ))}
-          {question.attribution ? (
-            <span className="mt-1.5 block border-t border-slate-100 pt-1.5 text-[10px] leading-snug text-slate-400">
-              {question.attribution}
-            </span>
-          ) : null}
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
 export function QuestionBankQuestionCard({
   question,
   actions,
@@ -118,8 +71,19 @@ export function QuestionBankQuestionCard({
   }
   if (question.conceptTitle) mappingRows.push(['Concept', question.conceptTitle]);
   if (question.palCategory) mappingRows.push(['Category', question.palCategory]);
+  // Previously shown in a hover tooltip next to the question-type pill; now folds
+  // into the drilldown alongside Mapping so both live in one place. Concept is
+  // left out here since Mapping above already carries it.
+  const detailRows: Array<[string, string]> = [];
+  if (question.bloom) detailRows.push(['Bloom', question.bloom]);
+  if (question.difficulty) detailRows.push(['Difficulty', question.difficulty]);
   const hasOptions = Boolean(question.options && question.options.length > 0);
-  const hasExtras = hasOptions || hasModelAnswer || mappingRows.length > 0;
+  const hasExtras =
+    hasOptions ||
+    hasModelAnswer ||
+    mappingRows.length > 0 ||
+    detailRows.length > 0 ||
+    Boolean(question.attribution);
   const [showAnswer, setShowAnswer] = useState(false);
 
   return (
@@ -145,12 +109,9 @@ export function QuestionBankQuestionCard({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-start">
-          <span className="inline-flex items-center gap-1.5">
-            <Pill className="border-indigo-200 bg-[#eef2ff] text-[#3157ff]">
-              {question.typeLabel ?? question.type}
-            </Pill>
-            <DetailsButton question={question} />
-          </span>
+          <Pill className="border-indigo-200 bg-[#eef2ff] text-[#3157ff]">
+            {question.typeLabel ?? question.type}
+          </Pill>
 
           {/* Generated questions wear their tags; a question from a book keeps
               them behind the info button above. */}
@@ -246,6 +207,8 @@ export function QuestionBankQuestionCard({
         <QuestionExtras
           modelAnswer={hasModelAnswer ? question.modelAnswer ?? '' : ''}
           mappingRows={mappingRows}
+          detailRows={detailRows}
+          attribution={question.attribution}
           open={showAnswer}
         >
           {hasOptions ? (
@@ -295,15 +258,27 @@ export function QuestionBankQuestionCard({
 function QuestionExtras({
   modelAnswer,
   mappingRows,
+  detailRows,
+  attribution,
   open,
   children,
 }: {
   modelAnswer: string;
   mappingRows: Array<[string, string]>;
+  /** Bloom/difficulty - previously a hover-only tooltip, now folded in alongside Mapping. */
+  detailRows: Array<[string, string]>;
+  attribution?: string;
   open: boolean;
   /** The MCQ options, shown first. */
   children?: React.ReactNode;
 }) {
+  const hasMapping = mappingRows.length > 0;
+  const hasDetails = detailRows.length > 0;
+  const hasMappingCard = hasMapping || hasDetails || Boolean(attribution);
+  // Side by side on sm+; stacked with a horizontal divider on mobile instead of
+  // the vertical one, so either layout always reads as one balanced block.
+  const showBothColumns = hasMapping && hasDetails;
+
   return (
     <div
       aria-hidden={!open}
@@ -325,17 +300,57 @@ function QuestionExtras({
           </div>
         ) : null}
 
-        {mappingRows.length > 0 ? (
+        {hasMappingCard ? (
           <div className="mt-3 rounded-[6px] border border-slate-200 border-l-4 border-l-emerald-500 bg-emerald-50/40 px-4 py-3">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Mapping</p>
-            <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-[14px] sm:grid-cols-[max-content_1fr]">
-              {mappingRows.map(([label, value]) => (
-                <div key={label} className="contents">
-                  <dt className="font-medium text-slate-500">{label}</dt>
-                  <dd className="font-semibold text-slate-800">{value}</dd>
+            <div
+              className={cn(
+                showBothColumns && 'grid gap-4 sm:grid-cols-2 sm:gap-x-6 sm:divide-x sm:divide-emerald-200/70'
+              )}
+            >
+              {hasMapping ? (
+                <div className={cn(showBothColumns && 'sm:pr-6')}>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Mapping</p>
+                  <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-[14px] sm:grid-cols-[max-content_1fr]">
+                    {mappingRows.map(([label, value]) => (
+                      <div key={label} className="contents">
+                        <dt className="font-medium text-slate-500">{label}</dt>
+                        <dd className="font-semibold text-slate-800">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
-              ))}
-            </dl>
+              ) : null}
+
+              {hasDetails ? (
+                <div
+                  className={cn(
+                    showBothColumns &&
+                      'mt-4 border-t border-emerald-200/70 pt-4 sm:mt-0 sm:border-t-0 sm:pt-0 sm:pl-6'
+                  )}
+                >
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Details</p>
+                  <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-[14px] sm:grid-cols-[max-content_1fr]">
+                    {detailRows.map(([label, value]) => (
+                      <div key={label} className="contents">
+                        <dt className="font-medium text-slate-500">{label}</dt>
+                        <dd className="font-semibold text-slate-800">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ) : null}
+            </div>
+
+            {attribution ? (
+              <p
+                className={cn(
+                  'text-[11px] leading-snug text-slate-500',
+                  (hasMapping || hasDetails) && 'mt-3 border-t border-emerald-200/70 pt-2'
+                )}
+              >
+                {attribution}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>

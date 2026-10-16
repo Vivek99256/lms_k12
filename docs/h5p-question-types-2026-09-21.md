@@ -226,7 +226,7 @@ practice activities, remedial learning and teacher resources.
 
 **All of those read chapter content from one place**:
 `H5PContentAdapter::forChapter()`, which surfaces H5P items into the content list
-as a *format* (`format: 'h5p'`, category `H5P Interactive`) rather than as a peer
+as a *format* (`format: 'h5p'`, category `Interactive`) rather than as a peer
 category. Two new `SOURCES` entries is the entire integration. There is no
 per-consumer registration, and none was added — which is the point of that
 adapter and is why adding a type does not touch twelve call sites.

@@ -2204,15 +2204,24 @@ export default function ChapterListPage() {
   // The top-level Question bank tab links here with no chapterId, so the sync
   // effect above never fires for it. Without this, a filter left over from an
   // earlier chapter-scoped visit in the same session would silently carry over
-  // instead of landing on the full, unfiltered bank the tab implies.
+  // instead of landing on the first chapter the tab now defaults to.
+  const questionBankDefaultAppliedRef = useRef(false);
+
   useEffect(() => {
-    if (view !== 'question-bank' || activeChapterId) return;
+    if (view !== 'question-bank' || activeChapterId) {
+      questionBankDefaultAppliedRef.current = false;
+      return;
+    }
+    if (questionBankDefaultAppliedRef.current) return;
+    if (allChapters.length === 0) return;
+
     questionBankChapterSyncedFromUrlRef.current = null;
-    setQuestionBankChapterFilter('all');
+    questionBankDefaultAppliedRef.current = true;
+    setQuestionBankChapterFilter(allChapters[0].id);
     setQuestionBankConceptFilter('all');
     setQuestionBankTypeFilter('all');
     setQuestionBankCategoryFilter('all');
-  }, [view, activeChapterId]);
+  }, [view, activeChapterId, allChapters]);
 
   const loadQuestionBankItems = useCallback(
     (filterValue: string) => {
@@ -5570,7 +5579,7 @@ export default function ChapterListPage() {
     const totalQuestionBankCount = questionBankItems.length;
     const visibleQuestionBankCount = filteredQuestionBankItems.length;
     const questionCountLabel = questionBankLoading
-      ? 'Loading questionsâ€¦'
+      ? 'Loading questions…'
       : questionBankError
         ? 'Error loading questions'
         : visibleQuestionBankCount === totalQuestionBankCount
@@ -5681,7 +5690,7 @@ export default function ChapterListPage() {
 
           {questionBankLoading ? (
             <div className="rounded-[8px] border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
-              <p className="text-sm font-medium text-slate-600">Loading questions for the selected chapterâ€¦</p>
+              <p className="text-sm font-medium text-slate-600">Loading questions for the selected chapter…</p>
             </div>
           ) : questionBankError ? (
             <div className="rounded-[8px] border border-rose-200 bg-rose-50 px-5 py-12 text-center shadow-sm">
@@ -6657,62 +6666,66 @@ export default function ChapterListPage() {
                   key={chapter.id}
                   className="overflow-hidden rounded-[14px] border border-slate-200/90 bg-white shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5">
-                    <button
-                      type="button"
-                      onClick={() => updateExpandedChapter(isExpanded ? null : chapter.id)}
-                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                    >
-                      <ChevronDown
-                        size={18}
-                        className={cn(
-                          'shrink-0 text-slate-500 transition-transform duration-200',
-                          !isExpanded && '-rotate-90'
-                        )}
-                      />
-                      <div className="min-w-0">
-                        <h3 className="text-[19px] font-bold leading-tight text-slate-950">
-                          {`Chapter ${chapter.number} \u00B7 ${chapter.title}`}
-                        </h3>
-                      </div>
-                    </button>
+                  <div className="flex items-start gap-4 px-6 py-5">
+                    <div className="flex w-1/2 min-w-0 items-center">
+                      <button
+                        type="button"
+                        onClick={() => updateExpandedChapter(isExpanded ? null : chapter.id)}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <ChevronDown
+                          size={18}
+                          className={cn(
+                            'shrink-0 text-slate-500 transition-transform duration-200',
+                            !isExpanded && '-rotate-90'
+                          )}
+                        />
+                        <div className="min-w-0">
+                          <h3 className="text-[19px] font-bold leading-tight text-slate-950">
+                            {`Chapter ${chapter.number} \u00B7 ${chapter.title}`}
+                          </h3>
+                        </div>
+                      </button>
+                    </div>
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => openChapterContentView(chapter, 'classroom')}
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <FolderOpen size={16} className="mr-2" />
-                      Classroom Resource
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => openChapterContentView(chapter, 'teacher')}
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <FolderOpen size={16} className="mr-2" />
-                      Teacher Workspace
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => openChapterCoherenceMapView(chapter)}
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <Network size={16} className="mr-2" />
-                      Coherence map
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => router.push('/lms/homework')}
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <ClipboardList size={16} className="mr-2" />
-                      Homework/Assignment
-                    </Button>
+                    <div className="flex w-1/2 flex-wrap items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => openChapterContentView(chapter, 'classroom')}
+                        className="h-8 shrink-0 rounded-lg border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      >
+                        <FolderOpen size={14} className="mr-1.5" />
+                        Classroom Resource
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => openChapterContentView(chapter, 'teacher')}
+                        className="h-8 shrink-0 rounded-lg border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      >
+                        <FolderOpen size={14} className="mr-1.5" />
+                        Teacher Workspace
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => openChapterCoherenceMapView(chapter)}
+                        className="h-8 shrink-0 rounded-lg border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      >
+                        <Network size={14} className="mr-1.5" />
+                        Coherence map
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => router.push('/lms/homework')}
+                        className="h-8 shrink-0 rounded-lg border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      >
+                        <ClipboardList size={14} className="mr-1.5" />
+                        Homework/Assignment
+                      </Button>
+                    </div>
                   </div>
 
                   {isExpanded && chapterConceptRows.length > 0 && (
