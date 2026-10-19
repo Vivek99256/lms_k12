@@ -54,6 +54,19 @@ export function ConceptDeck({
   const [openTopic, setOpenTopic] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
+  // The parent only remounts this deck when the hook's map itself changes (a
+  // different subject/grade); switching to another chapter of the SAME map
+  // just passes a new `initialChapterId` prop, so without this the drill-down
+  // state here would keep pointing at whichever chapter was opened first.
+  const [seenChapterId, setSeenChapterId] = useState(initialChapterId);
+
+  if (seenChapterId !== initialChapterId) {
+    setSeenChapterId(initialChapterId);
+    setOpenUnit(null);
+    setOpenChapter(initialChapterId);
+    setOpenTopic(null);
+  }
+
   const forest = useMemo(() => buildForest(map.nodes, new Set(ALL_LEVELS)), [map.nodes]);
 
   const byId = useMemo(() => {

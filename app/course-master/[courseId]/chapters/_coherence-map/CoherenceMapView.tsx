@@ -128,16 +128,21 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
 
   /**
    * A new scope from the hook - a different subject, or a different academic year -
-   * invalidates everything about where we had walked to.
+   * invalidates everything about where we had walked to. Opening a different chapter
+   * of the SAME subject/grade does too: the hook's `map` is unchanged (it is scoped to
+   * subject+grade, not chapter), but the root concept picked for the previous chapter
+   * has no business staying centred once a different chapter was asked for.
    *
    * Adjusted during render rather than in an effect. React restarts the render before
    * committing, so the canvas never paints one frame of the old concept against the new
    * map; an effect would do exactly that, and would also cascade a second render.
    */
   const [seenMap, setSeenMap] = useState(map);
+  const [seenChapterId, setSeenChapterId] = useState(initialChapterId);
 
-  if (seenMap !== map) {
+  if (seenMap !== map || seenChapterId !== initialChapterId) {
     setSeenMap(map);
+    setSeenChapterId(initialChapterId);
     setWalked(null);
     setRootId(null);
     setRootStack([]);
