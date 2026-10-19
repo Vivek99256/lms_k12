@@ -123,6 +123,21 @@ export type AdminDashboardSummary = ApiStatusPayload & {
   recent_fee_receipts: Array<{ id?: number; receipt_no: string; amount: number; receiptdate: string; student_name: string }>;
   fee_collection_trend: Array<{ date: string; label: string; amount: number }>;
   students_by_class: Array<{ standard_id: number; standard_name: string; students: number }>;
+  /*
+   * The three fields below were added to RoleDashboardApiController::adminSummary later
+   * than the rest. A backend that predates them omits them, so they are optional and the
+   * widgets that read them stay hidden rather than showing zeros nobody recorded.
+   */
+  attendance_today?: { present: number; absent: number; not_marked: number; total_students: number };
+  /** `rate` is null for a day with no attendance marked (a holiday is not a 0% day). */
+  attendance_trend?: Array<{ date: string; label: string; present: number; absent: number; rate: number | null }>;
+  recent_activity?: Array<{
+    type: 'circular' | 'admission_enquiry';
+    id: number;
+    title: string;
+    detail: string | null;
+    occurred_at: string | null;
+  }>;
 };
 
 export type TeacherDashboardSummary = ApiStatusPayload & {
