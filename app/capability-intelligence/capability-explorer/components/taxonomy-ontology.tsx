@@ -56,6 +56,9 @@ export function TaxonomyOntology() {
       const payload = await fetchGraph({ type: nextType, q: search })
       setType(nextType)
       setNodes(payload.nodes ?? [])
+      if (!payload.available) {
+        setError(payload.reason ?? 'The taxonomy graph is not reachable right now.')
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Couldn't load the taxonomy.")
     } finally {
