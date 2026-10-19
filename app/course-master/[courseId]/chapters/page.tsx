@@ -193,9 +193,6 @@ import { DocumentViewer, type DocumentViewerItem } from '@/components/study-docu
 import { documentKindOf } from '@/lib/study-document/document';
 import type { DocumentKind } from '@/lib/study-document/types';
 import { pdfFileNameFromTitle } from '@/lib/study-deck/pdf';
-import { OpenWithMethod } from '@/components/ceds/OpenWithMethod';
-import { formatCodeFor } from '@/lib/ceds/open';
-import { cedsEnabledFor } from '@/lib/ceds/scope';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import { useCurriculumMeta } from '../../data/curriculum';
@@ -1312,8 +1309,6 @@ export default function ChapterListPage() {
   const [selectedContentItem, setSelectedContentItem] = useState<ChapterContentItem | null>(null);
   // The study document open over the page, if any (revision notes, a remedial class, classroom activities).
   const [openDocument, setOpenDocument] = useState<DocumentViewerItem | null>(null);
-  // The Classroom Resource card whose Open is waiting for a teaching method (see handleOpenContent).
-  const [methodGate, setMethodGate] = useState<ChapterContentItem | null>(null);
   const [chapterContentCategories, setChapterContentCategories] = useState<
     Record<string, Record<string, ChapterContentAsset[]>>
   >({});
@@ -2899,22 +2894,7 @@ export default function ChapterListPage() {
     });
   };
 
-  /**
-   * In Classroom Resource, a card that is one of the six CEDS formats (presentation, activity, Prayogshala, revision
-   * notes, remedial class) first asks for the resource format and the teaching method, says why when they do not suit
-   * each other, and shows the method's lesson flow; the resource itself opens from there (openContentNow, unchanged).
-   * Only for Std 9 Science, Chapter 1 (lib/ceds/scope.ts). Every other chapter, every other card, and the Teacher
-   * Workspace open directly as before.
-   */
   const handleOpenContent = (item: ChapterContentItem) => {
-    if (contentResourceType === 'classroom' && formatCodeFor(item.type) !== null && item.chapterId !== undefined && cedsEnabledFor(item.chapterId)) {
-      setMethodGate(item);
-      return;
-    }
-    openContentNow(item);
-  };
-
-  const openContentNow = (item: ChapterContentItem) => {
     // A Prayogshala activity is a structured document (objective, procedure, safety...),
     // not a file or a route, so it opens in its own detail view. The activity came
     // down with the list; nothing is fetched here.
@@ -6088,17 +6068,6 @@ export default function ChapterListPage() {
     />
   );
 
-  // A Classroom Resource card's Open asks for the format and the teaching method first.
-  const methodGateOverlay = methodGate ? (
-    <OpenWithMethod
-      chapterId={Number(methodGate.chapterId)}
-      itemTitle={methodGate.title}
-      itemType={methodGate.type}
-      onOpenResource={() => openContentNow(methodGate)}
-      onClose={() => setMethodGate(null)}
-    />
-  ) : null;
-
   if (view === 'content' && contentChapter) {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
     const totalItems = resourceScopedContentItems.length;
@@ -6595,7 +6564,6 @@ export default function ChapterListPage() {
             onSuccess={handleGenerateSuccess}
           />
           {documentViewer}
-      {methodGateOverlay}
         </div>
       </div>
     );
@@ -7142,7 +7110,6 @@ export default function ChapterListPage() {
       )}
 
       {documentViewer}
-      {methodGateOverlay}
     </div>
   );
 }
