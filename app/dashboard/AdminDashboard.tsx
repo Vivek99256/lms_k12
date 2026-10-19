@@ -2,15 +2,16 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  BookOpenCheck, Cake, CalendarCheck, ClipboardList, GraduationCap, Megaphone, MessageCircleWarning, ReceiptIndianRupee,
-  RefreshCw, School, UserPlus, Users, Wallet, ArrowUpRight,
+  ArrowUpRight, BookOpenCheck, Cake, CalendarCheck, CalendarDays, ClipboardList, GraduationCap, History, Megaphone,
+  MessageCircleWarning, ReceiptIndianRupee, RefreshCw, School, UserPlus, Users, Wallet, Zap,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardAuthError, fetchAdminDashboard, getDashboardSession, type AdminDashboardSummary } from '@/app/dashboard/_lib/dashboard-api';
 import {
   DashboardError, DashboardSkeleton, EmptyState, MiniStat, SectionPanel, SegmentBar, StatCard,
 } from '@/app/dashboard/_components/DashboardPrimitives';
-import { DashboardBarChart } from '@/app/dashboard/_components/DashboardBarChart';
+import { DashboardBarChart, DashboardDoughnut } from '@/app/dashboard/_components/DashboardBarChart';
+import { ACCENTS, ACCENT_ORDER, SECTION_ACCENT } from '@/app/dashboard/_components/dashboard-accents';
 import { AdminQuickActions, useHasMenuModule } from '@/app/dashboard/_components/AdminQuickActions';
 import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
 import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
@@ -40,6 +41,8 @@ const ADMIN_WIDGETS = [
 ] as const satisfies readonly DashboardWidget[];
 
 type WidgetId = (typeof ADMIN_WIDGETS)[number]['id'];
+
+const S = SECTION_ACCENT;
 
 /* ---------- formatting ---------- */
 
@@ -114,6 +117,9 @@ const GLANCE_GRID: Record<number, string> = {
 
 /* ---------- fee status (Fees module summary — gated by the user's fee rights) ---------- */
 
+const FEE_COLLECTED = ACCENTS[S.fees].chart.bar;
+const FEE_OUTSTANDING = ACCENTS.rose.chart.barLight;
+
 function FeeStatusPanel() {
   const [data, setData] = useState<FeesDashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -133,53 +139,56 @@ function FeeStatusPanel() {
     return () => controller.abort();
   }, []);
 
+  const a = ACCENTS[S.fees];
   const action = (
-    <a href="/fees/dashboard" className="inline-flex items-center gap-1 rounded-md text-xs font-medium text-[#4F46E5] outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40">
-      Fees dashboard <ArrowUpRight size={14} aria-hidden />
+    <a
+      href="/fees/dashboard"
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold outline-none hover:underline focus-visible:ring-2 ${a.chip} ${a.ring}`}
+    >
+      Open <ArrowUpRight size={13} aria-hidden />
     </a>
   );
 
   return (
-    <SectionPanel title="Fee collection this year" description="Collected against total demand" action={action}>
+    <SectionPanel title="Fee collection this year" description="Collected against total demand" action={action} accent={S.fees} icon={ReceiptIndianRupee} shape="notch">
       {error ? (
         <p className="text-sm text-slate-500">{error}</p>
       ) : !data ? (
-        <div className="space-y-3" aria-busy="true">
-          <div className="h-6 w-2/3 animate-pulse rounded bg-slate-100" />
-          <div className="h-2 animate-pulse rounded-full bg-slate-100" />
-          <div className="h-10 animate-pulse rounded bg-slate-100" />
+        <div className="flex items-center gap-4" aria-busy="true">
+          <div className="h-[132px] w-[132px] animate-pulse rounded-full bg-teal-50" />
+          <div className="flex-1 space-y-2">
+            <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
+            <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
+          </div>
         </div>
       ) : data.summary.demand_amount <= 0 && data.summary.collected_amount <= 0 ? (
-        <EmptyState message="No fee demand has been set up for this academic year." />
+        <EmptyState accent={S.fees} message="No fee demand has been set up for this academic year." />
       ) : (
-        <>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
-              {formatPercent(Math.min(100, data.summary.collection_rate))}
-            </span>
-            <span className="text-xs text-slate-500">collection rate</span>
-          </div>
-          <div
-            className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"
-            role="progressbar"
-            aria-label="Fee collection rate"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(Math.min(100, data.summary.collection_rate))}
-          >
-            <div className="h-full rounded-full bg-[#4F46E5]" style={{ width: `${Math.min(100, data.summary.collection_rate)}%` }} />
-          </div>
-          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <dt className="text-xs text-slate-500">Collected</dt>
-              <dd className="mt-0.5 font-semibold text-slate-900 tabular-nums">{formatCurrency(data.summary.collected_amount)}</dd>
+        <div className="flex flex-col items-center gap-4 sm:flex-row lg:flex-col xl:flex-row">
+          <DashboardDoughnut
+            center={formatPercent(Math.min(100, data.summary.collection_rate))}
+            centerLabel="collected"
+            formatValue={formatCurrency}
+            segments={[
+              { label: 'Collected', value: data.summary.collected_amount, color: FEE_COLLECTED },
+              { label: 'Outstanding', value: Math.max(0, data.summary.outstanding_amount), color: FEE_OUTSTANDING },
+            ]}
+          />
+          <dl className="grid w-full flex-1 grid-cols-1 gap-2 text-sm">
+            <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-3 py-2">
+              <dt className="flex items-center gap-1.5 text-xs font-medium text-teal-800">
+                <span className="h-2 w-2 rounded-full" style={{ background: FEE_COLLECTED }} aria-hidden /> Collected
+              </dt>
+              <dd className="mt-0.5 font-bold text-teal-950 tabular-nums">{formatCurrency(data.summary.collected_amount)}</dd>
             </div>
-            <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <dt className="text-xs text-slate-500">Outstanding</dt>
-              <dd className="mt-0.5 font-semibold text-slate-900 tabular-nums">{formatCurrency(data.summary.outstanding_amount)}</dd>
+            <div className="rounded-xl border border-rose-100 bg-rose-50/70 px-3 py-2">
+              <dt className="flex items-center gap-1.5 text-xs font-medium text-rose-800">
+                <span className="h-2 w-2 rounded-full" style={{ background: FEE_OUTSTANDING }} aria-hidden /> Outstanding
+              </dt>
+              <dd className="mt-0.5 font-bold text-rose-950 tabular-nums">{formatCurrency(data.summary.outstanding_amount)}</dd>
             </div>
           </dl>
-        </>
+        </div>
       )}
     </SectionPanel>
   );
@@ -253,94 +262,121 @@ export default function AdminDashboard() {
 
   const now = loadedAt ?? new Date();
   const firstName = (user?.name || '').trim().split(/\s+/)[0];
+  const academicYear = getDashboardSession().academicYearId;
   const ready = !loading && prefs.ready && !error && data;
 
-  /* --- primary KPI row --- */
+  /* --- primary KPI row: four sections, four card styles, four shapes --- */
   const kpis: React.ReactNode[] = [];
   if (data) {
     if (show('kpi.total_students'))
       kpis.push(
         <StatCard
           key="students"
+          accent={S.students}
+          variant="gradient"
+          shape="leaf"
+          iconShape="squircle"
           label="Total students"
           value={data.summary.total_students.toLocaleString('en-IN')}
           icon={GraduationCap}
-          hint={`Enrolled this academic year · ${data.summary.total_classes} classes`}
+          hint={`Across ${data.summary.total_classes} classes`}
         />,
       );
     if (show('kpi.attendance_today') && attendance)
       kpis.push(
         <StatCard
           key="attendance"
+          accent={S.attendance}
+          variant="tinted"
+          shape="soft"
+          iconShape="circle"
           label="Today's attendance"
           value={attendance.rate == null ? 'Not marked' : formatPercent(attendance.rate)}
           icon={CalendarCheck}
-          tone={attendance.rate == null ? 'default' : attendance.rate < 75 ? 'warning' : 'positive'}
-          hint={
-            attendance.marked === 0
-              ? 'No class has marked attendance yet today'
-              : `${attendance.present.toLocaleString('en-IN')} present · ${attendance.absent.toLocaleString('en-IN')} absent · ${attendance.not_marked.toLocaleString('en-IN')} not marked`
-          }
+          hint={attendance.marked === 0 ? 'No class has marked attendance yet' : undefined}
         >
-          <SegmentBar
-            label={`${attendance.present} present, ${attendance.absent} absent, ${attendance.not_marked} not marked`}
-            segments={[
-              { label: 'Present', value: attendance.present, className: 'bg-emerald-500' },
-              { label: 'Absent', value: attendance.absent, className: 'bg-red-500' },
-              { label: 'Not marked', value: attendance.not_marked, className: 'bg-slate-200' },
-            ]}
-          />
+          {attendance.marked > 0 && (
+            <SegmentBar
+              legend
+              label={`${attendance.present} present, ${attendance.absent} absent, ${attendance.not_marked} not marked`}
+              segments={[
+                { label: 'Present', value: attendance.present, className: 'bg-emerald-500' },
+                { label: 'Absent', value: attendance.absent, className: 'bg-rose-500' },
+                { label: 'Not marked', value: attendance.not_marked, className: 'bg-slate-300' },
+              ]}
+            />
+          )}
         </StatCard>,
       );
     if (show('kpi.fees_collected_today'))
       kpis.push(
         <StatCard
           key="fees"
+          accent={S.fees}
+          variant="strip"
+          shape="notch"
+          iconShape="blob"
           label="Fees collected today"
           value={formatCurrency(data.summary.fees_collected_today)}
           icon={Wallet}
-          tone="positive"
           hint={`${formatCurrencyCompact(data.fee_collection_trend.reduce((sum, row) => sum + row.amount, 0))} in the last 7 days`}
         />,
       );
     if (show('kpi.total_staff'))
       kpis.push(
-        <StatCard key="staff" label="Total staff" value={data.summary.total_staff.toLocaleString('en-IN')} icon={Users} hint="Active user accounts" />,
+        <StatCard
+          key="staff"
+          accent={S.staff}
+          variant="bordered"
+          shape="round"
+          iconShape="square"
+          label="Total staff"
+          value={data.summary.total_staff.toLocaleString('en-IN')}
+          icon={Users}
+          hint="Active user accounts"
+        />,
       );
   }
 
   /* --- secondary "at a glance" strip --- */
   const glance: React.ReactNode[] = [];
   if (data) {
-    if (show('kpi.total_classes')) glance.push(<MiniStat key="classes" label="Classes" value={data.summary.total_classes} icon={School} />);
+    if (show('kpi.total_classes'))
+      glance.push(<MiniStat key="classes" accent={S.students} iconShape="squircle" label="Classes" value={data.summary.total_classes} icon={School} />);
     if (show('kpi.admissions_this_year'))
-      glance.push(<MiniStat key="admissions" label="Admission enquiries this year" value={data.summary.admissions_this_year} icon={UserPlus} />);
-    if (show('kpi.homework_today')) glance.push(<MiniStat key="homework" label="Homework posted today" value={data.summary.homework_today} icon={BookOpenCheck} />);
-    if (show('kpi.circulars_today')) glance.push(<MiniStat key="circulars" label="Circulars today" value={data.summary.circulars_today} icon={Megaphone} />);
+      glance.push(
+        <MiniStat key="admissions" accent={S.admissions} iconShape="circle" label="Admission enquiries this year" value={data.summary.admissions_this_year} icon={UserPlus} />,
+      );
+    if (show('kpi.homework_today'))
+      glance.push(<MiniStat key="homework" accent={S.academics} iconShape="blob" label="Homework posted today" value={data.summary.homework_today} icon={BookOpenCheck} />);
+    if (show('kpi.circulars_today'))
+      glance.push(<MiniStat key="circulars" accent={S.communication} iconShape="square" label="Circulars today" value={data.summary.circulars_today} icon={Megaphone} />);
     if (show('kpi.pending_parent_communications'))
       glance.push(
         <MiniStat
           key="parents"
+          accent={S.celebrations}
+          iconShape="circle"
           label="Parent messages awaiting reply"
           value={data.summary.pending_parent_communications}
           icon={MessageCircleWarning}
-          tone={data.summary.pending_parent_communications > 0 ? 'warning' : 'default'}
         />,
       );
   }
 
-  /* --- main column --- */
+  /* --- main and side columns --- */
   const main: React.ReactNode[] = [];
   const side: React.ReactNode[] = [];
   if (data) {
     const trendCharts: React.ReactNode[] = [];
     if (show('chart.fee_collection'))
       trendCharts.push(
-        <SectionPanel key="fee-trend" title="Fee collection" description="Last 7 days, all fee types">
+        <SectionPanel key="fee-trend" accent={S.fees} icon={Wallet} title="Fee collection" description="Last 7 days, all fee types">
           {data.fee_collection_trend.every((row) => row.amount === 0) ? (
-            <EmptyState icon={ReceiptIndianRupee} message="No fee collections in the last 7 days." />
+            <EmptyState accent={S.fees} icon={ReceiptIndianRupee} message="No fee collections in the last 7 days." />
           ) : (
             <DashboardBarChart
+              accent={S.fees}
               label="Collected"
               labels={data.fee_collection_trend.map((row) => row.label)}
               values={data.fee_collection_trend.map((row) => row.amount)}
@@ -352,11 +388,12 @@ export default function AdminDashboard() {
       );
     if (show('chart.attendance_trend') && data.attendance_trend)
       trendCharts.push(
-        <SectionPanel key="attendance-trend" title="Attendance" description="Students present, last 7 days">
+        <SectionPanel key="attendance-trend" accent={S.attendance} icon={CalendarCheck} title="Attendance" description="Students present, last 7 days">
           {data.attendance_trend.every((row) => row.rate == null) ? (
-            <EmptyState icon={CalendarCheck} message="No attendance was marked in the last 7 days." />
+            <EmptyState accent={S.attendance} icon={CalendarCheck} message="No attendance was marked in the last 7 days." />
           ) : (
             <DashboardBarChart
+              accent={S.attendance}
               label="Present"
               labels={data.attendance_trend.map((row) => row.label)}
               values={data.attendance_trend.map((row) => row.rate)}
@@ -376,11 +413,12 @@ export default function AdminDashboard() {
 
     if (show('chart.students_by_class'))
       main.push(
-        <SectionPanel key="by-class" title="Students by class" description="Current enrollment distribution">
+        <SectionPanel key="by-class" accent={S.academics} icon={GraduationCap} shape="leaf" title="Students by class" description="Current enrollment distribution">
           {data.students_by_class.length === 0 ? (
-            <EmptyState icon={GraduationCap} message="No enrollment data yet." />
+            <EmptyState accent={S.academics} icon={GraduationCap} message="No enrollment data yet." />
           ) : (
             <DashboardBarChart
+              accent={S.academics}
               label="Students"
               labels={data.students_by_class.map((row) => row.standard_name)}
               values={data.students_by_class.map((row) => Number(row.students))}
@@ -392,29 +430,38 @@ export default function AdminDashboard() {
 
     if (show('panel.recent_fee_receipts'))
       main.push(
-        <SectionPanel key="receipts" title="Recent fee receipts" description="Latest payments received" flush>
+        <SectionPanel key="receipts" accent={S.fees} icon={ReceiptIndianRupee} shape="notch" title="Recent fee receipts" description="Latest payments received" flush>
           {data.recent_fee_receipts.length === 0 ? (
-            <div className="px-5 pb-3">
-              <EmptyState icon={ReceiptIndianRupee} message="No fee receipts yet this academic year." />
+            <div className="p-5">
+              <EmptyState accent={S.fees} icon={ReceiptIndianRupee} message="No fee receipts yet this academic year." />
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-y border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    <th scope="col" className="px-5 py-2">Student</th>
-                    <th scope="col" className="px-3 py-2">Receipt</th>
-                    <th scope="col" className="hidden px-3 py-2 sm:table-cell">Date</th>
-                    <th scope="col" className="px-5 py-2 text-right">Amount</th>
+                  <tr className="border-b border-teal-100 bg-teal-50/60 text-left text-[11px] font-semibold uppercase tracking-wider text-teal-800">
+                    <th scope="col" className="px-5 py-2.5">Student</th>
+                    <th scope="col" className="px-3 py-2.5">Receipt</th>
+                    <th scope="col" className="hidden px-3 py-2.5 sm:table-cell">Date</th>
+                    <th scope="col" className="px-5 py-2.5 text-right">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-teal-50">
                   {data.recent_fee_receipts.map((row, i) => (
-                    <tr key={row.id ?? i} className="hover:bg-slate-50/60">
-                      <td className="max-w-[220px] truncate px-5 py-2.5 font-medium text-slate-900">{row.student_name}</td>
-                      <td className="px-3 py-2.5 font-mono text-xs text-slate-600">{row.receipt_no}</td>
+                    <tr key={row.id ?? i} className="transition-colors odd:bg-white even:bg-slate-50/50 hover:bg-teal-50/60">
+                      <td className="max-w-[220px] px-5 py-2.5">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${ACCENTS[ACCENT_ORDER[i % ACCENT_ORDER.length]].iconSoft}`} aria-hidden>
+                            {initials(row.student_name)}
+                          </span>
+                          <span className="truncate font-medium text-slate-900">{row.student_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">{row.receipt_no}</span>
+                      </td>
                       <td className="hidden px-3 py-2.5 text-slate-500 sm:table-cell">{formatRelativeDay(row.receiptdate)}</td>
-                      <td className="px-5 py-2.5 text-right font-medium text-slate-900 tabular-nums">{formatCurrency(row.amount)}</td>
+                      <td className="px-5 py-2.5 text-right font-bold text-teal-800 tabular-nums">{formatCurrency(row.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -424,10 +471,9 @@ export default function AdminDashboard() {
         </SectionPanel>,
       );
 
-    /* --- side column --- */
     if (show('panel.quick_actions'))
       side.push(
-        <SectionPanel key="quick" title="Quick actions" description="Shortcuts to frequent tasks">
+        <SectionPanel key="quick" accent={S.students} icon={Zap} shape="round" title="Quick actions" description="Shortcuts to frequent tasks">
           <AdminQuickActions />
         </SectionPanel>,
       );
@@ -436,24 +482,25 @@ export default function AdminDashboard() {
 
     if (show('panel.recent_activity') && data.recent_activity)
       side.push(
-        <SectionPanel key="activity" title="Recent activity" description="Circulars and admission enquiries">
+        <SectionPanel key="activity" accent={S.staff} icon={History} title="Recent activity" description="Circulars and admission enquiries">
           {data.recent_activity.length === 0 ? (
-            <EmptyState message="Nothing new this academic year." />
+            <EmptyState accent={S.staff} icon={History} message="Nothing new this academic year." />
           ) : (
-            <ol className="space-y-3">
+            <ol className="relative space-y-4 before:absolute before:bottom-2 before:left-[15px] before:top-2 before:w-px before:bg-sky-100">
               {data.recent_activity.map((item) => {
                 const isCircular = item.type === 'circular';
+                const itemAccent = ACCENTS[isCircular ? S.communication : S.admissions];
                 const Icon = isCircular ? Megaphone : ClipboardList;
                 return (
-                  <li key={`${item.type}-${item.id}`} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                      <Icon size={14} strokeWidth={1.75} aria-hidden />
+                  <li key={`${item.type}-${item.id}`} className="relative flex items-start gap-3">
+                    <span className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-4 ring-white ${itemAccent.iconSolid}`}>
+                      <Icon size={14} strokeWidth={2} aria-hidden />
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-900" title={item.title}>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <p className="truncate text-sm font-semibold text-slate-900" title={item.title}>
                         {item.title || (isCircular ? 'Untitled circular' : 'Unnamed applicant')}
                       </p>
-                      <p className="truncate text-xs text-slate-500">
+                      <p className={`truncate text-xs font-medium ${itemAccent.muted}`}>
                         {isCircular ? 'Circular published' : 'Admission enquiry'}
                         {item.detail && (
                           <>
@@ -463,7 +510,7 @@ export default function AdminDashboard() {
                         )}
                       </p>
                     </div>
-                    <span className="shrink-0 text-xs text-slate-400">{formatRelativeDay(item.occurred_at)}</span>
+                    <span className="shrink-0 pt-1 text-xs text-slate-400">{formatRelativeDay(item.occurred_at)}</span>
                   </li>
                 );
               })}
@@ -474,25 +521,28 @@ export default function AdminDashboard() {
 
     if (show('panel.upcoming_birthdays'))
       side.push(
-        <SectionPanel key="birthdays" title="Upcoming birthdays" description="Students in the next 7 days">
+        <SectionPanel key="birthdays" accent={S.celebrations} icon={Cake} shape="leaf" title="Upcoming birthdays" description="Students in the next 7 days">
           {data.upcoming_birthdays.length === 0 ? (
-            <EmptyState icon={Cake} message="No student birthdays in the next 7 days." />
+            <EmptyState accent={S.celebrations} icon={Cake} message="No student birthdays in the next 7 days." />
           ) : (
-            <ul className="space-y-3">
-              {data.upcoming_birthdays.map((row, i) => (
-                <li key={`${row.student_name}-${i}`} className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-[#4F46E5]" aria-hidden>
-                    {initials(row.student_name)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900">{row.student_name}</p>
-                    <p className="truncate text-xs text-slate-500">
-                      {row.standard_name} – {row.division_name}
-                    </p>
-                  </div>
-                  <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{formatBirthday(row.dob)}</span>
-                </li>
-              ))}
+            <ul className="space-y-2">
+              {data.upcoming_birthdays.map((row, i) => {
+                const avatar = ACCENTS[ACCENT_ORDER[i % ACCENT_ORDER.length]];
+                return (
+                  <li key={`${row.student_name}-${i}`} className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-amber-50">
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatar.iconSolid}`} aria-hidden>
+                      {initials(row.student_name)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">{row.student_name}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {row.standard_name} – {row.division_name}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">{formatBirthday(row.dob)}</span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </SectionPanel>,
@@ -501,34 +551,43 @@ export default function AdminDashboard() {
 
   return (
     <div className="mx-auto w-full max-w-[1600px] flex-1 px-1 pb-6 sm:px-2">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500">
-            {now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
-          <h1 className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-slate-900">
-            {greeting(now)}
-            {firstName ? `, ${firstName}` : ''}
-          </h1>
-          <p className="mt-0.5 text-sm text-slate-500">Here&apos;s today&apos;s overview across the school.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {loadedAt && (
-            <span className="hidden text-xs text-slate-400 sm:inline">
-              Updated {loadedAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => load('refresh')}
-            disabled={loading || refreshing}
-            aria-label="Refresh dashboard"
-            title="Refresh"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 shadow-xs outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40 disabled:opacity-50"
-          >
-            <RefreshCw size={16} className={refreshing ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden />
-          </button>
-          {prefs.ready && <CustomizeDashboard widgets={ADMIN_WIDGETS} {...prefs.customizeProps} />}
+      {/* Welcome banner — the one solid gradient card, so it anchors the page. */}
+      <header className="relative mb-5 overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-600 px-5 py-5 text-white shadow-lg shadow-indigo-600/20 sm:px-7 sm:py-6">
+        <span className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-white/10" aria-hidden />
+        <span className="pointer-events-none absolute -bottom-20 right-24 h-40 w-40 rounded-full bg-violet-400/20" aria-hidden />
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-indigo-100">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1">
+                <CalendarDays size={13} aria-hidden />
+                {now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </span>
+              {academicYear && <span className="rounded-full bg-white/15 px-2.5 py-1">Academic year {academicYear}</span>}
+            </div>
+            <h1 className="mt-3 truncate text-2xl font-bold tracking-tight sm:text-3xl">
+              {greeting(now)}
+              {firstName ? `, ${firstName}` : ''}
+            </h1>
+            <p className="mt-1 text-sm text-indigo-100">Here&apos;s today&apos;s overview across the school.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {loadedAt && (
+              <span className="hidden text-xs text-indigo-100 sm:inline">
+                Updated {loadedAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => load('refresh')}
+              disabled={loading || refreshing}
+              aria-label="Refresh dashboard"
+              title="Refresh"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white outline-none transition-colors hover:bg-white/25 focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={refreshing ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden />
+            </button>
+            {prefs.ready && <CustomizeDashboard widgets={ADMIN_WIDGETS} {...prefs.customizeProps} className="border-white/0 text-slate-800" />}
+          </div>
         </div>
       </header>
 
@@ -543,9 +602,8 @@ export default function AdminDashboard() {
           {kpis.length > 0 && <div className={`grid gap-4 ${KPI_GRID[kpis.length]}`}>{kpis}</div>}
 
           {glance.length > 0 && (
-            <section aria-label="Today at a glance" className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              {/* 1px gaps over a tinted background draw the dividers, so they stay right however the grid wraps. */}
-              <div className={`grid gap-px bg-slate-100 ${GLANCE_GRID[glance.length]} [&>*]:bg-white`}>{glance}</div>
+            <section aria-label="Today at a glance" className={`grid gap-3 ${GLANCE_GRID[glance.length]}`}>
+              {glance}
             </section>
           )}
 
