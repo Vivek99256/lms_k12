@@ -73,10 +73,10 @@ export function ShapeGrid({ shape, rows, titleKey, subtitleKey, onOpen, actions 
               type="button"
               onClick={() => onOpen(row)}
               className={cn(
-                'flex h-full w-full flex-col gap-2 rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 p-4 text-left',
+                'flex h-full w-full flex-col gap-2 rounded-2xl border-2 border-indigo-600/25 bg-gradient-to-br from-indigo-50 to-white p-4 text-left dark:from-indigo-950 dark:to-background',
                 'transition-all duration-200',
-                'hover:-translate-y-0.5 hover:border-primary/60 hover:from-primary/20 hover:to-primary/10',
-                'hover:shadow-[0_12px_28px_-14px_var(--primary)]',
+                'hover:-translate-y-0.5 hover:border-indigo-600/60 hover:from-indigo-100 hover:to-indigo-50 dark:hover:from-indigo-900 dark:hover:to-indigo-950',
+                'hover:shadow-[0_12px_28px_-14px_#4f46e5]',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
               )}
             >
@@ -172,8 +172,8 @@ function Tile({
       <span
         aria-hidden
         className={cn(
-          'absolute inset-0 bg-primary/30 transition-colors duration-200',
-          'group-hover:bg-primary group-focus-within:bg-primary',
+          'absolute inset-0 bg-indigo-600/40 transition-colors duration-200',
+          'group-hover:bg-indigo-600 group-focus-within:bg-indigo-600',
           rounded,
         )}
         style={clip ? { clipPath: clip } : undefined}
@@ -182,8 +182,8 @@ function Tile({
       <span
         aria-hidden
         className={cn(
-          'absolute inset-[2px] bg-gradient-to-br from-primary/15 to-primary/5 transition-colors duration-200',
-          'group-hover:from-primary/30 group-hover:to-primary/15',
+          'absolute inset-[2px] bg-gradient-to-br from-indigo-50 to-white transition-colors duration-200 dark:from-indigo-950 dark:to-background',
+          'group-hover:from-indigo-100 group-hover:to-indigo-50 dark:group-hover:from-indigo-900 dark:group-hover:to-indigo-950',
           rounded,
         )}
         style={clip ? { clipPath: clip } : undefined}
