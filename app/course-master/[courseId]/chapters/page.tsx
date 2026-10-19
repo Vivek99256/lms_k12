@@ -2183,13 +2183,10 @@ export default function ChapterListPage() {
   };
 
   useEffect(() => {
-    if (!contentChapter) return;
+    if (!contentChapter || selectedLibraryChapterId === contentChapter.id) return;
 
-    const hasMatchingChapter = allChapters.some((chapter) => chapter.id === selectedLibraryChapterId);
-    if (!selectedLibraryChapterId || !hasMatchingChapter) {
-      queueMicrotask(() => setSelectedLibraryChapterId(contentChapter.id));
-    }
-  }, [allChapters, contentChapter, selectedLibraryChapterId]);
+    queueMicrotask(() => setSelectedLibraryChapterId(contentChapter.id));
+  }, [contentChapter, selectedLibraryChapterId]);
 
   const questionBankChapterSyncedFromUrlRef = useRef<string | null>(null);
 
