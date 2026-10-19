@@ -36,11 +36,21 @@ export function CurriculumTab({
   unmapped,
   isLoading,
   loadError,
+  standardId = null,
+  subjectId = null,
+  curriculumId = null,
+  chapterId = null,
 }: {
   curricula: ApiCurriculum[];
   unmapped: ApiUnmappedGroup[];
   isLoading: boolean;
   loadError: string | null;
+  /** Shared academic scope - narrows which curriculum (and, once a chapter is
+   * also picked, which unit/chapter) this tab displays. */
+  standardId?: number | null;
+  subjectId?: number | null;
+  curriculumId?: number | null;
+  chapterId?: number | null;
 }) {
   if (isLoading) {
     return (
@@ -66,25 +76,64 @@ export function CurriculumTab({
     );
   }
 
+  const hasScope = standardId !== null && subjectId !== null;
+
+  // Show only what was picked above: the exact curriculum when one is
+  // selected, falling back to the Standard/Subject pair if the curriculum
+  // picker hasn't resolved one yet.
+  const visibleCurricula = curriculumId !== null
+    ? curricula.filter((c) => c.curriculum_id === curriculumId)
+    : hasScope
+      ? curricula.filter((c) => c.standard_id === standardId && c.subject_id === subjectId)
+      : curricula;
+
+  const visibleUnmapped = hasScope
+    ? unmapped.filter((g) => g.standard_id === standardId && g.subject_id === subjectId)
+    : unmapped;
+
+  if (hasScope && visibleCurricula.length === 0 && visibleUnmapped.length === 0) {
+    return (
+      <div className="rounded-lg border border-[#ddd9d2] bg-white px-4 py-10 text-center text-sm text-[#9a958e]">
+        No curriculum data found for the selected Standard and Subject.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {curricula.map((curriculum, index) => (
+      {visibleCurricula.map((curriculum, index) => (
         <CurriculumCard
           key={curriculum.curriculum_id}
           curriculum={curriculum}
           accent={subjectColorAt(index).dotColor}
+          focusChapterId={chapterId}
         />
       ))}
 
-      {unmapped.map((group) => (
+      {visibleUnmapped.map((group) => (
         <UnmappedCard key={`${group.standard_id}-${group.subject_id}`} group={group} />
       ))}
     </div>
   );
 }
 
-function CurriculumCard({ curriculum, accent }: { curriculum: ApiCurriculum; accent: string }) {
+function CurriculumCard({
+  curriculum,
+  accent,
+  focusChapterId,
+}: {
+  curriculum: ApiCurriculum;
+  accent: string;
+  focusChapterId: number | null;
+}) {
   const [isOpen, setIsOpen] = useState(true);
+
+  // Once a chapter is picked, narrow the unit list to the unit(s) that
+  // actually contain it - the whole point is to show only the selection,
+  // not the entire curriculum with one thing highlighted.
+  const visibleUnits = focusChapterId !== null
+    ? curriculum.units.filter((u) => u.chapters.some((c) => c.chapter_id === focusChapterId))
+    : curriculum.units;
 
   const marks = formatMarks(curriculum.total_marks, curriculum.internal_marks);
   const { declared_chapters: declared, extracted_chapters: extracted, chapters_with_intelligence: withIntel } =
@@ -152,13 +201,21 @@ function CurriculumCard({ curriculum, accent }: { curriculum: ApiCurriculum; acc
           <OutcomeTree goals={curriculum.outcomes} />
 
           <div>
-            <SectionHeading>Units ({curriculum.units.length})</SectionHeading>
-            {curriculum.units.length === 0 ? (
-              <NotProvided label="No units have been recorded for this curriculum." />
+            <SectionHeading>
+              {focusChapterId !== null ? `Unit (${visibleUnits.length})` : `Units (${visibleUnits.length})`}
+            </SectionHeading>
+            {visibleUnits.length === 0 ? (
+              <NotProvided
+                label={
+                  focusChapterId !== null
+                    ? 'The selected chapter was not found in this curriculum’s units.'
+                    : 'No units have been recorded for this curriculum.'
+                }
+              />
             ) : (
               <div className="space-y-2">
-                {curriculum.units.map((unit) => (
-                  <UnitRow key={unit.unit_id} unit={unit} />
+                {visibleUnits.map((unit) => (
+                  <UnitRow key={unit.unit_id} unit={unit} focusChapterId={focusChapterId} />
                 ))}
               </div>
             )}
@@ -263,11 +320,18 @@ function OutcomeTree({ goals }: { goals: ApiOutcomeGoal[] }) {
   );
 }
 
-function UnitRow({ unit }: { unit: ApiUnit }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [openChapterId, setOpenChapterId] = useState<number | null>(null);
+function UnitRow({ unit, focusChapterId }: { unit: ApiUnit; focusChapterId: number | null }) {
+  const containsFocusChapter = focusChapterId !== null && unit.chapters.some((c) => c.chapter_id === focusChapterId);
+  const [isOpen, setIsOpen] = useState(containsFocusChapter);
+  const [openChapterId, setOpenChapterId] = useState<number | null>(containsFocusChapter ? focusChapterId : null);
 
   const missing = unit.declared_chapter_count - unit.extracted_chapter_count;
+
+  // Once a chapter is picked, this unit was only included because it
+  // contains it (see visibleUnits in CurriculumCard) - show only that one.
+  const visibleChapters = focusChapterId !== null
+    ? unit.chapters.filter((c) => c.chapter_id === focusChapterId)
+    : unit.chapters;
 
   return (
     <div className="overflow-hidden rounded-lg border border-[#e5e1da]">
@@ -337,12 +401,12 @@ function UnitRow({ unit }: { unit: ApiUnit }) {
           </div>
 
           <div>
-            <SectionHeading>Extracted chapters ({unit.chapters.length})</SectionHeading>
-            {unit.chapters.length === 0 ? (
+            <SectionHeading>Extracted chapters ({visibleChapters.length})</SectionHeading>
+            {visibleChapters.length === 0 ? (
               <NotProvided label="No chapter content has been extracted for this unit yet." />
             ) : (
               <div className="space-y-2">
-                {unit.chapters.map((chapter) => (
+                {visibleChapters.map((chapter) => (
                     <div key={chapter.chapter_id} className="overflow-hidden rounded-lg border border-[#e5e1da]">
                       <button
                         type="button"
