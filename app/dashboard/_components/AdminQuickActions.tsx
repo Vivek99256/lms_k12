@@ -7,6 +7,7 @@ import {
 import { useShellMenu } from '@/app/components/shell-menu-context';
 import { buildMenuSearchIndex, type MenuSearchEntry } from '@/app/data/menuSearch';
 import { EmptyState, QuickActionTile } from '@/app/dashboard/_components/DashboardPrimitives';
+import { ICON_SHAPE_ORDER, SECTION_ACCENT, type Accent } from '@/app/dashboard/_components/dashboard-accents';
 
 /**
  * Frequent admin tasks, each tied to the menu screen(s) that perform it.
@@ -16,15 +17,15 @@ import { EmptyState, QuickActionTile } from '@/app/dashboard/_components/Dashboa
  * menu — so this list can never offer a screen the menu would not, and it follows
  * whatever rights the school has configured without a second permission check here.
  */
-const ACTIONS: Array<{ id: string; label: string; icon: LucideIcon; screens: string[] }> = [
-  { id: 'add-student', label: 'Add student', icon: UserPlus, screens: ['add student'] },
-  { id: 'collect-fees', label: 'Collect fees', icon: Wallet, screens: ['fees collect', 'fee collect'] },
-  { id: 'attendance', label: 'Mark attendance', icon: CalendarCheck, screens: ['student attendance'] },
-  { id: 'enquiry', label: 'New enquiry', icon: ClipboardList, screens: ['admission inquiry', 'admission enquiry'] },
-  { id: 'circular', label: 'Post circular', icon: Megaphone, screens: ['circular'] },
-  { id: 'notify-parents', label: 'Notify parents', icon: Send, screens: ['send notification parents', 'send sms parents'] },
-  { id: 'homework', label: 'Homework', icon: BookOpenCheck, screens: ['student homework'] },
-  { id: 'timetable', label: 'Timetable', icon: CalendarClock, screens: ['create timetable', 'view classwise timetable'] },
+const ACTIONS: Array<{ id: string; label: string; icon: LucideIcon; screens: string[]; accent: Accent }> = [
+  { id: 'add-student', label: 'Add student', icon: UserPlus, screens: ['add student'], accent: SECTION_ACCENT.students },
+  { id: 'collect-fees', label: 'Collect fees', icon: Wallet, screens: ['fees collect', 'fee collect'], accent: SECTION_ACCENT.fees },
+  { id: 'attendance', label: 'Mark attendance', icon: CalendarCheck, screens: ['student attendance'], accent: SECTION_ACCENT.attendance },
+  { id: 'enquiry', label: 'New enquiry', icon: ClipboardList, screens: ['admission inquiry', 'admission enquiry'], accent: SECTION_ACCENT.admissions },
+  { id: 'circular', label: 'Post circular', icon: Megaphone, screens: ['circular'], accent: SECTION_ACCENT.communication },
+  { id: 'notify-parents', label: 'Notify parents', icon: Send, screens: ['send notification parents', 'send sms parents'], accent: SECTION_ACCENT.staff },
+  { id: 'homework', label: 'Homework', icon: BookOpenCheck, screens: ['student homework'], accent: SECTION_ACCENT.academics },
+  { id: 'timetable', label: 'Timetable', icon: CalendarClock, screens: ['create timetable', 'view classwise timetable'], accent: SECTION_ACCENT.celebrations },
 ];
 
 const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -50,7 +51,7 @@ export function AdminQuickActions() {
     return (
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-[76px] animate-pulse rounded-lg bg-slate-100" />
+          <div key={i} className="h-[84px] animate-pulse rounded-xl bg-slate-100" />
         ))}
       </div>
     );
@@ -62,8 +63,15 @@ export function AdminQuickActions() {
 
   return (
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
-      {available.map((action) => (
-        <QuickActionTile key={action.id} label={action.label} icon={action.icon} onClick={() => navigate(action.entry)} />
+      {available.map((action, i) => (
+        <QuickActionTile
+          key={action.id}
+          label={action.label}
+          icon={action.icon}
+          accent={action.accent}
+          iconShape={ICON_SHAPE_ORDER[i % ICON_SHAPE_ORDER.length]}
+          onClick={() => navigate(action.entry)}
+        />
       ))}
     </div>
   );
