@@ -16,6 +16,9 @@ interface SidebarProps {
   dynamicLevel2Counts?: Record<string, number | undefined>;
   onLevel1Select: (item: MenuItem) => void;
   onLevel2Select: (submenu: SubmenuItem, parent: MenuItem) => void;
+  /** Rendered as the phone-width drawer: always expanded, and closing it closes the drawer. */
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 interface Level2PanelState {
@@ -59,10 +62,14 @@ export default function Sidebar({
   dynamicLevel2Counts = {},
   onLevel1Select,
   onLevel2Select,
+  mobileOpen = false,
+  onMobileClose,
 }: SidebarProps) {
   const pathname = usePathname() || '';
   const router = useRouter();
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [collapsedState, setIsCollapsed] = useState(true);
+  // The phone drawer is only ever shown expanded — a rail inside a drawer would be pointless.
+  const isCollapsed = collapsedState && !mobileOpen;
   const [level2Panel, setLevel2Panel] = useState<Level2PanelState | null>(null);
 
   const openLevel2Panel = (item: MenuItem, element: HTMLElement) => {
@@ -110,7 +117,6 @@ export default function Sidebar({
       const stored = localStorage.getItem('userData');
       if (stored) {
         const parsed = JSON.parse(stored);
-        console.log('Sidebar logoUrl from localStorage:', parsed.logo);
         if (parsed.logo) {
           if (parsed.logo.startsWith('http')) return parsed.logo;
           const base = parsed.host_name || '';
@@ -140,6 +146,7 @@ export default function Sidebar({
   const closeSidebarAfterSelection = () => {
     setLevel2Panel(null);
     setIsCollapsed(true);
+    onMobileClose?.();
   };
 
   useEffect(() => {
@@ -224,21 +231,25 @@ export default function Sidebar({
 
   return (
     <div
-      className={`${isCollapsed ? 'w-[104px]' : 'w-[280px]'} h-full p-4 shrink-0 flex flex-col transition-[width] duration-700 ease-in-out relative group z-50`}
+      className={`${isCollapsed ? 'w-[88px]' : 'w-[264px]'} h-full p-3 shrink-0 flex flex-col transition-[width] duration-200 ease-out motion-reduce:transition-none relative group z-50`}
     >
-      <div className="bg-white/80 backdrop-blur-xl w-full h-full rounded-[28px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-200/50 flex flex-col relative">
+      <div className="bg-white w-full h-full rounded-2xl shadow-sm border border-slate-200 flex flex-col relative">
         <button
           type="button"
           onClick={() => {
-            setIsCollapsed((collapsed) => !collapsed);
+            if (mobileOpen) {
+              onMobileClose?.();
+            } else {
+              setIsCollapsed((collapsed) => !collapsed);
+            }
             setLevel2Panel(null);
           }}
-          className={`pt-8 pb-6 flex w-full items-center transition-all duration-500 ${isCollapsed ? 'justify-center' : 'px-5 justify-between'}`}
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className={`pt-6 pb-5 flex w-full items-center rounded-t-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4F46E5]/40 ${isCollapsed ? 'justify-center' : 'px-4 justify-between'}`}
+          aria-label={mobileOpen ? 'Close navigation' : isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!isCollapsed}
         >
           {isCollapsed ? (
-            <div className="w-10 h-10 border border-lg rounded-xl flex items-center justify-center text-gray-600 shrink-0">
+            <div className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-600 shrink-0 hover:bg-slate-50">
               <ChevronRight size={20} aria-hidden="true" />
             </div>
           ) : (
@@ -247,51 +258,52 @@ export default function Sidebar({
                 {logoUrl ? (
                   <img src={logoUrl} alt="Logo" className="w-9 h-9 rounded-xl object-contain shrink-0" />
                 ) : (
-                  <div className="w-9 h-9 bg-gradient-to-br from-[#0D6EFD] to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white font-bold shrink-0">
+                  <div className="w-9 h-9 bg-[#4F46E5] rounded-xl flex items-center justify-center text-white text-sm font-semibold shrink-0">
                     TC
                   </div>
                 )}
-                <h1 className="font-bold text-lg tracking-tight text-gray-900 whitespace-nowrap overflow-hidden">
+                <span className="font-semibold text-base tracking-tight text-slate-900 truncate">
                   {schoolName}
-                </h1>
+                </span>
               </div>
 
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-600 shrink-0">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 shrink-0 hover:bg-slate-50">
                 <Menu size={20} />
               </div>
             </>
           )}
         </button>
 
-        <div className={`flex-1 overflow-y-auto py-2 scrollbar-hide ${isCollapsed ? 'px-2' : 'px-4'}`}>
+        <div className={`flex-1 overflow-y-auto py-2 scrollbar-hide ${isCollapsed ? 'px-2' : 'px-3'}`}>
           {!isCollapsed && (
-            <div className="text-[11px] font-bold text-gray-400 mb-4 px-2 uppercase tracking-widest whitespace-nowrap overflow-hidden transition-all duration-500">
+            <div className="text-[11px] font-semibold text-slate-400 mb-3 px-3 uppercase tracking-widest whitespace-nowrap overflow-hidden">
               Menu
             </div>
           )}
-          <nav className="space-y-1">
+          <nav className="space-y-1" aria-label="Main">
             <a
               href="/dashboard"
               title={isCollapsed ? 'Dashboard' : ''}
+              aria-current={isDashboardActive ? 'page' : undefined}
               onClick={(event) => {
                 event.preventDefault();
                 router.push('/dashboard');
                 closeSidebarAfterSelection();
               }}
-              className={`flex items-center rounded-2xl text-sm font-semibold transition-all duration-500 group relative overflow-hidden cursor-pointer
+              className={`flex items-center rounded-xl text-sm font-medium transition-colors duration-150 group relative overflow-hidden cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40
                 ${isDashboardActive
-                  ? 'text-[#0D6EFD] bg-blue-50/80'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50/80'
+                  ? 'text-[#4F46E5] bg-indigo-50'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }
-                ${isCollapsed ? 'justify-center p-3' : 'px-3 py-3 gap-3'}`}
+                ${isCollapsed ? 'justify-center p-3' : 'px-3 py-2.5 gap-3'}`}
             >
               {isDashboardActive && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[#0D6EFD] rounded-r-full" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#4F46E5] rounded-r-full" />
               )}
               <LayoutDashboard
                 size={20}
-                strokeWidth={isDashboardActive ? 2.5 : 2}
-                className={`shrink-0 transition-transform duration-500 ${isDashboardActive ? 'scale-110' : 'group-hover:scale-110 text-gray-400 group-hover:text-gray-600'}`}
+                strokeWidth={isDashboardActive ? 2.25 : 1.75}
+                className={`shrink-0 ${isDashboardActive ? '' : 'text-slate-400 group-hover:text-slate-600'}`}
               />
               {!isCollapsed && <span className="flex-1 whitespace-nowrap overflow-hidden">Dashboard</span>}
             </a>
@@ -299,7 +311,7 @@ export default function Sidebar({
             {showInitialLoading && (
               <div className="space-y-2">
                 {[...Array(7)].map((_, index) => (
-                  <div key={index} className="h-11 rounded-2xl animate-pulse bg-gray-200/60" />
+                  <div key={index} className="h-11 rounded-xl animate-pulse bg-slate-100" />
                 ))}
               </div>
             )}
@@ -346,24 +358,26 @@ export default function Sidebar({
                   <a
                     href={item.href || '#'}
                     title={isCollapsed ? item.label : ''}
+                    aria-current={isActive ? 'page' : undefined}
+                    aria-expanded={hasSubmenu ? isPanelOpen : undefined}
                     onClick={(event) => {
                       event.preventDefault();
                       handleLevel1Click(item, event.currentTarget);
                     }}
-                    className={`flex items-center rounded-2xl text-sm font-semibold transition-all duration-500 group relative overflow-hidden cursor-pointer
+                    className={`flex items-center rounded-xl text-sm font-medium transition-colors duration-150 group relative overflow-hidden cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40
                       ${isActive || isPanelOpen
-                        ? 'text-[#0D6EFD] bg-blue-50/80'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50/80'
+                        ? 'text-[#4F46E5] bg-indigo-50'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                       }
-                      ${isCollapsed ? 'justify-center p-3' : 'px-3 py-3 gap-3'}`}
+                      ${isCollapsed ? 'justify-center p-3' : 'px-3 py-2.5 gap-3'}`}
                   >
                     {(isActive || isPanelOpen) && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[#0D6EFD] rounded-r-full" />
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#4F46E5] rounded-r-full" />
                     )}
                     <Icon
                       size={20}
-                      strokeWidth={isActive || isPanelOpen ? 2.5 : 2}
-                      className={`shrink-0 transition-transform duration-500 ${isActive || isPanelOpen ? 'scale-110' : 'group-hover:scale-110 text-gray-400 group-hover:text-gray-600'}`}
+                      strokeWidth={isActive || isPanelOpen ? 2.25 : 1.75}
+                      className={`shrink-0 ${isActive || isPanelOpen ? '' : 'text-slate-400 group-hover:text-slate-600'}`}
                     />
                     {!isCollapsed && (
                       <span className="flex-1 whitespace-nowrap overflow-hidden">{item.label}</span>
@@ -396,7 +410,7 @@ export default function Sidebar({
           }}
         >
           <div className="shrink-0 px-4 py-2 mb-1">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Level 2 Menu</p>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Module</p>
             <h3 className="truncate text-sm font-bold text-popover-foreground">{level2Panel.item.label}</h3>
           </div>
           <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-auto scroll-smooth scrollbar-hide px-3 pb-2 pr-2">
@@ -420,13 +434,13 @@ export default function Sidebar({
                       key={`${submenu.label}-${columnIndex * LEVEL2_ITEMS_PER_COLUMN + itemIndex}`}
                       type="button"
                       onClick={() => handleLevel2Click(submenu)}
-                      className={`h-10 w-full flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-semibold transition-all cursor-pointer text-left
+                      className={`h-10 w-full flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer text-left outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40
                         ${isSubActive
-                          ? 'border-[#0D6EFD]/20 bg-[#0D6EFD]/10 text-[#0D6EFD] shadow-sm'
+                          ? 'border-[#4F46E5]/20 bg-indigo-50 text-[#4F46E5] shadow-sm'
                           : 'border-border bg-card text-muted-foreground shadow-xs hover:border-muted-foreground/30 hover:bg-muted/60 hover:text-foreground hover:shadow-sm'
                         }`}
                     >
-                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${isSubActive ? 'bg-[#0D6EFD]/10 text-[#0D6EFD]' : 'bg-muted text-muted-foreground'}`}>
+                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${isSubActive ? 'bg-[#4F46E5]/10 text-[#4F46E5]' : 'bg-muted text-muted-foreground'}`}>
                         {SubIcon ? <SubIcon size={15} /> : submenu.label.charAt(0).toUpperCase()}
                       </span>
                       <span className="min-w-0 flex-1 truncate">{submenu.label}</span>

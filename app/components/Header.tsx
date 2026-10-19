@@ -198,12 +198,15 @@ const getStoredSelection = (key: string) => {
 };
 
 export default function Header({
+  onOpenNavigation,
   onToggleChatbot,
   isChatbotOpen,
   menuItems = [],
   onMenuSearchNavigate,
   toolStrip,
 }: {
+  /** Opens the sidebar drawer on phone widths, where the sidebar rail is hidden. */
+  onOpenNavigation?: () => void;
   onToggleChatbot: () => void;
   isChatbotOpen: boolean;
   /** The shell's rights-filtered menu tree — what the top-bar search searches. */
@@ -444,7 +447,7 @@ const logoUrl = (() => {
 
   const yearButtonRef = useRef<HTMLButtonElement>(null);
   const termButtonRef = useRef<HTMLButtonElement>(null);
-  const userButtonRef = useRef<HTMLDivElement>(null);
+  const userButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleYearToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -463,7 +466,7 @@ const logoUrl = (() => {
     setShowUserDropdown(false);
   };
 
-  const handleUserToggle = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleUserToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (showUserDropdown) {
       closeUserDropdown();
       return;
@@ -529,7 +532,7 @@ const logoUrl = (() => {
             }}
             className={`w-full text-left px-4 py-2 text-sm transition-colors ${
               value === option 
-                ? 'text-[#0D6EFD] bg-blue-50/80 font-medium' 
+                ? 'text-[#4F46E5] bg-indigo-50 font-medium' 
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50/80'
             }`}
           >
@@ -542,16 +545,23 @@ const logoUrl = (() => {
   };
 
   return (
-    <div className="flex h-16 w-full items-center justify-between rounded-[28px] border border-gray-200/50 bg-white/80 px-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
-      <div className="flex items-center gap-4 flex-1">
-        <button className="p-2 hover:bg-gray-100 rounded-full lg:hidden"><Menu size={20} /></button>
-        
-        <div className="flex-1 max-w-xl mr-2">
+    <div className="flex h-16 w-full items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-2 shadow-sm sm:px-4">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
+        <button
+          type="button"
+          onClick={onOpenNavigation}
+          aria-label="Open navigation"
+          className="shrink-0 rounded-lg p-2 text-slate-600 hover:bg-slate-100 md:hidden outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40"
+        >
+          <Menu size={20} />
+        </button>
+
+        <div className="min-w-0 flex-1 max-w-xl sm:mr-2">
           <HeaderMenuSearch menuItems={menuItems} onNavigate={handleMenuSearchNavigate} />
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
         {toolStrip ? (
           <button
             type="button"
@@ -559,7 +569,7 @@ const logoUrl = (() => {
             aria-expanded={toolStrip.open}
             aria-label={`${toolStrip.open ? 'Hide' : 'Show'} ${toolStrip.label} tools`}
             title={`${toolStrip.label} tools`}
-            className="flex items-center rounded-xl border border-gray-200/50 bg-white px-3 py-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+            className="flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40"
           >
             <ChevronDown size={16} className={`transition-transform ${toolStrip.open ? 'rotate-180' : ''}`} />
           </button>
@@ -568,9 +578,10 @@ const logoUrl = (() => {
         <button
           ref={yearButtonRef}
           onClick={handleYearToggle}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200/50 bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
+          aria-label={`Academic year: ${effectiveYear || "not set"}`}
+          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:gap-2 sm:px-3 outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40"
         >
-          <GraduationCap size={16} className="text-gray-500" />
+          <GraduationCap size={16} className="hidden text-slate-500 sm:block" />
           <span className="max-w-[80px] truncate">{effectiveYear || '—'}</span>
           <ChevronDown size={14} className={`text-gray-400 transition-transform ${showYearDropdown ? 'rotate-180' : ''}`} />
         </button>
@@ -578,10 +589,11 @@ const logoUrl = (() => {
         <button
           ref={termButtonRef}
           onClick={handleTermToggle}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200/50 bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
+          aria-label={`Term: ${effectiveTerm || "not set"}`}
+          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:gap-2 sm:px-3 outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40"
         >
-          <BookOpen size={16} className="text-gray-500" />
-          
+          <BookOpen size={16} className="hidden text-slate-500 sm:block" />
+
           <span className="max-w-[60px] truncate">{effectiveTerm || '—'}</span>
           <ChevronDown size={14} className={`text-gray-400 transition-transform ${showTermDropdown ? 'rotate-180' : ''}`} />
         </button>
@@ -591,43 +603,53 @@ const logoUrl = (() => {
 
         <button
           onClick={onToggleChatbot}
-          className={`relative p-2 rounded-full transition-colors ${
-            isChatbotOpen ? 'text-gray-600 bg-gray-100' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'
+          className={`relative rounded-xl p-1 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40 ${
+            isChatbotOpen ? 'bg-slate-100' : 'hover:bg-slate-100'
           }`}
           title="Open AI assistant"
+          aria-label="Open AI assistant"
+          aria-pressed={isChatbotOpen}
         >
-          <div className="w-8 h-8 bg-gradient-to-br from-[#0D6EFD] to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-          <Bot size={16} />
-        </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#4F46E5] text-white">
+            <Bot size={16} />
+          </div>
         </button>
 
-        <div className="relative cursor-pointer">
-          <Bell size={20} className="text-gray-600" />
-          <div className="absolute -top-1 -right-1 bg-[#0D6EFD] text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center">3</div>
-        </div>
+        {/* No notification feed is wired yet, so the bell carries no count — an invented number is worse than none. */}
+        <span className="hidden p-1 text-slate-500 lg:block" aria-hidden>
+          <Bell size={20} />
+        </span>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-3 cursor-pointer" ref={userButtonRef} onClick={handleUserToggle}>
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-xl p-1 text-left hover:bg-slate-50 lg:gap-3 lg:pr-2 outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]/40"
+            ref={userButtonRef}
+            onClick={handleUserToggle}
+            aria-haspopup="menu"
+            aria-expanded={showUserDropdown}
+            aria-label="Account menu"
+          >
             {logoUrl ? (
               <LogoImage
                 key={logoUrl}
                 url={logoUrl}
                 fallback={
-                  <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
+                  <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-indigo-50 flex items-center justify-center text-sm font-semibold text-[#4F46E5]">
                     {user?.name?.charAt(0).toUpperCase() || 'U'}
                   </div>
                 }
               />
             ) : (
-              <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
+              <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-indigo-50 flex items-center justify-center text-sm font-semibold text-[#4F46E5]">
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
             )}
-            <span className="font-medium text-sm flex items-center gap-1">
-              {user?.name || 'User'}
-              <ChevronDown size={14} className={`transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} />
+            <span className="flex items-center gap-1 text-sm font-medium text-slate-800">
+              <span className="hidden max-w-[160px] truncate lg:inline">{user?.name || 'User'}</span>
+              <ChevronDown size={14} className={`text-slate-400 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} />
             </span>
-          </div>
+          </button>
           
           </div>
         
@@ -667,7 +689,7 @@ const logoUrl = (() => {
                         <button
                           type="button"
                           onClick={() => { closeUserDropdown(); router.push(groupHref); }}
-                          className="max-w-full truncate rounded-md text-left text-sm font-bold text-popover-foreground transition-colors hover:text-[#0D6EFD]"
+                          className="max-w-full truncate rounded-md text-left text-sm font-bold text-popover-foreground transition-colors hover:text-[#4F46E5]"
                         >
                           {group.label}
                         </button>
