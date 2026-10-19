@@ -65,8 +65,8 @@ export function CapabilityLibraryTaxonomy() {
               className={cn(
                 '-mb-px flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition-colors',
                 isActive
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
+                  ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                  : 'border-transparent text-muted-foreground hover:text-indigo-600 dark:hover:text-indigo-400',
               )}
             >
               <tab.icon className="h-4 w-4" />
@@ -77,7 +77,9 @@ export function CapabilityLibraryTaxonomy() {
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums',
-                    isActive ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+                    isActive
+                      ? 'bg-indigo-600/10 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-300'
+                      : 'bg-muted text-muted-foreground',
                   )}
                 >
                   {count.toLocaleString()}

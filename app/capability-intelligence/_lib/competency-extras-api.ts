@@ -201,9 +201,94 @@ export interface KasaUsage {
 }
 
 /** GAP: `GET /skill_library/{id}/edit` — not in the given backend context. */
+/** Shape of GET /competency/library/skills/{id} (CapabilityLibraryController::skillAssociations). */
+interface SkillShowData {
+  record: DetailRow;
+  jobroles: MappedJobRole[];
+  proficiency: ProficiencyLevelRow[];
+  classification: Record<'knowledge' | 'ability' | 'attitude' | 'behaviour', Array<{
+    id: number;
+    classification: string;
+    classification_category: string | null;
+    classification_sub_category: string | null;
+    classification_item: string | null;
+    proficiency_level: string | null;
+  }>>;
+  applications: Array<{ id: number; application: string | null; proficiency_level: string | null }>;
+}
+
+/**
+ * Adapts the Capability Library show payload to the shape the Skill Details
+ * popup expects. The old G2G `/skill_library/{id}/edit` route has no API
+ * equivalent in this backend, so the popup is fed from the show endpoint.
+ */
+function toSkillDetail(skillId: number, data: SkillShowData): SkillDetailResponse {
+  const levelDescriptions = new Map<string, string>();
+  (data.proficiency ?? []).forEach((row) => {
+    const description = row.description ?? row.type_description;
+    if (row.proficiency_level && description && !levelDescriptions.has(String(row.proficiency_level))) {
+      levelDescriptions.set(String(row.proficiency_level), description);
+    }
+  });
+
+  const toItem = (
+    skillRowId: number,
+    kind: string,
+    row: { id: number; proficiency_level: string | null; classification_category?: string | null; classification_sub_category?: string | null; classification_item: string | null },
+  ): ClassificationItem => ({
+    id: row.id,
+    skill_id: skillRowId,
+    proficiency_level: row.proficiency_level,
+    proficiency_description: row.proficiency_level ? (levelDescriptions.get(String(row.proficiency_level)) ?? null) : null,
+    classification: kind,
+    classification_category: row.classification_category ?? null,
+    classification_sub_category: row.classification_sub_category ?? null,
+    classification_item: row.classification_item,
+  });
+
+  const groupByLevel = (items: ClassificationItem[]): ProficiencyGroup[] => {
+    const groups = new Map<string, ClassificationItem[]>();
+    items.forEach((item) => {
+      const key = String(item.proficiency_level ?? '');
+      if (!key) return;
+      groups.set(key, [...(groups.get(key) ?? []), item]);
+    });
+    return Array.from(groups, ([proficiency_level, list]) => ({ proficiency_level, items: list }))
+      .sort((a, b) => Number(a.proficiency_level) - Number(b.proficiency_level));
+  };
+
+  const kasa = (kind: 'knowledge' | 'ability' | 'attitude' | 'behaviour') =>
+    (data.classification?.[kind] ?? []).map((row) => toItem(skillId, kind, row));
+
+  const applications = (data.applications ?? []).map((row) =>
+    toItem(skillId, 'application', { ...row, classification_item: row.application }),
+  );
+
+  return {
+    editData: data.record,
+    skillName: data.record?.title,
+    userJobroleData: data.jobroles ?? [],
+    userproficiency_levelData: data.proficiency ?? [],
+    userAttitudeData: kasa('attitude'),
+    userBehaviourData: kasa('behaviour'),
+    userKnowledgeData: kasa('knowledge'),
+    userabilityData: kasa('ability'),
+    userApplicationData: applications,
+    userViewKnowledge: groupByLevel(kasa('knowledge')),
+    userViewAbility: groupByLevel(kasa('ability')),
+    userViewApplication: groupByLevel(applications),
+  };
+}
+
 export const skillDetailService = {
-  get: (session: SessionContext, skillId: number, formType: 'user' | 'admin' = 'user') =>
-    apiGet<SkillDetailResponse>(session, `/skill_library/${skillId}/edit`, contextParams(session, { formType })),
+  get: async (session: SessionContext, skillId: number): Promise<SkillDetailResponse> => {
+    const response = await apiGet<{ data: SkillShowData }>(
+      session,
+      `/competency/library/skills/${skillId}`,
+      contextParams(session),
+    );
+    return toSkillDetail(skillId, response.data);
+  },
 
   /** This one IS in scope: GET /competency/library/kasa/{type}/{id}/usage. */
   kasaUsage: (session: SessionContext, type: string, id: number) =>
