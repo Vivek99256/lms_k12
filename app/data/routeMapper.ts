@@ -352,6 +352,12 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   // 2026_09_08_140000_add_new_pal_reports_submodule_menu. Staff-only: the
   // menu row withholds the student grant and the API refuses a student caller.
   'new_pal.reports': '/pal/reports/attainment',
+  // Activity & Performance Report — per-student and per-class, registered by
+  // 2026_10_20_000001_add_pal_activity_report_menus. Siblings of the
+  // Coverage/Attainment report above rather than sub-rows of it, since each
+  // has its own menu row and its own page.
+  'new_pal.activity_report': '/pal/reports/activity',
+  'new_pal.class_activity_report': '/pal/reports/class-activity',
   // Administration — the second New PAL level-3 sub-module, registered by
   // 2026_08_14_160100_add_administration_submodule_menu. Follows the same
   // `new_pal.<sub_module>` link convention as Content Model above rather than
