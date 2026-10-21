@@ -98,6 +98,17 @@ export interface DeckImage {
   attribution: string;
   attribution_required: boolean;
   title?: string | null;
+  /** What a story scene's picture is for: the scene itself, a close-up, the evidence, a comparison, or a drawn diagram. */
+  role?: 'scene' | 'close_up' | 'evidence' | 'compare' | 'diagram';
+  /**
+   * The part of a story scene's picture the student should look at, as percentages of the picture's width and height (x and y are the
+   * top-left corner). Drawn as a highlight over it; ignored when it is not a rectangle inside the picture.
+   */
+  focus?: { x: number; y: number; w: number; h: number } | null;
+  /** A short name for the highlighted part (at most three words), drawn as a tag beside it. */
+  focus_label?: string | null;
+  /** Set on a picture of the scientific process: which step (observation, investigation, evidence or conclusion) is in focus. */
+  step?: 'observation' | 'investigation' | 'evidence' | 'conclusion';
   /**
    * False when the picture should never be used as a soft background behind another slide (a grey electron micrograph or a
    * photograph of equipment makes a dull or busy texture). Absent means it may be.
@@ -141,12 +152,18 @@ export interface HotspotsInteraction {
   wrapup: string;
 }
 
+/** The template a story act is made with; the player draws exactly these as story scenes (components/study-deck/StoryView.tsx). */
+export const STORY_TEMPLATE = 'story_branching_scenario';
+
+/** What a story node is: a narrated scene (one way on), a decision (two or more choices) or an ending (none). */
+export type StoryNodeKind = 'scene' | 'decision' | 'ending';
+
 export interface ScenarioChoice {
   id: string;
   text: string;
-  /** What happens as a result. */
+  /** What happens as a result (in a story: the story event that follows this choice). */
   outcome: string;
-  /** Why it happens: the explanation the learner reads. */
+  /** Why it happens: the explanation the learner reads (in a story: the scientific explanation for this path). */
   why: string;
   /** Whether this is the sound choice. Shown as a reading of the situation, never a mark. */
   sound: boolean;
@@ -158,11 +175,33 @@ export interface ScenarioNode {
   id: string;
   prompt: string;
   choices: ScenarioChoice[];
+  /** Story nodes only (all optional, so a deck stored before stories is unchanged). */
+  kind?: StoryNodeKind;
+  title?: string;
+  /** The scene's narration, or an ending's text. */
+  body?: string;
+  /** This scene's own picture: the main one, drawn large. */
+  image?: DeckImage | null;
+  /** Up to two supporting pictures beside the main one (a photograph with a drawn diagram, a close-up, a comparison). */
+  extra_images?: DeckImage[];
+  /** A plain-language explanation of the concept this scene teaches, told through what has just happened (title and body). */
+  explain?: { title: string; body: string };
+  /**
+   * Only on a scene or ending where branches meet: a short lead-in for each way in (`after` is the node the learner came from), so what
+   * happened on their own path shows in the scene that follows.
+   */
+  variants?: Array<{ after: string; body: string }>;
+  /** The concepts this scene teaches (the server checks that every path teaches all of the act's). */
+  concept_ids?: number[];
 }
 
 /** A lightweight branching scenario. Links only go forward, so every path ends. */
 export interface ScenarioInteraction {
   kind: 'scenario';
+  /** Set to STORY_TEMPLATE for a story act: nodes are scenes, decisions and endings. */
+  template?: typeof STORY_TEMPLATE;
+  /** A story act's mission: what the learner is trying to do. */
+  mission?: { title: string; body: string };
   reason: string;
   situation: string;
   start: string;

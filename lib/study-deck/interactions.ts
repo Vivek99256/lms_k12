@@ -12,6 +12,7 @@
 
 import { scoreHotspotVisit } from '../h5p/image-hotspots';
 import type {
+  DeckImage,
   DeckInteraction,
   DeckSlide,
   HotspotSpot,
@@ -23,6 +24,7 @@ import type {
   ScenarioInteraction,
   ScenarioNode,
 } from './types';
+import { STORY_TEMPLATE } from './types';
 
 /** A stable key for a slide's interaction in the progress record. */
 export function interactionKey(slide: Pick<DeckSlide, 'n'>): string {
@@ -149,11 +151,92 @@ export function choose(interaction: ScenarioInteraction, state: ScenarioState, c
 export function advance(interaction: ScenarioInteraction, state: ScenarioState): ScenarioState {
   const choice = choiceOf(nodeOf(interaction, state.nodeId), state.chosen);
   if (!choice || state.ended) return state;
-  if (choice.next !== null && nodeOf(interaction, choice.next)) {
-    return { ...state, nodeId: choice.next, chosen: null };
+  const next = choice.next !== null ? nodeOf(interaction, choice.next) : undefined;
+  if (next) {
+    // A story ending is a scene of its own: the learner lands on it, and the path is finished.
+    return { ...state, nodeId: next.id, chosen: null, ended: next.kind === 'ending' };
   }
 
   return { ...state, ended: true };
+}
+
+/**
+ * Take the one way on from a story scene (its "Continue"): the same two steps a decision takes, choose then advance, as one.
+ * At a decision, or anywhere else, it only advances a choice that has already been picked.
+ */
+export function continueStory(interaction: ScenarioInteraction, state: ScenarioState): ScenarioState {
+  const node = nodeOf(interaction, state.nodeId);
+  if (!node || state.ended) return state;
+  if (node.kind === 'scene' && node.choices.length === 1) return advance(interaction, choose(interaction, state, node.choices[0].id));
+
+  return advance(interaction, state);
+}
+
+/** The node the learner came from to reach `node` on the path they are walking, or null at the start. */
+export function cameFrom(interaction: ScenarioInteraction, state: ScenarioState, node: ScenarioNode): string | null {
+  for (let i = state.path.length - 1; i >= 0; i -= 1) {
+    const step = state.path[i];
+    if (choiceOf(nodeOf(interaction, step.nodeId), step.choiceId)?.next === node.id) return step.nodeId;
+  }
+
+  return null;
+}
+
+/** The lead-in a scene where branches meet gives for the way the learner came in, or null when it has none for that way. */
+export function variantFor(interaction: ScenarioInteraction, state: ScenarioState, node: ScenarioNode): string | null {
+  const from = cameFrom(interaction, state, node);
+  if (from === null) return null;
+
+  return node.variants?.find((variant) => variant.after === from)?.body ?? null;
+}
+
+/**
+ * The pictures to draw for the learner's current node: the scene's own main picture then its supporting ones. A decision has none of
+ * its own when the scene before it was the one that set it up, so it keeps showing the latest picture on the path (the same place,
+ * the same apparatus); a scene without a picture shows none rather than a picture of something else.
+ */
+export function picturesFor(interaction: ScenarioInteraction, state: ScenarioState, node: ScenarioNode): DeckImage[] {
+  const own = [node.image, ...(node.extra_images ?? [])].filter((image): image is DeckImage => !!image);
+  if (own.length > 0 || node.kind !== 'decision') return own;
+  for (let i = state.path.length - 1; i >= 0; i -= 1) {
+    const before = nodeOf(interaction, state.path[i].nodeId);
+    if (before?.image) return [before.image, ...(before.extra_images ?? [])];
+  }
+
+  return [];
+}
+
+export interface StoryProgress {
+  /** The scene the learner is in, counted in story order, and how many there are. */
+  position: number;
+  total: number;
+  /** How far along the story this scene is, 0 to 100. */
+  percent: number;
+  decisionsTried: number;
+  decisionsTotal: number;
+  ended: boolean;
+}
+
+/** Where the learner is in a story act. The nodes only move forward, so a node's place in the list is how far on it is. */
+export function storyProgress(interaction: ScenarioInteraction, state: ScenarioState): StoryProgress {
+  const total = interaction.nodes.length;
+  const position = Math.max(1, interaction.nodes.findIndex((n) => n.id === state.nodeId) + 1);
+  const decisions = interaction.nodes.filter((n) => n.kind === 'decision');
+  const tried = decisions.flatMap((n) => n.choices.map((c) => c.id)).filter((id) => state.tried.includes(id)).length;
+
+  return {
+    position,
+    total,
+    percent: state.ended ? 100 : Math.round(((position - 1) / Math.max(1, total - 1)) * 100),
+    decisionsTried: tried,
+    decisionsTotal: decisions.reduce((sum, n) => sum + n.choices.length, 0),
+    ended: state.ended,
+  };
+}
+
+/** The decisions the learner made on the path just walked (scenes are not decisions), for the closing recap. */
+export function decisionsTaken(interaction: ScenarioInteraction, state: ScenarioState): Array<{ node: ScenarioNode; choice: ScenarioChoice }> {
+  return pathTaken(interaction, state).filter(({ node }) => node.kind === 'decision');
 }
 
 /** Go back to the start to try a different path. What was tried is remembered. */
@@ -377,6 +460,7 @@ export function interactionProblem(value: unknown, slideImageIsDiagram: boolean)
     }
     case 'scenario': {
       const s = i as ScenarioInteraction;
+      if (s.template !== undefined) return storyProblem(s);
       if (!Array.isArray(s.nodes) || s.nodes.length === 0) return 'has no decisions';
       const ids = s.nodes.map((n) => n.id);
       if (new Set(ids).size !== ids.length) return 'repeats a decision id';
@@ -426,6 +510,54 @@ export function interactionProblem(value: unknown, slideImageIsDiagram: boolean)
     default:
       return `has an unknown kind "${String((i as { kind?: unknown }).kind)}"`;
   }
+}
+
+/**
+ * What is wrong with a story act (a scenario made with the story template), or null when the player can walk it: every node has the
+ * parts its kind needs, every way on leads forward to a node that exists, every node can be reached from the start, and every
+ * path ends in an ending. The server holds a story to more (path-by-path concept coverage, merges, size); this is what the player
+ * itself needs in order never to strand a learner.
+ */
+export function storyProblem(s: ScenarioInteraction): string | null {
+  if (s.template !== STORY_TEMPLATE) return `names an unknown template "${String(s.template)}"`;
+  const nodes = s.nodes;
+  if (!Array.isArray(nodes) || nodes.length === 0) return 'has no scenes';
+  const ids = nodes.map((n) => n.id);
+  if (ids.some((id) => !id) || new Set(ids).size !== ids.length) return 'has a scene with no id, or two with the same id';
+  if (s.start !== ids[0]) return 'does not start at its first scene';
+  if (nodes[0].kind !== 'scene') return 'does not open with a scene';
+  const position = new Map(ids.map((id, index) => [id, index]));
+  let endings = 0;
+  for (const node of nodes) {
+    const kind = node.kind;
+    if (kind !== 'scene' && kind !== 'decision' && kind !== 'ending') return `has "${node.id}" of kind "${String(kind)}"`;
+    if (!Array.isArray(node.choices)) return `has "${node.id}" with no list of choices`;
+    if (kind === 'ending') {
+      endings += 1;
+      if (node.choices.length !== 0) return `has an ending ("${node.id}") that still has a way on`;
+      if (!node.body) return `has an ending ("${node.id}") with no text`;
+      continue;
+    }
+    if (kind === 'scene' && node.choices.length !== 1) return `has a scene ("${node.id}") that does not have exactly one way on`;
+    if (kind === 'scene' && !node.body) return `has a scene ("${node.id}") with no narration`;
+    if (kind === 'decision' && (node.choices.length < 2 || !node.prompt)) return `has a decision ("${node.id}") with no question or fewer than two choices`;
+    const choiceIds = node.choices.map((c) => c.id);
+    if (choiceIds.some((id) => !id) || new Set(choiceIds).size !== choiceIds.length) return `has "${node.id}" with a choice that has no id, or two with the same id`;
+    for (const choice of node.choices) {
+      if (choice.next === null || choice.next === undefined || !position.has(choice.next)) return `has a way on from "${node.id}" that leads nowhere`;
+      if ((position.get(choice.next) ?? -1) <= (position.get(node.id) ?? 0)) return `has a way on from "${node.id}" that leads back, so a path might never end`;
+    }
+    if (node.image && (!node.image.url || !(node.image.width > 0) || !(node.image.height > 0))) return `has a picture on "${node.id}" that cannot be drawn`;
+  }
+  if (endings === 0) return 'has no ending';
+  // Every scene must be reachable, or the learner could never see what was written for it.
+  const seen = new Set<string>([ids[0]]);
+  for (const node of nodes) {
+    if (!seen.has(node.id)) return `has a scene ("${node.id}") that no choice leads to`;
+    for (const choice of node.choices) if (choice.next) seen.add(choice.next);
+  }
+
+  return null;
 }
 
 /**

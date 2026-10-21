@@ -1,4 +1,4 @@
-﻿//
+//
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -103,6 +103,10 @@ import {
   PrayogshalaEditorDialog,
 } from './PrayogshalaDialogs';
 import { filterCardAssets } from '@/lib/prayogshala/cardEligibility';
+import { CoursePresentationFlow } from '@/components/coursePresentation/CoursePresentationFlow';
+import { COURSE_PRESENTATION_CARD_ID, routeCardOpen, shouldShowCoursePresentationCard } from '@/lib/coursePresentation/card';
+import { coursePresentationEnabledFor } from '@/lib/coursePresentation/scope';
+import { readCpState, startState, withCpState, withoutCpState, type CpState } from '@/lib/coursePresentation/urlState';
 import { PrayogshalaLab } from './PrayogshalaLab';
 import { PrayogshalaTopicPanel } from './PrayogshalaTopicPanel';
 import { deletePrayogshalaActivity, type PrayogshalaActivity } from '../../data/prayogshala';
@@ -549,11 +553,48 @@ interface ChapterContentItem {
    */
   studyDocKind?: DocumentKind | null;
   chapterId?: string;
+  /**
+   * Set only on the dedicated Course Presentation card of a pilot chapter (lib/coursePresentation). It is what sends
+   * a click to the two-choice screen; no other card carries it.
+   */
+  coursePresentationPilot?: boolean;
   slides: {
     id: string;
     number: number;
     title: string;
   }[];
+}
+
+/**
+ * The dedicated Course Presentation card. Nothing is stored behind it: it only opens the two-choice screen and the
+ * read-only source pre-flight. It is a card in the existing Classroom presentation style, not a new kind of content.
+ */
+function buildCoursePresentationCard(chapter: Chapter): ChapterContentItem {
+  return {
+    id: COURSE_PRESENTATION_CARD_ID,
+    title: 'Course Presentation',
+    subtitle: 'Classroom Presentation',
+    chapterTitle: chapter.title,
+    conceptTitle: 'Classroom Presentation',
+    contentCategory: 'Classroom Presentation',
+    conceptId: null,
+    conceptName: null,
+    type: 'Classroom presentation',
+    source: 'Authored',
+    preview: 'presentation',
+    actionLabel: 'Open',
+    slideCount: 0,
+    statValue: 'Not generated',
+    updatedDate: '',
+    updatedAt: '',
+    bodyHtml: null,
+    slides: [],
+    topicName: null,
+    summary: null,
+    prayogshala: null,
+    chapterId: chapter.id,
+    coursePresentationPilot: true,
+  };
 }
 
 type QuestionOptionLabel = (typeof QUESTION_OPTION_LABELS)[number];
@@ -1455,7 +1496,14 @@ export default function ChapterListPage() {
     if (!course || !activeLibraryChapter) return [];
     const cacheKey = `${activeLibraryChapter.id}:${activeContentLibraryTab}:${contentGroupBy}:${contentResourceType}`;
     const apiCategories = chapterContentCategories[cacheKey];
-    if (apiCategories) return buildApiChapterContentItems(activeLibraryChapter, apiCategories);
+    if (apiCategories) {
+      const loaded = buildApiChapterContentItems(activeLibraryChapter, apiCategories);
+      // The dedicated Course Presentation card exists only in the Classroom Resource lane of a pilot chapter,
+      // and never beside a presentation that is already stored.
+      return shouldShowCoursePresentationCard({ chapterId: activeLibraryChapter.id, lane: contentResourceType, loaded: true, items: loaded })
+        ? [buildCoursePresentationCard(activeLibraryChapter), ...loaded]
+        : loaded;
+    }
     if (/^\d+$/.test(activeLibraryChapter.id)) return [];
     return buildChapterContentItems(course, activeLibraryChapter, activeLibraryChapterConcepts);
   }, [activeContentLibraryTab, activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, contentGroupBy, contentResourceType, course]);
@@ -2773,6 +2821,9 @@ export default function ChapterListPage() {
   };
 
   const openChapterContentView = (chapter: Chapter, resourceType: 'classroom' | 'teacher' = 'classroom') => {
+    // The list below shows the chapter held in selectedLibraryChapterId. Without this, a chapter opened from the chapter list kept
+    // showing the FIRST chapter's resources (the address said one chapter, the page loaded another).
+    setSelectedLibraryChapterId(chapter.id);
     setContentLibraryTab('All content');
     setContentSourceFilter('all');
     setContentSearch('');
@@ -2891,7 +2942,31 @@ export default function ChapterListPage() {
     });
   };
 
+  /** The Course Presentation screen is shown while the URL says so, for a pilot chapter in the Classroom lane only. */
+  const cpState = readCpState(searchParams);
+  const cpChapterId = activeLibraryChapter?.id ?? '';
+  const cpOpen = cpState.open && contentResourceType === 'classroom' && coursePresentationEnabledFor(cpChapterId);
+
+  // Written from the address as it is at that moment, so a state never overwrites an unrelated parameter. The screen
+  // itself settles quick successive choices before calling this (see CoursePresentationFlow).
+  const setCpState = (next: CpState) => {
+    const params = withCpState(new URLSearchParams(window.location.search), next);
+    router.replace(`/course-master/${courseId}/chapters?${params.toString()}`);
+  };
+
+  const closeCoursePresentation = () => {
+    const params = withoutCpState(new URLSearchParams(window.location.search));
+    router.replace(`/course-master/${courseId}/chapters?${params.toString()}`);
+  };
+
   const handleOpenContent = (item: ChapterContentItem) => {
+    // Only the dedicated Course Presentation card takes the new two-choice route (decided by an explicit
+    // marker in lib/coursePresentation/card.ts). Everything else, Prayogshala included, falls through unchanged.
+    if (routeCardOpen(item, contentResourceType) === 'course-presentation') {
+      setCpState(startState());
+      return;
+    }
+
     // A Prayogshala activity is a structured document (objective, procedure, safety...),
     // not a file or a route, so it opens in its own detail view. The activity came
     // down with the list; nothing is fetched here.
@@ -6348,6 +6423,29 @@ export default function ChapterListPage() {
                 ))}
               </div>
             )}
+
+          {cpOpen ? (
+            <CoursePresentationFlow
+              chapterId={Number(cpChapterId)}
+              initial={cpState}
+              onMirror={setCpState}
+              onClose={closeCoursePresentation}
+              onOpenPresentation={(deepLink) => {
+                if (typeof window !== 'undefined') {
+                  const params = withoutCpState(new URLSearchParams(window.location.search));
+                  window.history.replaceState({}, '', `/course-master/${courseId}/chapters?${params.toString()}`);
+                }
+                router.push(deepLink);
+              }}
+              onOpenPreview={(address) => {
+                if (typeof window !== 'undefined') {
+                  const params = withoutCpState(new URLSearchParams(window.location.search));
+                  window.history.replaceState({}, '', `/course-master/${courseId}/chapters?${params.toString()}`);
+                }
+                router.push(address);
+              }}
+            />
+          ) : null}
 
           {labActivityId ? (
             labActivity?.lab_config ? (
