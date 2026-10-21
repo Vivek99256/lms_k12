@@ -201,6 +201,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
         <button
           type="button"
           onClick={() => setOutlineOpen(true)}
+          aria-label="Outline"
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
         >
           <List className="h-4 w-4" aria-hidden="true" />

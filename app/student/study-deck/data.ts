@@ -4,6 +4,7 @@ import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { getRequestContext } from '@/app/course-master/page';
 import { fetchWholeChapter } from '@/app/h5p/data/question-bank-library';
 import { readApiJson } from '@/app/h5p/data/h5p';
+import { fetchCpDraft, fetchCpPreview } from '@/lib/coursePresentation/api';
 import { parseDeck } from '@/lib/study-deck/deck';
 import { imageUrlsRequest, resolveDeckImages } from '@/lib/study-deck/images';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
@@ -27,7 +28,11 @@ export interface LoadedDeck {
   deck: StudyDeck;
   /** Where the deck's relative image paths are served from; null when they are absolute URLs. */
   assetBase: string | null;
-  source: 'api' | 'pilot';
+  source: 'api' | 'pilot' | 'preview' | 'draft';
+  /** A draft only: what it is (a review copy, nothing stored). */
+  draft?: { notice: string };
+  /** A preview only: what it is, and what the stored data could not supply. */
+  preview?: { notice: string; missing: { what: string; where: string; why: string }[]; summary: { slides: number; pictures_placed: number; concepts_with_intelligence: number; concepts: number }; coverage: { total_concepts: number; renderable: number; from_intelligence: number; from_concept_record_only: number; unresolved: number } };
 }
 
 /** The pilot reads a copy of the local review bundle that `lms:generate-study-deck --export-player` wrote. */
@@ -62,8 +67,23 @@ async function fetchImageUrls(ids: number[], instituteId: number, signal?: Abort
   return (raw.data ?? {}) as Record<string, string>;
 }
 
-export async function loadStudyDeck(chapterId: number, options: { pilot: boolean; contentId?: number | null; signal?: AbortSignal }): Promise<LoadedDeck> {
+export async function loadStudyDeck(chapterId: number, options: { pilot: boolean; contentId?: number | null; preview?: { pedagogy: string; format: string } | null; draft?: string | null; signal?: AbortSignal }): Promise<LoadedDeck> {
   const instituteId = Number(getRequestContext()?.sub_institute_id ?? NaN);
+
+  // A generated DRAFT waiting for a teacher's review: played from the server's review copy, before anything is stored.
+  if (options.draft) {
+    const res = await fetchCpDraft(chapterId, options.draft, options.signal);
+    const deck = await resolveDeckImages(parseDeck(res.deck), (ids) => fetchImageUrls(ids, instituteId, options.signal));
+
+    return { deck, assetBase: null, source: 'draft', draft: { notice: res.notice } };
+  }
+
+  // A Course Presentation PREVIEW: the chosen template filled from the chapter's stored data by the server (read only,
+  // no AI call, nothing stored). Its pictures arrive as addresses the school may load; the deck is checked like any other.
+  if (options.preview) {
+    const res = await fetchCpPreview(chapterId, options.preview.pedagogy, options.preview.format, options.signal);
+    return { deck: parseDeck(res.deck), assetBase: null, source: 'preview', preview: { notice: res.notice, missing: res.missing, summary: res.summary, coverage: res.coverage.summary } };
+  }
 
   if (options.pilot) {
     const base = `/study-deck/chapter-${chapterId}`;

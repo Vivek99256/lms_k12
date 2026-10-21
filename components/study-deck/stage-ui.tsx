@@ -449,7 +449,7 @@ function trimStop(caption: string): string {
 }
 
 /** Who made a picture, and under what licence; a diagram is drawn for the lesson and has neither. */
-function creditOf(image: DeckImage): string {
+export function creditOf(image: DeckImage): string {
   return image.type === 'photo' && image.source_url ? `${image.creator ?? 'Openverse'}, ${image.licence}` : 'Drawn for this lesson';
 }
 
@@ -495,7 +495,7 @@ export function SideFigure({ image, assetBase }: { image: DeckImage | null | und
  * The picture at full size over the lesson. It is drawn into the page body, not into the stage: the stage is scaled
  * with a transform, and a fixed window inside a transformed box would be placed (and sized) by that box.
  */
-function PictureDialog({ image, src, onClose }: { image: DeckImage; src: string; onClose: () => void }) {
+export function PictureDialog({ image, src, onClose }: { image: DeckImage; src: string; onClose: () => void }) {
   const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
