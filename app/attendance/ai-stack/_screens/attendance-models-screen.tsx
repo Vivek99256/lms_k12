@@ -63,8 +63,7 @@ const SOURCE_LABELS: Record<AiResolvedRow['source'], string> = {
   module_platform: 'A credential bound to Attendance for the whole estate',
   pool: "This school's shared credential, used by every module without its own",
   pool_platform: 'The estate-wide shared credential',
-  env: 'The deployment environment, with no credential row behind it',
-  config: 'A configuration file default',
+  config: 'Nothing is configured for it yet',
 };
 
 export function AttendanceModelsScreen() {
@@ -121,7 +120,7 @@ export function AttendanceModelsScreen() {
   /** The models the resolved provider actually offers, from the central catalogue. */
   const providerModels = useMemo<AiModelOption[]>(() => {
     if (!resolved || !catalogue) return [];
-    return (catalogue.models[resolved.provider] ?? []).filter((model) => model.status === 1);
+    return (catalogue.models[resolved.provider ?? ''] ?? []).filter((model) => model.status === 1);
   }, [resolved, catalogue]);
 
   const provider = usage?.provider;
@@ -169,13 +168,15 @@ export function AttendanceModelsScreen() {
         <>
           <AiStackMetrics
             metrics={[
-              { key: 'provider', label: 'Provider', value: resolved.provider_label || resolved.provider },
+              { key: 'provider', label: 'Provider', value: resolved.provider_label || resolved.provider || 'Not configured' },
               { key: 'model', label: 'Model', value: resolved.model ?? 'provider default', hint: 'What a generation runs on.' },
               {
                 key: 'credential',
                 label: 'Credential',
-                value: resolved.has_key ? 'bound' : 'none',
-                hint: resolved.has_key ? undefined : 'Requests fall back to the environment.',
+                value: resolved.credential ? resolved.credential.label.toLowerCase() : resolved.has_key ? 'bound' : 'none',
+                hint: resolved.has_key
+                  ? (resolved.credential?.detail ?? undefined)
+                  : 'No usable credential: requests report a configuration error until one is added in AI Providers.',
               },
               {
                 key: 'driveable',

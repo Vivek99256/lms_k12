@@ -1,8 +1,7 @@
-import { generateObject } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { createLocalAiModel } from "@/lib/ai/local-model";
+import { BackendCompletionError, completeViaBackend } from "@/lib/ai/backend-complete";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { requireSession } from "@/lib/security/session-token";
 import {
@@ -96,6 +95,17 @@ Rules:
 - Keep the source's own wording. Do not improve, expand or summarise it.
 - Preserve step order and numbering.`;
 
+/** The model was asked for JSON only, but a stray code fence or sentence around it is tolerated. */
+function parseJsonObject(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("The AI reply was not a JSON object.");
+    return JSON.parse(match[0]);
+  }
+}
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "SOP conversion failed.";
 }
@@ -185,18 +195,28 @@ export async function POST(request: Request) {
   // 2. Fall back to normalising prose, then convert the normalised text through
   //    the very same parser.
   try {
-    // Inside the try: with no API key configured this throws, and an
-    // unconfigured environment should read as "AI is unavailable, convert it
-    // structurally instead" (6.15.8 degraded mode) rather than as a crash.
-    const model = createLocalAiModel();
-
-    const { object } = await generateObject({
-      model,
-      schema: proposalSchema,
-      system: SYSTEM_PROMPT,
-      prompt: buildPrompt(body, sopModule),
+    // The model call goes through the backend's AI Providers (module `knowledge_sop`): provider,
+    // model, credential, priority and fallback are whatever is saved there, and this server holds
+    // no provider key. A module with nothing configured throws below, which reads as "AI is
+    // unavailable, convert it structurally instead" (6.15.8 degraded mode) rather than as a crash.
+    const completion = await completeViaBackend(request, {
+      module: "knowledge_sop",
+      messages: [
+        {
+          role: "system",
+          content: `${SYSTEM_PROMPT}\n\nReply with ONE JSON object and nothing else, matching this JSON Schema:\n${JSON.stringify(z.toJSONSchema(proposalSchema))}`,
+        },
+        { role: "user", content: buildPrompt(body, sopModule) },
+      ],
+      json: true,
       temperature: 0,
+      maxTokens: 8192,
     });
+
+    // The reply is validated by the same schema the model used to be bound to: a malformed or
+    // invented shape fails here exactly as it did, and never reaches the review screen.
+    const object = proposalSchema.parse(parseJsonObject(completion.text));
+    const modelLabel = completion.model ?? "AI Providers";
 
     const intakeText = toIntakeText({
       procedureRef: body.procedureRef || object.procedureRef,
@@ -211,7 +231,7 @@ export async function POST(request: Request) {
       outputs: object.outputs,
     });
 
-    const converted = convertSopProcedure(intakeText, sopModule, { method: "ai", model: model.modelId });
+    const converted = convertSopProcedure(intakeText, sopModule, { method: "ai", model: modelLabel });
 
     if (!converted.spec) {
       return NextResponse.json(
@@ -229,19 +249,20 @@ export async function POST(request: Request) {
       spec: converted.spec,
       issues: converted.issues,
       method: "ai",
-      model: model.modelId,
+      model: modelLabel,
       intakeText,
     } satisfies ConvertResponse);
   } catch (error) {
     console.error("[process/convert] route failure", error);
     const message = getErrorMessage(error);
 
-    if (/GOOGLE_GENERATIVE_AI_API_KEY|GEMINI_API_KEY/.test(message)) {
+    if (error instanceof BackendCompletionError && error.kind === "not_configured") {
       return NextResponse.json(
         {
           error:
-            "AI assistance is not configured on this server, so prose cannot be normalised. Paste the procedure in the structured format (attribute lines, a numbered step table, an output list) to convert it without AI.",
+            "AI assistance is not configured, so prose cannot be normalised. Paste the procedure in the structured format (attribute lines, a numbered step table, an output list) to convert it without AI.",
           code: "AI_NOT_CONFIGURED",
+          // The backend says what an administrator has to set up in AI Providers.
           detail: message,
           issues: structured.issues,
         },
@@ -249,8 +270,11 @@ export async function POST(request: Request) {
       );
     }
 
-    if (isQuotaExceededError(message)) {
-      const retryAfterSeconds = parseRetryAfterSeconds(message);
+    if ((error instanceof BackendCompletionError && error.kind === "quota") || isQuotaExceededError(message)) {
+      const retryAfterSeconds =
+        error instanceof BackendCompletionError && error.retryAfterSeconds
+          ? error.retryAfterSeconds
+          : parseRetryAfterSeconds(message);
       return NextResponse.json(
         {
           error:
