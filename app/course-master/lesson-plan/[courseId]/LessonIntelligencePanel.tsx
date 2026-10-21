@@ -9,7 +9,6 @@ import {
   Loader2,
   RefreshCw,
   Sparkles,
-  Users,
   Wand2,
   X,
 } from 'lucide-react';
@@ -275,7 +274,193 @@ export function LessonIntelligencePanel({
 
   if (!ready) return null;
 
-  }
+  return (
+    <section className="overflow-hidden rounded-[14px] border border-[#E3EAF4] bg-white shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+      >
+        <span className="flex items-center gap-2 text-[15px] font-semibold text-[#0F172A]">
+          <Sparkles size={16} className="text-[#4F46E5]" />
+          AI Lesson Intelligence
+        </span>
+        <ChevronDown size={18} className={cn('text-[#64748B] transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open ? (
+        <div className="space-y-5 border-t border-[#E3EAF4] px-5 py-5">
+          {error ? (
+            <div className="flex items-center gap-2 rounded-[10px] border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <AlertTriangle size={14} />
+              {error}
+            </div>
+          ) : null}
+          {notice ? (
+            <div className="flex items-center gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700">
+              <Check size={14} />
+              {notice}
+            </div>
+          ) : null}
+
+          {loading ? (
+            <div className="flex items-center gap-2 text-[13px] text-[#64748B]">
+              <Loader2 size={14} className="animate-spin" />
+              Loading lesson intelligence...
+            </div>
+          ) : capacity ? (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Stat label="Total periods" value={capacity.grand_totals.total_periods} />
+                <Stat label="Teaching minutes" value={capacity.grand_totals.total_teaching_minutes} />
+                <Stat label="Required minutes" value={capacity.grand_totals.total_required_minutes} />
+                <Stat label="Capacity" value={capacity.grand_totals.status} tone={STATUS_STYLES[capacity.grand_totals.status]} />
+              </div>
+
+              {capacity.terms.length > 0 ? (
+                <div className="space-y-2">
+                  {capacity.terms.map((term, index) => (
+                    <div
+                      key={term.term_id ?? `${term.term_title ?? 'term'}-${index}`}
+                      className={cn(
+                        'flex flex-wrap items-center justify-between gap-2 rounded-[10px] border px-3 py-2 text-[13px]',
+                        STATUS_STYLES[term.status] ?? 'border-[#E3EAF4] bg-white text-[#0F172A]'
+                      )}
+                    >
+                      <span className="font-medium">{term.term_title ?? 'Term'}</span>
+                      <span className="text-[#475569]">
+                        {term.term_start} - {term.term_end} - {term.teaching_weeks} weeks - {term.total_teaching_periods} periods
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => generateMacro(plans.length > 0)}
+                  disabled={busy === 'macro'}
+                  className="rounded-[10px] bg-[#4F46E5] text-white hover:bg-[#4338CA]"
+                >
+                  {busy === 'macro' ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Wand2 size={14} className="mr-1.5" />}
+                  {plans.length > 0 ? 'Regenerate macro plan' : 'Generate macro plan'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void load()}
+                  disabled={loading}
+                  className="rounded-[10px] border-[#CBD5E1] text-[#475569]"
+                >
+                  <RefreshCw size={14} className="mr-1.5" />
+                  Refresh
+                </Button>
+              </div>
+
+              {plans.length > 0 ? (
+                <div className="space-y-2">
+                  {plans.map((plan) => {
+                    const isExpanded = expandedPlanId === plan.id;
+                    const progress =
+                      plan.periods_total > 0 ? Math.round((plan.periods_with_plan / plan.periods_total) * 100) : 0;
+
+                    return (
+                      <div key={plan.id} className="overflow-hidden rounded-[10px] border border-[#E3EAF4]">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedPlanId((current) => (current === plan.id ? null : plan.id))}
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-[14px] font-medium text-[#0F172A]">{plan.plan_title}</span>
+                            <span className="text-[12px] text-[#64748B]">
+                              {plan.term_start_date} - {plan.term_end_date} - {plan.periods_with_plan}/{plan.periods_total} periods planned ({progress}%)
+                            </span>
+                          </span>
+                          <ChevronDown size={16} className={cn('shrink-0 text-[#64748B] transition-transform', isExpanded && 'rotate-180')} />
+                        </button>
+
+                        {isExpanded ? (
+                          <div className="space-y-3 border-t border-[#E3EAF4] bg-[#FBFDFF] px-4 py-3">
+                            {plan.macro_plan_json?.chapter_schedule?.length ? (
+                              <ul className="space-y-1.5">
+                                {plan.macro_plan_json.chapter_schedule.map((chapter, index) => (
+                                  <li
+                                    key={`${chapter.chapter_id ?? 'none'}-${index}`}
+                                    className="flex items-center justify-between gap-3 text-[13px]"
+                                  >
+                                    <span className="truncate text-[#0F172A]">{chapter.chapter_name}</span>
+                                    <span className="shrink-0 text-[#64748B]">
+                                      {chapter.allocated_periods} periods - Week {chapter.start_week}-{chapter.end_week}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-[13px] text-[#64748B]">No chapter schedule generated yet.</p>
+                            )}
+
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => startSchedule(plan.id)}
+                                disabled={busy === `meso-${plan.id}`}
+                                className="rounded-[8px] bg-[#0EA5E9] text-white hover:bg-[#0284C7]"
+                              >
+                                {busy === `meso-${plan.id}` ? (
+                                  <Loader2 size={13} className="mr-1.5 animate-spin" />
+                                ) : (
+                                  <CalendarRange size={13} className="mr-1.5" />
+                                )}
+                                Build schedule
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => generateMicro(plan.id, 10)}
+                                disabled={busy === `micro-${plan.id}` || plan.periods_total === 0}
+                                className="rounded-[8px] border-[#CBD5E1] text-[#475569]"
+                              >
+                                {busy === `micro-${plan.id}` ? (
+                                  <Loader2 size={13} className="mr-1.5 animate-spin" />
+                                ) : (
+                                  <Sparkles size={13} className="mr-1.5" />
+                                )}
+                                Generate AI content
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-[13px] text-[#64748B]">No term plan yet. Generate a macro plan to get started.</p>
+              )}
+            </>
+          ) : (
+            <p className="text-[13px] text-[#64748B]">Couldn’t load capacity data.</p>
+          )}
+        </div>
+      ) : null}
+
+      {teacherPrompt ? (
+        <TeacherAssignmentDialog
+          teachers={teacherPrompt.teachers}
+          chapters={teacherPrompt.chapters}
+          assignments={assignments}
+          setAssignments={setAssignments}
+          busy={busy === `meso-${teacherPrompt.planId}`}
+          onCancel={() => setTeacherPrompt(null)}
+          onAuto={() => confirmSchedule(teacherPrompt.planId, null)}
+          onConfirm={() => confirmSchedule(teacherPrompt.planId, assignments)}
+        />
+      ) : null}
+    </section>
+  );
+}
 
 function Stat({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: string; tone?: string }) {
   return (
