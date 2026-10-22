@@ -1,4 +1,4 @@
-﻿//
+//
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -103,6 +103,10 @@ import {
   PrayogshalaEditorDialog,
 } from './PrayogshalaDialogs';
 import { filterCardAssets } from '@/lib/prayogshala/cardEligibility';
+import { CoursePresentationFlow } from '@/components/coursePresentation/CoursePresentationFlow';
+import { COURSE_PRESENTATION_CARD_ID, routeCardOpen, shouldShowCoursePresentationCard } from '@/lib/coursePresentation/card';
+import { coursePresentationEnabledFor } from '@/lib/coursePresentation/scope';
+import { readCpState, startState, withCpState, withoutCpState, type CpState } from '@/lib/coursePresentation/urlState';
 import { PrayogshalaLab } from './PrayogshalaLab';
 import { PrayogshalaTopicPanel } from './PrayogshalaTopicPanel';
 import { deletePrayogshalaActivity, type PrayogshalaActivity } from '../../data/prayogshala';
@@ -549,11 +553,48 @@ interface ChapterContentItem {
    */
   studyDocKind?: DocumentKind | null;
   chapterId?: string;
+  /**
+   * Set only on the dedicated Course Presentation card of a pilot chapter (lib/coursePresentation). It is what sends
+   * a click to the two-choice screen; no other card carries it.
+   */
+  coursePresentationPilot?: boolean;
   slides: {
     id: string;
     number: number;
     title: string;
   }[];
+}
+
+/**
+ * The dedicated Course Presentation card. Nothing is stored behind it: it only opens the two-choice screen and the
+ * read-only source pre-flight. It is a card in the existing Classroom presentation style, not a new kind of content.
+ */
+function buildCoursePresentationCard(chapter: Chapter): ChapterContentItem {
+  return {
+    id: COURSE_PRESENTATION_CARD_ID,
+    title: 'Course Presentation',
+    subtitle: 'Classroom Presentation',
+    chapterTitle: chapter.title,
+    conceptTitle: 'Classroom Presentation',
+    contentCategory: 'Classroom Presentation',
+    conceptId: null,
+    conceptName: null,
+    type: 'Classroom presentation',
+    source: 'Authored',
+    preview: 'presentation',
+    actionLabel: 'Open',
+    slideCount: 0,
+    statValue: 'Not generated',
+    updatedDate: '',
+    updatedAt: '',
+    bodyHtml: null,
+    slides: [],
+    topicName: null,
+    summary: null,
+    prayogshala: null,
+    chapterId: chapter.id,
+    coursePresentationPilot: true,
+  };
 }
 
 type QuestionOptionLabel = (typeof QUESTION_OPTION_LABELS)[number];
@@ -1455,7 +1496,14 @@ export default function ChapterListPage() {
     if (!course || !activeLibraryChapter) return [];
     const cacheKey = `${activeLibraryChapter.id}:${activeContentLibraryTab}:${contentGroupBy}:${contentResourceType}`;
     const apiCategories = chapterContentCategories[cacheKey];
-    if (apiCategories) return buildApiChapterContentItems(activeLibraryChapter, apiCategories);
+    if (apiCategories) {
+      const loaded = buildApiChapterContentItems(activeLibraryChapter, apiCategories);
+      // The dedicated Course Presentation card exists only in the Classroom Resource lane of a pilot chapter,
+      // and never beside a presentation that is already stored.
+      return shouldShowCoursePresentationCard({ chapterId: activeLibraryChapter.id, lane: contentResourceType, loaded: true, items: loaded })
+        ? [buildCoursePresentationCard(activeLibraryChapter), ...loaded]
+        : loaded;
+    }
     if (/^\d+$/.test(activeLibraryChapter.id)) return [];
     return buildChapterContentItems(course, activeLibraryChapter, activeLibraryChapterConcepts);
   }, [activeContentLibraryTab, activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, contentGroupBy, contentResourceType, course]);
@@ -2178,13 +2226,10 @@ export default function ChapterListPage() {
   };
 
   useEffect(() => {
-    if (!contentChapter) return;
+    if (!contentChapter || selectedLibraryChapterId === contentChapter.id) return;
 
-    const hasMatchingChapter = allChapters.some((chapter) => chapter.id === selectedLibraryChapterId);
-    if (!selectedLibraryChapterId || !hasMatchingChapter) {
-      queueMicrotask(() => setSelectedLibraryChapterId(contentChapter.id));
-    }
-  }, [allChapters, contentChapter, selectedLibraryChapterId]);
+    queueMicrotask(() => setSelectedLibraryChapterId(contentChapter.id));
+  }, [contentChapter, selectedLibraryChapterId]);
 
   const questionBankChapterSyncedFromUrlRef = useRef<string | null>(null);
 
@@ -2204,15 +2249,24 @@ export default function ChapterListPage() {
   // The top-level Question bank tab links here with no chapterId, so the sync
   // effect above never fires for it. Without this, a filter left over from an
   // earlier chapter-scoped visit in the same session would silently carry over
-  // instead of landing on the full, unfiltered bank the tab implies.
+  // instead of landing on the first chapter the tab now defaults to.
+  const questionBankDefaultAppliedRef = useRef(false);
+
   useEffect(() => {
-    if (view !== 'question-bank' || activeChapterId) return;
+    if (view !== 'question-bank' || activeChapterId) {
+      questionBankDefaultAppliedRef.current = false;
+      return;
+    }
+    if (questionBankDefaultAppliedRef.current) return;
+    if (allChapters.length === 0) return;
+
     questionBankChapterSyncedFromUrlRef.current = null;
-    setQuestionBankChapterFilter('all');
+    questionBankDefaultAppliedRef.current = true;
+    setQuestionBankChapterFilter(allChapters[0].id);
     setQuestionBankConceptFilter('all');
     setQuestionBankTypeFilter('all');
     setQuestionBankCategoryFilter('all');
-  }, [view, activeChapterId]);
+  }, [view, activeChapterId, allChapters]);
 
   const loadQuestionBankItems = useCallback(
     (filterValue: string) => {
@@ -2767,6 +2821,9 @@ export default function ChapterListPage() {
   };
 
   const openChapterContentView = (chapter: Chapter, resourceType: 'classroom' | 'teacher' = 'classroom') => {
+    // The list below shows the chapter held in selectedLibraryChapterId. Without this, a chapter opened from the chapter list kept
+    // showing the FIRST chapter's resources (the address said one chapter, the page loaded another).
+    setSelectedLibraryChapterId(chapter.id);
     setContentLibraryTab('All content');
     setContentSourceFilter('all');
     setContentSearch('');
@@ -2885,7 +2942,31 @@ export default function ChapterListPage() {
     });
   };
 
+  /** The Course Presentation screen is shown while the URL says so, for a pilot chapter in the Classroom lane only. */
+  const cpState = readCpState(searchParams);
+  const cpChapterId = activeLibraryChapter?.id ?? '';
+  const cpOpen = cpState.open && contentResourceType === 'classroom' && coursePresentationEnabledFor(cpChapterId);
+
+  // Written from the address as it is at that moment, so a state never overwrites an unrelated parameter. The screen
+  // itself settles quick successive choices before calling this (see CoursePresentationFlow).
+  const setCpState = (next: CpState) => {
+    const params = withCpState(new URLSearchParams(window.location.search), next);
+    router.replace(`/course-master/${courseId}/chapters?${params.toString()}`);
+  };
+
+  const closeCoursePresentation = () => {
+    const params = withoutCpState(new URLSearchParams(window.location.search));
+    router.replace(`/course-master/${courseId}/chapters?${params.toString()}`);
+  };
+
   const handleOpenContent = (item: ChapterContentItem) => {
+    // Only the dedicated Course Presentation card takes the new two-choice route (decided by an explicit
+    // marker in lib/coursePresentation/card.ts). Everything else, Prayogshala included, falls through unchanged.
+    if (routeCardOpen(item, contentResourceType) === 'course-presentation') {
+      setCpState(startState());
+      return;
+    }
+
     // A Prayogshala activity is a structured document (objective, procedure, safety...),
     // not a file or a route, so it opens in its own detail view. The activity came
     // down with the list; nothing is fetched here.
@@ -5570,7 +5651,7 @@ export default function ChapterListPage() {
     const totalQuestionBankCount = questionBankItems.length;
     const visibleQuestionBankCount = filteredQuestionBankItems.length;
     const questionCountLabel = questionBankLoading
-      ? 'Loading questionsâ€¦'
+      ? 'Loading questions…'
       : questionBankError
         ? 'Error loading questions'
         : visibleQuestionBankCount === totalQuestionBankCount
@@ -5681,7 +5762,7 @@ export default function ChapterListPage() {
 
           {questionBankLoading ? (
             <div className="rounded-[8px] border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
-              <p className="text-sm font-medium text-slate-600">Loading questions for the selected chapterâ€¦</p>
+              <p className="text-sm font-medium text-slate-600">Loading questions for the selected chapter…</p>
             </div>
           ) : questionBankError ? (
             <div className="rounded-[8px] border border-rose-200 bg-rose-50 px-5 py-12 text-center shadow-sm">
@@ -6343,6 +6424,29 @@ export default function ChapterListPage() {
               </div>
             )}
 
+          {cpOpen ? (
+            <CoursePresentationFlow
+              chapterId={Number(cpChapterId)}
+              initial={cpState}
+              onMirror={setCpState}
+              onClose={closeCoursePresentation}
+              onOpenPresentation={(deepLink) => {
+                if (typeof window !== 'undefined') {
+                  const params = withoutCpState(new URLSearchParams(window.location.search));
+                  window.history.replaceState({}, '', `/course-master/${courseId}/chapters?${params.toString()}`);
+                }
+                router.push(deepLink);
+              }}
+              onOpenPreview={(address) => {
+                if (typeof window !== 'undefined') {
+                  const params = withoutCpState(new URLSearchParams(window.location.search));
+                  window.history.replaceState({}, '', `/course-master/${courseId}/chapters?${params.toString()}`);
+                }
+                router.push(address);
+              }}
+            />
+          ) : null}
+
           {labActivityId ? (
             labActivity?.lab_config ? (
               <PrayogshalaLab activity={labActivity} lab={labActivity.lab_config} onClose={closePrayogshalaLab} />
@@ -6657,62 +6761,66 @@ export default function ChapterListPage() {
                   key={chapter.id}
                   className="overflow-hidden rounded-[14px] border border-slate-200/90 bg-white shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5">
-                    <button
-                      type="button"
-                      onClick={() => updateExpandedChapter(isExpanded ? null : chapter.id)}
-                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                    >
-                      <ChevronDown
-                        size={18}
-                        className={cn(
-                          'shrink-0 text-slate-500 transition-transform duration-200',
-                          !isExpanded && '-rotate-90'
-                        )}
-                      />
-                      <div className="min-w-0">
-                        <h3 className="text-[19px] font-bold leading-tight text-slate-950">
-                          {`Chapter ${chapter.number} \u00B7 ${chapter.title}`}
-                        </h3>
-                      </div>
-                    </button>
+                  <div className="flex items-start gap-4 px-6 py-5">
+                    <div className="flex w-1/2 min-w-0 items-center">
+                      <button
+                        type="button"
+                        onClick={() => updateExpandedChapter(isExpanded ? null : chapter.id)}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <ChevronDown
+                          size={18}
+                          className={cn(
+                            'shrink-0 text-slate-500 transition-transform duration-200',
+                            !isExpanded && '-rotate-90'
+                          )}
+                        />
+                        <div className="min-w-0">
+                          <h3 className="text-[19px] font-bold leading-tight text-slate-950">
+                            {`Chapter ${chapter.number} \u00B7 ${chapter.title}`}
+                          </h3>
+                        </div>
+                      </button>
+                    </div>
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => openChapterContentView(chapter, 'classroom')}
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <FolderOpen size={16} className="mr-2" />
-                      Classroom Resource
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => openChapterContentView(chapter, 'teacher')}
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <FolderOpen size={16} className="mr-2" />
-                      Teacher Workspace
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => openChapterCoherenceMapView(chapter)}
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <Network size={16} className="mr-2" />
-                      Coherence map
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => router.push('/lms/homework')}
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <ClipboardList size={16} className="mr-2" />
-                      Homework/Assignment
-                    </Button>
+                    <div className="flex w-1/2 items-stretch gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => openChapterContentView(chapter, 'classroom')}
+                        className="h-auto min-h-8 flex-1 shrink basis-0 flex-col gap-0.5 whitespace-normal break-words rounded-lg border-slate-300 bg-white px-1 py-1.5 text-center text-[11px] leading-tight font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      >
+                        <FolderOpen size={14} className="shrink-0" />
+                        Classroom Resource
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => openChapterContentView(chapter, 'teacher')}
+                        className="h-auto min-h-8 flex-1 shrink basis-0 flex-col gap-0.5 whitespace-normal break-words rounded-lg border-slate-300 bg-white px-1 py-1.5 text-center text-[11px] leading-tight font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      >
+                        <FolderOpen size={14} className="shrink-0" />
+                        Teacher Workspace
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => openChapterCoherenceMapView(chapter)}
+                        className="h-auto min-h-8 flex-1 shrink basis-0 flex-col gap-0.5 whitespace-normal break-words rounded-lg border-slate-300 bg-white px-1 py-1.5 text-center text-[11px] leading-tight font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      >
+                        <Network size={14} className="shrink-0" />
+                        Coherence map
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => router.push('/lms/homework')}
+                        className="h-auto min-h-8 flex-1 shrink basis-0 flex-col gap-0.5 whitespace-normal break-words rounded-lg border-slate-300 bg-white px-1 py-1.5 text-center text-[11px] leading-tight font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      >
+                        <ClipboardList size={14} className="shrink-0" />
+                        Homework/Assignment
+                      </Button>
+                    </div>
                   </div>
 
                   {isExpanded && chapterConceptRows.length > 0 && (

@@ -35,21 +35,26 @@ import { SubjectProgressDetailsView } from './SubjectProgressView';
 import { OVERVIEW_WIDGETS, OverviewTab, type OverviewStat } from './OverviewTab';
 import { CurriculumTab } from './CurriculumTab';
 import { OutcomesTab } from './OutcomesTab';
+import { LessonPlansTab } from './LessonPlansTab';
+import { AcademicScopeBar } from './AcademicScopeBar';
+import { useAcademicScope } from './useAcademicScope';
 import { CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
 import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
 
-type TabKey = 'overview' | 'curriculum' | 'outcomes';
+type TabKey = 'overview' | 'curriculum' | 'outcomes' | 'lesson-plans';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'overview', label: 'Overview' },
   { key: 'curriculum', label: 'Curriculum' },
-  { key: 'outcomes', label: 'Outcomes & Delivery' },
+  { key: 'outcomes', label: 'CG / LO Analysis' },
+  { key: 'lesson-plans', label: 'Lesson Plans' },
 ];
 
 export default function CurriculumPlanningPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<UpcomingLessonRow | null>(null);
   const [isAddTopicDialogOpen, setIsAddTopicDialogOpen] = useState(false);
   const [isUpcomingLessonsViewOpen, setIsUpcomingLessonsViewOpen] = useState(false);
   const [isSubjectProgressViewOpen, setIsSubjectProgressViewOpen] = useState(false);
@@ -188,6 +193,11 @@ export default function CurriculumPlanningPage() {
         room: item.teacher_name,
         period: item.period_slot,
         status: upcomingStatusLabel(item.status),
+        periodId: item.period_id,
+        subjectName: item.subject_name ?? undefined,
+        standardName: item.standard_name ?? undefined,
+        // slice(0, 3): newer ICU renders September as "Sept"; editMonths uses "Sep".
+        month: new Date(`${item.scheduled_date}T00:00:00`).toLocaleDateString('en-GB', { month: 'short' }).slice(0, 3),
       };
     });
   }, [apiData]);
@@ -208,6 +218,7 @@ export default function CurriculumPlanningPage() {
 
   const curricula = apiData?.curriculum ?? [];
   const unmappedChapters = apiData?.unmapped_chapters ?? [];
+  const scope = useAcademicScope(curricula);
 
   const gradeLabel = 'All standards';
 
@@ -237,20 +248,40 @@ export default function CurriculumPlanningPage() {
       : loadError || 'No curriculum data found yet.';
 
   const outcomesSubtitle = `${curricula.length} curricula available - pick a Standard, Subject and Curriculum below`;
+  const lessonPlansSubtitle =
+    scope.standardId !== null && scope.subjectId !== null
+      ? 'Pick a Division below to plan and schedule lessons for this class'
+      : 'Pick a Standard and Subject above to plan its lessons';
 
   const headerSubtitle =
-    activeTab === 'overview' ? overviewSubtitle : activeTab === 'curriculum' ? curriculumSubtitle : outcomesSubtitle;
+    activeTab === 'overview'
+      ? overviewSubtitle
+      : activeTab === 'curriculum'
+        ? curriculumSubtitle
+        : activeTab === 'outcomes'
+          ? outcomesSubtitle
+          : lessonPlansSubtitle;
   const headerTitle =
     activeTab === 'overview'
       ? `${gradeLabel} - Yearly syllabus overview`
       : activeTab === 'curriculum'
         ? `${gradeLabel} - Curriculum`
-        : `${gradeLabel} - Curriculum Outcomes & Delivery`;
+        : activeTab === 'outcomes'
+          ? `${gradeLabel} - CG / LO Analysis`
+          : `${gradeLabel} - Lesson Plans`;
 
   const dialogs = (
     <>
       {isFilterDialogOpen && <FilterSyllabusDialog onClose={() => setIsFilterDialogOpen(false)} />}
-      {isEditDialogOpen && <EditTopicDialog onClose={() => setIsEditDialogOpen(false)} />}
+      {isEditDialogOpen && (
+        <EditTopicDialog
+          lesson={editingLesson}
+          onClose={() => {
+            setIsEditDialogOpen(false);
+            setEditingLesson(null);
+          }}
+        />
+      )}
       {isAddTopicDialogOpen && <AddTopicDialog onClose={() => setIsAddTopicDialogOpen(false)} />}
     </>
   );
@@ -265,6 +296,10 @@ export default function CurriculumPlanningPage() {
           onBack={() => setIsUpcomingLessonsViewOpen(false)}
           onFilter={() => setIsFilterDialogOpen(true)}
           onAddLesson={() => setIsAddTopicDialogOpen(true)}
+          onEditLesson={(lesson) => {
+            setEditingLesson(lesson);
+            setIsEditDialogOpen(true);
+          }}
         />
       </RequireStaff>
     );
@@ -343,6 +378,10 @@ export default function CurriculumPlanningPage() {
         ))}
       </div>
 
+      {activeTab !== 'overview' ? (
+        <AcademicScopeBar scope={scope} showChapter={activeTab === 'curriculum' || activeTab === 'lesson-plans'} />
+      ) : null}
+
       {activeTab === 'overview' ? (
         <OverviewTab
           stats={stats}
@@ -363,9 +402,22 @@ export default function CurriculumPlanningPage() {
           unmapped={unmappedChapters}
           isLoading={isLoading}
           loadError={loadError}
+          standardId={scope.standardId}
+          subjectId={scope.subjectId}
+          curriculumId={scope.curriculumId}
+          chapterId={scope.chapterId}
         />
+      ) : activeTab === 'outcomes' ? (
+        <OutcomesTab curricula={curricula} standardId={scope.standardId} subjectId={scope.subjectId} curriculumId={scope.curriculumId} />
       ) : (
-        <OutcomesTab curricula={curricula} />
+        <LessonPlansTab
+          session={session}
+          standardId={scope.standardId}
+          subjectId={scope.subjectId}
+          chapterOptions={scope.chapterOptions}
+          chapterId={scope.chapterId}
+          setChapterId={scope.setChapterId}
+        />
       )}
     </div>
     </RequireStaff>

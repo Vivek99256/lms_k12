@@ -23,6 +23,22 @@ export interface AiModuleOption {
   /** True when this module resolves its provider through the saved configuration. */
   wired: boolean;
   consumer: string;
+  /** What a provider must be able to do to serve this module (chat, json, vision, ...). */
+  requires: string[];
+  min_output_tokens: number | null;
+  /** The module whose configuration this one uses when it has none of its own. */
+  inherits: string | null;
+  /** `none` when the module makes no model call at all. */
+  runtime: 'model' | 'none';
+  /** What is missing, in words an administrator can act on. */
+  gap: string | null;
+}
+
+/** How usable a stored credential is, as judged by asking the provider. */
+export interface AiCredentialStatus {
+  status: 'ready' | 'present' | 'invalid' | 'absent' | 'not_required';
+  label: string;
+  detail: string | null;
 }
 
 export interface AiProviderOption {
@@ -52,7 +68,55 @@ export interface AiConfigurationOptions {
   modules: AiModuleOption[];
   providers: AiProviderOption[];
   models: Record<string, AiModelOption[]>;
-  active_driver: string;
+  /** False until the `priority` column has been added; ordering is then newest-first. */
+  priority_supported: boolean;
+}
+
+export interface AiCompatibleModel {
+  id: number;
+  model_id: string;
+  label: string;
+  /** Fits what the module needs. */
+  compatible: boolean;
+  /** The provider itself confirmed the model — not merely the catalogue. */
+  verified: boolean;
+  reasons: string[];
+  max_output_tokens: number | null;
+  context_tokens: number | null;
+}
+
+export interface AiCompatibleProvider {
+  provider: string;
+  label: string;
+  capable: boolean;
+  selectable: boolean;
+  /** `configured` is saved for the module; `best_fit` is this module's top unconfigured choice. */
+  status: 'configured' | 'best_fit' | 'compatible' | 'not_capable';
+  /** The module's own code was built and run against this provider. */
+  proven: boolean;
+  /** Why it sits where it does for this module. */
+  fit: string | null;
+  /** Capable AND its key was accepted by the provider — safe to run on. */
+  ready: boolean;
+  /** 1 = first priority; null for a provider that cannot serve the module. */
+  rank: number | null;
+  reasons: string[];
+  capabilities: string[];
+  credential: AiCredentialStatus;
+  configured: { id: number; priority: number | null; model: string | null; scope: string } | null;
+  models: AiCompatibleModel[];
+  docs: string | null;
+}
+
+export interface AiModuleCompatibility {
+  module: string;
+  module_label: string;
+  runtime: 'model' | 'none';
+  gap: string | null;
+  requires: { key: string; label: string }[];
+  min_output_tokens: number | null;
+  priority_supported: boolean;
+  providers: AiCompatibleProvider[];
 }
 
 export interface AiConfigurationRow {
@@ -60,6 +124,10 @@ export interface AiConfigurationRow {
   ai_module: string | null;
   module_label: string;
   module_wired: boolean;
+  module_runtime: 'model' | 'none' | null;
+  /** 1 = tried first for its module; null = unranked. */
+  priority: number | null;
+  credential: AiCredentialStatus;
   provider: string;
   provider_label: string;
   api_type: string;
@@ -73,24 +141,45 @@ export interface AiConfigurationRow {
   updated_at: string | null;
 }
 
+/** One provider a module may call, in the order it will try them. */
+export interface AiResolvedChainLeg {
+  order: number;
+  provider: string;
+  provider_label: string;
+  model: string | null;
+  priority: number | null;
+  source: string;
+  key_id: number | string | null;
+  has_key: boolean;
+  credential?: AiCredentialStatus;
+}
+
 /** What a module resolves to right now, including modules with nothing saved. */
 export interface AiResolvedRow {
   module: string;
   module_label: string;
   description: string;
   wired: boolean;
-  provider: string;
-  provider_label: string;
+  runtime: 'model' | 'none';
+  gap: string | null;
+  requires: string[];
+  /** Null when nothing usable is configured — there is no provider to name. */
+  provider: string | null;
+  provider_label: string | null;
   model: string | null;
-  source: 'module' | 'module_platform' | 'pool' | 'pool_platform' | 'env' | 'config';
+  source: 'module' | 'module_platform' | 'pool' | 'pool_platform' | 'config';
   scope: string;
   key_id: number | string | null;
   has_key: boolean;
   driveable: boolean;
+  inherited_from: string | null;
+  chain: AiResolvedChainLeg[];
+  credential: AiCredentialStatus;
 }
 
 export interface AiConfigurationIndex {
   sub_institute_id: string | number;
+  priority_supported: boolean;
   configurations: AiConfigurationRow[];
   resolved: AiResolvedRow[];
 }
@@ -110,6 +199,16 @@ export interface AiConfigurationPayload {
   account_email?: string | null;
   api_limit?: number | null;
   status?: number;
+  /** 1 = tried first. Only honoured once the priority column exists. */
+  priority?: number | null;
+}
+
+export interface AiConfigurationSaved {
+  configuration: AiConfigurationRow;
+  /** What the provider said about the key that was just saved. */
+  credential: AiCredentialStatus | null;
+  /** The "what each module calls" table, re-resolved straight after the write. */
+  resolved: AiResolvedRow[];
 }
 
 export interface AiModelPayload {
@@ -215,17 +314,30 @@ export function fetchAiConfigurations(): Promise<AiConfigurationIndex> {
   return call<AiConfigurationIndex>('/configuration');
 }
 
-export function createAiConfiguration(
-  payload: AiConfigurationPayload
-): Promise<{ configuration: AiConfigurationRow }> {
+export function createAiConfiguration(payload: AiConfigurationPayload): Promise<AiConfigurationSaved> {
   return call('/configuration', 'POST', payload);
 }
 
-export function updateAiConfiguration(
-  id: number,
-  payload: AiConfigurationPayload
-): Promise<{ configuration: AiConfigurationRow }> {
+export function updateAiConfiguration(id: number, payload: AiConfigurationPayload): Promise<AiConfigurationSaved> {
   return call(`/configuration/${id}`, 'PUT', payload);
+}
+
+/** Which providers and models can really serve one module, best first. */
+export function fetchAiCompatibility(module: string): Promise<AiModuleCompatibility> {
+  return call<AiModuleCompatibility>(`/configuration/compatibility?module=${encodeURIComponent(module)}`);
+}
+
+/** Set a module's provider order: configuration ids, first choice first. */
+export function reorderAiConfigurations(
+  module: string,
+  order: number[]
+): Promise<{ configurations: AiConfigurationRow[]; resolved: AiResolvedRow[] }> {
+  return call('/configuration/reorder', 'POST', { ai_module: module, order });
+}
+
+/** Ask the provider whether a stored key is accepted. */
+export function verifyAiConfiguration(id: number): Promise<{ id: number; credential: AiCredentialStatus }> {
+  return call(`/configuration/${id}/verify`, 'POST');
 }
 
 export function retireAiConfiguration(id: number): Promise<{ id: number }> {

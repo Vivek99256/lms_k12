@@ -4,6 +4,7 @@ import React, { createContext, useMemo, useState, useEffect, useRef, useCallback
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
+import { ASK_ASSISTANT_EVENT, type AskAssistantDetail } from '@/lib/exam-help';
 import { StuckUserAssistant } from '@/components/ai/StuckUserAssistant';
 import { StuckNudgePopup } from '@/components/ai/StuckNudgePopup';
 import type { StuckPromptContext } from '@/lib/ai/stuck-assist-types';
@@ -26,6 +27,7 @@ import { canSeeInternalItems, showDeferredModules } from '@/lib/roadmap';
 import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
 import { useModuleLevel3Nav } from '@/app/_lib/use-module-level3-nav';
+import { ShellMenuContext, type ShellMenuState } from '@/app/components/shell-menu-context';
 
 interface SelectedBranch {
   level1Key: string;
@@ -282,6 +284,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [toolStripOpen, setToolStripOpen] = useState(false);
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
+  // Below the md breakpoint the sidebar is an overlay drawer opened from the header.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   // How wide the user has decided the assistant should be, remembered across sessions.
   const assistantPanel = useResizablePanel();
   const rightToolbarToggleRef = useRef<HTMLButtonElement>(null);
@@ -637,6 +641,23 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const handleNudgeNo = useCallback(() => setShowStuckNudge(false), []);
 
+  // A question put to the assistant from elsewhere on the page - today the "Ask AI" button on an exam
+  // question. Opens the panel and hands it the prompt; the panel sends it once and clears it here.
+  const [assistantPrompt, setAssistantPrompt] = useState<AskAssistantDetail | null>(null);
+
+  useEffect(() => {
+    const onAsk = (event: Event) => {
+      const detail = (event as CustomEvent<AskAssistantDetail>).detail;
+      if (!detail?.prompt) return;
+      setShowStuckNudge(false);
+      setIsChatbotOpen(true);
+      setIsRightToolbarOpen(false);
+      setAssistantPrompt(detail);
+    };
+    window.addEventListener(ASK_ASSISTANT_EVENT, onAsk);
+    return () => window.removeEventListener(ASK_ASSISTANT_EVENT, onAsk);
+  }, []);
+
   const handleLevel1Select = (item: MenuItem) => {
     setSelectedBranch((current) => {
       const key = getMenuKey(item);
@@ -729,6 +750,41 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
     if (entry.route) router.push(entry.route);
   };
+
+  // Any navigation — sidebar, search, a link in the page — closes the mobile drawer.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMobileNavOpen(false);
+  }, [pathname]);
+
+  // Widening past the md breakpoint brings the rail back, so the drawer has nothing left to do.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const query = window.matchMedia('(min-width: 768px)');
+    const close = () => {
+      if (query.matches) setMobileNavOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileNavOpen(false);
+    };
+    query.addEventListener('change', close);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      query.removeEventListener('change', close);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [mobileNavOpen]);
+
+  // handleMenuSearchNavigate is recreated every render; pages get a stable function that
+  // always calls the latest one, so the context value only changes when the menu does.
+  const menuNavigateRef = useRef(handleMenuSearchNavigate);
+  useEffect(() => {
+    menuNavigateRef.current = handleMenuSearchNavigate;
+  });
+  const shellMenu = useMemo<ShellMenuState>(
+    () => ({ menuItems, loading, navigate: (entry) => menuNavigateRef.current(entry) }),
+    [menuItems, loading],
+  );
 
   const selectedL1 = useMemo(() => {
     if (!selectedBranch?.level1Key) return null;
@@ -850,18 +906,27 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       than the root layout so it covers exactly the surface the assistant appears on.
     */
     <PageAiContextProvider>
+    <ShellMenuContext.Provider value={shellMenu}>
     <div className="app-shell-background flex h-screen overflow-hidden">
-      <Sidebar
-        menuItems={displayedMenuItems}
-        loading={loading}
-        error={error}
-        refetch={refetch}
-        dynamicLevel2Counts={moduleLevel3Menu.level2Counts}
-        onLevel1Select={handleLevel1Select}
-        onLevel2Select={handleLevel2Select}
-      />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden px-4 pb-4 pt-3">
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-40 bg-slate-900/40 md:hidden" onClick={() => setMobileNavOpen(false)} aria-hidden />
+      )}
+      <div className={`${mobileNavOpen ? 'fixed inset-y-0 left-0 z-50 flex' : 'hidden'} md:static md:z-auto md:flex`}>
+        <Sidebar
+          menuItems={displayedMenuItems}
+          loading={loading}
+          error={error}
+          refetch={refetch}
+          dynamicLevel2Counts={moduleLevel3Menu.level2Counts}
+          onLevel1Select={handleLevel1Select}
+          onLevel2Select={handleLevel2Select}
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
+        />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden px-3 pb-3 pt-3 sm:px-4 sm:pb-4">
         <Header
+          onOpenNavigation={() => setMobileNavOpen(true)}
           onToggleChatbot={toggleChatbot}
           isChatbotOpen={isChatbotOpen}
           menuItems={menuItems}
@@ -953,6 +1018,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                   onToggleChatbot={toggleChatbot}
                   stuckPrompt={pendingStuckPrompt}
                   onStuckPromptHandled={() => setPendingStuckPrompt(null)}
+                  assistantPrompt={assistantPrompt}
+                  onAssistantPromptHandled={() => setAssistantPrompt(null)}
                 />
               </div>
             </>
@@ -970,6 +1037,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         />
       </div>
     </div>
+    </ShellMenuContext.Provider>
     </PageAiContextProvider>
   );
 }

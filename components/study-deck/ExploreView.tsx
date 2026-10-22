@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { ArrowRight, CheckCircle2, Columns2, History, Layers, Lightbulb, MousePointerClick } from 'lucide-react';
 
+import { headingRepeatsText } from '@/lib/study-deck/cardTitle';
 import { INTERACTION_HEADING, itemsProgress, nextItem, selectItem, teaserOf } from '@/lib/study-deck/interactions';
 import type { DeckImage, ExploreItem, ItemsInteraction } from '@/lib/study-deck/types';
 import { BeforeAfter } from './BeforeAfter';
@@ -410,7 +411,7 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
                 </span>
                 <span className={`font-semibold leading-tight text-slate-900 ${portrait ? 'text-[1.05em]' : 'text-[1.3em]'}`}>{item.label}</span>
               </span>
-              {portrait || kind === 'timeline' ? null : <span className={`line-clamp-4 text-[0.95em] italic leading-snug ${seen(item.id) ? 'text-slate-700' : 'text-slate-600'}`}>&ldquo;{teaserOf(item.text, 9)}&rdquo;</span>}
+              {portrait || kind === 'timeline' || headingRepeatsText(item.label, item.text) ? null : <span className={`line-clamp-4 text-[0.95em] italic leading-snug ${seen(item.id) ? 'text-slate-700' : 'text-slate-600'}`}>&ldquo;{teaserOf(item.text, 9)}&rdquo;</span>}
               {portrait ? null : <span aria-hidden="true" className="pointer-events-none" style={WATERMARK}>{index + 1}</span>}
               {portrait ? null : <span className="text-[0.75em] font-medium text-sd-strong">{seen(item.id) ? 'Opened. Select to read it again' : kind === 'steps' ? 'Select to see this step' : kind === 'timeline' ? 'Select to see this event' : 'Select to open'}</span>}
             </button>

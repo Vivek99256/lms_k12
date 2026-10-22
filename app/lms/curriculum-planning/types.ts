@@ -45,6 +45,10 @@ export type UpcomingLessonRow = {
   period: string;
   status: UpcomingLessonStatus;
   highlight?: boolean;
+  periodId?: number;
+  subjectName?: string;
+  standardName?: string;
+  month?: string;
 };
 
 export type SubjectProgressTopic = {

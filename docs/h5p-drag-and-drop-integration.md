@@ -175,7 +175,7 @@ misconception-detection jobs, so this feeds real PAL analytics, not a log.
 ### LMS integration
 
 `H5PContentAdapter` is the seam. Adding `drag_drop` to its `SOURCES` surfaces
-published activities into the chapter content list under **H5P Interactive**,
+published activities into the chapter content list under **Interactive**,
 which is what courses, lessons, topics, learning activities, homework,
 worksheets and assessments all read. Ids are namespaced (`h5p:drag_drop:7`) so
 they can never collide with a `content_master.id`.
@@ -241,7 +241,7 @@ validation section of the request:**
 10. Export → re-import → confirm the round trip, and open the exported `.h5p`
     in Lumi or a Moodle with `H5P.DragQuestion` installed.
 11. Confirm published activities appear in the chapter content list under
-    **H5P Interactive**, and drafts do not.
+    **Interactive**, and drafts do not.
 
 A full `next build` was not run — `tsc --noEmit` and ESLint both pass, which
 covers type and lint correctness, but a production build has not been timed.

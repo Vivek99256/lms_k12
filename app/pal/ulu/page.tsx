@@ -14,7 +14,6 @@ export default async function PalUluParentPage({
       description="This view is built from the chapter’s concepts and skills. When no chapter is selected, PAL loads the latest available chapter."
       basePath="/pal/ulu"
       variant="ulu"
-      selectModules={(model) => model.uluModules}
     />
   );
 }

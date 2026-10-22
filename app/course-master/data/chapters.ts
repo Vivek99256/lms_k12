@@ -1096,8 +1096,8 @@ export async function fetchGeneratableQuestionFormats(): Promise<GeneratableForm
   return normaliseGeneratableFormats(raw.data);
 }
 
-export async function fetchSemanticIntelligenceChapters(): Promise<SemanticIntelligenceChapter[]> {
-  const res = await fetch(`${API_BASE_URL}/api/semantic-intelligence`);
+export async function fetchSemanticIntelligenceChapters(init?: RequestInit): Promise<SemanticIntelligenceChapter[]> {
+  const res = await fetch(`${API_BASE_URL}/api/semantic-intelligence`, init);
   const raw = await readApiJson(res, 'Failed to fetch semantic intelligence chapters');
 
   if (!res.ok || raw.status === false) {
@@ -1109,9 +1109,10 @@ export async function fetchSemanticIntelligenceChapters(): Promise<SemanticIntel
 }
 
 export async function fetchSemanticIntelligenceResult(
-  extractionId: string | number
+  extractionId: string | number,
+  init?: RequestInit
 ): Promise<SemanticIntelligenceResult | null> {
-  const res = await fetch(`${API_BASE_URL}/api/semantic-intelligence/${extractionId}/result`);
+  const res = await fetch(`${API_BASE_URL}/api/semantic-intelligence/${extractionId}/result`, init);
   const raw = await readApiJson(res, 'Failed to fetch semantic intelligence result');
 
   if (res.status === 404) {

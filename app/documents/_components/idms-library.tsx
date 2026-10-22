@@ -206,6 +206,14 @@ export function IdmsLibrary() {
   const [error, setError] = useState('');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // The result of the last upload stays visible after the popup closes, then fades out on its own.
+  useEffect(() => {
+    if (!uploadNotice) return;
+    const t = setTimeout(() => setUploadNotice(null), uploadNotice.type === 'success' ? 6000 : 12000);
+    return () => clearTimeout(t);
+  }, [uploadNotice]);
   const [selected, setSelected] = useState<DocumentItem | null>(null);
 
   const loadDocuments = useCallback(async () => {
@@ -236,7 +244,9 @@ export function IdmsLibrary() {
    * every search would make the sidebar numbers move under the user's cursor
    * and imply the tree describes the current result set, which it does not.
    */
-  useEffect(() => {
+  // Also refetched after anything that changes what is published (upload, delete, restore); otherwise the
+  // sidebar counts and tags stay stale until the page is reloaded.
+  const loadNavigation = useCallback(() => {
     IdmsApi.getBrowseTree()
       .then((result) => setTree(result.data ?? []))
       .catch(() => setTree([]));
@@ -244,6 +254,10 @@ export function IdmsLibrary() {
       .then((result) => setTagCloud(result.data ?? []))
       .catch(() => setTagCloud([]));
   }, []);
+
+  useEffect(() => {
+    loadNavigation();
+  }, [loadNavigation]);
 
   /*
    * loadDocuments flips the loading flag before it awaits. That is the point of
@@ -345,6 +359,7 @@ export function IdmsLibrary() {
       />
 
       {error && <InlineMessage type="error" text={error} />}
+      {uploadNotice && <InlineMessage type={uploadNotice.type} text={uploadNotice.text} />}
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row">
@@ -618,15 +633,32 @@ export function IdmsLibrary() {
         </section>
       )}
 
-      <TrashDialog isOpen={trashOpen} onClose={() => setTrashOpen(false)} onRestored={() => void loadDocuments()} />
+      <TrashDialog isOpen={trashOpen} onClose={() => setTrashOpen(false)} onRestored={() => {
+          void loadDocuments();
+          loadNavigation();
+        }}
+      />
 
       <UploadReviewModal
         isOpen={uploadOpen}
         onClose={() => setUploadOpen(false)}
-        onDocumentConfirmed={(doc, { total }) => {
-          // Only open the detail panel for a single upload; a batch would keep stealing focus.
-          if (total === 1) setSelected(doc);
+        onFinished={({ published, failed }) => {
           void loadDocuments();
+          loadNavigation();
+          if (published > 0 && failed === 0) {
+            setUploadNotice({
+              type: 'success',
+              text: `${published} ${published === 1 ? 'document was' : 'documents were'} uploaded and published.`,
+            });
+          } else if (failed > 0) {
+            setUploadNotice({
+              type: 'error',
+              text:
+                published > 0
+                  ? `${published} published, ${failed} could not be uploaded. Reopen Upload documents to try those again.`
+                  : `${failed} ${failed === 1 ? 'file' : 'files'} could not be uploaded.`,
+            });
+          }
         }}
       />
 
@@ -641,6 +673,7 @@ export function IdmsLibrary() {
         onClose={() => setSelected(null)}
         onRefresh={() => {
           void loadDocuments();
+          loadNavigation();
           setSelected(null);
         }}
       />

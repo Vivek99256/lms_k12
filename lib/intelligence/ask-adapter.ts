@@ -181,6 +181,17 @@ function renderSection(section: AnswerSection): string | null {
     return lines.length ? `${heading}${lines.join("\n")}` : null;
   }
 
+  if (section.type === "exam_answer") {
+    // The answer first, then why - the same order the card shows, so a spoken or plain-text reply matches it.
+    const parts = [
+      section.value ? `${section.label ?? "Correct Answer"}: ${section.value}` : null,
+      section.text ? `${section.heading ? section.heading + " " : ""}${section.text}` : null,
+      section.note ?? null,
+    ].filter((part): part is string => Boolean(part));
+
+    return parts.length ? parts.join("\n") : null;
+  }
+
   if (section.type === "comparison") {
     const lines = (section.items ?? []).map((raw) => {
       const row = raw as Record<string, unknown>;

@@ -54,6 +54,7 @@ import type { StuckPromptContext } from '@/lib/ai/stuck-assist-types';
 import { toActionableFollowUps } from '@shared/conversational-ai-core/followup-suggestions';
 import { useAiWorkspace } from '@/hooks/use-ai-workspace';
 import { usePageAiContext } from '@/contexts/PageAiContext';
+import { examHelpPayload, type AskAssistantDetail } from '@/lib/exam-help';
 import type { Capability } from '@/lib/intelligence/workspace';
 // The governed twelve-stage pipeline, reached through `/api/ai/ask/stream` — a thin
 // Next route that forwards to Laravel and translates its SSE into the AI SDK's UI
@@ -110,6 +111,14 @@ type ChatMessage = PanelMessage;
  * the "clear on refresh" rule has to be decided once per page load rather than per
  * component mount — see the note in that module.
  */
+
+/**
+ * The source lines worth showing. A student's exam-question help is read from one question row; naming the
+ * internal tool behind it tells a student nothing, so it is left off.
+ */
+function visibleCitations<T extends { tool?: string | null }>(citations: T[] | undefined): T[] {
+  return (citations ?? []).filter((citation) => citation.tool !== 'exam_assessment.question_help');
+}
 
 /** The language an answer is written in, for the page's own wording around it. */
 function answerLanguageOf(message: { language?: { delivered?: string } }): UiLanguage {
@@ -177,8 +186,14 @@ export default function ChatbotPanel({
   onToggleChatbot,
   stuckPrompt,
   onStuckPromptHandled,
+  assistantPrompt,
+  onAssistantPromptHandled,
 }: {
   onToggleChatbot: () => void;
+  /** A question put to the assistant from elsewhere on the page (e.g. "Ask AI" on an exam question).
+   *  Sent once, as if the person had typed it. */
+  assistantPrompt?: AskAssistantDetail | null;
+  onAssistantPromptHandled?: () => void;
   /** Set when the idle watcher opened this panel — renders the "need a hand?" prompt
    *  as the panel's own first bubble, not a separate popup. Consumed once. */
   stuckPrompt?: StuckPromptContext | null;
@@ -521,7 +536,9 @@ export default function ChatbotPanel({
       {
         body: {
           conversationId: lifecycleThreadRef.current,
-          payload: actionPayload ?? {},
+          // On an exam's attempt screen this also carries the paper and the question the student is on, so
+          // "explain it in simpler words" still means that question. The backend re-checks both.
+          payload: { ...(examHelpPayload(pathname) ?? {}), ...(actionPayload ?? {}) },
           module: actionModule ?? workspace.context?.module ?? null,
           route: pathname,
           inputMode: voice ? 'voice' : 'text',
@@ -618,6 +635,16 @@ export default function ChatbotPanel({
   const handleSend = () => {
     void sendMessage(transcript || input);
   };
+
+  // A question asked from elsewhere on the page. Each nonce is sent once, however often this re-renders.
+  const lastAssistantNonce = useRef(0);
+  useEffect(() => {
+    if (!assistantPrompt || assistantPrompt.nonce === lastAssistantNonce.current) return;
+    lastAssistantNonce.current = assistantPrompt.nonce;
+    void sendMessage(assistantPrompt.prompt);
+    onAssistantPromptHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assistantPrompt]);
 
   /*
    * The "are you stuck?" prompt, as the panel's own first bubble — never a separate
@@ -946,13 +973,13 @@ export default function ChatbotPanel({
                       than only the newest: the point of a source line is that it stays
                       checkable after the conversation has moved on.
                     */}
-                    {message.role === 'assistant' && message.citations?.length ? (
+                    {message.role === 'assistant' && visibleCitations(message.citations).length ? (
                       <div className="mt-2.5 border-t border-gray-100 pt-2">
                         <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
                           {uiLabel(answerLanguageOf(message), 'sources')}
                         </p>
                         <ul className="mt-1 space-y-0.5">
-                          {message.citations.map((citation, citationIndex) => (
+                          {visibleCitations(message.citations).map((citation, citationIndex) => (
                             <li key={`${citation.tool}-${citationIndex}`} className="text-[11px] leading-snug text-gray-500">
                               <span className={citation.available ? '' : 'text-amber-600'}>
                                 {citation.module && citation.tool && citation.tool !== citation.module

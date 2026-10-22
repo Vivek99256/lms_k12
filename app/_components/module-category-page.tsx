@@ -631,6 +631,16 @@ export function ModuleCategoryPage({
     [router, searchParams]
   );
 
+  // A `?tab=` naming a menu that lives on its own page is not a tab here: the
+  // header's drill-down links every menu this way without knowing which ones
+  // render inline, so the ones that do not are sent on to their own route.
+  useEffect(() => {
+    if (!requestedTab) return;
+
+    const requested = tabs.find((tab) => tab.id === requestedTab);
+    if (requested && opensInOwnPage(requested)) router.replace(requested.route);
+  }, [requestedTab, tabs, router]);
+
   const Outlet = screenRegistry.Outlet;
 
   // Process Builder is a screen, not a tab strip, for the same reason as
