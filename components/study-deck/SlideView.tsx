@@ -16,6 +16,8 @@ import { HotspotsView } from './HotspotsView';
 import { MatchView } from './MatchView';
 import { OrderView } from './OrderView';
 import { ScenarioView } from './ScenarioView';
+import { StoryView } from './StoryView';
+import { STORY_TEMPLATE } from '@/lib/study-deck/types';
 import { Eyebrow, GlyphIcon, SlideStage, TONES, useStage, VisualFigure } from './stage-ui';
 
 export interface SlideViewProps {
@@ -103,9 +105,14 @@ function SlideLayout({ deck, slide, progress, assetBase, onResult, onGoto, onNex
         <HotspotsView interaction={interaction} image={slide.image} assetBase={assetBase} done={exploredDone} onDone={explored} lead={lead} memoryKey={memoryKey} />
       ) : null;
     case 'scenario':
-      return interaction?.kind === 'scenario' ? (
+      if (interaction?.kind !== 'scenario') return null;
+
+      // A story act is selected by its template, never by guesswork: only interaction.template === STORY_TEMPLATE gets the story player.
+      return interaction.template === STORY_TEMPLATE ? (
+        <StoryView interaction={interaction} done={exploredDone} onDone={explored} lead={lead} memoryKey={memoryKey} image={slide.image} assetBase={assetBase} />
+      ) : (
         <ScenarioView interaction={interaction} done={exploredDone} onDone={explored} lead={lead} memoryKey={memoryKey} image={slide.image} assetBase={assetBase} />
-      ) : null;
+      );
     case 'explore':
       return interaction && 'items' in interaction && interaction.kind !== 'order' ? (
         <ExploreView interaction={interaction} done={exploredDone} onDone={explored} lead={lead} image={slide.image} assetBase={assetBase} memoryKey={memoryKey} bleed={bleed} />
