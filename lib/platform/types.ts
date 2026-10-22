@@ -70,7 +70,7 @@ export interface PlatformRegistry {
   modules: RegistryModule[];
   components: RegistryComponent[];
   notifications: Array<{ key: ItemKey; module: string; component: ComponentKey; label: string }>;
-  tasks: Array<{ key: ItemKey; module: string; component: ComponentKey; label: string }>;
+  tasks: Array<{ key: ItemKey; module: string; component: ComponentKey; label: string; has_job?: boolean }>;
   workflows: Array<{ key: ItemKey; module: string; component: ComponentKey; label: string }>;
   approver_types: RegistryOption[];
   escalation_actions: RegistryOption[];
@@ -168,6 +168,8 @@ export interface ScheduledTaskRow {
   describes: string | null;
   disabled: boolean;
   disabled_by_default: boolean;
+  /** A job is registered to run this task. Without one, Run now has nothing to do. */
+  has_job: boolean;
   /** Minutes to wait after a failure, doubling each retry. 0 means no retry. */
   fail_delay: number;
   last_run_at: string | null;

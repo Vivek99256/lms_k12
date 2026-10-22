@@ -16,14 +16,16 @@ const PARTS = ['slides', 'sections'] as const;
 
 interface HasImage {
   image?: { url?: string | null } | null;
+  /** A story scene's supporting pictures (a photograph, a close-up, a drawn diagram beside its main picture). */
+  extra_images?: Array<{ url?: string | null }> | null;
   /** A slide's interaction, whose items may each carry a picture. */
   interaction?: object | null;
 }
 
-/** The items (or hotspot parts) of a slide's interaction that can carry their own picture. */
+/** The items, hotspot parts or story scenes of a slide's interaction that can carry their own picture. */
 function itemsOf(part: HasImage): HasImage[] {
-  const interaction = part.interaction as { items?: unknown; spots?: unknown } | null | undefined;
-  const items = interaction?.items ?? interaction?.spots;
+  const interaction = part.interaction as { items?: unknown; spots?: unknown; nodes?: unknown } | null | undefined;
+  const items = interaction?.items ?? interaction?.spots ?? interaction?.nodes;
 
   return Array.isArray(items) ? (items as HasImage[]) : [];
 }
@@ -51,6 +53,10 @@ export function pendingImageIds(deck: Pictured): number[] {
       for (const card of itemsOf(item)) {
         const cardId = imageRefId(card.image?.url);
         if (cardId !== null) ids.add(cardId);
+        for (const extra of card.extra_images ?? []) {
+          const extraId = imageRefId(extra?.url);
+          if (extraId !== null) ids.add(extraId);
+        }
       }
     }
   }
@@ -76,6 +82,11 @@ export function applyImageUrls<T extends Pictured>(deck: T, urls: Readonly<Recor
         const cardId = imageRefId(card.image?.url);
         const cardUrl = cardId === null ? undefined : urls[String(cardId)];
         if (card.image && cardUrl) card.image.url = cardUrl;
+        for (const extra of card.extra_images ?? []) {
+          const extraId = imageRefId(extra?.url);
+          const extraUrl = extraId === null ? undefined : urls[String(extraId)];
+          if (extra && extraUrl) extra.url = extraUrl;
+        }
       }
     }
   }

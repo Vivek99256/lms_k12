@@ -127,6 +127,20 @@ export interface TagCloudItem {
   count: number;
 }
 
+/** An API failure that keeps the HTTP status, so callers can decide whether a retry is safe. */
+export class ApiError extends Error {
+  status: number;
+  /** Seconds the server asked us to wait (Retry-After), when it sent one. */
+  retryAfter?: number;
+
+  constructor(message: string, status: number, retryAfter?: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.retryAfter = retryAfter;
+  }
+}
+
 async function requestApi<T>(path: string, options: RequestInit = {}): Promise<T> {
   const session = buildSessionContext();
   const base = session.baseUrl || '';
@@ -177,11 +191,12 @@ export const IdmsApi = {
         headers,
       });
     } catch {
-      throw new Error('the server could not be reached. Check your connection and try again');
+      throw new ApiError('the server could not be reached. Check your connection and try again', 0);
     }
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.status === 0) {
-      if (json.message) throw new Error(json.message);
+      const retryAfter = Number(res.headers.get('Retry-After')) || undefined;
+      if (json.message) throw new ApiError(json.message, res.status, retryAfter);
       const byStatus: Record<number, string> = {
         401: 'your session has expired. Sign in again',
         403: 'you do not have permission to upload documents',
@@ -189,10 +204,12 @@ export const IdmsApi = {
         415: 'the server does not accept this file type',
         422: 'the server rejected the file',
         500: 'the server hit an error while saving the file',
+        429: 'the server is receiving too many requests right now',
         502: 'the server is temporarily unavailable',
         503: 'the server is temporarily unavailable',
+        504: 'the server took too long to answer while saving and analyzing the file',
       };
-      throw new Error(byStatus[res.status] ?? `the server refused the upload (code ${res.status})`);
+      throw new ApiError(byStatus[res.status] ?? `the server refused the upload (code ${res.status})`, res.status, retryAfter);
     }
     return json;
   },

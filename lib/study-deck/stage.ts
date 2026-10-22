@@ -15,7 +15,7 @@
 
 import { exampleCards } from './interactions';
 import { isBleedPhoto } from './theme';
-import type { DeckSlide, StudyDeck } from './types';
+import { STORY_TEMPLATE, type DeckSlide, type StudyDeck } from './types';
 
 export type StepKind = 'teach' | 'example' | 'discuss';
 
@@ -128,7 +128,7 @@ export function pendingHint(slide: DeckSlide, step: StepKind, explored: boolean)
     case 'hotspots':
       return `Explore all ${slide.interaction.spots.length} parts of the diagram to continue.`;
     case 'scenario':
-      return 'Make your decision to continue.';
+      return slide.interaction.template === STORY_TEMPLATE ? 'Follow the story to an ending to continue.' : 'Make your decision to continue.';
     case 'reveal':
       return `Open all ${slide.interaction.items.length} cards to continue.`;
     case 'steps':

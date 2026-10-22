@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 import { StudyDeckPlayer } from '@/components/study-deck/StudyDeckPlayer';
+import { CHAPTER_DATA_PREVIEW_TITLE, readDraftRun, readPreviewRequest } from '@/lib/coursePresentation/previewAddress';
 import { startSlideOf } from '@/lib/study-deck/stage';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import { learnerKey, loadBank, loadStudyDeck, PILOT_NOTE, type LoadedDeck } from '../data';
@@ -24,6 +25,12 @@ export default function StudyDeckPage() {
   const search = useSearchParams();
   const chapterId = Number(params?.chapterId ?? NaN);
   const pilot = search?.get('source') === 'pilot';
+  // A source-data preview of a Course Presentation: /student/study-deck/<chapter>?source=preview&pedagogy=<key>&format=<key>.
+  const preview = readPreviewRequest(search);
+  // A draft waiting for review: /student/study-deck/<chapter>?draft=<run>.
+  const draft = readDraftRun(search);
+  const previewPedagogy = preview?.pedagogy ?? null;
+  const previewFormat = preview?.format ?? null;
   // The Classroom Resource list opens a specific content item: /student/study-deck/<chapter>?content=<content_master.id>.
   const contentParam = Number(search?.get('content') ?? NaN);
   const contentId = Number.isFinite(contentParam) && contentParam > 0 ? contentParam : null;
@@ -42,8 +49,9 @@ export default function StudyDeckPage() {
 
     (async () => {
       try {
-        const loaded = await loadStudyDeck(chapterId, { pilot, contentId, signal });
-        const bank = await loadBank(chapterId, signal);
+        const loaded = await loadStudyDeck(chapterId, { pilot, contentId, preview, draft, signal });
+        // A preview or a story draft holds no practice question, so it never asks the question bank.
+        const bank = loaded.source === 'preview' || loaded.source === 'draft' ? [] : await loadBank(chapterId, signal);
         if (!signal.aborted) setState({ phase: 'ready', loaded, bank });
       } catch (error) {
         if (signal.aborted) return;
@@ -52,7 +60,8 @@ export default function StudyDeckPage() {
     })();
 
     return () => controller.abort();
-  }, [invalid, chapterId, pilot, contentId, attempt]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invalid, chapterId, pilot, contentId, previewPedagogy, previewFormat, draft, attempt]);
 
   if (invalid) {
     return (
@@ -92,6 +101,33 @@ export default function StudyDeckPage() {
 
   return (
     <>
+      {state.loaded.source === 'preview' && state.loaded.preview ? (
+        <div role="note" data-testid="cp-preview-banner" className="bg-sky-50 px-4 py-2 text-center text-sm text-sky-900">
+          <p data-testid="cp-preview-title" className="font-semibold">{CHAPTER_DATA_PREVIEW_TITLE}</p>
+          <p>{state.loaded.preview.notice}</p>
+          <p data-testid="cp-preview-coverage" className="mt-1 text-xs">
+            {state.loaded.preview.coverage.renderable} of {state.loaded.preview.coverage.total_concepts} concepts are in this deck: {state.loaded.preview.coverage.from_intelligence} from intelligence, {state.loaded.preview.coverage.from_concept_record_only} from the stored concept record alone
+            {state.loaded.preview.coverage.unresolved > 0 ? `; ${state.loaded.preview.coverage.unresolved} could not be tied to a source` : ''}.
+          </p>
+          {state.loaded.preview.missing.length > 0 ? (
+            <details className="mt-1 text-left">
+              <summary className="cursor-pointer text-center">What the stored data could not supply ({state.loaded.preview.missing.length})</summary>
+              <ul className="mx-auto mt-1 max-w-3xl list-disc space-y-0.5 pl-5 text-xs">
+                {state.loaded.preview.missing.map((m) => (
+                  <li key={`${m.what}-${m.where}`}>
+                    {m.what} ({m.where}): {m.why}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+      {state.loaded.source === 'draft' ? (
+        <p role="note" data-testid="cp-draft-banner" className="bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
+          {state.loaded.draft?.notice}
+        </p>
+      ) : null}
       {state.loaded.source === 'pilot' ? (
         <p role="note" className="bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
           {PILOT_NOTE}

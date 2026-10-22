@@ -314,8 +314,7 @@ function TaskRow({
 
   const [runResult, setRunResult] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // Runs the task once through the same dispatcher the minute tick uses. A task
-  // with no registered job says so rather than reporting success.
+  // Runs the task once through the same dispatcher the minute tick uses.
   const runNow = async () => {
     setBusy(true);
     setRunResult(null);
@@ -380,18 +379,22 @@ function TaskRow({
             <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
               <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">{task.expression}</span>
               {sentence && <span>{sentence}</span>}
-              <button
-                type="button"
-                disabled={!mayEdit || busy}
-                title={mayEdit ? 'Run this task once, now' : rightsReason}
-                onClick={runNow}
-                className="rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Run now
-              </button>
-              {runResult && (
-                <span className={runResult.ok ? 'text-emerald-700' : 'text-amber-700'}>{runResult.text}</span>
-              )}
+              {task.has_job ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={!mayEdit || busy}
+                    title={mayEdit ? 'Run this task once, now' : rightsReason}
+                    onClick={runNow}
+                    className="rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Run now
+                  </button>
+                  {runResult && (
+                    <span className={runResult.ok ? 'text-emerald-700' : 'text-amber-700'}>{runResult.text}</span>
+                  )}
+                </>
+              ) : null}
             </div>
           )}
 
@@ -490,7 +493,11 @@ function TaskRow({
                 answer and stops the row implying it is about to happen. */}
             Next: {task.disabled ? 'not while switched off' : formatWhen(task.next_run_at)}
           </span>
-          <span>Last: {formatWhen(task.last_run_at)}</span>
+          <span>
+            Last run: {formatWhen(task.last_run_at)}
+            {task.last_run_status === 'ok' && <span className="ml-1 text-emerald-700">· succeeded</span>}
+            {task.last_run_status === 'failed' && <span className="ml-1 text-red-700">· failed</span>}
+          </span>
           {task.fail_delay > 0 && <span className="text-slate-500">Retries after {task.fail_delay} min</span>}
           {!editing && (
             <button

@@ -1,9 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { UploadCloud, AlertTriangle, Loader2, Sparkles, X, CheckCircle2, Circle, FileText } from 'lucide-react';
+import {
+  UploadCloud,
+  AlertTriangle,
+  Loader2,
+  X,
+  CheckCircle2,
+  Circle,
+  FileText,
+  RotateCcw,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { IdmsApi, type DocumentItem, type DocumentWarning } from '../_lib/idms-api';
+import { IdmsApi, ApiError, type DocumentItem, type DocumentWarning } from '../_lib/idms-api';
 import {
   collectFromDrop,
   collectFromInput,
@@ -14,19 +23,13 @@ import {
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Called once per published document. `total` is how many files were in the batch. */
-  onDocumentConfirmed: (doc: DocumentItem, meta: { total: number }) => void;
+  /** Called once when every file in the batch has either been published or has failed. */
+  onFinished: (result: { published: number; failed: number }) => void;
 }
 
-type ItemStatus = 'queued' | 'uploading' | 'processing' | 'review' | 'confirmed' | 'failed' | 'discarded';
-
-interface Edits {
-  title: string;
-  docType: string;
-  academicYear: string;
-  summary: string;
-  tags: DocumentItem['tags'];
-}
+type ItemStatus = 'queued' | 'uploading' | 'processing' | 'publishing' | 'published' | 'failed';
+/** Where a failed file stopped, which decides what "Retry" has to redo. */
+type FailedStage = 'upload' | 'analysis' | 'timeout' | 'publish';
 
 interface QueueItem {
   key: string;
@@ -35,30 +38,45 @@ interface QueueItem {
   path: string;
   status: ItemStatus;
   docId?: number;
-  doc?: DocumentItem;
-  edits?: Edits;
   error?: string;
+  failedStage?: FailedStage;
+  /** Short status line, e.g. while waiting to retry after a busy server. */
+  note?: string;
+  warnings?: string[];
   /** Epoch ms at each stage boundary; drives the times shown on the stage tracker. */
   uploadStartedAt?: number;
   uploadedAt?: number;
   readyAt?: number;
-  confirmedAt?: number;
-  confirming?: boolean;
+  publishedAt?: number;
 }
 
 const POLL_MS = 2000;
-// The single-file flow gave up polling after 30 attempts (~60s) and showed whatever had loaded.
-const POLL_GIVE_UP_MS = 60_000;
+// Analysis is one backend job. Past this the file is reported as failed with a Retry that checks it again.
+const ANALYSIS_TIMEOUT_MS = 3 * 60_000;
+// Waits before re-sending an upload the server refused as busy or that never reached it.
+const UPLOAD_RETRY_DELAYS_MS = [2000, 5000, 12_000];
+const AUTO_CLOSE_MS = 1600;
+
+// How far through the pipeline a file counts as being, for the overall progress bar.
+const STAGE_WEIGHT: Record<ItemStatus, number> = {
+  queued: 0,
+  uploading: 0.15,
+  processing: 0.5,
+  publishing: 0.85,
+  published: 1,
+  failed: 1,
+};
 
 const STATUS_LABEL: Record<ItemStatus, string> = {
-  queued: 'Waiting to upload',
+  queued: 'Waiting',
   uploading: 'Uploading',
   processing: 'Analyzing',
-  review: 'Ready for review',
-  confirmed: 'Published',
+  publishing: 'Publishing',
+  published: 'Published',
   failed: 'Failed',
-  discarded: 'Discarded',
 };
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function formatDuration(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -75,46 +93,200 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** "<file>: <stage> failed because <reason>" so every failure names its file and says why. */
+/** "<file>: <stage> failed because <reason>." so every failure names its file and says why. */
 function failureText(path: string, stage: string, cause: unknown, fallback: string): string {
   const raw = cause instanceof Error ? cause.message : typeof cause === 'string' ? cause : '';
   const reason = (raw || fallback).trim().replace(/[.\s]+$/, '');
   return `${path}: ${stage} failed because ${reason.charAt(0).toLowerCase()}${reason.slice(1)}.`;
 }
 
-function editsFrom(doc: DocumentItem): Edits {
-  return {
-    title: doc.title,
-    docType: doc.document_type || '',
-    academicYear: doc.academic_year || '',
-    summary: doc.summary || '',
-    tags: doc.tags || [],
-  };
+/** Failures where the server never started on the file, so sending it again cannot create a duplicate. */
+function isTransientUpload(err: unknown): boolean {
+  return err instanceof ApiError && (err.status === 0 || err.status === 429 || err.status === 503);
 }
 
-export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: UploadModalProps) {
+function warningText(w: DocumentWarning): string {
+  return typeof w === 'string' ? w : w.message || w.type || '';
+}
+
+export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalProps) {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [started, setStarted] = useState(false);
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
   const [reading, setReading] = useState(false);
   const [skipped, setSkipped] = useState<string[]>([]);
+  const [now, setNow] = useState(() => Date.now());
 
-  // Guards against double-starting an upload (strict-mode effects) and against late results after a reset.
-  const startedKeys = useRef<Set<string>>(new Set());
-  const generation = useRef(0);
-  const totalRef = useRef(0);
   const itemsRef = useRef(items);
+  const generation = useRef(0);
+  // Keys waiting for their upload turn. A single worker drains it, so uploads go strictly one at a time.
+  const pending = useRef<string[]>([]);
+  const draining = useRef(false);
+  const notified = useRef(false);
+  const onFinishedRef = useRef(onFinished);
+  const onCloseRef = useRef(onClose);
 
   useEffect(() => {
     itemsRef.current = items;
-  }, [items]);
+    onFinishedRef.current = onFinished;
+    onCloseRef.current = onClose;
+  });
 
   const patch = useCallback((key: string, changes: Partial<QueueItem>) => {
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...changes } : it)));
   }, []);
 
-  const busy = items.some((it) => it.status === 'uploading' || it.status === 'processing');
+  const pathOf = (key: string) => itemsRef.current.find((it) => it.key === key)?.path ?? 'file';
+
+  /** Confirm the document with what the analysis found. No review step: this is the auto-publish. */
+  const publish = useCallback(
+    async (key: string, docId: number, known?: DocumentItem) => {
+      const path = pathOf(key);
+      patch(key, { status: 'publishing', note: undefined, error: undefined, failedStage: undefined });
+      try {
+        const doc = known ?? (await IdmsApi.getDocument(docId)).data;
+        await IdmsApi.confirmDocument(docId, {
+          title: doc.title,
+          document_type: doc.document_type || '',
+          academic_year: doc.academic_year || '',
+          summary: doc.summary || '',
+          // AI-suggested tags are accepted as-is; anything already rejected stays rejected.
+          tags: (doc.tags || []).map((t) => ({ ...t, status: t.status === 'rejected' ? 'rejected' : 'accepted' })),
+        });
+        patch(key, {
+          status: 'published',
+          publishedAt: Date.now(),
+          warnings: (doc.warnings || []).map(warningText).filter(Boolean),
+        });
+      } catch (err) {
+        patch(key, {
+          status: 'failed',
+          failedStage: 'publish',
+          error: failureText(path, 'Publishing', err, 'the document could not be saved'),
+        });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [patch],
+  );
+
+  /** Wait for the analysis of one uploaded document, then publish it. Runs alongside the next upload. */
+  const finish = useCallback(
+    async (key: string, docId: number) => {
+      const path = pathOf(key);
+      const startedAt = Date.now();
+      for (;;) {
+        try {
+          const { data: doc } = await IdmsApi.getDocument(docId);
+          if (doc.processing_status === 'ready_for_review' || doc.processing_status === 'done') {
+            patch(key, { readyAt: Date.now() });
+            await publish(key, docId, doc);
+            return;
+          }
+          if (doc.processing_status === 'failed') {
+            patch(key, {
+              status: 'failed',
+              failedStage: 'analysis',
+              error: failureText(
+                path,
+                'Analysis',
+                doc.processing_error,
+                'the analysis pipeline reported an error without details',
+              ),
+            });
+            return;
+          }
+        } catch (err) {
+          if (Date.now() - startedAt > ANALYSIS_TIMEOUT_MS) {
+            patch(key, {
+              status: 'failed',
+              failedStage: 'timeout',
+              error: failureText(path, 'Analysis', err, 'the processing status could not be read'),
+            });
+            return;
+          }
+        }
+        if (Date.now() - startedAt > ANALYSIS_TIMEOUT_MS) {
+          patch(key, {
+            status: 'failed',
+            failedStage: 'timeout',
+            error: `${path}: Analysis failed because it did not finish within ${ANALYSIS_TIMEOUT_MS / 60_000} minutes. The file is uploaded and may still complete; use Retry to check again.`,
+          });
+          return;
+        }
+        await sleep(POLL_MS);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [patch, publish],
+  );
+
+  const uploadOne = useCallback(
+    async (item: QueueItem) => {
+      patch(item.key, {
+        status: 'uploading',
+        uploadStartedAt: Date.now(),
+        uploadedAt: undefined,
+        readyAt: undefined,
+        publishedAt: undefined,
+        error: undefined,
+        failedStage: undefined,
+        note: undefined,
+      });
+
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const res = await IdmsApi.uploadDocument(item.file);
+          const docId = res.data?.id as number | undefined;
+          if (!docId) throw new Error('the server did not return a document id');
+          patch(item.key, { status: 'processing', docId, uploadedAt: Date.now(), note: undefined });
+          void finish(item.key, docId);
+          return;
+        } catch (err) {
+          if (isTransientUpload(err) && attempt < UPLOAD_RETRY_DELAYS_MS.length) {
+            const retryAfterMs = err instanceof ApiError && err.retryAfter ? err.retryAfter * 1000 : 0;
+            const wait = Math.max(UPLOAD_RETRY_DELAYS_MS[attempt], retryAfterMs);
+            patch(item.key, {
+              note: `Server busy, trying again in ${Math.round(wait / 1000)}s (attempt ${attempt + 2} of ${UPLOAD_RETRY_DELAYS_MS.length + 1})`,
+            });
+            await sleep(wait);
+            continue;
+          }
+          patch(item.key, {
+            status: 'failed',
+            failedStage: 'upload',
+            note: undefined,
+            error: failureText(item.path, 'Upload', err, 'the upload did not complete'),
+          });
+          return;
+        }
+      }
+    },
+    [patch, finish],
+  );
+
+  const drain = useCallback(async () => {
+    if (draining.current) return;
+    draining.current = true;
+    try {
+      while (pending.current.length > 0) {
+        const key = pending.current.shift() as string;
+        const item = itemsRef.current.find((it) => it.key === key);
+        // A failure on one file never stops the next one.
+        if (item) await uploadOne(item);
+      }
+    } finally {
+      draining.current = false;
+    }
+  }, [uploadOne]);
+
+  const busy = items.some((it) => ['queued', 'uploading', 'processing', 'publishing'].includes(it.status));
+  const publishedCount = items.filter((it) => it.status === 'published').length;
+  const failedCount = items.filter((it) => it.status === 'failed').length;
+  const settled = started && items.length > 0 && !busy;
+  const percent =
+    items.length === 0
+      ? 0
+      : Math.round((items.reduce((sum, it) => sum + STAGE_WEIGHT[it.status], 0) / items.length) * 100);
 
   // Live clock so elapsed times tick while something is in flight.
   useEffect(() => {
@@ -123,93 +295,36 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
     return () => clearInterval(t);
   }, [busy]);
 
-  // Upload one file at a time, in the order they were added.
+  const resetAll = useCallback(() => {
+    generation.current += 1;
+    pending.current = [];
+    notified.current = false;
+    setItems([]);
+    setSkipped([]);
+    setReading(false);
+    setStarted(false);
+  }, []);
+
+  // Tell the library once per settle (and again after a retry settles) so it can reload and show the result.
   useEffect(() => {
-    if (!started) return;
-    if (items.some((it) => it.status === 'uploading')) return;
-    const next = items.find((it) => it.status === 'queued' && !startedKeys.current.has(it.key));
-    if (!next) return;
+    if (!settled) {
+      notified.current = false;
+      return;
+    }
+    if (notified.current) return;
+    notified.current = true;
+    onFinishedRef.current({ published: publishedCount, failed: failedCount });
+  }, [settled, publishedCount, failedCount]);
 
-    startedKeys.current.add(next.key);
-    const gen = generation.current;
-    patch(next.key, { status: 'uploading', uploadStartedAt: Date.now() });
-
-    IdmsApi.uploadDocument(next.file)
-      .then((res) => {
-        if (gen !== generation.current) return;
-        const docId = res.data?.id as number | undefined;
-        if (!docId) throw new Error('The server did not return a document id.');
-        patch(next.key, { status: 'processing', docId, uploadedAt: Date.now() });
-      })
-      .catch((err) => {
-        if (gen !== generation.current) return;
-        patch(next.key, { status: 'failed', error: failureText(next.path, 'Upload', err, 'the upload did not complete') });
-      });
-  }, [started, items, patch]);
-
-  // Poll every document that is being analyzed, in parallel.
-  const processingKey = items
-    .filter((it) => it.status === 'processing')
-    .map((it) => it.key)
-    .join('|');
-
+  // Google-Drive style: close by itself when everything went through.
   useEffect(() => {
-    if (!processingKey) return;
-    const gen = generation.current;
-    const tick = async () => {
-      const pending = itemsRef.current.filter((it) => it.status === 'processing' && it.docId);
-      await Promise.all(
-        pending.map(async (it) => {
-          const waited = Date.now() - (it.uploadedAt ?? Date.now());
-          try {
-            const { data: doc } = await IdmsApi.getDocument(it.docId as number);
-            if (gen !== generation.current) return;
-            if (doc.processing_status === 'ready_for_review' || doc.processing_status === 'done') {
-              patch(it.key, { status: 'review', doc, edits: editsFrom(doc), readyAt: Date.now() });
-            } else if (doc.processing_status === 'failed') {
-              patch(it.key, {
-                status: 'failed',
-                error: failureText(
-                  it.path,
-                  'Analysis',
-                  doc.processing_error,
-                  'the analysis pipeline reported an error without details',
-                ),
-              });
-            } else if (waited > POLL_GIVE_UP_MS) {
-              patch(it.key, {
-                status: 'review',
-                doc,
-                edits: editsFrom(doc),
-                readyAt: Date.now(),
-                error: `${it.path}: analysis is taking longer than expected, so the suggestions below may be incomplete. Check them before publishing.`,
-              });
-            }
-          } catch (err) {
-            if (waited > POLL_GIVE_UP_MS && gen === generation.current) {
-              patch(it.key, {
-                status: 'failed',
-                error: failureText(it.path, 'Analysis', err, "the processing status could not be read"),
-              });
-            }
-          }
-        }),
-      );
-    };
-    const t = setInterval(tick, POLL_MS);
-    return () => clearInterval(t);
-  }, [processingKey, patch]);
-
-  // Keep the review pane on a document that can actually be reviewed.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    setActiveKey((cur) => {
-      const curItem = items.find((it) => it.key === cur);
-      if (curItem && curItem.status === 'review') return cur;
-      return items.find((it) => it.status === 'review')?.key ?? null;
-    });
-  }, [items]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+    if (!settled || failedCount > 0) return;
+    const t = setTimeout(() => {
+      resetAll();
+      onCloseRef.current();
+    }, AUTO_CLOSE_MS);
+    return () => clearTimeout(t);
+  }, [settled, failedCount, resetAll]);
 
   if (!isOpen) return null;
 
@@ -250,66 +365,74 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
 
   const startUpload = () => {
     if (items.length === 0) return;
-    totalRef.current = items.length;
+    pending.current = items.map((it) => it.key);
+    notified.current = false;
     setNow(Date.now());
     setStarted(true);
+    void drain();
   };
 
-  const handleClose = () => {
-    generation.current += 1;
-    startedKeys.current = new Set();
-    setItems([]);
-    setSkipped([]);
-    setReading(false);
-    setStarted(false);
-    setActiveKey(null);
-    onClose();
-  };
-
-  const editActive = (changes: Partial<Edits>) => {
+  /** Stop uploading files that have not started. Files already uploaded still finish and publish. */
+  const cancelRemaining = () => {
+    const dropped = new Set(pending.current);
+    pending.current = [];
     setItems((prev) =>
-      prev.map((it) => (it.key === activeKey && it.edits ? { ...it, edits: { ...it.edits, ...changes } } : it)),
+      prev.map((it) =>
+        dropped.has(it.key)
+          ? {
+              ...it,
+              status: 'failed' as ItemStatus,
+              failedStage: 'upload' as FailedStage,
+              error: `${it.path}: Upload failed because it was cancelled before it started. Use Retry to upload it.`,
+            }
+          : it,
+      ),
     );
   };
 
-  const handleTagToggle = (idx: number, newStatus: 'accepted' | 'rejected') => {
-    const current = items.find((it) => it.key === activeKey);
-    if (!current?.edits) return;
-    const updated = [...current.edits.tags];
-    updated[idx] = { ...updated[idx], status: newStatus };
-    editActive({ tags: updated });
-  };
-
-  const handleConfirm = async () => {
-    const current = items.find((it) => it.key === activeKey);
-    if (!current || !current.docId || !current.edits) return;
-    patch(current.key, { confirming: true, error: undefined });
-    try {
-      const res = await IdmsApi.confirmDocument(current.docId, {
-        title: current.edits.title,
-        document_type: current.edits.docType,
-        academic_year: current.edits.academicYear,
-        summary: current.edits.summary,
-        tags: current.edits.tags,
-      });
-      patch(current.key, { status: 'confirmed', confirming: false, confirmedAt: Date.now() });
-      onDocumentConfirmed(res.data, { total: totalRef.current });
-    } catch (err) {
-      patch(current.key, {
-        confirming: false,
-        error: failureText(current.path, 'Publishing', err, 'the document could not be saved'),
-      });
+  const retryItems = (keys: string[]) => {
+    notified.current = false;
+    for (const key of keys) {
+      const it = itemsRef.current.find((x) => x.key === key);
+      if (!it || it.status !== 'failed') continue;
+      if (it.failedStage === 'publish' && it.docId) {
+        void publish(key, it.docId);
+      } else if (it.failedStage === 'timeout' && it.docId) {
+        patch(key, { status: 'processing', error: undefined, failedStage: undefined, uploadedAt: Date.now() });
+        void finish(key, it.docId);
+      } else {
+        // Upload or analysis failure: the file is sent again from scratch.
+        patch(key, { status: 'queued', error: undefined, failedStage: undefined, docId: undefined });
+        pending.current.push(key);
+      }
     }
+    void drain();
   };
 
-  const handleDiscard = () => {
-    if (activeKey) patch(activeKey, { status: 'discarded' });
+  const handleClose = () => {
+    if (busy && !window.confirm('Uploads are still running. Close anyway? Files already uploaded will still be published, the rest will not be uploaded.')) {
+      return;
+    }
+    if (started) onFinishedRef.current({ published: publishedCount, failed: failedCount });
+    resetAll();
+    onClose();
   };
 
-  const active = items.find((it) => it.key === activeKey && it.status === 'review');
-  const settled = items.filter((it) => ['confirmed', 'discarded', 'failed'].includes(it.status)).length;
-  const allSettled = started && items.length > 0 && settled === items.length;
-  const awaitingReview = items.filter((it) => it.status === 'review').length;
+  const header = !started
+    ? null
+    : settled
+    ? failedCount === 0
+      ? { tone: 'ok' as const, title: `All ${items.length} ${items.length === 1 ? 'file' : 'files'} uploaded and published` }
+      : {
+          tone: 'bad' as const,
+          title:
+            publishedCount > 0
+              ? `${publishedCount} published, ${failedCount} could not be uploaded`
+              : `${failedCount === 1 ? 'The file' : `All ${failedCount} files`} could not be uploaded`,
+        }
+    : { tone: 'busy' as const, title: 'Uploading your documents' };
+
+  const current = items.find((it) => it.status === 'uploading') ?? items.find((it) => it.status === 'processing');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -334,8 +457,8 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
               onDrop={(e) => {
                 e.preventDefault();
                 // Collect synchronously: the browser empties the DataTransfer after the handler returns.
-                const pending = collectFromDrop(e.dataTransfer);
-                void pending.then((res) => addFiles(res.files, res.skipped));
+                const pendingDrop = collectFromDrop(e.dataTransfer);
+                void pendingDrop.then((res) => addFiles(res.files, res.skipped));
               }}
               className="mt-6 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center hover:border-indigo-500"
             >
@@ -345,7 +468,7 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 PDF, DOCX, XLSX, PPTX, Images up to 50MB each. Zips and folders are opened and every file inside is
-                uploaded on its own.
+                uploaded on its own, then published automatically.
               </p>
               <input
                 type="file"
@@ -420,7 +543,7 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
                       type="button"
                       onClick={() => removeQueued(it.key)}
                       className="shrink-0 text-slate-400 hover:text-red-600"
-                      aria-label={`Remove ${it.file.name}`}
+                      aria-label={`Remove ${it.path}`}
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -436,173 +559,78 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
                 onClick={startUpload}
                 className="bg-indigo-600 text-white hover:bg-indigo-700"
               >
-                {items.length > 1 ? `Upload & Process ${items.length} files` : 'Upload & Process'}
+                {items.length > 1 ? `Upload ${items.length} files` : 'Upload'}
               </Button>
             </div>
           </div>
         )}
 
-        {started && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Processing your documents</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {settled} of {items.length} finished
-                {awaitingReview > 0 ? ` · ${awaitingReview} waiting for your review` : ''}
-              </p>
+        {started && header && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pr-8">
+              {header.tone === 'ok' && <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />}
+              {header.tone === 'bad' && <AlertTriangle className="h-6 w-6 shrink-0 text-red-600" />}
+              {header.tone === 'busy' && <Loader2 className="h-6 w-6 shrink-0 animate-spin text-indigo-600" />}
+              <h2 className="text-xl font-bold text-slate-900">{header.title}</h2>
             </div>
 
-            <ul className="space-y-2">
-              {items.map((it) => (
-                <QueueRow
-                  key={it.key}
-                  item={it}
-                  now={now}
-                  isActive={it.key === activeKey}
-                  onSelect={() => it.status === 'review' && setActiveKey(it.key)}
+            <div>
+              <div
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percent}
+                aria-label="Upload progress"
+                className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100"
+              >
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    header.tone === 'ok' ? 'bg-emerald-500' : header.tone === 'bad' ? 'bg-red-500' : 'bg-indigo-600'
+                  }`}
+                  style={{ width: `${percent}%` }}
                 />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-slate-600">
+                <span className="min-w-0 truncate">
+                  {publishedCount} of {items.length} {items.length === 1 ? 'file' : 'files'} uploaded and published
+                  {failedCount > 0 ? ` · ${failedCount} failed` : ''}
+                  {current && !settled ? ` · ${STATUS_LABEL[current.status]} ${current.path}` : ''}
+                </span>
+                <span className="shrink-0 font-semibold tabular-nums text-slate-800">{percent}%</span>
+              </div>
+            </div>
+
+            {settled && failedCount === 0 && (
+              <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+                Everything was uploaded and published to the Document Library. This window will close now.
+              </p>
+            )}
+
+            <ul className="max-h-[46vh] space-y-2 overflow-y-auto pr-1">
+              {items.map((it) => (
+                <QueueRow key={it.key} item={it} now={now} onRetry={() => retryItems([it.key])} />
               ))}
             </ul>
 
-            {active && active.doc && active.edits && (
-              <div className="space-y-4 border-t pt-4">
-                <div className="flex items-center gap-2 text-indigo-600">
-                  <Sparkles className="h-5 w-5 shrink-0" />
-                  <span className="min-w-0 truncate text-sm font-semibold">
-                    AI Intelligent Review Ready — {active.file.name}
-                  </span>
-                  <span className="ml-auto shrink-0 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                    Confidence: {Math.round((active.doc.confidence || 0.8) * 100)}%
-                  </span>
-                </div>
-
-                {active.error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{active.error}</div>}
-
-                <div className="flex items-center gap-1.5 overflow-x-auto rounded-lg bg-slate-100 p-3 text-xs text-slate-700">
-                  <span className="font-semibold text-slate-900">Logical Location:</span>
-                  <span>{active.doc.logical_location?.path}</span>
-                </div>
-
-                {active.doc.warnings && active.doc.warnings.length > 0 && (
-                  <div className="space-y-1 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-                    {active.doc.warnings.map((w: DocumentWarning, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-                        <span>{typeof w === 'string' ? w : w.message || w.type}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="space-y-3 pt-2">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700">Document Title</label>
-                    <input
-                      type="text"
-                      value={active.edits.title}
-                      onChange={(e) => editActive({ title: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700">Detected Type</label>
-                      <input
-                        type="text"
-                        value={active.edits.docType}
-                        onChange={(e) => editActive({ docType: e.target.value })}
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700">Academic Year</label>
-                      <input
-                        type="text"
-                        value={active.edits.academicYear}
-                        onChange={(e) => editActive({ academicYear: e.target.value })}
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700">Executive Summary</label>
-                    <textarea
-                      rows={3}
-                      value={active.edits.summary}
-                      onChange={(e) => editActive({ summary: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700">Suggested Tags (Accept / Reject)</label>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {active.edits.tags.map((t, idx) => (
-                        <div
-                          key={idx}
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                            t.status === 'accepted'
-                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                              : t.status === 'rejected'
-                              ? 'border-slate-200 bg-slate-100 text-slate-400 line-through'
-                              : 'border-amber-200 bg-amber-50 text-amber-800'
-                          }`}
-                        >
-                          <span>{t.name}</span>
-                          {t.status !== 'accepted' && (
-                            <button
-                              type="button"
-                              onClick={() => handleTagToggle(idx, 'accepted')}
-                              className="font-bold hover:text-emerald-900"
-                              title="Accept tag"
-                            >
-                              ✓
-                            </button>
-                          )}
-                          {t.status !== 'rejected' && (
-                            <button
-                              type="button"
-                              onClick={() => handleTagToggle(idx, 'rejected')}
-                              className="font-bold hover:text-red-900"
-                              title="Reject tag"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 border-t pt-4">
-                  <Button variant="ghost" onClick={handleDiscard} disabled={active.confirming}>Discard</Button>
-                  <Button
-                    disabled={active.confirming}
-                    onClick={handleConfirm}
-                    className="bg-indigo-600 text-white hover:bg-indigo-700"
-                  >
-                    {active.confirming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Confirm & Publish
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {!active && busy && (
-              <p className="text-center text-xs text-slate-500">
-                Running text extraction, optical character recognition (OCR), AI entity parsing, and duplicate check.
-                The first file that finishes will open here for review.
-              </p>
-            )}
-
-            {allSettled && (
-              <div className="flex justify-end border-t pt-4">
-                <Button onClick={handleClose} className="bg-indigo-600 text-white hover:bg-indigo-700">Done</Button>
-              </div>
-            )}
+            <div className="flex justify-end gap-2 border-t pt-4">
+              {busy && items.some((it) => it.status === 'queued') && (
+                <Button variant="ghost" onClick={cancelRemaining}>Cancel remaining files</Button>
+              )}
+              {settled && failedCount > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => retryItems(items.filter((it) => it.status === 'failed').map((it) => it.key))}
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Retry {failedCount} failed
+                </Button>
+              )}
+              {settled && (
+                <Button onClick={handleClose} className="bg-indigo-600 text-white hover:bg-indigo-700">
+                  {failedCount > 0 ? 'Close' : 'Done'}
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -610,26 +638,18 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
   );
 }
 
-function QueueRow({
-  item,
-  now,
-  isActive,
-  onSelect,
-}: {
-  item: QueueItem;
-  now: number;
-  isActive: boolean;
-  onSelect: () => void;
-}) {
+function QueueRow({ item, now, onRetry }: { item: QueueItem; now: number; onRetry: () => void }) {
   const { status } = item;
   const uploadMs = item.uploadStartedAt !== undefined ? (item.uploadedAt ?? now) - item.uploadStartedAt : 0;
   const analyzeMs = item.uploadedAt !== undefined ? (item.readyAt ?? now) - item.uploadedAt : 0;
+  const publishMs = item.readyAt !== undefined ? (item.publishedAt ?? now) - item.readyAt : 0;
+  const failedAt = status === 'failed' ? item.failedStage : undefined;
 
-  // Only the stages the backend actually reports: upload, analysis (one pipeline job), review, publish.
-  const stages: Array<{ label: string; state: 'done' | 'active' | 'todo'; detail?: string }> = [
+  // Only the stages the backend actually reports: upload, analysis (one pipeline job) and publish.
+  const stages: Array<{ label: string; state: 'done' | 'active' | 'failed' | 'todo'; detail?: string }> = [
     {
       label: 'Upload',
-      state: item.uploadedAt ? 'done' : status === 'uploading' ? 'active' : 'todo',
+      state: failedAt === 'upload' ? 'failed' : item.uploadedAt ? 'done' : status === 'uploading' ? 'active' : 'todo',
       detail:
         item.uploadStartedAt !== undefined
           ? `${formatClock(item.uploadStartedAt)} · ${formatDuration(uploadMs)}`
@@ -637,53 +657,51 @@ function QueueRow({
     },
     {
       label: 'Analyze (extract, OCR, classify, tag, duplicate check)',
-      state: item.readyAt ? 'done' : status === 'processing' ? 'active' : 'todo',
+      state:
+        failedAt === 'analysis' || failedAt === 'timeout'
+          ? 'failed'
+          : item.readyAt
+          ? 'done'
+          : status === 'processing'
+          ? 'active'
+          : 'todo',
       detail:
         item.uploadedAt !== undefined ? `${formatClock(item.uploadedAt)} · ${formatDuration(analyzeMs)}` : undefined,
     },
     {
-      label: 'Review',
-      state: item.confirmedAt || status === 'discarded' ? 'done' : status === 'review' ? 'active' : 'todo',
-      detail: item.readyAt !== undefined ? `Ready at ${formatClock(item.readyAt)}` : undefined,
-    },
-    {
       label: 'Publish',
-      state: item.confirmedAt ? 'done' : 'todo',
-      detail: item.confirmedAt !== undefined ? formatClock(item.confirmedAt) : undefined,
+      state: failedAt === 'publish' ? 'failed' : item.publishedAt ? 'done' : status === 'publishing' ? 'active' : 'todo',
+      detail:
+        item.readyAt !== undefined ? `${formatClock(item.readyAt)} · ${formatDuration(publishMs)}` : undefined,
     },
   ];
 
   const badge =
     status === 'failed'
       ? 'bg-red-50 text-red-700'
-      : status === 'confirmed'
+      : status === 'published'
       ? 'bg-emerald-50 text-emerald-700'
-      : status === 'review'
-      ? 'bg-indigo-50 text-indigo-700'
-      : 'bg-slate-100 text-slate-600';
+      : status === 'queued'
+      ? 'bg-slate-100 text-slate-600'
+      : 'bg-indigo-50 text-indigo-700';
 
   return (
-    <li
-      className={`rounded-lg border p-3 ${isActive ? 'border-indigo-300 bg-indigo-50/40' : 'border-slate-200'} ${
-        status === 'review' ? 'cursor-pointer' : ''
-      }`}
-      onClick={onSelect}
-    >
+    <li className={`rounded-lg border p-3 ${status === 'failed' ? 'border-red-200' : 'border-slate-200'}`}>
       <div className="flex items-center gap-2 text-sm">
-        {(status === 'uploading' || status === 'processing') && (
+        {(status === 'uploading' || status === 'processing' || status === 'publishing') && (
           <Loader2 className="h-4 w-4 shrink-0 animate-spin text-indigo-600" />
         )}
-        {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />}
+        {status === 'published' && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />}
         {status === 'failed' && <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />}
-        {(status === 'queued' || status === 'review' || status === 'discarded') && (
-          <FileText className="h-4 w-4 shrink-0 text-slate-400" />
-        )}
+        {status === 'queued' && <FileText className="h-4 w-4 shrink-0 text-slate-400" />}
         <span className="min-w-0 flex-1 truncate font-medium text-slate-800" title={item.path}>{item.path}</span>
         <span className="shrink-0 text-xs text-slate-400">{formatSize(item.file.size)}</span>
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}>{STATUS_LABEL[status]}</span>
       </div>
 
-      {status !== 'queued' && status !== 'discarded' && (
+      {item.note && <p className="mt-1.5 pl-6 text-xs text-amber-700">{item.note}</p>}
+
+      {(status === 'uploading' || status === 'processing' || status === 'publishing' || status === 'failed') && (
         <ol className="mt-2 space-y-1 pl-6">
           {stages.map((s) => (
             <li key={s.label} className="flex items-center gap-2 text-xs">
@@ -691,17 +709,46 @@ function QueueRow({
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
               ) : s.state === 'active' ? (
                 <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-indigo-600" />
+              ) : s.state === 'failed' ? (
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />
               ) : (
                 <Circle className="h-3.5 w-3.5 shrink-0 text-slate-300" />
               )}
-              <span className={s.state === 'todo' ? 'text-slate-400' : 'text-slate-700'}>{s.label}</span>
+              <span className={s.state === 'todo' ? 'text-slate-400' : s.state === 'failed' ? 'text-red-700' : 'text-slate-700'}>
+                {s.label}
+              </span>
               {s.detail && <span className="ml-auto shrink-0 tabular-nums text-slate-500">{s.detail}</span>}
             </li>
           ))}
         </ol>
       )}
 
-      {status === 'failed' && item.error && <p className="mt-2 pl-6 text-xs text-red-700">{item.error}</p>}
+      {status === 'published' && item.publishedAt !== undefined && item.uploadStartedAt !== undefined && (
+        <p className="mt-1 pl-6 text-xs text-slate-500">
+          Published at {formatClock(item.publishedAt)} · took {formatDuration(item.publishedAt - item.uploadStartedAt)}
+        </p>
+      )}
+
+      {status === 'published' && item.warnings && item.warnings.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5 pl-6 text-xs text-amber-800">
+          {item.warnings.map((w, i) => (
+            <li key={i} className="flex items-start gap-1.5">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+              <span>{w}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {status === 'failed' && item.error && (
+        <div className="mt-2 flex items-start gap-2 pl-6">
+          <p className="min-w-0 flex-1 text-xs text-red-700">{item.error}</p>
+          <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={onRetry}>
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+            Retry
+          </Button>
+        </div>
+      )}
     </li>
   );
 }

@@ -12,6 +12,7 @@
  */
 
 import { mapQuestionToPlayerPayload, type RuntimeScope } from '../h5p/question-bank-runtime';
+import { repairGenericLabels } from './cardTitle';
 import { interactionProblem } from './interactions';
 import type { BankQuestion, H5pTargetKind } from '../h5p/question-bank-h5p-map';
 import {
@@ -68,6 +69,8 @@ export function parseDeck(raw: unknown): StudyDeck {
     if (slide.interaction) {
       const problem = interactionProblem(slide.interaction, slide.image?.type === 'diagram' || slide.image?.annotated === true);
       if (problem) throw new DeckError(`Slide ${slide.n}'s interaction ${problem}.`);
+      // A deck stored with numbered card labels ("Key idea 1") shows a heading drawn from each card's own text. Display only.
+      repairGenericLabels(slide, deck as StudyDeck);
     }
     slide.activities.forEach((activity) => {
       if (!(PLAYABLE_TARGETS as readonly string[]).includes(activity.as)) {
