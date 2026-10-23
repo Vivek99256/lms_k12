@@ -18,6 +18,7 @@ import {
   type ScenarioState,
 } from '@/lib/study-deck/interactions';
 import { assetUrl } from '@/lib/study-deck/deck';
+import { failedPictureLabel, imageAttemptKey, imageFailed, imageLoaded, INITIAL_IMAGE_LOAD, type ImageLoadState } from '@/lib/study-deck/imageLoad';
 import { containedRect, captionText, regionInBox, usableRegion } from '@/lib/study-deck/picture';
 import type { DeckImage, ScenarioInteraction } from '@/lib/study-deck/types';
 import { creditOf, PictureDialog, Tag, TONES, useRememberedReducer, useStage } from './stage-ui';
@@ -317,8 +318,11 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
   const [shown, setShown] = useState(true);
   const box = useRef<HTMLSpanElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  // How each picture of this scene has loaded: one retry of the same address after a failure, then a labelled frame (see lib/study-deck/imageLoad.ts).
+  const [loads, setLoads] = useState<Record<string, ImageLoadState>>({});
   const main = images[Math.min(index, images.length - 1)];
   const src = assetUrl(main.url, assetBase ?? null);
+  const load = loads[main.url] ?? INITIAL_IMAGE_LOAD;
   const region = usableRegion(main.focus);
   const caption = captionText(main.caption, { photo: main.type === 'photo', highlighted: region !== null });
 
@@ -346,8 +350,28 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
           className="group relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[1em] border-[0.15em] border-white bg-slate-100 shadow-[0_0.3em_1.1em_rgba(15,23,42,0.18),0_0_0_0.06em_var(--sd-line)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
         >
           <span ref={box} className="relative block h-full w-full">
-            {/* eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies */}
-            <img src={src} alt={main.alt} data-testid="story-picture" className="block h-full w-full object-contain" />
+            {load.status === 'failed' ? (
+              <span
+                role="img"
+                aria-label={failedPictureLabel(main.alt)}
+                data-testid="story-picture-failed"
+                className="flex h-full w-full items-center justify-center p-[1em] text-center text-[0.8em] font-semibold text-slate-700"
+              >
+                {failedPictureLabel(main.alt)}
+              </span>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies
+              <img
+                key={imageAttemptKey(main.url, load)}
+                src={src}
+                alt={main.alt}
+                data-testid="story-picture"
+                data-load-state={load.status}
+                onLoad={() => setLoads((prev) => ({ ...prev, [main.url]: imageLoaded(prev[main.url]) }))}
+                onError={() => setLoads((prev) => ({ ...prev, [main.url]: imageFailed(prev[main.url]) }))}
+                className="block h-full w-full object-contain"
+              />
+            )}
             {mark && main.focus_label ? (
               <span
                 aria-hidden="true"
