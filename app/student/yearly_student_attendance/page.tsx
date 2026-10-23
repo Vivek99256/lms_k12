@@ -15,7 +15,6 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   EmptyTableRow,
-  Field,
   InlineMessage,
   LoadingRows,
   PageFrame,
@@ -429,7 +428,9 @@ export default function YearlyStudentAttendancePage() {
 
       <SectionPanel title="Filters" description="Choose a grade, standard and division to view yearly attendance.">
         <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <SearchDropdown
+            className="contents"
             fields={['section', 'standard', 'division']}
             values={{ section, standard, division }}
             required={{ section: true, standard: true, division: true }}
@@ -440,19 +441,36 @@ export default function YearlyStudentAttendancePage() {
             onDivisionChange={handleDivisionChange}
           />
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Field label="From date">
-              <Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} required />
-            </Field>
-            <Field label="To date">
-              <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} required />
-            </Field>
-            <div className="flex items-end">
-              <Button type="button" className="h-10 w-full" onClick={handleSearch} disabled={loading}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                Search
-              </Button>
+            {/* Sized like the Grade / Standard / Division dropdowns beside them. */}
+            <div className="space-y-1.5">
+              <label htmlFor="yearly-from-date" className="block text-sm font-medium text-slate-700">From date</label>
+              <Input
+                id="yearly-from-date"
+                type="date"
+                className="h-11 rounded-xl border-slate-300 px-4 text-sm text-slate-700"
+                value={fromDate}
+                onChange={(event) => setFromDate(event.target.value)}
+                required
+              />
             </div>
+            <div className="space-y-1.5">
+              <label htmlFor="yearly-to-date" className="block text-sm font-medium text-slate-700">To date</label>
+              <Input
+                id="yearly-to-date"
+                type="date"
+                className="h-11 rounded-xl border-slate-300 px-4 text-sm text-slate-700"
+                value={toDate}
+                onChange={(event) => setToDate(event.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end border-t border-slate-100 pt-4">
+            <Button type="button" onClick={handleSearch} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Search
+            </Button>
           </div>
         </div>
       </SectionPanel>

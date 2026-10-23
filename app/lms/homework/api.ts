@@ -368,7 +368,10 @@ async function postJson(path: string, values: UnknownRecord): Promise<UnknownRec
   appendCommonParams(params, current);
   const body = JSON.stringify({
     ...values,
-    type: "API",
+    // A caller can name its own `type` (the homework list filters on
+    // type = 'Homework'); without this the "API" marker overwrote it and the
+    // list query matched no rows.
+    type: typeof values.type === "string" && values.type ? values.type : "API",
     sub_institute_id: Number(current.subInstituteId),
     syear: Number(current.syear),
     user_id: Number(current.userId),
