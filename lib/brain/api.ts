@@ -720,3 +720,169 @@ export const fetchTeacherIntelligence = () => brainFetch<BrainTeacherIntelligenc
 
 export const fetchGraph = (params: { type?: string; id?: string; q?: string } = {}) =>
   brainFetch<BrainGraphPayload & BrainGraphExpansion>(withQuery(tenantPath('/graph'), params));
+
+/* ----------------------------------------------------------- cross-module insights */
+
+export interface BrainCrossModuleRow {
+  class: string;
+  attendanceRate: number;
+  attendanceStudents: number;
+  resultPercentage: number;
+  resultStudents: number;
+}
+
+export interface BrainCrossModuleInsight {
+  key: string;
+  title: string;
+  kind: 'association';
+  /** supported: computed; insufficient_data / unavailable: declined, with the reason in `explanation`. */
+  status: 'supported' | 'insufficient_data' | 'unavailable';
+  period: string | null;
+  explanation: string;
+  calculation: string;
+  limitations: string[];
+  nextStep: string;
+  sources: Array<{ module: string; label: string; route: string; tables: string[] }>;
+  metrics: {
+    spearman?: number | null;
+    pearson?: number | null;
+    strength?: 'strong' | 'moderate' | 'none' | null;
+    classesCompared?: number;
+    institutionAttendanceRate?: number | null;
+    institutionMeanPercentage?: number | null;
+    classesBelowOnBoth?: number;
+  };
+  rows: BrainCrossModuleRow[];
+  belowOnBoth?: string[];
+  coverage: { classesCompared: number; attendanceOnly: string[]; resultsOnly: string[] };
+}
+
+export interface BrainCrossModulePayload {
+  tenantId: string;
+  academicYear: { syear: string | null };
+  generatedAt: string;
+  insights: BrainCrossModuleInsight[];
+  modules: Array<{ module: string; label: string; available: boolean; reason: string | null }>;
+  notImplemented: string[];
+}
+
+export const fetchCrossModule = () => brainFetch<BrainCrossModulePayload>(tenantPath('/cross-module/intelligence'));
+
+/* ----------------------------------------------------------- execution center */
+
+export type BrainExecutionGroup = 'queued' | 'running' | 'completed' | 'failed' | 'blocked' | 'rolled_back' | 'other';
+export type BrainOutcomeState = 'not_applicable' | 'no_outcome' | 'failed' | 'reported' | 'measured' | 'verified';
+
+export interface BrainExecutionEvidence {
+  id: string;
+  source: string | null;
+  type: string | null;
+  summary: string;
+  confidence: number | null;
+  observedAt: string | null;
+  linkedAt?: string | null;
+}
+
+export interface BrainExecutionMeasurement {
+  before: number;
+  after: number;
+  change: number;
+  unit: string | null;
+  basis: string | null;
+  accountsAffected: number | null;
+}
+
+export interface BrainExecutionAttention {
+  kind: string;
+  severity: 'high' | 'medium' | 'low';
+  reason: string;
+  nextStep: string;
+}
+
+export interface BrainExecutionRecord {
+  id: string;
+  esoId: string;
+  decisionId: string | null;
+  title: string;
+  reason: string | null;
+  decision: { rationale: string; status: string; decidedBy: string; decidedAt: string | null } | null;
+  action: { code: string | null; name: string | null } | null;
+  executor: { label: string; type: string; raw: string };
+  status: string;
+  group: BrainExecutionGroup;
+  createdAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  ageDays: number | null;
+  error: string | null;
+  isSample: boolean;
+  outcome: {
+    id: string;
+    result: string;
+    feedback: string;
+    confidence: number | null;
+    confidenceMeaning: string;
+    measurement: BrainExecutionMeasurement | null;
+    recordedAt: string | null;
+    recordedBy: string;
+  } | null;
+  outcomeState: BrainOutcomeState;
+  evidence: { execution: BrainExecutionEvidence[]; executionCount: number; finding: BrainExecutionEvidence[]; findingTotal: number };
+  evidenceCount: number;
+  attention: BrainExecutionAttention | null;
+  technical: Record<string, unknown>;
+}
+
+export type BrainExecutionCounts = Record<BrainExecutionGroup | 'total', number>;
+
+export interface BrainExecutionCenterPayload {
+  available: boolean;
+  reason?: string;
+  tenantId: string;
+  generatedAt: string;
+  partial: string | null;
+  health: { real: BrainExecutionCounts; sample: BrainExecutionCounts };
+  verification: {
+    real: Record<string, number>;
+    sample: Record<string, number>;
+    outcomes: { total: number; linkedToAnExecution: number; notLinked: number };
+  };
+  attention: Array<
+    BrainExecutionAttention & {
+      id: string; title: string; status: string; group: BrainExecutionGroup; isSample: boolean;
+      ageDays: number | null; createdAt: string | null; executor: string; outcomeState: BrainOutcomeState;
+    }
+  >;
+  impact: Array<{
+    id: string; title: string; isSample: boolean; outcomeState: BrainOutcomeState; result: string; feedback: string;
+    measurement: BrainExecutionMeasurement | null; confidence: number | null; confidenceMeaning: string;
+    recordedAt: string | null; recordedBy: string; evidenceCount: number;
+  }>;
+  history: { total: number; page: number; perPage: number; lastPage: number; data: BrainExecutionRecord[] };
+  definitions: {
+    statuses: Record<string, string>;
+    verification: Record<string, string>;
+    evidence: Record<string, string>;
+    confidence: string;
+  };
+}
+
+export interface BrainExecutionCenterQuery {
+  page?: number;
+  perPage?: number;
+  status?: string;
+  sample?: string;
+  q?: string;
+}
+
+export const fetchExecutionCenter = (query: BrainExecutionCenterQuery = {}) =>
+  brainFetch<BrainExecutionCenterPayload>(withQuery(tenantPath('/execution-center'), { ...query }));
+
+export const linkExecutionEvidence = (executionId: string, evidenceIds: string[]) =>
+  brainFetch<{ executionId: string; linked: number; alreadyLinked: number }>(tenantPath(`/executions/${executionId}/evidence`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ evidence_ids: evidenceIds }),
+  });
+
+export const fetchExecutionRecord = (id: string) => brainFetch<BrainExecutionRecord>(tenantPath(`/execution-center/${id}`));

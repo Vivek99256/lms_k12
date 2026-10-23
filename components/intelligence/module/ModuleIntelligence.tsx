@@ -1,27 +1,27 @@
 'use client';
 
-import { useCallback, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { AlertCircle, Brain, Loader2, RefreshCw } from 'lucide-react';
 
 import { useBrainResource } from '@/app/enterprise-brain/_components/useBrainResource';
 
-import type { ModuleIntelligenceContract, SectionKey } from './contract';
+import {
+  INTELLIGENCE_TABS,
+  resolveIntelligenceTarget,
+  type IntelligenceTabKey,
+} from '@/lib/intelligence/module-tabs';
+
+import { defaultSections, type ModuleIntelligenceContract, type SectionCopy, type SectionKey } from './contract';
 import { timestamp } from './format';
 import { AccentButton, NoDataReasonProvider, Surface } from './primitives';
-import { IntelligenceSectionNav, SECTION_NAV_LABELS } from './section-nav';
+import { IntelligenceSectionNav } from './section-nav';
 import {
-  BreakdownsSection,
   CrossModuleWorkflowSection,
-  DataQualitySection,
   DecisionsSection,
-  FindingsSection,
-  LearningSection,
   ModuleIntegrationSection,
-  PositionSection,
-  PrioritiesSection,
   RecommendationsSection,
-  SummarySection,
 } from './sections';
+import { SummaryTab, type SummaryFocus } from './summary-tab';
 
 /**
  * The one Intelligence screen, rendered from a module's contract.
@@ -60,12 +60,32 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState('');
   /**
-   * Which section is on screen. `null` means "not chosen yet", which resolves to
-   * the contract's first section — a module cannot open on a section it does not
-   * declare, and switching modules cannot strand the selection on a key the new
-   * contract has never heard of.
+   * Which of the five tabs is on screen. `null` means "not chosen yet", which
+   * resolves to Summary.
+   *
+   * THE TABS ARE FIXED: Summary, Recommendations, Decisions, Module Integration,
+   * Cross-Module Workflow (see lib/intelligence/module-tabs.ts). The contract
+   * still declares eleven sections and every one still renders - Position,
+   * Breakdowns, Findings, Priorities, Data quality and Learning are parts of the
+   * Summary tab, not tabs of their own.
    */
-  const [openSection, setOpenSection] = useState<SectionKey | null>(null);
+  const [openTab, setOpenTab] = useState<IntelligenceTabKey | null>(null);
+  /** A Summary part to open and scroll to, set by an old section link or by the reader. */
+  const [summaryFocus, setSummaryFocus] = useState<SummaryFocus | null>(null);
+
+  // Links from before the five-tab layout name a section that is no longer a tab
+  // (`?intelSection=findings`, `#data-quality`). They resolve to Summary plus the
+  // part to scroll to, so an old bookmark lands on its content instead of a blank
+  // screen. Anything that is not a section name - an unrelated #hash - is left alone.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const target = resolveIntelligenceTarget(params.get('intelSection')) ?? resolveIntelligenceTarget(window.location.hash);
+    if (!target) return;
+    // Read after mount, not during render, so server and client markup agree.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpenTab(target.tab);
+    if (target.part) setSummaryFocus({ part: target.part, nonce: Date.now() });
+  }, []);
 
   const { data, error, loading, refreshing, refresh } = useBrainResource(
     () => contract.load(),
@@ -105,20 +125,21 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
     return grouped;
   }, [contract]);
 
-  /** The tabs: this module's own sections, labelled by what they already are. */
-  const navSections = useMemo(
-    () =>
-      contract.sections.map((section) => ({
-        key: section.key,
-        label: SECTION_NAV_LABELS[section.key] ?? section.copy.title,
-      })),
+  /** Exactly the five tabs, for every module. */
+  const navSections = useMemo(() => INTELLIGENCE_TABS.map((tab) => ({ key: tab.key, label: tab.label })), []);
+
+  const activeKey: IntelligenceTabKey = openTab ?? 'summary';
+
+  /**
+   * A section's copy: the module's own wording when its contract declares the
+   * section, the standard wording otherwise. A tab always has copy to render.
+   */
+  const copyFor = useCallback(
+    (key: SectionKey): SectionCopy =>
+      contract.sections.find((section) => section.key === key)?.copy ??
+      defaultSections().find((section) => section.key === key)!.copy,
     [contract],
   );
-
-  const activeKey =
-    openSection && contract.sections.some((section) => section.key === openSection)
-      ? openSection
-      : contract.sections[0]?.key;
 
   /**
    * The module's own name, without the product word.
@@ -285,104 +306,44 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
             accent={contract.accent}
             sections={navSections}
             activeKey={activeKey ?? ''}
-            onSelect={(key) => setOpenSection(key as SectionKey)}
+            onSelect={(key) => setOpenTab(key as IntelligenceTabKey)}
           />
 
-          {contract.sections
-            .filter((section) => section.key === activeKey)
-            .map((section) => {
-          const extras = renderExtras(section.key);
-
-          switch (section.key) {
-            case 'summary':
-              return (
-                <SummarySection
-                  key={section.key}
-                  copy={section.copy}
-                  summary={data.summary}
-                  metrics={summaryMetrics}
-                />
-              );
-            case 'position':
-              return (
-                <PositionSection key={section.key} copy={section.copy} position={data.position} extras={extras} />
-              );
-            case 'breakdowns':
-              return (
-                <BreakdownsSection
-                  key={section.key}
-                  copy={section.copy}
-                  breakdowns={data.breakdowns}
-                  extras={extras}
-                />
-              );
-            case 'findings':
-              return (
-                <FindingsSection
-                  key={section.key}
-                  copy={section.copy}
-                  findings={data.findings}
-                  ruleStatus={data.ruleStatus}
-                  freshness={data.freshness}
-                  onRecompute={contract.actions?.run ? () => void recompute() : undefined}
-                  running={running}
-                  extras={extras}
-                />
-              );
-            case 'priorities':
-              return (
-                <PrioritiesSection key={section.key} copy={section.copy} priorities={data.priorities} extras={extras} />
-              );
-            case 'recommendations':
-              return (
-                <RecommendationsSection
-                  key={section.key}
-                  copy={section.copy}
-                  recommendations={data.recommendations}
-                  onDecide={decide}
-                  extras={extras}
-                />
-              );
-            case 'decisions':
-              return (
-                <DecisionsSection
-                  key={section.key}
-                  copy={section.copy}
-                  decisionTrail={data.decisionTrail}
-                  extras={extras}
-                />
-              );
-            case 'dataQuality':
-              return (
-                <DataQualitySection
-                  key={section.key}
-                  copy={section.copy}
-                  dataQuality={data.dataQuality}
-                  extras={extras}
-                />
-              );
-            case 'learning':
-              return <LearningSection key={section.key} copy={section.copy} learning={data.learning} extras={extras} />;
-            case 'integration':
-              return (
-                <ModuleIntegrationSection
-                  key={section.key}
-                  module={contract.key}
-                  copy={section.copy}
-                />
-              );
-            case 'workflow':
-              return (
-                <CrossModuleWorkflowSection
-                  key={section.key}
-                  module={contract.key}
-                  copy={section.copy}
-                />
-              );
-            default:
-              return null;
-          }
-            })}
+          <div role="tabpanel" aria-label={INTELLIGENCE_TABS.find((tab) => tab.key === activeKey)?.label}>
+            {activeKey === 'summary' ? (
+              <SummaryTab
+                declared={contract.sections.map((section) => section.key)}
+                copyFor={copyFor}
+                data={data}
+                summaryMetrics={summaryMetrics}
+                extrasFor={renderExtras}
+                onRecompute={contract.actions?.run ? () => void recompute() : undefined}
+                running={running}
+                focus={summaryFocus}
+              />
+            ) : null}
+            {activeKey === 'recommendations' ? (
+              <RecommendationsSection
+                copy={copyFor('recommendations')}
+                recommendations={data.recommendations}
+                onDecide={decide}
+                extras={renderExtras('recommendations')}
+              />
+            ) : null}
+            {activeKey === 'decisions' ? (
+              <DecisionsSection
+                copy={copyFor('decisions')}
+                decisionTrail={data.decisionTrail}
+                extras={renderExtras('decisions')}
+              />
+            ) : null}
+            {activeKey === 'integration' ? (
+              <ModuleIntegrationSection module={contract.key} copy={copyFor('integration')} />
+            ) : null}
+            {activeKey === 'workflow' ? (
+              <CrossModuleWorkflowSection module={contract.key} copy={copyFor('workflow')} />
+            ) : null}
+          </div>
         </>
       </NoDataReasonProvider>
 
