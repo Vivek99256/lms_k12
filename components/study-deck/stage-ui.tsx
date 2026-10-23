@@ -9,6 +9,7 @@ import { assetUrl } from '@/lib/study-deck/deck';
 import { glyphOf, type Glyph } from '@/lib/study-deck/glyph';
 import { lensView, nudge } from '@/lib/study-deck/loupe';
 import { backdropUrl, THEMES, themeVars, type StageTheme } from '@/lib/study-deck/theme';
+import { creditText, isTextbookPicture, webSource } from '@/lib/study-deck/imageCredit';
 import type { DeckImage } from '@/lib/study-deck/types';
 import styles from './stage.module.css';
 
@@ -318,7 +319,7 @@ export function VisualFigure({ image, assetBase, children, className = '', camer
   const ratio = image.width > 0 && image.height > 0 ? image.width / image.height : 16 / 9;
   const band = crop && crop.bottom > crop.top ? (crop.bottom - crop.top) / 100 : 1;
   const frameRatio = ratio / band;
-  const photo = image.type === 'photo' && Boolean(image.source_url);
+  const photo = webSource(image) !== null;
   const still = useReducedMotion();
 
   const transform = cameraTransform(still ? null : camera);
@@ -411,7 +412,7 @@ export function VisualFigure({ image, assetBase, children, className = '', camer
               {creditOf(image)}
             </span>
             {photo ? (
-              <a href={image.source_url ?? undefined} target="_blank" rel="noreferrer noopener" className="shrink-0 font-semibold text-sd-strong underline">
+              <a href={webSource(image) ?? undefined} target="_blank" rel="noreferrer noopener" className="shrink-0 font-semibold text-sd-strong underline">
                 Source
               </a>
             ) : null}
@@ -430,15 +431,18 @@ export const PANEL = 'rounded-[1.1em] border border-white/70 bg-white/88 shadow-
 
 /** Who made a photograph and under what licence, as a small chip on top of it. Nothing for a drawn diagram. */
 export function PhotoCredit({ image, className = '' }: { image: DeckImage; className?: string }) {
-  if (image.type !== 'photo' || !image.source_url) return null;
+  const web = webSource(image);
+  if (web === null && !isTextbookPicture(image)) return null;
 
   return (
     <p className={`max-w-[80%] truncate rounded-full bg-slate-950/60 px-[0.9em] py-[0.2em] text-[0.55em] text-white ${className}`}>
       {image.caption ? `${trimStop(image.caption)}. ` : ''}
-      {image.creator ?? 'Openverse'}, {image.licence}{' '}
-      <a href={image.source_url} target="_blank" rel="noreferrer noopener" className="font-semibold underline">
-        Source
-      </a>
+      {creditText(image)}{' '}
+      {web !== null ? (
+        <a href={web} target="_blank" rel="noreferrer noopener" className="font-semibold underline">
+          Source
+        </a>
+      ) : null}
     </p>
   );
 }
@@ -450,7 +454,7 @@ function trimStop(caption: string): string {
 
 /** Who made a picture, and under what licence; a diagram is drawn for the lesson and has neither. */
 export function creditOf(image: DeckImage): string {
-  return image.type === 'photo' && image.source_url ? `${image.creator ?? 'Openverse'}, ${image.licence}` : 'Drawn for this lesson';
+  return creditText(image);
 }
 
 /**
@@ -536,8 +540,8 @@ export function PictureDialog({ image, src, onClose }: { image: DeckImage; src: 
           <figcaption className="mt-3 text-sm text-slate-700">
             {image.caption ? `${trimStop(image.caption)}. ` : ''}
             {creditOf(image)}.{' '}
-            {image.type === 'photo' && image.source_url ? (
-              <a href={image.source_url} target="_blank" rel="noreferrer noopener" className="text-indigo-700 underline">
+            {webSource(image) !== null ? (
+              <a href={webSource(image) ?? undefined} target="_blank" rel="noreferrer noopener" className="text-indigo-700 underline">
                 Source
               </a>
             ) : null}

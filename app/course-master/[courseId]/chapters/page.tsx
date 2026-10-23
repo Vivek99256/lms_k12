@@ -1498,8 +1498,9 @@ export default function ChapterListPage() {
     const apiCategories = chapterContentCategories[cacheKey];
     if (apiCategories) {
       const loaded = buildApiChapterContentItems(activeLibraryChapter, apiCategories);
-      // The dedicated Course Presentation card exists only in the Classroom Resource lane of a pilot chapter,
-      // and never beside a presentation that is already stored.
+      // The dedicated Course Presentation card exists only in the Classroom Resource lane of a chapter in scope. It is the one
+      // entry point for choosing a teaching method and format; presentations already stored (each made for one choice) are
+      // separate cards that open straight to their own deck.
       return shouldShowCoursePresentationCard({ chapterId: activeLibraryChapter.id, lane: contentResourceType, loaded: true, items: loaded })
         ? [buildCoursePresentationCard(activeLibraryChapter), ...loaded]
         : loaded;

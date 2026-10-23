@@ -168,7 +168,8 @@ export interface CpCoverage {
   unresolved: { name: string; reason: string | null }[];
   intelligence_entries_not_mapped: string[];
   pictures: { with_a_verified_picture: number; without: number; candidates_rejected: number };
-  learning_outcomes: string;
+  /** Present only when the school has stored learning outcomes for the chapter. */
+  learning_outcomes?: string | null;
 }
 
 /** What the picture library says about the chapter (read only). */
@@ -195,6 +196,8 @@ export interface CpExistingResource {
   title: string;
   status: string;
   format?: string;
+  /** The teaching method the item was stored for; null/absent for an item stored without one. */
+  method?: string | null;
   ref?: number;
 }
 

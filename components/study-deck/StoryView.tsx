@@ -33,6 +33,7 @@ import {
 import type { DeckImage, ScenarioInteraction } from '@/lib/study-deck/types';
 import { DeckPin } from './DeckPin';
 import { PartCallout } from './PartCallout';
+import { webSource } from '@/lib/study-deck/imageCredit';
 import { creditOf, PictureDialog, Tag, TONES, useRememberedReducer, useStage } from './stage-ui';
 
 export interface StoryViewProps {
@@ -475,10 +476,10 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
       <div className="flex shrink-0 items-center gap-[0.5em]">
         <p className="min-w-0 flex-1 truncate text-[0.58em] text-slate-600" data-testid="story-credit">
           {creditOf(main)}
-          {main.type === 'photo' && main.source_url ? (
+          {webSource(main) !== null ? (
             <>
               {' · '}
-              <a href={main.source_url} target="_blank" rel="noreferrer noopener" className="text-indigo-700 underline" data-testid="story-source">
+              <a href={webSource(main) ?? undefined} target="_blank" rel="noreferrer noopener" className="text-indigo-700 underline" data-testid="story-source">
                 Source
               </a>
             </>

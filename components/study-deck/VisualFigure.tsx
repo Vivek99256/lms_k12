@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
 import { assetUrl } from '@/lib/study-deck/deck';
+import { creditText, webSource } from '@/lib/study-deck/imageCredit';
 import type { DeckImage } from '@/lib/study-deck/types';
 
 export interface VisualFigureProps {
@@ -57,9 +58,9 @@ export function VisualFigure({ image, assetBase, children }: VisualFigureProps) 
       {isDiagram ? <p className="px-4 pt-2 text-xs text-slate-500 sm:hidden">Swipe sideways to see the whole diagram.</p> : null}
       <figcaption className="border-t border-slate-100 px-4 py-2 text-xs text-slate-600">
         {image.caption ? `${image.caption}. ` : ''}
-        {image.type === 'photo' && image.source_url ? `${image.creator ?? 'Openverse'}, ${image.licence}. ` : 'Drawn for this lesson. '}
-        {image.type === 'photo' && image.source_url ? (
-          <a href={image.source_url} target="_blank" rel="noreferrer noopener" className="text-indigo-700 underline">
+        {creditText(image)}.{' '}
+        {webSource(image) !== null ? (
+          <a href={webSource(image) ?? undefined} target="_blank" rel="noreferrer noopener" className="text-indigo-700 underline">
             Source
           </a>
         ) : null}

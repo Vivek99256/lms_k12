@@ -9,6 +9,7 @@ import { exampleKey, interactionKey } from '@/lib/study-deck/interactions';
 import { conceptStatus, type DeckProgress, type ResultInput } from '@/lib/study-deck/progress';
 import { layoutOf, type LayoutKind, type StepKind } from '@/lib/study-deck/stage';
 import { backdropUrl, THEMES, themeForTopic, themeOf } from '@/lib/study-deck/theme';
+import { creditText, isTextbookPicture, missingPictureNotice, webSource } from '@/lib/study-deck/imageCredit';
 import type { DeckImage, DeckSlide, StudyDeck } from '@/lib/study-deck/types';
 import { ExplainDock } from './ExplainDock';
 import { ExploreView } from './ExploreView';
@@ -63,12 +64,16 @@ export function SlideView(props: SlideViewProps) {
 
   // No panel when the slide has nothing beyond its main picture (the cover; a slide with no explanation at all). The
   // number badge takes the bottom-right corner, so the slide keeps a little room under it.
+  // A slide that planned a picture and has none says so on the slide itself (the image-text layout has its own, larger notice).
+  const noPicture = layout === 'image-text' || layout === 'cover' ? null : missingPictureNotice(slide);
+
   if (tabs.length === 0) {
     return (
       <SlideStage {...stage}>
         <div data-fit={layout === 'cover' ? undefined : true} className={`h-full ${layout === 'cover' ? '' : 'overflow-hidden pb-[1.8em]'}`}>
           <SlideLayout {...props} layout={layout} bleed={bleed} />
         </div>
+        <NoPictureBadge notice={noPicture} />
       </SlideStage>
     );
   }
@@ -80,6 +85,7 @@ export function SlideView(props: SlideViewProps) {
           <SlideLayout {...props} layout={layout} bleed={bleed} />
         </div>
         <ExplainDock key={slide.n} deck={deck} slide={slide} layout={layout} tabs={tabs} done={dockDone} onDone={dockDoneNow} />
+        <NoPictureBadge notice={noPicture} />
       </div>
     </SlideStage>
   );
@@ -133,7 +139,9 @@ function SlideLayout({ deck, slide, progress, assetBase, onResult, onGoto, onNex
             <Bullets slide={slide} />
             <Connections deck={deck} slide={slide} onGoto={onGoto} />
           </div>
-          <div className="min-h-0 min-w-0">{slide.image ? <VisualFigure image={slide.image} assetBase={assetBase} /> : null}</div>
+          <div className="min-h-0 min-w-0">
+            {slide.image ? <VisualFigure image={slide.image} assetBase={assetBase} /> : <NoPicture notice={missingPictureNotice(slide)} />}
+          </div>
         </Split>
       );
     case 'cards':
@@ -419,16 +427,42 @@ function TopicList({ deck, onGoto, onDark = false }: { deck: StudyDeck; onGoto: 
 // Whole screens
 // ---------------------------------------------------------------------------
 
+/** A small, quiet badge in the corner of a slide whose picture was planned but not found: a gap is stated, never left looking like a loading picture. */
+function NoPictureBadge({ notice }: { notice: string | null }) {
+  if (notice === null) return null;
+
+  return (
+    <p role="note" data-testid="no-picture-badge" className="absolute left-[1.4em] top-[0.8em] z-20 max-w-[60%] rounded-full border border-dashed border-slate-400 bg-white/90 px-[0.9em] py-[0.2em] text-[0.55em] text-slate-700">
+      {notice}
+    </p>
+  );
+}
+
+/** Said plainly where a slide planned a picture and none was suitable, so a gap is never mistaken for a loading picture. */
+function NoPicture({ notice }: { notice: string | null }) {
+  if (notice === null) return null;
+
+  return (
+    <p role="note" data-testid="no-picture" className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-600">
+      {notice}
+    </p>
+  );
+}
+
 /** Who made the cover picture, small in the corner (a photograph always carries its credit). */
 function CoverCredit({ image }: { image: DeckImage }) {
-  if (image.type !== 'photo' || !image.source_url) return null;
+  const web = webSource(image);
+  if (web === null && !isTextbookPicture(image)) return null;
 
   return (
     <p className="absolute bottom-[0.8em] left-[1.4em] z-20 max-w-[60%] truncate rounded-full bg-slate-950/55 px-[0.9em] py-[0.2em] text-[0.55em] text-white">
-      Photo: {image.creator ?? 'Openverse'}, {image.licence}{' '}
-      <a href={image.source_url} target="_blank" rel="noreferrer noopener" className="font-semibold underline">
-        Source
-      </a>
+      {web !== null ? 'Photo: ' : ''}
+      {creditText(image)}{' '}
+      {web !== null ? (
+        <a href={web} target="_blank" rel="noreferrer noopener" className="font-semibold underline">
+          Source
+        </a>
+      ) : null}
     </p>
   );
 }

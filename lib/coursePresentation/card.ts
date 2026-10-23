@@ -4,8 +4,12 @@ import { coursePresentationEnabledFor } from './scope';
  * Which Classroom Resource cards belong to the Course Presentation workflow.
  *
  * Opening a card is decided HERE, on an explicit marker, never on a card's type or on "everything else": only the
- * dedicated Course Presentation card of a pilot chapter takes the new route. Prayogshala cards, every other card
+ * dedicated Course Presentation card of a chapter in scope takes the new route. Prayogshala cards, every other card
  * type, and every card of every other chapter keep their existing handler.
+ *
+ * That includes the presentations already STORED for the chapter: each is its own content item made for one teaching
+ * method and format, and opens straight to its own deck (its deep link), never into the chooser. A chapter's printed
+ * poster (also a "Classroom presentation") keeps opening as it always did.
  */
 export const COURSE_PRESENTATION_CARD_ID = 'course-presentation-pilot';
 
@@ -26,13 +30,7 @@ export function isCoursePresentationCard(item: OpenableCard): boolean {
   if (item.prayogshala || !coursePresentationEnabledFor(item.chapterId)) {
     return false;
   }
-  return (
-    item.coursePresentationPilot === true ||
-    item.id === COURSE_PRESENTATION_CARD_ID ||
-    item.type === 'Classroom presentation' ||
-    (typeof item.deepLink === 'string' && /^\/student\/study-deck\//.test(item.deepLink)) ||
-    Boolean(item.pdfUrl)
-  );
+  return item.coursePresentationPilot === true || item.id === COURSE_PRESENTATION_CARD_ID;
 }
 
 export function routeCardOpen(item: OpenableCard, lane: ResourceLane): CardOpenRoute {
@@ -40,9 +38,10 @@ export function routeCardOpen(item: OpenableCard, lane: ResourceLane): CardOpenR
 }
 
 /**
- * Whether the dedicated card should be added to a chapter's list. Only in the Classroom Resource lane of a pilot
- * chapter, once its content has loaded, and never beside a Classroom presentation that already exists (that
- * card is reused as it is, not duplicated).
+ * Whether the dedicated card should be added to a chapter's list: in the Classroom Resource lane of a chapter in scope,
+ * once its content has loaded. It is the ONE entry point for choosing a teaching method and format, so it is there
+ * whatever is already stored: a stored presentation, story lesson or the chapter's poster is a different item (made
+ * for one choice, or not a generated deck at all) and neither replaces it nor makes it a duplicate.
  */
 export function shouldShowCoursePresentationCard(input: {
   chapterId: string | number | null | undefined;
@@ -50,6 +49,6 @@ export function shouldShowCoursePresentationCard(input: {
   loaded: boolean;
   items: readonly { type: string; coursePresentationPilot?: boolean }[];
 }): boolean {
-  if (!input.loaded || input.lane !== 'classroom' || !coursePresentationEnabledFor(input.chapterId)) return false;
-  return !input.items.some((item) => item.type === 'Classroom presentation' && item.coursePresentationPilot !== true);
+  // Never added twice (the list may already hold it).
+  return input.loaded && input.lane === 'classroom' && coursePresentationEnabledFor(input.chapterId) && !input.items.some((item) => item.coursePresentationPilot === true);
 }
