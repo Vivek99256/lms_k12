@@ -21,12 +21,13 @@ import {
   RefreshCw,
   Settings2,
 } from 'lucide-react';
-import { fetchClassIntelligence, fetchExecutive } from '@/lib/brain/api';
+import { fetchClassIntelligence, fetchCrossModule, fetchExecutive } from '@/lib/brain/api';
 import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
 import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
 import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
 import { useBrainResource } from './_components/useBrainResource';
 import { Card, ErrorState, LoadingState } from './_components/primitives';
+import { CrossModuleInsightsSection } from './_components/CrossModuleInsights';
 import { Delta, EvidenceStrip, HealthDial, IntelligenceCard } from './_components/IntelligenceCard';
 import type { BrainClassIntelligence, BrainExecutivePayload } from '@/lib/brain/api';
 
@@ -47,6 +48,7 @@ const HOME_WIDGETS = [
   { id: 'panel.what_changed', label: 'What changed', group: 'panel' },
   { id: 'panel.at_risk', label: 'What is at risk', group: 'panel' },
   { id: 'panel.class_attendance', label: 'Class attendance intelligence', group: 'panel' },
+  { id: 'panel.cross_module', label: 'Cross-module insights', group: 'panel' },
   { id: 'panel.top_findings', label: 'Most important findings', group: 'panel' },
   { id: 'panel.priority_actions', label: 'Priority actions', group: 'panel' },
   { id: 'panel.intelligence_tools', label: 'Intelligence tools', group: 'panel' },
@@ -595,6 +597,7 @@ function IntelligenceTools({
 export default function BrainOverviewPage() {
   const { data, error, loading, refresh } = useBrainResource(fetchExecutive, []);
   const classIntelligence = useBrainResource(fetchClassIntelligence, []);
+  const crossModule = useBrainResource(fetchCrossModule, []);
   const prefs = useDashboardPreferences('brain.home', HOME_WIDGETS);
   const show = prefs.isVisible;
 
@@ -767,6 +770,9 @@ export default function BrainOverviewPage() {
 
       {/* ---------------------------------------------------- Class Intelligence */}
       {show('panel.class_attendance') && <ClassIntelligenceSection resource={classIntelligence} />}
+
+      {/* ---------------------------------------------------- Cross-module insights */}
+      {show('panel.cross_module') && <CrossModuleInsightsSection resource={crossModule} />}
 
       {/* ---------------------------------------------------- Most important findings */}
       {show('panel.top_findings') && (
