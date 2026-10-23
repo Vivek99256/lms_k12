@@ -20,10 +20,11 @@ export function resolveSelectedContent(
 ): ResolvedContent | null {
   if (!pedagogy || !format || !preflight) return null;
 
-  // 1. Check existing stored resources in this format
+  // 1. Check existing stored resources made for exactly this format AND teaching method. An item stored for another
+  //    method, or without one (the chapter's original presentation), is never opened under this choice.
   const resources = preflight.existing_resources ?? [];
   const matchingResource = resources.find(
-    (r) => (r.format ?? 'interactive_slides') === format || !r.format,
+    (r) => (r.format ?? 'interactive_slides') === format && r.method === pedagogy,
   );
 
   if (matchingResource && typeof matchingResource.ref === 'number') {

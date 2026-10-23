@@ -18,8 +18,22 @@ import {
   type ScenarioState,
 } from '@/lib/study-deck/interactions';
 import { assetUrl } from '@/lib/study-deck/deck';
+import { failedPictureLabel, imageAttemptKey, imageFailed, imageLoaded, INITIAL_IMAGE_LOAD, type ImageLoadState } from '@/lib/study-deck/imageLoad';
 import { containedRect, captionText, regionInBox, usableRegion } from '@/lib/study-deck/picture';
+import {
+  calloutSide,
+  closeStoryHotspot,
+  discoveredSummary,
+  initialStoryHotspots,
+  openStoryHotspot,
+  storyHotspotProgress,
+  storySpots,
+  type StoryHotspotState,
+} from '@/lib/study-deck/storyHotspots';
 import type { DeckImage, ScenarioInteraction } from '@/lib/study-deck/types';
+import { DeckPin } from './DeckPin';
+import { PartCallout } from './PartCallout';
+import { webSource } from '@/lib/study-deck/imageCredit';
 import { creditOf, PictureDialog, Tag, TONES, useRememberedReducer, useStage } from './stage-ui';
 
 export interface StoryViewProps {
@@ -316,9 +330,15 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(true);
   const box = useRef<HTMLSpanElement>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [size, setSize] = useState({ w: 0, h: 0, x: 0, y: 0 });
+  const wrap = useRef<HTMLDivElement>(null);
+  // Which parts of each picture have been opened (a picture with parts is explored like a hotspots slide).
+  const [explored, setExplored] = useState<Record<string, StoryHotspotState>>({});
+  // How each picture of this scene has loaded: one retry of the same address after a failure, then a labelled frame (see lib/study-deck/imageLoad.ts).
+  const [loads, setLoads] = useState<Record<string, ImageLoadState>>({});
   const main = images[Math.min(index, images.length - 1)];
   const src = assetUrl(main.url, assetBase ?? null);
+  const load = loads[main.url] ?? INITIAL_IMAGE_LOAD;
   const region = usableRegion(main.focus);
   const caption = captionText(main.caption, { photo: main.type === 'photo', highlighted: region !== null });
 
@@ -326,7 +346,11 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
-    const read = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    const read = () => {
+      const b = el.getBoundingClientRect();
+      const w = wrap.current?.getBoundingClientRect();
+      setSize({ w: el.clientWidth, h: el.clientHeight, x: w ? b.left - w.left : 0, y: w ? b.top - w.top : 0 });
+    };
     read();
     const observer = new ResizeObserver(read);
     observer.observe(el);
@@ -335,10 +359,14 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
   }, [main.url]);
   const picture = containedRect(size.w, size.h, main.width, main.height);
   const mark = region !== null && shown && picture.width > 0 ? regionInBox(picture, region) : null;
+  const spots = load.status === 'failed' ? [] : storySpots(main);
+  const hstate = explored[main.url] ?? initialStoryHotspots();
+  const hprogress = storyHotspotProgress(spots, hstate);
+  const activeIndex = spots.findIndex((spot) => spot.id === hstate.active);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col gap-[0.4em]" data-testid="story-pictures">
-      <div className="relative flex min-h-0 flex-1">
+      <div ref={wrap} className="relative flex min-h-0 flex-1">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -346,8 +374,28 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
           className="group relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[1em] border-[0.15em] border-white bg-slate-100 shadow-[0_0.3em_1.1em_rgba(15,23,42,0.18),0_0_0_0.06em_var(--sd-line)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
         >
           <span ref={box} className="relative block h-full w-full">
-            {/* eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies */}
-            <img src={src} alt={main.alt} data-testid="story-picture" className="block h-full w-full object-contain" />
+            {load.status === 'failed' ? (
+              <span
+                role="img"
+                aria-label={failedPictureLabel(main.alt)}
+                data-testid="story-picture-failed"
+                className="flex h-full w-full items-center justify-center p-[1em] text-center text-[0.8em] font-semibold text-slate-700"
+              >
+                {failedPictureLabel(main.alt)}
+              </span>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies
+              <img
+                key={imageAttemptKey(main.url, load)}
+                src={src}
+                alt={main.alt}
+                data-testid="story-picture"
+                data-load-state={load.status}
+                onLoad={() => setLoads((prev) => ({ ...prev, [main.url]: imageLoaded(prev[main.url]) }))}
+                onError={() => setLoads((prev) => ({ ...prev, [main.url]: imageFailed(prev[main.url]) }))}
+                className="block h-full w-full object-contain"
+              />
+            )}
             {mark && main.focus_label ? (
               <span
                 aria-hidden="true"
@@ -372,6 +420,37 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
             View larger
           </span>
         </button>
+        {spots.length > 0 && picture.width > 0 ? (
+          <div
+            data-testid="story-hotspots"
+            className="pointer-events-none absolute z-10 [&_button]:pointer-events-auto"
+            style={{ left: size.x + picture.left, top: size.y + picture.top, width: picture.width, height: picture.height }}
+          >
+            {spots.map((spot, i) => (
+              <DeckPin
+                key={spot.id}
+                index={i}
+                x={(spot.pin ?? spot).x}
+                y={(spot.pin ?? spot).y}
+                name={`${spot.label}: open the explanation`}
+                selected={hstate.active === spot.id}
+                explored={hstate.opened.includes(spot.id)}
+                compact={picture.width < 360}
+                onSelect={() => setExplored((prev) => ({ ...prev, [main.url]: openStoryHotspot(prev[main.url] ?? initialStoryHotspots(), spots, spot.id) }))}
+              />
+            ))}
+            {activeIndex >= 0 ? (
+              <PartCallout
+                number={activeIndex + 1}
+                title={spots[activeIndex].label}
+                text={spots[activeIndex].text}
+                assetBase={assetBase}
+                placement={calloutSide(spots[activeIndex])}
+                onClose={() => setExplored((prev) => ({ ...prev, [main.url]: closeStoryHotspot(prev[main.url] ?? initialStoryHotspots()) }))}
+              />
+            ) : null}
+          </div>
+        ) : null}
         {region !== null ? (
           <button
             type="button"
@@ -389,13 +468,18 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
           {caption}
         </p>
       ) : null}
+      {spots.length > 0 ? (
+        <p className="shrink-0 text-[0.68em] font-semibold text-sd-strong" data-testid="story-hotspot-progress" aria-live="polite">
+          {hprogress.done ? `${discoveredSummary(spots)} All ${hprogress.total} parts explored.` : `Explore the picture: ${hprogress.opened} of ${hprogress.total} parts opened. Select a numbered pin.`}
+        </p>
+      ) : null}
       <div className="flex shrink-0 items-center gap-[0.5em]">
         <p className="min-w-0 flex-1 truncate text-[0.58em] text-slate-600" data-testid="story-credit">
           {creditOf(main)}
-          {main.type === 'photo' && main.source_url ? (
+          {webSource(main) !== null ? (
             <>
               {' · '}
-              <a href={main.source_url} target="_blank" rel="noreferrer noopener" className="text-indigo-700 underline" data-testid="story-source">
+              <a href={webSource(main) ?? undefined} target="_blank" rel="noreferrer noopener" className="text-indigo-700 underline" data-testid="story-source">
                 Source
               </a>
             </>

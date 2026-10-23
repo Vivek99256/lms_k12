@@ -196,7 +196,7 @@ function CoverageSection({ coverage }: { coverage: CpCoverage }) {
           ))}
         </ul>
       </details>
-      <p className="mt-1 text-xs text-slate-500">Learning outcomes are {coverage.learning_outcomes}.</p>
+      {coverage.learning_outcomes ? <p className="mt-1 text-xs text-slate-500">Learning outcomes are {coverage.learning_outcomes}.</p> : null}
     </div>
   );
 }
@@ -375,6 +375,10 @@ export function CoursePresentationFlow({
   const error = (showingPreflight ? current?.error : optionsError) || '';
   const checking = bothChosen && (chooseFit === null || current === null);
   const resolvedContent = resolveSelectedContent(chapterId, state.pedagogy, state.format, preflight);
+  // Only content made for exactly this choice is opened as the lesson. The no-AI source preview is the same text for every teaching method,
+  // so it is never the primary action: Create generates the lesson for the chosen method, and the preview is offered apart, labelled as what it is.
+  const storedContent = resolvedContent && resolvedContent.kind !== 'template_preview' ? resolvedContent : null;
+  const previewContent = resolvedContent && resolvedContent.kind === 'template_preview' ? resolvedContent : null;
 
   useEffect(() => {
     firstRadio.current?.focus();
@@ -456,7 +460,21 @@ export function CoursePresentationFlow({
             <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
               {!bothChosen && <p className="mr-auto text-xs text-slate-500">Choose one of each to continue.</p>}
               {bothChosen && fit !== null && !fit.continue_allowed && <p className="mr-auto text-xs text-slate-500">Choose a different method or format to continue.</p>}
-              {bothChosen && resolvedContent && (
+              {bothChosen && previewContent && (
+                <button
+                  type="button"
+                  data-testid="cp-open-preview"
+                  title="Built from the chapter's stored data; the lesson text is the same for every teaching method"
+                  onClick={() => {
+                    if (mirrorTimer.current) clearTimeout(mirrorTimer.current);
+                    onOpenPreview(previewContent.url);
+                  }}
+                  className="text-xs font-medium text-slate-600 underline hover:text-slate-900"
+                >
+                  Preview the source material (same for every teaching method)
+                </button>
+              )}
+              {bothChosen && storedContent && (
                 <button
                   type="button"
                   onClick={() => onState({ ...state, stage: 'preflight' })}
@@ -468,21 +486,17 @@ export function CoursePresentationFlow({
               <button type="button" onClick={close} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Cancel
               </button>
-              {bothChosen && resolvedContent ? (
+              {bothChosen && storedContent ? (
                 <button
                   type="button"
                   data-testid="cp-open-content"
                   onClick={() => {
                     if (mirrorTimer.current) clearTimeout(mirrorTimer.current);
-                    if (resolvedContent.kind === 'template_preview') {
-                      onOpenPreview(resolvedContent.url);
-                    } else {
-                      onOpenPresentation(resolvedContent.url);
-                    }
+                    onOpenPresentation(storedContent.url);
                   }}
                   className="rounded-md bg-indigo-600 px-3.5 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
                 >
-                  {resolvedContent.label}
+                  {storedContent.label}
                 </button>
               ) : (
                 <button
