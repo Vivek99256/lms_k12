@@ -106,7 +106,10 @@ export const vanWiseConfig: TransportConfig = {
 
 export const vanSummaryConfig: TransportConfig = {
   module: "van-summary-report", title: "Van summary report", description: "Review student counts by vehicle and school shift.", singular: "Summary", report: true,
-  fields: [],
+  fields: [
+    { key: "van", label: "Vehicle", kind: "select", source: "vehicles" },
+    { key: "shift", label: "Shift", kind: "select", source: "shifts" },
+  ],
   columns: [
     { key: "vehicle_name", label: "Vehicle" }, { key: "shift_title", label: "Shift" }, { key: "student_count", label: "Students" },
   ],

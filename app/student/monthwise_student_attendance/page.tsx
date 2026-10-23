@@ -308,6 +308,27 @@ function formatMonthYear(month: string, year: string) {
   return `${monthLabel} / ${year}`;
 }
 
+/**
+ * Calendar years the Year filter offers.
+ *
+ * The report searches attendance by the calendar year of `attendance_date`, but the
+ * list used to hold only academic years (plus one). An academic year runs for months and
+ * a tenant's attendance can sit in a later calendar year than its academic-year label
+ * (academic year 2022 with attendance dated 2026), so those years were not selectable and
+ * the report read "No attendance taken". Every year from the first academic year up to the
+ * current calendar year is offered instead.
+ */
+function withCalendarYears(academicYears: string[]): string[] {
+  const numeric = academicYears.map(Number).filter((value) => Number.isFinite(value) && value > 0);
+  if (numeric.length === 0) return academicYears;
+
+  const first = Math.min(...numeric);
+  const last = Math.max(Math.max(...numeric) + 1, new Date().getFullYear());
+  const years: string[] = [];
+  for (let value = first; value <= last; value += 1) years.push(String(value));
+  return years;
+}
+
 function readStoredAcademicYears(): string[] {
   if (typeof window === 'undefined') return [];
 
@@ -331,17 +352,7 @@ function readStoredAcademicYears(): string[] {
     }
   }
 
-  const sorted = Array.from(values).sort((left, right) => Number(left) - Number(right));
-  const maxYear = sorted.reduce((current, entry) => {
-    const numeric = Number(entry);
-    return Number.isFinite(numeric) && numeric > current ? numeric : current;
-  }, 0);
-
-  if (maxYear > 0) {
-    sorted.push(String(maxYear + 1));
-  }
-
-  return sorted;
+  return withCalendarYears(Array.from(values).sort((left, right) => Number(left) - Number(right)));
 }
 
 function readStoredRecords() {
@@ -477,17 +488,7 @@ export default function MonthwiseStudentAttendancePage() {
       const values = academicYears
         .map((entry) => readString(asRecord(entry).syear ?? asRecord(entry).academic_year))
         .filter(Boolean);
-      const sorted = Array.from(new Set(values)).sort((left, right) => Number(left) - Number(right));
-      const maxYear = sorted.reduce((current, entry) => {
-        const numeric = Number(entry);
-        return Number.isFinite(numeric) && numeric > current ? numeric : current;
-      }, 0);
-
-      if (maxYear > 0) {
-        sorted.push(String(maxYear + 1));
-      }
-
-      return sorted;
+      return withCalendarYears(Array.from(new Set(values)).sort((left, right) => Number(left) - Number(right)));
     }
 
     return readStoredAcademicYears();
@@ -769,7 +770,9 @@ export default function MonthwiseStudentAttendancePage() {
 
       <SectionPanel title="Filters" description="Filter by grade, standard, division, year and month. Batch is optional.">
         <div className="space-y-4">
+          <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${showBatchField ? 'xl:grid-cols-6' : 'xl:grid-cols-5'}`}>
           <SearchDropdown
+            className="contents"
             fields={['section', 'standard', 'division']}
             values={{ section, standard, division }}
             required={{ section: true, standard: true, division: true }}
@@ -780,7 +783,6 @@ export default function MonthwiseStudentAttendancePage() {
             onDivisionChange={handleDivisionChange}
           />
 
-          <div className={`grid gap-4 ${showBatchField ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
             {showBatchField && (
               <Field label="Batch">
                 <NativeSelect value={batch} onChange={setBatch} disabled={loadingBatch}>
@@ -815,13 +817,13 @@ export default function MonthwiseStudentAttendancePage() {
                 ))}
               </NativeSelect>
             </Field>
+          </div>
 
-            <div className="flex items-end">
-              <Button type="button" className="h-10 w-full" onClick={handleSearch} disabled={loading}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                Search
-              </Button>
-            </div>
+          <div className="flex justify-end border-t border-slate-100 pt-4">
+            <Button type="button" onClick={handleSearch} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Search
+            </Button>
           </div>
         </div>
       </SectionPanel>

@@ -14,6 +14,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import AgewiseReportView from './_components/AgewiseReportView';
+import StudentDisciplineInsights from './_components/StudentDisciplineInsights';
+import StudentHealthInsights from './_components/StudentHealthInsights';
+import StudentRequestReportView from './_components/StudentRequestReportView';
 import {
   Activity,
   FileBarChart,
@@ -348,7 +352,6 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
   const [rows, setRows] = useState<FlatRow[]>([]);
   const [disciplineSummary, setDisciplineSummary] = useState<DisciplineSummaryRow[]>([]);
   const [agewiseClasses, setAgewiseClasses] = useState<string[]>([]);
-  const [agewiseBuckets, setAgewiseBuckets] = useState<Array<{ age: string; M: number; F: number }>>([]);
   const [agewiseMatrix, setAgewiseMatrix] = useState<Array<Record<string, string | number>>>([]);
   const [grandTotal, setGrandTotal] = useState(0);
 
@@ -432,15 +435,6 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
         counts.set(key, (counts.get(key) || 0) + 1);
       });
       return Array.from(counts.entries()).map(([name, total]) => ({ name, total }));
-    }
-
-    if (kind === 'student_health_report') {
-      const counts = new Map<string, number>();
-      rows.forEach((row) => {
-        const key = String(row.student_name || 'Unknown');
-        counts.set(key, (counts.get(key) || 0) + 1);
-      });
-      return Array.from(counts.entries()).slice(0, 10).map(([name, total]) => ({ name, total }));
     }
 
     if (kind === 'student_discipline_report') {
@@ -532,6 +526,14 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
 
     return { columns, rows: exportRows };
   }, [agewiseClasses, agewiseMatrix]);
+
+  const requestExport = useMemo(() => {
+    const columns: TableExportColumn[] = headers.map((header) => ({ key: header.key, label: header.label }));
+    const exportRows: TableExportRow[] = rows.map((row) =>
+      Object.fromEntries(headers.map((header) => [header.key, formatCellValue(header.key, row[header.key])]))
+    );
+    return { columns, rows: exportRows };
+  }, [headers, rows]);
 
   const handleSectionChange = (value: DropdownValue, selectedData: AcademicSection[]) => {
     const selectedValue = getSingleValue(value);
@@ -644,18 +646,6 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
         setMessage({ type: response.rows.length > 0 ? 'success' : 'info', text: response.message });
       } else if (kind === 'agewise_report') {
         const response = await fetchAgewiseReport({ grade: section, standard, division });
-        const bucketSummary = response.buckets.map((bucket) => {
-          const totals = response.classes.reduce(
-            (accumulator, className) => {
-              accumulator.M += bucket.values[className]?.M || 0;
-              accumulator.F += bucket.values[className]?.F || 0;
-              return accumulator;
-            },
-            { M: 0, F: 0 }
-          );
-          return { age: bucket.age, ...totals };
-        });
-
         const matrix = response.buckets.map((bucket) => {
           const row: Record<string, string | number> = { age: bucket.age };
           response.classes.forEach((className) => {
@@ -666,7 +656,6 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
         });
 
         setAgewiseClasses(response.classes);
-        setAgewiseBuckets(bucketSummary);
         setAgewiseMatrix(matrix);
         setGrandTotal(response.grandTotal);
         setMessage({ type: response.buckets.length > 0 ? 'success' : 'info', text: response.message });
@@ -964,30 +953,6 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
   function renderFlatReport() {
     return (
       <div className="space-y-3">
-        {kind === 'student_request_report' ? (
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={rows.length === 0}
-              onClick={() =>
-                exportRowsAsPdf({
-                  filename: 'student-request-report.pdf',
-                  title: toTitle(kind),
-                  subtitle: selectedClassSummary || 'All records',
-                  columns: headers.map((header) => ({ key: header.key, label: header.label })),
-                  rows: rows.map((row) =>
-                    Object.fromEntries(
-                      headers.map((header) => [header.key, formatCellValue(header.key, row[header.key])])
-                    )
-                  ),
-                })
-              }
-            >
-              PDF
-            </Button>
-          </div>
-        ) : null}
         <RecordTable
           rows={rows}
           columns={flatColumns}
@@ -1002,6 +967,10 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
   }
 
   function renderCharts() {
+    if (kind === 'student_health_report') {
+      return <StudentHealthInsights rows={rows} />;
+    }
+
     if (kind === 'student_strength_report') {
       const chartRows = rows.map((row) => ({
         name: standardWise.includes('division')
@@ -1031,30 +1000,6 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
           <div className="grid gap-4">
             <SummaryCard label="Rows" value={rows.length} />
             <SummaryCard label="Total Students" value={rows.reduce((sum, row) => sum + Number(row.total_students || 0), 0)} />
-          </div>
-        </div>
-      );
-    }
-
-    if (kind === 'agewise_report') {
-      return (
-        <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
-          <ChartCard title="Agewise Gender Distribution">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={agewiseBuckets}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="age" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="M" name="Male" stackId="age" fill="#2563eb" />
-                <Bar dataKey="F" name="Female" stackId="age" fill="#f97316" />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-          <div className="grid gap-4">
-            <SummaryCard label="Age Buckets" value={agewiseBuckets.length} />
-            <SummaryCard label="Grand Total" value={grandTotal} />
           </div>
         </div>
       );
@@ -1092,27 +1037,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
     }
 
     if (kind === 'student_discipline_report') {
-      return (
-        <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
-          <ChartCard title="Positive vs Negative Incidents">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={flatChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" hide />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="positive" fill="#16a34a" />
-                <Bar dataKey="negative" fill="#dc2626" />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-          <div className="grid gap-4">
-            <SummaryCard label="Entries" value={rows.length} />
-            <SummaryCard label="Student Summaries" value={disciplineSummary.length} />
-          </div>
-        </div>
-      );
+      return <StudentDisciplineInsights rows={rows} summary={disciplineSummary} />;
     }
 
     if (flatChartData.length === 0) return null;
@@ -1121,11 +1046,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
       <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
         <ChartCard
           title={
-            kind === 'student_request_report'
-              ? 'Requests by Type'
-              : kind === 'student_health_report'
-                ? 'Health Entries by Student'
-                : 'Rows by Standard'
+            kind === 'student_request_report' ? 'Requests by Type' : 'Rows by Standard'
           }
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -1208,52 +1129,6 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
     );
   }
 
-  function renderAgewiseTable() {
-    return (
-      <div className="space-y-4">
-        {exportButtonSet(agewiseExport.columns, agewiseExport.rows, 'Agewise Report')}
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <Table className="min-w-[1200px]">
-            <TableHeader>
-              <TableRow className="bg-slate-100 hover:bg-slate-100">
-                <TableHead rowSpan={2}>Age</TableHead>
-                {agewiseClasses.map((className) => (
-                  <TableHead key={className} colSpan={2} className="text-center">
-                    {className}
-                  </TableHead>
-                ))}
-              </TableRow>
-              <TableRow className="bg-slate-50 hover:bg-slate-50">
-                {agewiseClasses.flatMap((className) => [
-                  <TableHead key={`${className}-M`} className="text-center">M</TableHead>,
-                  <TableHead key={`${className}-F`} className="text-center">F</TableHead>,
-                ])}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {agewiseMatrix.length > 0 ? (
-                agewiseMatrix.map((row, index) => (
-                  <TableRow key={`${String(row.age)}-${index}`}>
-                    <TableCell>{String(row.age)}</TableCell>
-                    {agewiseClasses.flatMap((className) => [
-                      <TableCell key={`${className}-${index}-M`} className="text-center">{Number(row[`${className}_M`] || 0)}</TableCell>,
-                      <TableCell key={`${className}-${index}-F`} className="text-center">{Number(row[`${className}_F`] || 0)}</TableCell>,
-                    ])}
-                  </TableRow>
-                ))
-              ) : (
-                <EmptyTableRow
-                  colSpan={Math.max(3, 1 + agewiseClasses.length * 2)}
-                  label={hasSearched ? 'No agewise rows match the selected criteria.' : 'Generate the agewise report to view the matrix.'}
-                />
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    );
-  }
-
   const icon =
     kind === 'student_health_report'
       ? <HeartPulse className="h-4 w-4" />
@@ -1299,15 +1174,26 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
       ) : null}
 
       {kind === 'agewise_report' ? (
-        <>
-          {agewiseBuckets.length > 0 ? <SectionPanel title="Insights">{renderCharts()}</SectionPanel> : null}
-          <SectionPanel title="Report" description={selectedClassSummary || 'Generate the agewise report to view the matrix.'}>
-            {renderAgewiseTable()}
-          </SectionPanel>
-        </>
+        <AgewiseReportView
+          classes={agewiseClasses}
+          matrix={agewiseMatrix}
+          grandTotal={grandTotal}
+          hasSearched={hasSearched}
+          summary={selectedClassSummary}
+          actions={exportButtonSet(agewiseExport.columns, agewiseExport.rows, 'Agewise Report')}
+        />
       ) : null}
 
-      {!['student_strength_report', 'agewise_report'].includes(kind) ? (
+      {kind === 'student_request_report' ? (
+        <StudentRequestReportView
+          rows={rows}
+          hasSearched={hasSearched}
+          summary={selectedClassSummary}
+          actions={exportButtonSet(requestExport.columns, requestExport.rows, 'Student Request Report')}
+        />
+      ) : null}
+
+      {!['student_strength_report', 'agewise_report', 'student_request_report'].includes(kind) ? (
         <>
           {((rows.length > 0 && kind !== 'student_discipline_report') || (kind === 'student_discipline_report' && (rows.length > 0 || disciplineSummary.length > 0))) ? (
             <SectionPanel title="Insights">{renderCharts()}</SectionPanel>

@@ -1,8 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, Brain, CalendarClock, GitBranch, Loader2, ScrollText, type LucideIcon } from 'lucide-react';
+import {
+  AlertCircle,
+  Brain,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  GitBranch,
+  LayoutList,
+  Loader2,
+  ScrollText,
+  type LucideIcon,
+} from 'lucide-react';
 
 import Link from 'next/link';
 
@@ -76,6 +87,9 @@ type Tab =
 type LoadState = 'loading' | 'ready' | 'error';
 
 const TAB_PARAM = 'tab';
+
+/** More tabs than this and the bar is one scrolling line with an "All" menu rather than underlined text. */
+const PILL_TAB_THRESHOLD = 6;
 
 /**
  * The one category that is a screen rather than a group of menus.
@@ -294,6 +308,153 @@ function findCategory(
     categories.find(
       (entry) => normalizePath(entry.route || `/modules/${moduleName}/${entry.key}`) === here
     ) ?? null
+  );
+}
+
+type StripItem = { id: string; label: string; disabled: boolean };
+
+/**
+ * One-line tab strip for a category with many screens.
+ *
+ * Scrolls sideways instead of wrapping (a dozen-plus tabs wrapped over three
+ * lines), keeps the open tab centred, and ends with an "All" menu so any screen
+ * is one click away without scrolling to it.
+ */
+function ScrollableTabStrip({
+  items,
+  activeId,
+  onSelect,
+}: {
+  items: StripItem[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const scroller = useRef<HTMLDivElement | null>(null);
+  const menuRoot = useRef<HTMLDivElement | null>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const measure = useCallback(() => {
+    const node = scroller.current;
+    if (!node) return;
+    setEdges({
+      left: node.scrollLeft > 4,
+      right: node.scrollLeft + node.clientWidth < node.scrollWidth - 4,
+    });
+  }, []);
+
+  useEffect(() => {
+    const node = scroller.current;
+    if (!node) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [measure, items.length]);
+
+  useEffect(() => {
+    if (!activeId) return;
+    const node = scroller.current?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeId)}"]`);
+    node?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [activeId]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!menuRoot.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [menuOpen]);
+
+  const nudge = (direction: -1 | 1) => {
+    const node = scroller.current;
+    if (!node) return;
+    node.scrollBy({ left: direction * node.clientWidth * 0.6, behavior: 'smooth' });
+  };
+
+  const arrow =
+    'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#5F7087] transition hover:bg-slate-100 hover:text-[#1E293B] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent';
+
+  return (
+    <div className="flex items-center gap-1 rounded-2xl border border-[#D9E3F1] bg-white p-1.5 shadow-sm">
+      <button type="button" className={arrow} disabled={!edges.left} onClick={() => nudge(-1)} aria-label="Scroll tabs left">
+        <ChevronLeft size={18} />
+      </button>
+
+      <div
+        ref={scroller}
+        onScroll={measure}
+        className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {items.map((item) => {
+          const isActive = item.id === activeId;
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              data-tab-id={item.id}
+              disabled={item.disabled}
+              aria-current={isActive ? 'page' : undefined}
+              onClick={() => onSelect(item.id)}
+              className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:text-[#94A3B8] disabled:hover:bg-transparent ${
+                isActive
+                  ? 'bg-[#5846EA] text-white shadow-sm'
+                  : 'text-[#5F7087] hover:bg-slate-100 hover:text-[#1E293B]'
+              }`}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <button type="button" className={arrow} disabled={!edges.right} onClick={() => nudge(1)} aria-label="Scroll tabs right">
+        <ChevronRight size={18} />
+      </button>
+
+      <div ref={menuRoot} className="relative shrink-0 border-l border-[#D9E3F1] pl-1.5">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-expanded={menuOpen}
+          className="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-50 px-3 text-[13px] font-semibold text-[#334155] ring-1 ring-slate-200 transition hover:bg-slate-100"
+        >
+          <LayoutList size={16} />
+          All
+          <span className="rounded-md bg-white px-1.5 py-0.5 text-[11px] text-[#5F7087] ring-1 ring-slate-200">{items.length}</span>
+        </button>
+
+        {menuOpen ? (
+          <div className="absolute right-0 top-full z-30 mt-2 max-h-[70vh] w-72 overflow-y-auto rounded-2xl border border-[#D9E3F1] bg-white p-1.5 shadow-xl">
+            {items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                disabled={item.disabled}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onSelect(item.id);
+                }}
+                className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-[13px] font-medium transition disabled:cursor-not-allowed disabled:text-[#94A3B8] disabled:hover:bg-transparent ${
+                  item.id === activeId ? 'bg-[#EEF0FF] text-[#5846EA]' : 'text-[#334155] hover:bg-slate-50'
+                }`}
+              >
+                <span className="truncate">{item.label}</span>
+                {item.id === activeId ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#5846EA]" /> : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -783,6 +944,27 @@ export function ModuleCategoryPage({
             * — pure chrome with nothing to switch to. It reappears the moment a
             * second screen exists.
             */}
+          {/*
+            * A LONG BAR IS ONE SCROLLING LINE. With a dozen or more tabs (Student →
+            * Reports has 16) the underlined row wrapped over three lines with its
+            * own scrollbar, and a wrapped card of pills was no better. Past six
+            * tabs the bar is a single line that scrolls sideways, with an "All"
+            * menu to jump to any screen. Short bars keep the underline style.
+            */}
+          {tabs.length > PILL_TAB_THRESHOLD ? (
+            <ScrollableTabStrip
+              items={tabs.map((tab) => ({
+                id: tab.id,
+                label: tab.label,
+                disabled: tab.kind === 'menu' && !tab.embeddable && !isResolvedRoute(tab.route),
+              }))}
+              activeId={activeTab?.id ?? null}
+              onSelect={(id) => {
+                const tab = tabs.find((entry) => entry.id === id);
+                if (tab) selectTab(tab);
+              }}
+            />
+          ) : (
           <div
             className={`flex flex-wrap items-center gap-5 overflow-x-auto border-b border-[#D9E3F1] ${
               tabs.length < 2 ? 'hidden' : ''
@@ -815,6 +997,7 @@ export function ModuleCategoryPage({
               );
             })}
           </div>
+          )}
 
           {activeTab?.kind === 'static' ? (
             activeTab.render()

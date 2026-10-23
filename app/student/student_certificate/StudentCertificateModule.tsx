@@ -9,6 +9,7 @@ import {
   Loader2,
   Printer,
   Search,
+  X,
 } from 'lucide-react';
 
 import SearchDropdown from '@/components/search-dropdown/SearchDropdown';
@@ -446,6 +447,7 @@ export default function StudentCertificateModule({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewMessage, setPreviewMessage] = useState<HtmlMessage | null>(null);
   const [previewPayload, setPreviewPayload] = useState<PreviewPayload | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [issueSaveLoading, setIssueSaveLoading] = useState(false);
 
   const [historySection, setHistorySection] = useState('');
@@ -783,6 +785,7 @@ export default function StudentCertificateModule({
       }
 
       setPreviewPayload(preview);
+      setPreviewOpen(true);
       setPreviewMessage({
         type: 'success',
         text: readMessage(payload, 'Certificate preview generated successfully.'),
@@ -850,6 +853,7 @@ export default function StudentCertificateModule({
         type: 'success',
         text: readMessage(payload, 'Certificates issued successfully.'),
       });
+      setPreviewOpen(false);
       setHistoryCertificateType(previewPayload.template);
       setViewMode('history');
       await handleHistorySearch(previewPayload.template);
@@ -1101,44 +1105,38 @@ export default function StudentCertificateModule({
 
           <HtmlMessageBanner message={previewMessage} />
 
-          <SectionPanel
-            title="Preview"
-            description="Preview the certificate here, then print it."
-            footer={(
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => openCertificatePrintWindow('Student Certificate Preview', previewPayload?.html || '')}
-                  disabled={!previewPayload}
-                >
-                  <Printer className="h-4 w-4" />
-                  Print Preview
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleIssueCertificate}
-                  disabled={!previewPayload || issueSaveLoading}
-                >
-                  {issueSaveLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />}
-                  Issue Certificate
-                </Button>
+          {previewPayload && previewOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+              <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                  <h2 className="text-sm font-bold text-slate-950">Certificate Preview</h2>
+                  <Button type="button" size="icon-sm" variant="ghost" onClick={() => setPreviewOpen(false)} aria-label="Close certificate preview">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="overflow-auto bg-slate-50 p-4">
+                  <div
+                    className="mx-auto min-w-[760px] max-w-[980px] bg-white p-4 shadow-sm"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewPayload.html, { document: true }) }}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-4 py-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => openCertificatePrintWindow('Student Certificate Preview', previewPayload.html)}
+                  >
+                    <Printer className="h-4 w-4" />
+                    Print Preview
+                  </Button>
+                  <Button type="button" onClick={handleIssueCertificate} disabled={issueSaveLoading}>
+                    {issueSaveLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />}
+                    Issue Certificate
+                  </Button>
+                </div>
               </div>
-            )}
-          >
-            {previewPayload ? (
-              <div className="overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div
-                  className="mx-auto min-w-[760px] max-w-[980px] bg-white p-4 shadow-sm"
-                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewPayload.html, { document: true }) }}
-                />
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm text-slate-600">
-                Generate a preview to review the certificate.
-              </div>
-            )}
-          </SectionPanel>
+            </div>
+          )}
         </>
       ) : (
         <>
