@@ -119,6 +119,11 @@ export interface DeckImage {
    * like a drawn diagram does. The marks sit where the person put them, so the picture is reviewed before it is stored.
    */
   annotated?: boolean;
+  /**
+   * A story scene's picture with two to four parts a learner can open (each part is explained and tied to the scene). Same shape as the parts of a
+   * hotspots slide; each part is found on the picture itself by the picture check, never drawn from a guess. Absent when the picture has none.
+   */
+  hotspots?: HotspotSpot[] | null;
 }
 
 /** A prompt for the class to talk about, with a possible answer for the teacher. Never marked. */

@@ -20,7 +20,19 @@ import {
 import { assetUrl } from '@/lib/study-deck/deck';
 import { failedPictureLabel, imageAttemptKey, imageFailed, imageLoaded, INITIAL_IMAGE_LOAD, type ImageLoadState } from '@/lib/study-deck/imageLoad';
 import { containedRect, captionText, regionInBox, usableRegion } from '@/lib/study-deck/picture';
+import {
+  calloutSide,
+  closeStoryHotspot,
+  discoveredSummary,
+  initialStoryHotspots,
+  openStoryHotspot,
+  storyHotspotProgress,
+  storySpots,
+  type StoryHotspotState,
+} from '@/lib/study-deck/storyHotspots';
 import type { DeckImage, ScenarioInteraction } from '@/lib/study-deck/types';
+import { DeckPin } from './DeckPin';
+import { PartCallout } from './PartCallout';
 import { creditOf, PictureDialog, Tag, TONES, useRememberedReducer, useStage } from './stage-ui';
 
 export interface StoryViewProps {
@@ -317,7 +329,10 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(true);
   const box = useRef<HTMLSpanElement>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [size, setSize] = useState({ w: 0, h: 0, x: 0, y: 0 });
+  const wrap = useRef<HTMLDivElement>(null);
+  // Which parts of each picture have been opened (a picture with parts is explored like a hotspots slide).
+  const [explored, setExplored] = useState<Record<string, StoryHotspotState>>({});
   // How each picture of this scene has loaded: one retry of the same address after a failure, then a labelled frame (see lib/study-deck/imageLoad.ts).
   const [loads, setLoads] = useState<Record<string, ImageLoadState>>({});
   const main = images[Math.min(index, images.length - 1)];
@@ -330,7 +345,11 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
-    const read = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    const read = () => {
+      const b = el.getBoundingClientRect();
+      const w = wrap.current?.getBoundingClientRect();
+      setSize({ w: el.clientWidth, h: el.clientHeight, x: w ? b.left - w.left : 0, y: w ? b.top - w.top : 0 });
+    };
     read();
     const observer = new ResizeObserver(read);
     observer.observe(el);
@@ -339,10 +358,14 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
   }, [main.url]);
   const picture = containedRect(size.w, size.h, main.width, main.height);
   const mark = region !== null && shown && picture.width > 0 ? regionInBox(picture, region) : null;
+  const spots = load.status === 'failed' ? [] : storySpots(main);
+  const hstate = explored[main.url] ?? initialStoryHotspots();
+  const hprogress = storyHotspotProgress(spots, hstate);
+  const activeIndex = spots.findIndex((spot) => spot.id === hstate.active);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col gap-[0.4em]" data-testid="story-pictures">
-      <div className="relative flex min-h-0 flex-1">
+      <div ref={wrap} className="relative flex min-h-0 flex-1">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -396,6 +419,37 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
             View larger
           </span>
         </button>
+        {spots.length > 0 && picture.width > 0 ? (
+          <div
+            data-testid="story-hotspots"
+            className="pointer-events-none absolute z-10 [&_button]:pointer-events-auto"
+            style={{ left: size.x + picture.left, top: size.y + picture.top, width: picture.width, height: picture.height }}
+          >
+            {spots.map((spot, i) => (
+              <DeckPin
+                key={spot.id}
+                index={i}
+                x={(spot.pin ?? spot).x}
+                y={(spot.pin ?? spot).y}
+                name={`${spot.label}: open the explanation`}
+                selected={hstate.active === spot.id}
+                explored={hstate.opened.includes(spot.id)}
+                compact={picture.width < 360}
+                onSelect={() => setExplored((prev) => ({ ...prev, [main.url]: openStoryHotspot(prev[main.url] ?? initialStoryHotspots(), spots, spot.id) }))}
+              />
+            ))}
+            {activeIndex >= 0 ? (
+              <PartCallout
+                number={activeIndex + 1}
+                title={spots[activeIndex].label}
+                text={spots[activeIndex].text}
+                assetBase={assetBase}
+                placement={calloutSide(spots[activeIndex])}
+                onClose={() => setExplored((prev) => ({ ...prev, [main.url]: closeStoryHotspot(prev[main.url] ?? initialStoryHotspots()) }))}
+              />
+            ) : null}
+          </div>
+        ) : null}
         {region !== null ? (
           <button
             type="button"
@@ -411,6 +465,11 @@ function StoryPictures({ images, assetBase, portrait }: { images: DeckImage[]; a
       {caption ? (
         <p className="shrink-0 text-[0.72em] font-medium leading-snug text-slate-800" data-testid="story-caption">
           {caption}
+        </p>
+      ) : null}
+      {spots.length > 0 ? (
+        <p className="shrink-0 text-[0.68em] font-semibold text-sd-strong" data-testid="story-hotspot-progress" aria-live="polite">
+          {hprogress.done ? `${discoveredSummary(spots)} All ${hprogress.total} parts explored.` : `Explore the picture: ${hprogress.opened} of ${hprogress.total} parts opened. Select a numbered pin.`}
         </p>
       ) : null}
       <div className="flex shrink-0 items-center gap-[0.5em]">
