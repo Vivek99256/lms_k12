@@ -152,6 +152,20 @@ const TYPE_STYLES: Record<
     ring: 'ring-stone-300',
     icon: FileText,
   },
+  'Vocabulary cards': {
+    band: 'from-amber-100 via-amber-50/60 to-transparent',
+    chip: 'bg-amber-100 text-amber-800',
+    text: 'text-amber-700',
+    ring: 'ring-amber-200',
+    icon: GraduationCap,
+  },
+  'Flash cards': {
+    band: 'from-lime-100 via-lime-50/60 to-transparent',
+    chip: 'bg-lime-100 text-lime-800',
+    text: 'text-lime-700',
+    ring: 'ring-lime-200',
+    icon: Layers3,
+  },
   'Interactive': {
     band: 'from-cyan-100 via-cyan-50/60 to-transparent',
     chip: 'bg-cyan-100 text-cyan-700',

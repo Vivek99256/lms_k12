@@ -142,7 +142,7 @@ export function GenerationPanel({
       {run?.state === 'failed' && (
         <div className="mt-2">
           <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
-            The draft could not be completed. {run.error}
+            {run.error || 'The draft could not be completed. The generation service did not provide a reason.'}
           </p>
           <button type="button" disabled={busy} onClick={discard} className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50">
             Discard and start over

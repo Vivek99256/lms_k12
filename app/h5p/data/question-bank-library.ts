@@ -3,7 +3,7 @@
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { readApiJson, type H5pContext } from './h5p';
 import { getRequestContext } from '@/app/course-master/page';
-import type { H5pCoursePresentation, H5pMemoryGame, H5pSingleChoiceSet, H5pTrueFalse } from './h5p-content-types';
+import type { H5pCoursePresentation, H5pImageHotspots, H5pMemoryGame, H5pSingleChoiceSet, H5pTrueFalse } from './h5p-content-types';
 import type { H5pTextActivity } from './h5p';
 import {
   mapQuestionToPlayerPayload,
@@ -323,6 +323,7 @@ export type PlayableActivity =
   // Like Essay, the runtime shape IS the shape: a generated question has no
   // `h5p_drag_drop` row, so there is no table type to narrow it to.
   | { kind: 'drag_drop'; item: RuntimeDragDrop }
+  | { kind: 'image_hotspots'; item: H5pImageHotspots }
   | { kind: 'flashcards'; item: RuntimeFlashcards }
   | { kind: 'course_presentation'; item: H5pCoursePresentation }
   // The one member with no table behind it: H5P.Essay is not built here, so
@@ -383,6 +384,8 @@ function narrow(activity: RuntimeActivity): PlayableActivity {
       return { kind: activity.kind, item: activity.item };
     case 'drag_drop':
       return { kind: activity.kind, item: activity.item };
+    case 'image_hotspots':
+      return { kind: activity.kind, item: activity.item as unknown as H5pImageHotspots };
     case 'memory_game':
       return { kind: activity.kind, item: activity.item as unknown as H5pMemoryGame };
     case 'course_presentation':

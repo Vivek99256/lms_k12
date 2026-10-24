@@ -378,6 +378,8 @@ const CONTENT_LIBRARY_TABS = [
   'Lesson plan',
   'My course',
   'Interactive',
+  // A chapter's flashcard deck of key words (stored as one content_master row, category 'Vocabulary Cards').
+  'Vocabulary cards',
   // Merged into the chapter content list by the backend (like H5P), so it is counted
   // and filtered like every other type and also appears under 'All content'.
   'Prayogshala',
@@ -474,6 +476,8 @@ type ChapterContentType =
   | 'Lesson plan'
   | 'My course'
   | 'Interactive'
+  | 'Vocabulary cards'
+  | 'Flash cards'
   | 'Prayogshala';
 type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded' | 'Authored';
 
@@ -614,6 +618,10 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   if (contentCategory === 'lesson plan') return 'Lesson plan';
   if (contentCategory === 'my course') return 'My course';
   if (contentCategory === 'prayogshala') return 'Prayogshala';
+  if (contentCategory === 'vocabulary cards') return 'Vocabulary cards';
+  // lms_flashcard rows (one per key word) carry no content_category, only the 'Flash Cards' bucket they are
+  // listed under; without this they fell through to the 'Revision notes' default below.
+  if (normalizedCategory === 'flash cards') return 'Flash cards';
   // Authoritative for the same reason as the categories above: without it, a
   // Revision Notes row whose file_type is 'pdf' matches the 'pdf' substring
   // check below first and is mislabelled 'PDF' instead of 'Revision notes'.
@@ -922,6 +930,7 @@ function getChapterContentType(index: number): ChapterContentType {
 
 function getChapterContentPreview(type: ChapterContentType): ChapterContentPreview {
   if (type === 'Interactive') return 'video';
+  if (type === 'Vocabulary cards' || type === 'Flash cards') return 'activity';
   if (type === 'Video') return 'video';
   if (type === 'Revision notes') return 'notes';
   if (type === 'PDF') return 'pdf';
@@ -1091,6 +1100,8 @@ function contentMatchesTab(item: ChapterContentItem, tab: string): boolean {
       return item.type === 'Interactive';
     case 'Prayogshala':
       return item.type === 'Prayogshala';
+    case 'Vocabulary cards':
+      return item.type === 'Vocabulary cards';
     default:
       return true;
   }
@@ -1609,36 +1620,6 @@ export default function ChapterListPage() {
     };
   }, []);
 
-  const questionBankTypeOptions = useMemo(() => {
-    const present = new Map<string, number>();
-    questionBankItems.forEach((question) => {
-      const label = question.typeLabel;
-      if (label) present.set(label, (present.get(label) ?? 0) + 1);
-    });
-
-    const ordered: Array<{ label: string; count: number; publisher?: string | null }> = [];
-    const seen = new Set<string>();
-
-    // Catalog order first, so related forms stay grouped the way the
-    // blueprint lists them rather than alphabetically by accident.
-    questionTypeCatalog.forEach((entry) => {
-      if (!entry.label || seen.has(entry.label)) return;
-      const count = present.get(entry.label);
-      if (!count) return;
-      seen.add(entry.label);
-      ordered.push({ label: entry.label, count, publisher: entry.publisher });
-    });
-
-    // Anything on the page the catalog has never heard of still gets listed,
-    // otherwise those questions become unreachable through the filter.
-    present.forEach((count, label) => {
-      if (seen.has(label)) return;
-      ordered.push({ label, count });
-    });
-
-    return ordered;
-  }, [questionBankItems, questionTypeCatalog]);
-
   // Debounced so typing does not re-filter on every keystroke.
   useEffect(() => {
     const timer = setTimeout(() => setQuestionBankSearch(questionBankSearchInput.trim()), 300);
@@ -1701,6 +1682,100 @@ export default function ChapterListPage() {
     questionBankConceptFilter === 'all' || questionBankConceptOptions.includes(questionBankConceptFilter)
       ? questionBankConceptFilter
       : 'all';
+
+  const scopedQuestionsForTypeCounts = useMemo(() => {
+    return questionBankItems.filter((question) => {
+      const matchesChapter =
+        questionBankChapterFilter === 'all' || question.chapterId === questionBankChapterFilter;
+      const matchesConcept =
+        effectiveQuestionBankConceptFilter === 'all' ||
+        question.conceptTitle === effectiveQuestionBankConceptFilter;
+      const matchesBloom =
+        questionBankBloomFilter === 'all' || question.bloom === questionBankBloomFilter;
+      const matchesDifficulty =
+        questionBankDifficultyFilter === 'all' || question.difficulty === questionBankDifficultyFilter;
+      const matchesCategory =
+        questionBankCategoryFilter === 'all' || question.palCategory === questionBankCategoryFilter;
+      const matchesSource =
+        questionBankSourceFilter === 'all' || (question.source ?? 'ai_generated') === questionBankSourceFilter;
+      const matchesStatus =
+        questionBankStatusFilter === 'all' ||
+        (questionBankStatusFilter === 'held' ? question.status === 0 : question.status !== 0);
+      const matchesSearch =
+        questionBankSearch === '' ||
+        question.question.toLowerCase().includes(questionBankSearch.toLowerCase());
+
+      return (
+        matchesChapter &&
+        matchesConcept &&
+        matchesBloom &&
+        matchesDifficulty &&
+        matchesCategory &&
+        matchesSource &&
+        matchesStatus &&
+        matchesSearch
+      );
+    });
+  }, [
+    questionBankItems,
+    questionBankChapterFilter,
+    effectiveQuestionBankConceptFilter,
+    questionBankBloomFilter,
+    questionBankDifficultyFilter,
+    questionBankCategoryFilter,
+    questionBankSourceFilter,
+    questionBankStatusFilter,
+    questionBankSearch,
+  ]);
+
+  const questionBankTypeOptions = useMemo(() => {
+    const present = new Map<string, number>();
+    scopedQuestionsForTypeCounts.forEach((question) => {
+      const label = question.typeLabel;
+      if (label) present.set(label, (present.get(label) ?? 0) + 1);
+    });
+
+    const PREFERRED_FORMAT_ORDER = [
+      'Multiple Choice Question (MCQ)',
+      'Single Choice Set',
+      'True / False',
+      'Fill in the Blanks',
+      'Flash Cards',
+      'Drag and Drop',
+      'Drag the Words',
+      'Mark the Words',
+      'Match Following / Memory Game',
+      'Image Hotspots',
+    ];
+
+    const ordered: Array<{ label: string; count: number; publisher?: string | null }> = [];
+    const seen = new Set<string>();
+
+    PREFERRED_FORMAT_ORDER.forEach((preferredLabel) => {
+      const count = present.get(preferredLabel);
+      if (!count) return;
+      seen.add(preferredLabel);
+      const catEntry = questionTypeCatalog.find((e) => e.label === preferredLabel);
+      ordered.push({ label: preferredLabel, count, publisher: catEntry?.publisher });
+    });
+
+    // Catalog order next for any other forms
+    questionTypeCatalog.forEach((entry) => {
+      if (!entry.label || seen.has(entry.label)) return;
+      const count = present.get(entry.label);
+      if (!count) return;
+      seen.add(entry.label);
+      ordered.push({ label: entry.label, count, publisher: entry.publisher });
+    });
+
+    // Anything else present on the page
+    present.forEach((count, label) => {
+      if (seen.has(label)) return;
+      ordered.push({ label, count });
+    });
+
+    return ordered;
+  }, [scopedQuestionsForTypeCounts, questionTypeCatalog]);
   /**
    * The filter bar's contents, in the order a teacher narrows down: where the
    * question sits, then what kind it is, then where it came from.
@@ -2392,7 +2467,7 @@ export default function ChapterListPage() {
       // H5P carries no audience signal in any h5p_* table, and the tracker asks for it
       // to be reachable "inside Classroom Resource AND Teacher Resource". So it is shown
       // on both surfaces rather than being assigned an audience we cannot evidence.
-      const isAudienceNeutral = item.type === 'Interactive';
+      const isAudienceNeutral = item.type === 'Interactive' || item.type === 'Vocabulary cards' || item.type === 'Flash cards';
       const isTeacherTraining = isTeacherTrainingContent(item);
       // Teacher Workspace only ever shows Teacher Training content; Classroom
       // Resources never shows it.

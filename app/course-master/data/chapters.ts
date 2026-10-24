@@ -1,4 +1,4 @@
-﻿import { fetchLmsCourses, type ApiChapter, type LmsSubject } from './lmsCourses';
+import { fetchLmsCourses, type ApiChapter, type LmsSubject } from './lmsCourses';
 import { getRequestContext, getSyear } from '../page';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { buildSessionContext } from '@/lib/erp-client';
@@ -1222,6 +1222,9 @@ export interface QuestionBankApiQuestion {
   distractors?: string[] | null;
   /** Image-based Drag & Drop payload; null on every row that has none. Checked again by readDragDrop(). */
   drag_drop?: import('@/lib/h5p/question-bank-h5p-map').DragDropData | null;
+  hotspots?: Array<{ label: string; x: number; y: number; feedback?: string }> | null;
+  image_ref?: { file?: string; title?: string; source?: string; url?: string } | null;
+  interaction_settings?: Record<string, unknown> | null;
   correct_option?: string | null;
 }
 

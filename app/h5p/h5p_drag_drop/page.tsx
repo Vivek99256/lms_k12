@@ -86,6 +86,7 @@ function DragDropListContent() {
   const [isStudent, setIsStudent] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
+  const [source, setSource] = useState<'authored' | 'bank'>('authored');
 
   useEffect(() => {
     let cancelled = false;
@@ -264,20 +265,41 @@ function DragDropListContent() {
             <InlineBanner kind="success" message={success} onDismiss={() => setSuccess('')} />
             <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
 
-            {/*
-              No bank tab on this type, and the reason said out loud.
-
-              Every other H5P content type can ask questions straight out of
-              `lms_question_master`. This one cannot, and a page that simply
-              lacked the tab would read as an oversight. What is missing is
-              named instead — it is a gap in what the bank RECORDS, not in
-              this screen, and it is the thing that would have to change.
-            */}
-            <div className="mb-4">
-              <QuestionBankSource kind={null} unavailableReason={NO_BANK_SOURCE_REASON['h5p_drag_drop']} ctx={ctx} noun="drag and drop activity" />
+            <div
+              role="tablist"
+              aria-label="Drag and drop source"
+              className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1"
+            >
+              {(
+                [
+                  ['authored', `Built here`],
+                  ['bank', 'From the question bank'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={source === value}
+                  onClick={() => setSource(value)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    source === value
+                      ? 'bg-white text-slate-800 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            {loading ? (
+            {source === 'bank' ? (
+              <QuestionBankSource
+                kind="drag_drop"
+                ctx={ctx}
+                noun="drag and drop activity"
+              />
+            ) : loading ? (
               <LoadingState label="Loading activities…" />
             ) : tasks.length === 0 ? (
               <EmptyState
