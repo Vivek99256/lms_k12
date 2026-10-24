@@ -138,8 +138,9 @@ export function buildSessionContext(): SessionContext {
     return {
       baseUrl:
         ERP_BASE_URL_OVERRIDE ||
-        readString(firstValue('host_name', 'hostName')).replace(/\/$/, '') ||
-        API_BASE_URL.replace(/\/$/, ''),
+        (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+          ? API_BASE_URL.replace(/\/$/, '') || readString(firstValue('host_name', 'hostName')).replace(/\/$/, '')
+          : readString(firstValue('host_name', 'hostName')).replace(/\/$/, '') || API_BASE_URL.replace(/\/$/, '')),
       token: readString(
         firstValue('user_token', 'token')
       ),
@@ -149,7 +150,7 @@ export function buildSessionContext(): SessionContext {
       ),
       syear,
       userId: readString(
-        firstValue('user_id', 'userId')
+        firstValue('user_id', 'userId', 'id')
       ),
       termId: readString(
         normalizeNumericId(

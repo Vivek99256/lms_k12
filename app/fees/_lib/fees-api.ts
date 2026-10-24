@@ -158,7 +158,7 @@ export function getFeesSession(): FeesSession {
   return {
     token: readStoredValue(['user_token', 'token'], userData, menuContext),
     subInstituteId: readStoredValue(['sub_institute_id', 'subInstituteId'], userData, menuContext),
-    userId: readStoredValue(['user_id', 'userId'], userData, menuContext),
+    userId: readStoredValue(['user_id', 'userId', 'id'], userData, menuContext),
     academicYearId: normalizeAcademicYear(selectedAcademicYear || readStoredValue(['academic_year_id', 'academicYearId'], userData, menuContext)),
     hostName: readStoredValue(['host_name', 'hostName'], userData, menuContext) || API_BASE_URL,
     termId: readStoredValue(['term_id', 'marking_period_id', 'academic_term_id', 'termId', 'markingPeriodId', 'academicTermId'], userData, menuContext),

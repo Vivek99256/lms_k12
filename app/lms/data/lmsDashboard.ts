@@ -213,14 +213,19 @@ export async function fetchLmsDashboard(
   url.searchParams.set('type', 'API');
   url.searchParams.set('sub_institute_id', session.subInstituteId);
   url.searchParams.set('syear', session.syear);
-  url.searchParams.set('user_id', request.userId);
+  if (session.termId) url.searchParams.set('term_id', session.termId);
+  url.searchParams.set('user_id', request.userId || session.userId);
   url.searchParams.set('user_profile', request.userProfile);
 
   const res = await fetch(url.toString(), {
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`Couldn’t load the dashboard. Try again.`);
+  if (!res.ok) {
+    const errorRecord = toRecord(await res.json().catch(() => ({})));
+    const msg = readString(errorRecord.message);
+    throw new Error(msg || `Couldn’t load the dashboard. Try again.`);
+  }
   const raw = toRecord(await readJson(res, 'Couldn’t load the dashboard'));
 
   const studentRecord = toRecord(raw.studentData);
