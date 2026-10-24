@@ -57,6 +57,7 @@ test('every catalogue form the brief lists has a mapping', () => {
     'drag_text', 'mark_the_words',
     // Image-based drag and drop: the picture and its zones travel in the row.
     'drag_drop',
+    'image_hotspots',
   ];
 
   for (const code of expected) {

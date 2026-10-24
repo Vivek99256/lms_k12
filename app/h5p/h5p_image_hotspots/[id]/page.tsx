@@ -142,7 +142,21 @@ function Popup({
  * attempt state belongs to the thing being attempted, and remounting it (a new
  * `key`) is how a clean attempt would be forced if that is ever wanted.
  */
-function HotspotActivity({ item, ctx }: { item: H5pImageHotspots; ctx: H5pContext }) {
+export function HotspotActivity({
+  item,
+  ctx,
+  onResult,
+}: {
+  item: H5pImageHotspots;
+  ctx: H5pContext;
+  onResult?: (result: {
+    score: number;
+    maxScore: number;
+    passed: boolean;
+    durationSeconds: number;
+    response: string;
+  }) => void;
+}) {
   // Memoised rather than derived inline: `item.points ?? []` is a new array
   // identity on every render when an item has no hotspots, which would
   // rebuild the `open` callback below on every render.
@@ -214,9 +228,17 @@ function HotspotActivity({ item, ctx }: { item: H5pImageHotspots; ctx: H5pContex
           response: `${covered.openedCount}/${covered.hotspotCount} hotspots`,
           durationSeconds: (Date.now() - startedAt.current) / 1000,
         });
+
+        onResult?.({
+          score: covered.score,
+          maxScore: covered.maxScore,
+          passed: covered.passed,
+          durationSeconds: Math.round((Date.now() - startedAt.current) / 1000),
+          response: `${covered.openedCount}/${covered.hotspotCount} hotspots`,
+        });
       }
     },
-    [item, ctx, opened, showing, points]
+    [item, ctx, opened, showing, points, onResult]
   );
 
   const reset = useCallback(() => {

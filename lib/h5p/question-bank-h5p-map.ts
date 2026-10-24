@@ -94,6 +94,9 @@ export interface BankQuestion {
    * `drag_drop`; null / absent on every other row. Geometry is percent of the image.
    */
   drag_drop?: DragDropData | null;
+  hotspots?: Array<{ label: string; x: number; y: number; feedback?: string }> | null;
+  image_ref?: { file?: string; title?: string; source?: string; url?: string } | null;
+  interaction_settings?: Record<string, unknown> | null;
 }
 
 /** A place on the picture a label can be dropped. x / y / width / height are percent of the image. */
@@ -144,7 +147,8 @@ export type H5pTargetKind =
   | 'flashcards'
   | 'course_presentation'
   | 'essay'
-  | 'drag_drop';
+  | 'drag_drop'
+  | 'image_hotspots';
 
 export interface H5pTarget {
   kind: H5pTargetKind;
@@ -207,6 +211,13 @@ export const H5P_TARGETS: Record<H5pTargetKind, H5pTarget> = {
     route: 'h5p_drag_drop',
     library: 'H5P.DragQuestion',
     label: 'Drag and drop',
+  },
+
+  image_hotspots: {
+    kind: 'image_hotspots',
+    route: 'h5p_image_hotspots',
+    library: 'H5P.ImageHotspots',
+    label: 'Image hotspots',
   },
 
   memory_game: {
@@ -344,6 +355,9 @@ export const MAPPINGS: TypeMapping[] = [
   // BankQuestion.drag_drop), which is what the bank was previously missing.
   mapping('drag_drop', 'Drag and drop', ['H5P.DragQuestion'], 'drag_drop', true, ''),
 
+  mapping('image_hotspots', 'Image hotspots', ['H5P.ImageHotspots'], 'image_hotspots', true, '',
+    ['flashcards', 'course_presentation']),
+
   // The three text-passage types are one table and one player apart from the
   // `content_type` discriminator, so a row that fills a blank also drags the
   // word into it and marks it in the sentence -- same question, same answer
@@ -353,7 +367,7 @@ export const MAPPINGS: TypeMapping[] = [
 
   mapping('match_following', 'Match the following', ['H5P.DragQuestion', 'H5P.MemoryGame'], 'memory_game', true,
     'Drag question needs drop-zone coordinates, which the bank does not store. Memory game pairs the same two columns and needs no geometry.',
-    ['flashcards', 'drag_text', 'course_presentation']),
+    ['flashcards', 'course_presentation']),
 
   mapping('assertion_reason', 'Assertion & reason', ['H5P.QuestionSet'], 'single_choice_set', false,
     'H5P.QuestionSet is not built here. Single choice set carries the assertion and the reason in one stem, with the stored verdicts as its options.',
@@ -606,10 +620,33 @@ export function convertibilityAs(question: BankQuestion, kind: H5pTargetKind): C
         : flashcardSides(question).front === ''
           ? { ok: false, reason: 'The question text is empty, so the card would have a blank front.' }
           : READY;
-    case 'drag_drop':
-      return readDragDrop(question.drag_drop) === null
-        ? { ok: false, reason: 'The picture, its drop zones or the answer key are missing or do not fit the picture, so the activity could not be played or marked.' }
-        : READY;
+    case 'drag_drop': {
+      if (readDragDrop(question.drag_drop) !== null) return READY;
+      if (question.interaction_settings?.mode === 'categorize') {
+        const settings = question.interaction_settings as { items?: unknown[]; targets?: unknown[] };
+        if (Array.isArray(settings.items) && settings.items.length >= 2 && Array.isArray(settings.targets) && settings.targets.length >= 2) {
+          return READY;
+        }
+      }
+      if (matchPairs(question).length >= 2) {
+        return READY;
+      }
+      return {
+        ok: false,
+        reason: 'The picture, its drop zones or the answer key are missing or do not fit the picture, so the activity could not be played or marked.',
+      };
+    }
+    case 'image_hotspots': {
+      const hotspots = question.hotspots ?? (question.interaction_settings?.hotspots as unknown[]);
+      const imageUrl = question.image_ref?.url;
+      if (!Array.isArray(hotspots) || hotspots.length === 0) {
+        return { ok: false, reason: 'No hotspots are recorded on this question.' };
+      }
+      if (!imageUrl || typeof imageUrl !== 'string' || !/^(https?:\/\/|data:image\/)/i.test(imageUrl)) {
+        return { ok: false, reason: 'No background image URL is recorded on this question.' };
+      }
+      return READY;
+    }
     case 'memory_game':
       return matchPairs(question).length < 2
         ? { ok: false, reason: 'Fewer than two pairs could be read from the question, so there is nothing to match.' }
@@ -778,11 +815,31 @@ export interface BlanksPassage {
 export function blanksPassage(question: BankQuestion): BlanksPassage {
   const stem = plainText(question.question);
 
-  const stored =
-    plainText(question.model_answer) ||
-    correctOptions(question)
+  let stored = plainText(question.model_answer);
+  if (stored.startsWith('{') && stored.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (typeof parsed.expected_response === 'string' && parsed.expected_response.trim() !== '') {
+        stored = parsed.expected_response;
+      } else if (parsed.interaction_settings?.blanks && typeof parsed.interaction_settings.blanks === 'object') {
+        stored = Object.values(parsed.interaction_settings.blanks).join('; ');
+      } else {
+        stored = '';
+      }
+    } catch {
+      // keep stored
+    }
+  }
+
+  if (!stored && question.interaction_settings?.blanks && typeof question.interaction_settings.blanks === 'object') {
+    stored = Object.values(question.interaction_settings.blanks).join('; ');
+  }
+
+  if (!stored) {
+    stored = correctOptions(question)
       .map((option) => plainText(option.text))
       .join('; ');
+  }
 
   const answers = stored
     .split(/\s*[;|]\s*/)
@@ -791,9 +848,8 @@ export function blanksPassage(question: BankQuestion): BlanksPassage {
 
   if (answers.length === 0) return { passage: escapeAsterisks(stem), slots: 0, inline: false };
 
-  // A run of three or more underscores, dots or dashes is how this bank draws a
-  // blank. Two would match ordinary punctuation and an em dash in prose.
-  const blankPattern = /(_{3,}|\.{3,}|-{3,})/g;
+  // A run of two or more underscores, dots or dashes, or [[n]] placeholder
+  const blankPattern = /(_{2,}|\.{3,}|-{3,}|\[\[\d+\]\])/g;
   const drawn = stem.match(blankPattern)?.length ?? 0;
 
   if (drawn === 0 && mappingForQuestion(question)?.code === 'mark_the_words') {
@@ -846,7 +902,7 @@ export function readDragDrop(value: unknown): DragDropData | null {
   const v = value as Record<string, unknown>;
 
   const image = v.image as Record<string, unknown> | undefined;
-  if (!image || typeof image.url !== 'string' || !/^https?:\/\//i.test(image.url)) return null;
+  if (!image || typeof image.url !== 'string' || !/^(https?:\/\/|data:image\/)/i.test(image.url)) return null;
   const w = image.width_px;
   const h = image.height_px;
   if (typeof w !== 'number' || typeof h !== 'number' || w < DD_LIMITS.minW || h < DD_LIMITS.minH) return null;
@@ -965,56 +1021,293 @@ export interface DragDropPlayerPayload {
   enable_show_solution: boolean;
 }
 
-export function toDragDropPayload(question: BankQuestion, context?: string): DragDropPlayerPayload | null {
-  const data = readDragDrop(question.drag_drop);
-  if (!data) return null;
+function buildCategorizeDragDropPayload(question: BankQuestion, context?: string): DragDropPlayerPayload | null {
+  const settings = question.interaction_settings as {
+    mode?: string;
+    items?: string[];
+    targets?: string[];
+    correct?: Record<string, string>;
+  };
+  const items = Array.isArray(settings?.items) ? settings.items : [];
+  const targets = Array.isArray(settings?.targets) ? settings.targets : [];
+  const correct = settings?.correct && typeof settings.correct === 'object' ? settings.correct : {};
 
-  const zoneNumber = new Map(data.zones.map((zone, index) => [zone.id, index + 1]));
-  const elementNumber = new Map(data.elements.map((element, index) => [element.id, index + 1]));
+  if (items.length < 2 || targets.length < 2) return null;
 
-  const attribution =
-    data.image.attribution ??
-    ([data.image.creator, data.image.licence].filter(Boolean).join(' — ') || null);
+  const canvasWidth = 800;
+  const canvasHeight = 500;
+  const bgSvg = `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}"><rect width="${canvasWidth}" height="${canvasHeight}" fill="#f8fafc" rx="16"/><rect x="20" y="20" width="${canvasWidth - 40}" height="${canvasHeight - 40}" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" rx="12"/></svg>`
+  )}`;
+
+  const numTargets = targets.length;
+  const zoneWidth = Math.min(40, Math.floor(84 / numTargets));
+  const spacing = numTargets > 1 ? (84 - zoneWidth * numTargets) / (numTargets - 1) : 0;
+
+  const elements = items.map((item, index) => ({
+    id: index + 1,
+    element_type: 'text' as const,
+    text: item,
+    image_path: null,
+    image_alt: null,
+    multiple: false,
+    drop_zone_ids: [],
+  }));
+
+  const itemToId = new Map(items.map((item, index) => [item, index + 1]));
+
+  const zones = targets.map((target, index) => {
+    const x = 8 + index * (zoneWidth + spacing);
+    const y = 25;
+    const correctElements = Object.entries(correct)
+      .filter(([, tgt]) => tgt === target)
+      .map(([itm]) => itemToId.get(itm))
+      .filter((id): id is number => id !== undefined);
+
+    return {
+      id: index + 1,
+      label: target,
+      position_x: Math.round(x * 10) / 10,
+      position_y: y,
+      width: zoneWidth,
+      height: 50,
+      correct_element_ids: correctElements,
+      single: false,
+      show_label: true,
+      tip: null,
+    };
+  });
 
   return {
-    title: activityTitle(question, `Label the diagram ${question.id}`),
+    title: activityTitle(question, `Drag and drop ${question.id}`),
     description: sourceDescription([question.id], context),
-    task_description: 'Drag each label onto the matching part of the picture.',
-    background_image: data.image.url,
-    image_alt: data.image.alt ?? '',
-    image_fit: data.image_fit ?? 'contain',
-    canvas_width: data.image.width_px,
-    canvas_height: data.image.height_px,
-    zones: data.zones.map((zone) => ({
-      id: zoneNumber.get(zone.id) as number,
-      label: zone.label,
-      position_x: zone.x,
-      position_y: zone.y,
-      width: zone.width,
-      height: zone.height,
-      correct_element_ids: data.elements
-        .filter((element) => element.zone_ids.includes(zone.id))
-        .map((element) => elementNumber.get(element.id) as number),
-      single: true,
-      show_label: false,
-      tip: null,
-    })),
-    elements: data.elements.map((element) => ({
-      id: elementNumber.get(element.id) as number,
-      element_type: 'text' as const,
-      text: element.text,
-      image_path: null,
-      image_alt: null,
-      multiple: false,
-      drop_zone_ids: [],
-    })),
-    attribution,
+    task_description: plainText(question.question) || 'Drag each item into the correct category.',
+    background_image: bgSvg,
+    image_alt: 'Categorize activity background',
+    image_fit: 'contain',
+    canvas_width: canvasWidth,
+    canvas_height: canvasHeight,
+    zones,
+    elements,
+    attribution: null,
     pass_percentage: 100,
     apply_penalties: false,
     single_point: false,
     enable_check: true,
     enable_retry: true,
     enable_show_solution: true,
+  };
+}
+
+function buildMatchingDragDropPayload(question: BankQuestion, pairs: MatchPair[], context?: string): DragDropPlayerPayload | null {
+  if (pairs.length < 2) return null;
+
+  const canvasWidth = 800;
+  const canvasHeight = 500;
+  const bgSvg = `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}"><rect width="${canvasWidth}" height="${canvasHeight}" fill="#f8fafc" rx="16"/><rect x="20" y="20" width="${canvasWidth - 40}" height="${canvasHeight - 40}" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" rx="12"/></svg>`
+  )}`;
+
+  const numPairs = Math.min(pairs.length, 6);
+  const activePairs = pairs.slice(0, numPairs);
+  const zoneHeight = Math.min(20, Math.floor(75 / numPairs));
+  const spacing = numPairs > 1 ? (75 - zoneHeight * numPairs) / (numPairs - 1) : 0;
+
+  const zones = activePairs.map((pair, index) => ({
+    id: index + 1,
+    label: pair.right,
+    position_x: 55,
+    position_y: 12 + index * (zoneHeight + spacing),
+    width: 38,
+    height: zoneHeight,
+    correct_element_ids: [index + 1],
+    single: true,
+    show_label: true,
+    tip: null,
+  }));
+
+  const elements = activePairs.map((pair, index) => ({
+    id: index + 1,
+    element_type: 'text' as const,
+    text: pair.left,
+    image_path: null,
+    image_alt: null,
+    multiple: false,
+    drop_zone_ids: [],
+  }));
+
+  return {
+    title: activityTitle(question, `Match and drop ${question.id}`),
+    description: sourceDescription([question.id], context),
+    task_description: plainText(question.question) || 'Drag each item onto its matching pair.',
+    background_image: bgSvg,
+    image_alt: 'Match activity background',
+    image_fit: 'contain',
+    canvas_width: canvasWidth,
+    canvas_height: canvasHeight,
+    zones,
+    elements,
+    attribution: null,
+    pass_percentage: 100,
+    apply_penalties: false,
+    single_point: false,
+    enable_check: true,
+    enable_retry: true,
+    enable_show_solution: true,
+  };
+}
+
+export function toDragDropPayload(question: BankQuestion, context?: string): DragDropPlayerPayload | null {
+  const data = readDragDrop(question.drag_drop);
+  if (data) {
+    const zoneNumber = new Map(data.zones.map((zone, index) => [zone.id, index + 1]));
+    const elementNumber = new Map(data.elements.map((element, index) => [element.id, index + 1]));
+
+    const attribution =
+      data.image.attribution ??
+      ([data.image.creator, data.image.licence].filter(Boolean).join(' — ') || null);
+
+    return {
+      title: activityTitle(question, `Label the diagram ${question.id}`),
+      description: sourceDescription([question.id], context),
+      task_description: 'Drag each label onto the matching part of the picture.',
+      background_image: data.image.url,
+      image_alt: data.image.alt ?? '',
+      image_fit: data.image_fit ?? 'contain',
+      canvas_width: data.image.width_px,
+      canvas_height: data.image.height_px,
+      zones: data.zones.map((zone) => ({
+        id: zoneNumber.get(zone.id) as number,
+        label: zone.label,
+        position_x: zone.x,
+        position_y: zone.y,
+        width: zone.width,
+        height: zone.height,
+        correct_element_ids: data.elements
+          .filter((element) => element.zone_ids.includes(zone.id))
+          .map((element) => elementNumber.get(element.id) as number),
+        single: true,
+        show_label: false,
+        tip: null,
+      })),
+      elements: data.elements.map((element) => ({
+        id: elementNumber.get(element.id) as number,
+        element_type: 'text' as const,
+        text: element.text,
+        image_path: null,
+        image_alt: null,
+        multiple: false,
+        drop_zone_ids: [],
+      })),
+      attribution,
+      pass_percentage: 100,
+      apply_penalties: false,
+      single_point: false,
+      enable_check: true,
+      enable_retry: true,
+      enable_show_solution: true,
+    };
+  }
+
+  if (question.interaction_settings?.mode === 'categorize') {
+    return buildCategorizeDragDropPayload(question, context);
+  }
+
+  const pairs = matchPairs(question);
+  if (pairs.length >= 2) {
+    return buildMatchingDragDropPayload(question, pairs, context);
+  }
+
+  return null;
+}
+
+export interface ImageHotspotsPlayerPayload {
+  title: string;
+  description: string;
+  task_description: string;
+  background_image: string;
+  background_alt: string;
+  image_width: number | null;
+  image_height: number | null;
+  default_icon: string;
+  default_icon_color: string;
+  show_hotspot_numbers: boolean;
+  points_per_hotspot: number;
+  pass_percentage: number;
+  enable_retry: boolean;
+  single_popup_open: boolean;
+  points: Array<{
+    id: number;
+    image_hotspots_id: number;
+    position_x: number;
+    position_y: number;
+    header: string;
+    popup_type: string;
+    body_text: string;
+    popup_image: string | null;
+    popup_image_alt: string | null;
+    icon_name: string | null;
+    icon_color: string | null;
+    icon_image: string | null;
+    tooltip: string | null;
+    aria_label: string | null;
+    popup_width: number;
+    sort_order: number;
+  }>;
+}
+
+export function toImageHotspotsPayload(question: BankQuestion, context?: string): ImageHotspotsPlayerPayload | null {
+  const hotspots = question.hotspots ?? (question.interaction_settings?.hotspots as unknown[]);
+  if (!Array.isArray(hotspots) || hotspots.length === 0) return null;
+
+  const imageUrl = question.image_ref?.url;
+  if (!imageUrl || typeof imageUrl !== 'string') return null;
+
+  const points = hotspots.map((hs, index) => {
+    const raw = (hs && typeof hs === 'object' ? hs : {}) as Record<string, unknown>;
+    const rawX = typeof raw.x === 'number' ? raw.x : 0.5;
+    const rawY = typeof raw.y === 'number' ? raw.y : 0.5;
+    const x = rawX <= 1 ? rawX * 100 : rawX;
+    const y = rawY <= 1 ? rawY * 100 : rawY;
+    const label = typeof raw.label === 'string' ? raw.label : `Point ${index + 1}`;
+    const feedback = typeof raw.feedback === 'string' ? raw.feedback : label;
+
+    return {
+      id: index + 1,
+      image_hotspots_id: -question.id,
+      position_x: Math.round(x * 100) / 100,
+      position_y: Math.round(y * 100) / 100,
+      header: label,
+      popup_type: 'text',
+      body_text: feedback,
+      popup_image: null,
+      popup_image_alt: null,
+      icon_name: 'info',
+      icon_color: '#2563eb',
+      icon_image: null,
+      tooltip: label,
+      aria_label: label,
+      popup_width: 40,
+      sort_order: index + 1,
+    };
+  });
+
+  return {
+    title: activityTitle(question, `Hotspots ${question.id}`),
+    description: sourceDescription([question.id], context),
+    task_description: plainText(question.question) || 'Tap the hotspots to learn more.',
+    background_image: imageUrl,
+    background_alt: question.image_ref?.title ?? '',
+    image_width: 800,
+    image_height: 500,
+    default_icon: 'info',
+    default_icon_color: '#2563eb',
+    show_hotspot_numbers: true,
+    points_per_hotspot: 1,
+    pass_percentage: 100,
+    enable_retry: true,
+    single_popup_open: true,
+    points,
   };
 }
 
@@ -1036,6 +1329,12 @@ export function readPairs(value: unknown): MatchPair[] | null {
 
   const pairs = value
     .map((entry) => {
+      if (Array.isArray(entry)) {
+        return {
+          left: typeof entry[0] === 'string' ? entry[0].trim() : '',
+          right: typeof entry[1] === 'string' ? entry[1].trim() : '',
+        };
+      }
       const record = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
       return {
         left: typeof record.left === 'string' ? record.left.trim() : '',
@@ -1055,15 +1354,12 @@ export function readPairs(value: unknown): MatchPair[] | null {
  * or options that carry both halves as `left - right`.
  */
 export function matchPairs(question: BankQuestion): MatchPair[] {
-  // 0. Structured pairs, when the row has them. These are the source of truth: the
-  // text forms below are split on "-", ":", "=" and the dashes, so a half such as
-  // "x-axis" or "a:b" cannot survive them. A row with fewer than two usable pairs
-  // is treated as having none, and falls through to the text forms.
-  const structured = (question.pairs ?? [])
-    .map((pair) => ({ left: plainText(pair?.left), right: plainText(pair?.right) }))
-    .filter((pair) => pair.left !== '' && pair.right !== '' && pair.left !== pair.right);
-
-  if (structured.length >= 2) return structured;
+  // 0. Structured pairs, when the row has them.
+  const rawPairs = question.pairs ?? (question.interaction_settings?.pairs as unknown);
+  const parsed = readPairs(rawPairs);
+  if (parsed && parsed.length >= 2) {
+    return parsed.map((p) => ({ left: plainText(p.left), right: plainText(p.right) }));
+  }
 
   const options = question.options ?? [];
   const byLabel = new Map(
