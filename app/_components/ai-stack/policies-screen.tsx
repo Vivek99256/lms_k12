@@ -316,7 +316,7 @@ export function AiStackPoliciesScreen({ module }: { module: AiStackModule }) {
 
       <OperatorRightsPanel module={module} />
 
-      {!canSave && !loading && (
+      {!canSave && !loading && !error && (
         <AiStackError>
           {module.label} has no row in <span className="font-mono">ai_modules</span> for this institute, so a policy
           cannot be scoped to it. An administrator needs to register the {module.label} module before policies can be
@@ -324,7 +324,7 @@ export function AiStackPoliciesScreen({ module }: { module: AiStackModule }) {
         </AiStackError>
       )}
 
-      {rows.length === 0 && !loading ? (
+      {rows.length === 0 && !loading && !error ? (
         <AiStackEmpty
           icon={ShieldCheck}
           title={`No ${module.label} AI policies yet`}

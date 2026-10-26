@@ -301,14 +301,14 @@ export function StudentsPoliciesScreen() {
 
       <OperatorRightsPanel />
 
-      {!canSave && !loading && (
+      {!canSave && !loading && !error && (
         <AiStackError>
           Students has no row in <span className="font-mono">ai_modules</span> for this institute, so a policy cannot
           be scoped to it. An administrator needs to register the Student module before policies can be saved here.
         </AiStackError>
       )}
 
-      {rows.length === 0 && !loading ? (
+      {rows.length === 0 && !loading && !error ? (
         <AiStackEmpty
           icon={ShieldCheck}
           title="No Student AI policies yet"
