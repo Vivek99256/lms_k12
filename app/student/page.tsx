@@ -211,6 +211,8 @@ type StudentContentItem = {
    * opens in place in the document viewer instead of in a new tab.
    */
   studyDocKind: DocumentKind | null;
+  /** An interactive classroom activity opens in its own player route. Only ever one of our own routes. */
+  deepLink: string | null;
 };
 
 const CONTENT_TABS: Array<{ key: StudentContentTypeKey; label: string }> = [
@@ -623,6 +625,7 @@ function normalizeChapterContent(
         updatedLabel: formatUpdatedLabel(asset.updated_at ?? asset.created_at),
         url,
         studyDocKind: documentKindOf(asset),
+        deepLink: readString(asset.deep_link).startsWith('/student/classroom-activity/') ? readString(asset.deep_link) : null,
         actionLabel: contentType.key === 'video' ? 'Play' : 'Open',
       };
     })
@@ -1182,6 +1185,10 @@ export default function StudentPage() {
     // A study document is a PDF with an online practice beside it, and opens in place over this page: no route, no new tab.
     if (item.studyDocKind) {
       setOpenDocument({ chapterId: item.chapterId, contentId: item.id, title: item.title, kind: item.studyDocKind });
+      return;
+    }
+    if (item.deepLink) {
+      router.push(item.deepLink);
       return;
     }
     if (!item.url) return;

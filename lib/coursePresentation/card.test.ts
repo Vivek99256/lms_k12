@@ -29,7 +29,7 @@ test('a Prayogshala card never opens the new workflow', () => {
 });
 
 test('other card types and other chapters keep the default route', () => {
-  for (const type of ['Revision notes', 'Classroom activity', 'Remedial class', 'Video', 'Worksheet', 'Interactive']) {
+  for (const type of ['Revision notes', 'Classroom activity', 'Remedial class', 'Video', 'Worksheet', 'Interactive', 'Educational Posters']) {
     assert.equal(routeCardOpen({ id: '1', type, chapterId: '8592' }, 'classroom'), 'default', type);
   }
   // A stored presentation, story lesson or poster is its own item: it opens as it always did (a stored deck straight to its own

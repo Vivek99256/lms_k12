@@ -598,11 +598,30 @@ export interface ChapterContentAsset {
   /** Canonical URL of a study deck's classroom PDF. Only present when the PDF is really stored. */
   pdf_url?: string;
   /**
+   * Set by the server on a stored study deck (Classroom Presentation or branching scenario), read from the item's own file
+   * name and from the run that stored it. A value the server cannot tell is null; see lib/coursePresentation/resourceCard.
+   */
+  content_id?: number | null;
+  teaching_method?: string | null;
+  teaching_method_label?: string | null;
+  teaching_method_short?: string | null;
+  content_format?: string | null;
+  content_format_label?: string | null;
+  generation_status?: string | null;
+  generation_run_id?: string | null;
+  /**
    * Set by the server on a study document: revision notes, a remedial class or classroom activities written by the study
    * pipeline, whose PDF is the primary file and which open in place with an online practice (see lib/study-document).
    * Absent on every other row, and never guessed from a title or a category.
    */
   study_doc_kind?: 'revision_notes' | 'remedial' | 'activities' | null;
+  /**
+   * Set by the server on an interactive classroom activity (a stored task card with steps and a worksheet): the printed
+   * activity code ("A1") and how many steps it has. Its deep_link opens the activity player. Absent on every other row,
+   * including the PDF task cards filed under the same category.
+   */
+  activity_code?: string;
+  activity_steps?: number;
 }
 
 /**
