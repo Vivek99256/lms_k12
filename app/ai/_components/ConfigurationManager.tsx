@@ -28,17 +28,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowDown,
   ArrowUp,
   Check,
+  Cpu,
   Loader2,
   Pencil,
   Plus,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   X,
+  Zap,
 } from 'lucide-react';
 
 import {
@@ -608,20 +612,85 @@ function ConfigurationForm({
             disabled={!form.provider || !provider}
             className={selectClass}
           >
-            <option value="">{form.provider ? 'Provider default (best fit)' : 'Select a provider first'}</option>
+            <option value="">{form.provider ? 'Provider default (recommended flagship model)' : 'Select a provider first'}</option>
             {models.map((m) => (
               <option key={m.id} value={m.model_id} disabled={!m.compatible}>
                 {m.label} ({m.model_id}){m.compatible ? (m.verified ? ' — confirmed by provider' : '') : ' — does not fit'}
               </option>
             ))}
           </select>
-          {chosenModel && (
+          {chosenModel ? (
+            <div className="mt-3 rounded-lg border border-border/80 bg-muted/30 p-3.5 text-xs space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-border/60">
+                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <Cpu className="size-3.5 text-primary" />
+                  {chosenModel.label}
+                  <span className="font-mono text-[11px] text-muted-foreground font-normal">({chosenModel.model_id})</span>
+                </span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {chosenModel.verified ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                      <Check className="size-3" /> Confirmed
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                      Registry
+                    </span>
+                  )}
+                  {chosenModel.context_tokens && (
+                    <span className="rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground border border-border/50">
+                      {chosenModel.context_tokens >= 1000000 ? `${(chosenModel.context_tokens / 1000000).toFixed(1)}M` : `${Math.round(chosenModel.context_tokens / 1000)}k`} context
+                    </span>
+                  )}
+                  {chosenModel.max_output_tokens && (
+                    <span className="rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground border border-border/50">
+                      {chosenModel.max_output_tokens >= 1000 ? `${Math.round(chosenModel.max_output_tokens / 1000)}k` : chosenModel.max_output_tokens} out
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {chosenModel.description && (
+                <p className="text-muted-foreground leading-relaxed">{chosenModel.description}</p>
+              )}
+
+              <div className="grid gap-2 sm:grid-cols-2 pt-1 text-[11px]">
+                {chosenModel.best_for && (
+                  <div className="space-y-0.5">
+                    <span className="font-medium text-foreground flex items-center gap-1">
+                      <Sparkles className="size-3 text-amber-500" /> Best Suited For
+                    </span>
+                    <p className="text-muted-foreground">{chosenModel.best_for}</p>
+                  </div>
+                )}
+                {chosenModel.strengths && (
+                  <div className="space-y-0.5">
+                    <span className="font-medium text-foreground flex items-center gap-1">
+                      <Zap className="size-3 text-blue-500" /> Strengths & Capabilities
+                    </span>
+                    <p className="text-muted-foreground">{chosenModel.strengths}</p>
+                  </div>
+                )}
+              </div>
+
+              {chosenModel.limitations ? (
+                <div className="pt-1.5 border-t border-border/40 text-[11px]">
+                  <span className="font-medium text-foreground flex items-center gap-1">
+                    <AlertCircle className="size-3 text-amber-600 dark:text-amber-400" /> Limitations & Constraints
+                  </span>
+                  <p className="text-muted-foreground mt-0.5">{chosenModel.limitations}</p>
+                </div>
+              ) : chosenModel.context_tokens ? (
+                <div className="pt-1 border-t border-border/40 text-[11px] text-muted-foreground">
+                  Context constraint: max {chosenModel.context_tokens.toLocaleString()} tokens per interaction.
+                </div>
+              ) : null}
+            </div>
+          ) : form.provider ? (
             <p className="mt-1.5 text-xs text-muted-foreground">
-              {chosenModel.max_output_tokens ? `Up to ${chosenModel.max_output_tokens.toLocaleString()} output tokens` : 'Output limit not published'}
-              {chosenModel.context_tokens ? ` · ${chosenModel.context_tokens.toLocaleString()}-token context` : ''}
-              {chosenModel.verified ? '' : ' · not yet confirmed with the provider'}
+              Provider default automatically uses the provider’s recommended flagship model for this module. Select a specific model above to view its capabilities.
             </p>
-          )}
+          ) : null}
           {provider && models.some((m) => !m.compatible) && (
             <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
               {models

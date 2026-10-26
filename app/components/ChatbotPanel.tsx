@@ -6,16 +6,22 @@ import {
   AlertCircle,
   Bot as BotIcon,
   ChevronLeft,
+  Headphones,
   Loader2,
   Mic,
   Send,
+  ShieldCheck,
   Square,
   SquarePen,
   User,
+  Video,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { useLiveAdminChat } from '@/hooks/use-live-admin-chat';
+import { LiveAdminChatView } from '@/components/live-chat/LiveAdminChatView';
+import { AdminSupportQueue } from '@/components/live-chat/AdminSupportQueue';
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
@@ -257,6 +263,8 @@ export default function ChatbotPanel({
   // guard against. `canSeeInternalView()` is the same rule the shell already uses to
   // decide Enterprise Brain access — one rule, not a second opinion about who is staff.
   const canSeeTrace = useMemo(() => canSeeInternalView(), []);
+  const isAdminUser = useMemo(() => canSeeInternalView(), []);
+  const [panelMode, setPanelMode] = useState<'ai' | 'live_admin' | 'admin_queue'>('ai');
 
   // What the page says it is showing — filters, search, KPI tiles, visible rows, the
   // record it is about. Empty for a page that registers nothing, which is every page
@@ -272,6 +280,21 @@ export default function ChatbotPanel({
     entityId: pageAi.entityId,
     selectedRecords: pageAi.selectedRecords,
     pageData: pageAi.pageData,
+  });
+
+  const liveChat = useLiveAdminChat({
+    user: {
+      userId: String(session.userId || 'guest-user'),
+      userName: String(session.profileName || (isAdminUser ? 'Admin Staff' : 'Student / Parent')),
+      userRole: String(session.profileName || (isAdminUser ? 'Administrator' : 'Student')),
+      subInstituteId: session.subInstituteId || 1,
+      clientId: session.clientId,
+      token: session.token,
+    },
+    pagePath: pathname,
+    pageTitle: workspace.context?.module_label || workspace.context?.entity_label || 'Dashboard',
+    isAdmin: isAdminUser,
+    enabled: true,
   });
   const [activeTab, setActiveTab] = useState<Capability>('conversational');
 
@@ -513,6 +536,26 @@ export default function ChatbotPanel({
 
     if (!trimmed || isLoading || sendingRef.current) return;
 
+    // Direct escalation to Live Admin or Google Meet
+    const lower = trimmed.toLowerCase();
+    if (
+      lower.includes('talk to admin') ||
+      lower.includes('speak with admin') ||
+      lower.includes('chat with admin') ||
+      lower.includes('human agent') ||
+      lower.includes('live agent') ||
+      lower.includes('google meet') ||
+      lower.includes('video call')
+    ) {
+      setPanelMode('live_admin');
+      if (!liveChat.session) {
+        void liveChat.startLiveSession(trimmed);
+      } else {
+        void liveChat.sendMessage(trimmed);
+      }
+      return;
+    }
+
     // Page navigation ("open admissions") is recognised here, in English, against the live tab
     // registry. A sentence in Hindi or Gujarati is turned into English first; the sentence the
     // person said is still what is asked and shown.
@@ -637,12 +680,33 @@ export default function ChatbotPanel({
   };
 
   // A question asked from elsewhere on the page. Each nonce is sent once, however often this re-renders.
+  //
+  // WHY IT WAITS, AND WHY IT CALLS THE LATEST sendMessage
+  //
+  // "Ask AI" opens this panel and hands it the prompt in the same moment, so the panel is only just
+  // mounting. In that first moment the chat library's Chat instance is still being settled (the effect
+  // runs once, the instance is rebuilt, the effect runs again), and a message pushed into the first
+  // instance resolves without error and without ever reaching the network - measured: sendMessage ran
+  // with isLoading false, sendUiMessage resolved, and no request left the browser. Sending a moment
+  // later, through a ref that always points at the newest sendMessage, reaches the instance that stays.
+  // The timer is cleared if the effect re-runs, so the prompt is still sent exactly once.
   const lastAssistantNonce = useRef(0);
+  const sendMessageRef = useRef(sendMessage);
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  });
   useEffect(() => {
     if (!assistantPrompt || assistantPrompt.nonce === lastAssistantNonce.current) return;
-    lastAssistantNonce.current = assistantPrompt.nonce;
-    void sendMessage(assistantPrompt.prompt);
-    onAssistantPromptHandled?.();
+
+    const prompt = assistantPrompt;
+    const timer = window.setTimeout(() => {
+      if (prompt.nonce === lastAssistantNonce.current) return;
+      lastAssistantNonce.current = prompt.nonce;
+      void sendMessageRef.current(prompt.prompt);
+      onAssistantPromptHandled?.();
+    }, 400);
+
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assistantPrompt]);
 
@@ -737,30 +801,114 @@ export default function ChatbotPanel({
   return (
     <aside className="h-full w-full overflow-hidden rounded-[28px] border border-gray-200/60 bg-white/92 shadow-[0_18px_55px_rgba(15,23,42,0.1)] backdrop-blur-xl">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="flex items-center justify-between border-b border-gray-200/70 bg-white/70 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-gray-200/70 bg-white/70 px-5 py-3.5">
           <div className="flex items-center gap-3">
             <div
               className="flex size-9 items-center justify-center rounded-2xl text-white shadow-[0_10px_24px_rgba(13,110,253,0.2)]"
-              style={{ background: 'var(--accent-gradient)' }}
+              style={{
+                background:
+                  panelMode === 'ai'
+                    ? 'var(--accent-gradient)'
+                    : 'linear-gradient(135deg, #0D6EFD 0%, #6366F1 100%)',
+              }}
             >
-              <BotIcon className="size-4" />
+              {panelMode === 'ai' ? <BotIcon className="size-4" /> : <Headphones className="size-4" />}
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Advance AI</h3>
-              <p className="text-[11px] font-medium text-gray-500">Multilingual, voice-enabled school intelligence</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900">
+                  {panelMode === 'ai' ? 'Advance AI' : panelMode === 'admin_queue' ? 'Admin Queue' : 'Live Admin Chat'}
+                </h3>
+                {liveChat.session && liveChat.session.status !== 'closed' ? (
+                  <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-[11px] font-medium text-gray-500">
+                {panelMode === 'ai'
+                  ? 'Multilingual, voice-enabled school intelligence'
+                  : 'Direct two-way support & Google Meet calling'}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={handleNewChat}
-              disabled={messages.length === 0 && !isLoading}
-              className="rounded-xl p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500"
-              title="New chat"
-              aria-label="Start a new chat"
-            >
-              <SquarePen size={17} aria-hidden="true" />
-            </button>
+          <div className="flex items-center gap-1.5">
+            {/* Mode Toggle Controls */}
+            <div className="flex items-center rounded-xl bg-gray-100/90 p-0.5 border border-gray-200/60 mr-1">
+              <button
+                type="button"
+                onClick={() => setPanelMode('ai')}
+                className={cn(
+                  'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all',
+                  panelMode === 'ai'
+                    ? 'bg-white text-gray-900 shadow-2xs'
+                    : 'text-gray-500 hover:text-gray-900'
+                )}
+                title="AI Intelligence Mode"
+              >
+                <BotIcon className="size-3.5" />
+                <span className="hidden sm:inline">AI</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPanelMode('live_admin');
+                  if (!isAdminUser && !liveChat.session) {
+                    void liveChat.startLiveSession();
+                  }
+                }}
+                className={cn(
+                  'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all relative',
+                  panelMode === 'live_admin'
+                    ? 'bg-white text-gray-900 shadow-2xs'
+                    : 'text-gray-500 hover:text-gray-900'
+                )}
+                title="Live Admin Support"
+              >
+                <Headphones className="size-3.5 text-[#0D6EFD]" />
+                <span className="hidden sm:inline">Admin</span>
+                {liveChat.notification ? (
+                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                ) : liveChat.session?.unreadCountForUser ? (
+                  <span className="size-2 rounded-full bg-red-500 animate-pulse" />
+                ) : null}
+              </button>
+              {isAdminUser ? (
+                <button
+                  type="button"
+                  onClick={() => setPanelMode('admin_queue')}
+                  className={cn(
+                    'flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all relative',
+                    panelMode === 'admin_queue'
+                      ? 'bg-white text-gray-900 shadow-2xs'
+                      : 'text-gray-500 hover:text-gray-900'
+                  )}
+                  title="Admin Support Queue"
+                >
+                  <ShieldCheck className="size-3.5 text-indigo-600" />
+                  {liveChat.adminQueue.length > 0 ? (
+                    <span className="inline-flex size-4 items-center justify-center rounded-full bg-indigo-600 text-[9px] font-bold text-white">
+                      {liveChat.adminQueue.length}
+                    </span>
+                  ) : null}
+                </button>
+              ) : null}
+            </div>
+
+            {panelMode === 'ai' ? (
+              <button
+                type="button"
+                onClick={handleNewChat}
+                disabled={messages.length === 0 && !isLoading}
+                className="rounded-xl p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500"
+                title="New chat"
+                aria-label="Start a new chat"
+              >
+                <SquarePen size={17} aria-hidden="true" />
+              </button>
+            ) : null}
+
             <button
               onClick={onToggleChatbot}
               className="rounded-xl p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
@@ -771,6 +919,61 @@ export default function ChatbotPanel({
           </div>
         </div>
 
+        {panelMode === 'live_admin' ? (
+          <div className="min-h-0 flex-1">
+            <LiveAdminChatView
+              session={liveChat.session}
+              messages={liveChat.messages}
+              currentUserId={String(session.userId || 'guest-user')}
+              currentUserName={String(session.profileName || (isAdminUser ? 'Admin Staff' : 'Student / Parent'))}
+              isAdmin={isAdminUser}
+              isAdminOnline={liveChat.isAdminOnline}
+              adminAvailability={liveChat.adminAvailability}
+              defaultMeetUrl={liveChat.defaultMeetUrl}
+              adminQueue={liveChat.adminQueue}
+              onSelectSession={(sid) => {
+                liveChat.setActiveAdminSessionId(sid);
+              }}
+              onSwitchToQueue={() => setPanelMode('admin_queue')}
+              notification={liveChat.notification}
+              onDismissNotification={liveChat.dismissNotification}
+              onUpdateAdminAvailability={liveChat.updateAvailability}
+              onSendMessage={liveChat.sendMessage}
+              onStartGoogleMeet={liveChat.startGoogleMeet}
+              onCloseSession={liveChat.closeCurrentSession}
+              onSwitchToAi={() => setPanelMode('ai')}
+              onBookSlot={liveChat.bookSlot}
+              onJoinMeeting={liveChat.joinMeeting}
+              onCancelMeeting={liveChat.cancelMeeting}
+              fetchAvailableSlots={liveChat.fetchAvailableSlots}
+              onConfigureSlots={liveChat.configureSlots}
+              isSending={liveChat.isSending}
+              isMeetStarting={liveChat.isMeetStarting}
+            />
+          </div>
+        ) : panelMode === 'admin_queue' ? (
+          <div className="min-h-0 flex-1">
+            <AdminSupportQueue
+              queue={liveChat.adminQueue}
+              activeSessionId={liveChat.activeAdminSessionId}
+              adminAvailability={liveChat.adminAvailability}
+              onUpdateAdminAvailability={liveChat.updateAvailability}
+              onSelectSession={(sid) => {
+                liveChat.setActiveAdminSessionId(sid);
+                setPanelMode('live_admin');
+              }}
+              onClaimSession={async (sid) => {
+                await liveChat.claimSession(sid);
+                setPanelMode('live_admin');
+              }}
+              onRefresh={() => void liveChat.refreshQueue()}
+              onConfigureSlots={liveChat.configureSlots}
+              fetchAvailableSlots={liveChat.fetchAvailableSlots}
+              defaultMeetUrl={liveChat.defaultMeetUrl}
+            />
+          </div>
+        ) : (
+          <>
         {/*
           What the assistant is currently looking at, and the abilities that make
           sense here. Both come from the resolved route, so walking from a student
@@ -890,6 +1093,24 @@ export default function ChatbotPanel({
                     : 'Suggested prompts'}
               </p>
               <div className="flex flex-col gap-1.5">
+                {/* Live Admin Help Quick Banner */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPanelMode('live_admin');
+                    if (!liveChat.session) void liveChat.startLiveSession('Hello, I would like to speak with an administrator.');
+                  }}
+                  className="flex items-center justify-between rounded-2xl border border-blue-200/90 bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white px-3.5 py-2.5 text-left text-sm font-semibold text-[#0D6EFD] shadow-2xs transition-all hover:-translate-y-0.5 hover:border-[#0D6EFD]/40 hover:shadow-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <Headphones className="size-4 text-[#0D6EFD]" />
+                    <span>Connect directly with an Admin (Live)</span>
+                  </div>
+                  <span className="rounded-full bg-blue-100/80 px-2 py-0.5 text-[10px] font-bold text-[#0D6EFD]">
+                    Live Chat & Meet
+                  </span>
+                </button>
+
                 {conversationalPrompts.map((prompt) => (
                   <button
                     key={prompt}
@@ -1094,6 +1315,37 @@ export default function ChatbotPanel({
                             {suggestion}
                           </button>
                         ))}
+                      </div>
+                    ) : null}
+
+                    {/* Quick escalation to Live Admin or Google Meet under latest reply */}
+                    {message.role === 'assistant' &&
+                    message.id === messages[messages.length - 1]?.id ? (
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPanelMode('live_admin');
+                            if (!liveChat.session) void liveChat.startLiveSession();
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50/80 px-2.5 py-1 text-[11px] font-semibold text-[#0D6EFD] transition-colors hover:bg-blue-100"
+                        >
+                          <Headphones className="size-3" />
+                          <span>Talk to Admin</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setPanelMode('live_admin');
+                            let s = liveChat.session;
+                            if (!s) s = await liveChat.startLiveSession('Requesting Google Meet video session.');
+                            if (s) void liveChat.startGoogleMeet();
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                        >
+                          <Video className="size-3" />
+                          <span>Google Meet Call</span>
+                        </button>
                       </div>
                     ) : null}
 
@@ -1418,6 +1670,8 @@ export default function ChatbotPanel({
             </div>
           ) : null}
         </div>
+        </>
+        )}
         </>
         )}
       </div>
