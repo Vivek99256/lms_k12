@@ -286,7 +286,7 @@ export default function ChatbotPanel({
     user: {
       userId: String(session.userId || 'guest-user'),
       userName: String(session.profileName || (isAdminUser ? 'Admin Staff' : 'Student / Parent')),
-      userRole: String(session.profileName || (isAdminUser ? 'Administrator' : 'Student')),
+      userRole: isAdminUser ? 'Administrator' : 'Student',
       subInstituteId: session.subInstituteId || 1,
       clientId: session.clientId,
       token: session.token,

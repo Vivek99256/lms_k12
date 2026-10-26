@@ -5,13 +5,24 @@ import {
   checkAndExpireMissedBookings,
   recordParticipantJoin,
 } from '@/lib/live-chat/store';
+import {
+  dbBookMeetingSlot,
+  dbCancelBooking,
+  dbCheckAndExpireMissedBookings,
+  dbRecordParticipantJoin,
+} from '@/lib/live-chat/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const expiredList = checkAndExpireMissedBookings();
+    let expiredList: any[] = [];
+    try {
+      expiredList = await dbCheckAndExpireMissedBookings();
+    } catch {
+      expiredList = checkAndExpireMissedBookings();
+    }
     return NextResponse.json({ bookings: expiredList });
   } catch (error) {
     return NextResponse.json(
@@ -35,15 +46,25 @@ export async function POST(request: Request) {
         );
       }
 
-      const result = bookMeetingSlot(slotId, sessionId, student);
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error || 'Failed to book slot' },
-          { status: 409 } // 409 Conflict for double booking
-        );
+      let booking: any = null;
+      try {
+        booking = await dbBookMeetingSlot(slotId, sessionId, student);
+      } catch (err) {
+        console.warn('[LiveChat API] Failed to book meeting in DB:', err);
       }
 
-      return NextResponse.json({ success: true, booking: result.booking });
+      if (!booking) {
+        const memResult = bookMeetingSlot(slotId, sessionId, student);
+        if (!memResult.success) {
+          return NextResponse.json(
+            { error: memResult.error || 'Failed to book slot' },
+            { status: 409 }
+          );
+        }
+        booking = memResult.booking;
+      }
+
+      return NextResponse.json({ success: true, booking });
     }
 
     if (action === 'join') {
@@ -55,7 +76,10 @@ export async function POST(request: Request) {
         );
       }
 
-      const updated = recordParticipantJoin(bookingId, role);
+      let updated = await dbRecordParticipantJoin(bookingId, role).catch(() => null);
+      if (!updated) {
+        updated = recordParticipantJoin(bookingId, role) || null;
+      }
       if (!updated) {
         return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
       }
@@ -69,10 +93,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'bookingId is required' }, { status: 400 });
       }
 
-      const updated = cancelBooking(
-        bookingId,
-        cancelledBy || { id: 'user', name: 'User', role: 'user' }
-      );
+      const resolver = cancelledBy || { id: 'user', name: 'User', role: 'user' };
+      let updated = await dbCancelBooking(bookingId, resolver).catch(() => null);
+      if (!updated) {
+        updated = cancelBooking(bookingId, resolver) || null;
+      }
 
       return NextResponse.json({ success: true, booking: updated });
     }

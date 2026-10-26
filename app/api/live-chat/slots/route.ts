@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import { configureAdminSlots, deleteSlot, getAvailableSlots, getDefaultMeetUrl } from '@/lib/live-chat/store';
+import {
+  dbConfigureAdminSlots,
+  dbDeleteSlot,
+  dbGetAvailableSlots,
+  dbGetDefaultMeetUrl,
+} from '@/lib/live-chat/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,9 +17,18 @@ export async function GET(request: Request) {
     const date = searchParams.get('date') || undefined;
     const includeBooked = searchParams.get('includeBooked') === 'true';
 
-    const slots = getAvailableSlots(subInstituteId, date, { includeBooked });
-    const defaultMeetUrl = getDefaultMeetUrl();
-    return NextResponse.json({ slots, defaultMeetUrl });
+    let slots: any[] | null = null;
+    let defaultMeetUrl: string | undefined = undefined;
+
+    try {
+      slots = await dbGetAvailableSlots(date, subInstituteId || '1', includeBooked);
+      defaultMeetUrl = await dbGetDefaultMeetUrl();
+    } catch {
+      slots = getAvailableSlots(subInstituteId, date, { includeBooked });
+      defaultMeetUrl = getDefaultMeetUrl();
+    }
+
+    return NextResponse.json({ slots: slots || [], defaultMeetUrl });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to retrieve available slots', detail: String(error) },
@@ -31,7 +46,10 @@ export async function POST(request: Request) {
       if (!slotId) {
         return NextResponse.json({ error: 'slotId is required for deletion' }, { status: 400 });
       }
-      const ok = deleteSlot(slotId);
+      let ok = await dbDeleteSlot(slotId).catch(() => false);
+      if (!ok) {
+        ok = deleteSlot(slotId);
+      }
       return NextResponse.json({ success: ok });
     }
 
@@ -46,7 +64,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const created = configureAdminSlots(
+    let created: any[] | null = null;
+    try {
+      created = await dbConfigureAdminSlots(
+        resolvedAdminId,
+        resolvedAdminName,
+        subInstituteId ?? 1,
+        date,
+        slots,
+        {
+          overwrite: Boolean(overwrite),
+          defaultMeetUrl: typeof defaultMeetUrl === 'string' ? defaultMeetUrl : undefined,
+        }
+      );
+    } catch (err) {
+      console.warn('[LiveChat API] Failed to configure slots in DB:', err);
+    }
+
+    // Also update in-memory store
+    const memCreated = configureAdminSlots(
       resolvedAdminId,
       resolvedAdminName,
       subInstituteId ?? 1,
@@ -58,10 +94,17 @@ export async function POST(request: Request) {
       }
     );
 
+    let resolvedMeetUrl = defaultMeetUrl;
+    try {
+      resolvedMeetUrl = (await dbGetDefaultMeetUrl()) || getDefaultMeetUrl();
+    } catch {
+      resolvedMeetUrl = getDefaultMeetUrl();
+    }
+
     return NextResponse.json({
       success: true,
-      slots: created,
-      defaultMeetUrl: getDefaultMeetUrl(),
+      slots: created || memCreated,
+      defaultMeetUrl: resolvedMeetUrl,
     });
   } catch (error) {
     return NextResponse.json(
@@ -79,7 +122,10 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'slotId query param is required' }, { status: 400 });
     }
 
-    const ok = deleteSlot(slotId);
+    let ok = await dbDeleteSlot(slotId).catch(() => false);
+    if (!ok) {
+      ok = deleteSlot(slotId);
+    }
     return NextResponse.json({ success: ok });
   } catch (error) {
     return NextResponse.json(

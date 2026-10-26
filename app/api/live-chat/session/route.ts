@@ -8,6 +8,15 @@ import {
   listSessions,
   markAsRead,
 } from '@/lib/live-chat/store';
+import {
+  dbAssignAdmin,
+  dbCloseSession,
+  dbGetAdminPresence,
+  dbGetOrCreateUserSession,
+  dbGetSession,
+  dbListSessions,
+  dbMarkAsRead,
+} from '@/lib/live-chat/db';
 import type { LiveChatUser } from '@/lib/live-chat/types';
 
 export const runtime = 'nodejs';
@@ -21,34 +30,59 @@ export async function GET(request: Request) {
     const adminQueue = searchParams.get('adminQueue');
     const subInstituteId = searchParams.get('subInstituteId');
 
-    const presence = getAdminPresence(subInstituteId || undefined);
+    let isOnline = false;
+    try {
+      const dbPresence = await dbGetAdminPresence(subInstituteId || undefined);
+      isOnline = dbPresence.isOnline;
+    } catch {
+      isOnline = getAdminPresence(subInstituteId || undefined).isOnline;
+    }
 
     if (sessionId) {
-      const session = getSession(sessionId);
+      let session = await dbGetSession(sessionId).catch(() => null);
+      if (!session) {
+        session = getSession(sessionId) || null;
+      }
       if (!session) {
         return NextResponse.json({ error: 'Session not found' }, { status: 404 });
       }
-      return NextResponse.json({ session, adminOnline: presence.isOnline });
+      return NextResponse.json({ session, adminOnline: isOnline });
     }
 
     if (adminQueue === 'true') {
-      const sessions = listSessions({
+      let sessions = await dbListSessions({
         subInstituteId: subInstituteId ? Number(subInstituteId) : undefined,
         excludeAdminRole: true,
-      });
-      return NextResponse.json({ sessions, adminOnline: presence.isOnline });
+      }).catch(() => null);
+
+      if (!sessions || sessions.length === 0) {
+        const memSessions = listSessions({
+          subInstituteId: subInstituteId ? Number(subInstituteId) : undefined,
+          excludeAdminRole: true,
+        });
+        if (memSessions.length > 0) {
+          sessions = memSessions;
+        }
+      }
+      return NextResponse.json({ sessions: sessions || [], adminOnline: isOnline });
     }
 
     if (userId) {
-      const sessions = listSessions();
-      const userSession = sessions.find(
+      let sessions = await dbListSessions().catch(() => null);
+      if (!sessions || sessions.length === 0) {
+        sessions = listSessions();
+      }
+      const userSession = (sessions || []).find(
         (s) => String(s.userId) === String(userId) && (s.status === 'waiting' || s.status === 'active')
       );
-      return NextResponse.json({ session: userSession || null, adminOnline: presence.isOnline });
+      return NextResponse.json({ session: userSession || null, adminOnline: isOnline });
     }
 
-    const all = listSessions();
-    return NextResponse.json({ sessions: all, adminOnline: presence.isOnline });
+    let all = await dbListSessions().catch(() => null);
+    if (!all || all.length === 0) {
+      all = listSessions();
+    }
+    return NextResponse.json({ sessions: all || [], adminOnline: isOnline });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to retrieve session', detail: String(error) },
@@ -68,14 +102,25 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'User details are required' }, { status: 400 });
       }
 
-      const { session, messages, adminOnline } = getOrCreateUserSession(
-        user,
-        body.pagePath,
-        body.pageTitle,
-        body.initialMessage
-      );
+      let result: { session: any; messages: any[]; adminOnline: boolean } | null = null;
+      try {
+        result = await dbGetOrCreateUserSession(
+          user,
+          body.pagePath,
+          body.pageTitle,
+          body.initialMessage
+        );
+      } catch (dbErr) {
+        console.warn('[LiveChat API] DB error during session creation, falling back to in-memory store:', dbErr);
+        result = getOrCreateUserSession(
+          user,
+          body.pagePath,
+          body.pageTitle,
+          body.initialMessage
+        );
+      }
 
-      return NextResponse.json({ session, messages, adminOnline });
+      return NextResponse.json(result);
     }
 
     if (action === 'assign_admin') {
@@ -83,7 +128,11 @@ export async function POST(request: Request) {
       if (!sessionId || !adminId) {
         return NextResponse.json({ error: 'sessionId and adminId are required' }, { status: 400 });
       }
-      const updated = assignAdmin(sessionId, { adminId, adminName: adminName || 'Admin' });
+
+      let updated = await dbAssignAdmin(sessionId, { adminId, adminName: adminName || 'Admin' }).catch(() => null);
+      if (!updated) {
+        updated = assignAdmin(sessionId, { adminId, adminName: adminName || 'Admin' }) || null;
+      }
       if (!updated) {
         return NextResponse.json({ error: 'Session not found' }, { status: 404 });
       }
@@ -95,13 +144,18 @@ export async function POST(request: Request) {
       if (!sessionId) {
         return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
       }
-      const updated = closeSession(sessionId, closedBy || { id: 'admin', name: 'Admin', role: 'admin' });
+
+      let updated = await dbCloseSession(sessionId, closedBy || { id: 'admin', name: 'Admin', role: 'admin' }).catch(() => null);
+      if (!updated) {
+        updated = closeSession(sessionId, closedBy || { id: 'admin', name: 'Admin', role: 'admin' }) || null;
+      }
       return NextResponse.json({ session: updated });
     }
 
     if (action === 'mark_read') {
       const { sessionId, role } = body;
       if (sessionId && (role === 'user' || role === 'admin')) {
+        await dbMarkAsRead(sessionId, role).catch(() => null);
         markAsRead(sessionId, role);
       }
       return NextResponse.json({ success: true });

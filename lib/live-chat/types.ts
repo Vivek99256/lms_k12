@@ -101,6 +101,7 @@ export interface LiveChatSession {
   adminId?: string;
   adminName?: string;
   meetUrl?: string;
+  activeMeetUrl?: string;
   createdAt: string;
   updatedAt: string;
   lastMessageText?: string;
