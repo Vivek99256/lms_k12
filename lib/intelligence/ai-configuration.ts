@@ -62,6 +62,11 @@ export interface AiModelOption {
   status: number;
   /** `platform` rows are shared estate-wide and read-only to a school. */
   scope: 'platform' | 'institute';
+  description?: string | null;
+  best_for?: string | null;
+  strengths?: string | null;
+  limitations?: string | null;
+  context_tokens?: number | null;
 }
 
 export interface AiConfigurationOptions {
@@ -83,6 +88,10 @@ export interface AiCompatibleModel {
   reasons: string[];
   max_output_tokens: number | null;
   context_tokens: number | null;
+  description?: string | null;
+  best_for?: string | null;
+  strengths?: string | null;
+  limitations?: string | null;
 }
 
 export interface AiCompatibleProvider {
