@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginPage from '@/app/login/page';
 import DashboardShell from './DashboardShell';
+import StudentRouteGuard from './student/StudentRouteGuard';
+import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { installErpAuthFetch } from '@/lib/erp-client';
 
 // Module scope, so it is in place before any page's first fetch (see lib/erp-client.ts).
@@ -27,7 +29,7 @@ const FULL_BLEED_ROUTES = [
 ];
 
 export default function ConditionalApp({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, menuContext } = useAuth();
   const pathname = usePathname() || '';
   const [mounted, setMounted] = useState(false);
 
@@ -58,6 +60,16 @@ export default function ConditionalApp({ children }: { children: React.ReactNode
 
   if (FULL_BLEED_ROUTES.some((route) => pathname.startsWith(route))) {
     return <>{children}</>;
+  }
+
+  // Students use the same shell as staff, so they see the same sidebar, category bar and
+  // screen tabs, filtered by their menu rights; the guard keeps them off staff-only URLs.
+  if (isStudentProfile(menuContext?.user_profile_name)) {
+    return (
+      <DashboardShell>
+        <StudentRouteGuard>{children}</StudentRouteGuard>
+      </DashboardShell>
+    );
   }
 
   return <DashboardShell>{children}</DashboardShell>;

@@ -1,5 +1,7 @@
 'use client';
 
+import { getStoredMenuContext } from '@/app/hooks/useMenuRights';
+import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import {
   useCallback,
   useEffect,
@@ -25,6 +27,7 @@ import {
 } from '@/components/ui/table';
 import PageHeader from '@/components/result/PageHeader';
 import { toast } from '@/components/result/toast';
+import { buildSessionContext } from '@/lib/erp-client';
 import { loadModuleOptions, loadModuleRows, saveModuleRecord, type JsonRecord } from '../_lib/api';
 import type { FrontDeskModule, ModuleField } from '../_lib/modules';
 
@@ -39,6 +42,14 @@ function scalar(value: SearchDropdownValues[keyof SearchDropdownValues]) {
   return Array.isArray(value) ? value : value ? [value] : [];
 }
 
+/** The stored value is a bare filename; the file itself is served from the backend's public storage disk. */
+function moduleFileUrl(folder: string, value: unknown): string {
+  const name = typeof value === 'string' ? value.trim() : '';
+  if (!name) return '';
+  if (/^https?:\/\//i.test(name)) return name;
+  return `${buildSessionContext().baseUrl}/storage/${folder}/${encodeURIComponent(name)}`;
+}
+
 function displayValue(value: unknown) {
   if (value == null || value === '') return '—';
   if (typeof value === 'object') return JSON.stringify(value);
@@ -46,6 +57,9 @@ function displayValue(value: unknown) {
 }
 
 export default function ModuleWorkbench({ module }: { module: FrontDeskModule }) {
+  // Students only read what the school has published; the publish/add form is
+  // for staff, so it is not drawn for them (the API enforces the same).
+  const isStudent = isStudentProfile(getStoredMenuContext()?.user_profile_name);
   const [rows, setRows] = useState<JsonRecord[]>([]);
   const [classValues, setClassValues] = useState(emptyClassValues);
   const [fieldValues, setFieldValues] = useState<Record<string, string | boolean>>({});
@@ -236,12 +250,12 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
   const filterFields = module.report ? module.filters : undefined;
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 md:p-6">
+    <main className="min-h-screen p-4 md:p-6">
       <div className="mx-auto max-w-[1600px] space-y-5">
         <PageHeader
           icon={CalendarDays}
           title={module.title}
-          subtitle={module.description}
+          subtitle={isStudent && !module.report ? `Latest ${module.title.toLowerCase()} from your school.` : module.description}
           breadcrumbs={[
             { label: 'Front desk', href: '/dashboard' },
             { label: module.title },
@@ -262,7 +276,7 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
           }
         />
 
-        {(module.fields?.length || module.classFields?.length || filterFields?.length) ? (
+        {!(isStudent && !module.report) && (module.fields?.length || module.classFields?.length || filterFields?.length) ? (
           <form onSubmit={module.report ? (event) => { event.preventDefault(); void load(); } : submit} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             {module.classFields?.length ? (
               <SearchDropdown
@@ -309,7 +323,18 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
                 ) : rows.length ? rows.map((row, index) => (
                   <TableRow key={String(row.id ?? index)}>
                     <TableCell>{index + 1}</TableCell>
-                    {module.columns.map((column) => <TableCell key={column.key}>{displayValue(row[column.key])}</TableCell>)}
+                    {module.columns.map((column) => {
+                      const fileUrl = column.key === 'file_name' && module.fileFolder ? moduleFileUrl(module.fileFolder, row[column.key]) : '';
+                      return (
+                        <TableCell key={column.key}>
+                          {fileUrl ? (
+                            <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
+                              {displayValue(row[column.key])}
+                            </a>
+                          ) : displayValue(row[column.key])}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 )) : (
                   <TableRow><TableCell colSpan={module.columns.length + 1} className="h-32 text-center text-slate-500">{searched ? 'No data found.' : 'Choose filters and search to load records.'}</TableCell></TableRow>

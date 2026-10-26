@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, Loader2 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useShellMenu } from '@/app/components/shell-menu-context';
+import { buildStudentNav } from '@/app/components/student/student-nav';
 import { buildSessionContext } from '@/lib/erp-client';
 import { DashboardError, EmptyState } from '@/app/dashboard/_components/DashboardPrimitives';
 import {
@@ -16,6 +18,50 @@ import {
 } from '@/app/pal/data/pal-eso';
 import ChapterDashboardView from '@/app/pal/eso/_components/ChapterDashboardView';
 import { friendlyError } from '@/lib/user-messages';
+
+/**
+ * Shortcuts to the screens this student's account can open. Built from the same
+ * rights-filtered menu the navigation uses, so a tile never leads to a page the
+ * student can't use.
+ */
+function QuickAccess() {
+  const { menuItems, loading } = useShellMenu();
+  const items = useMemo(
+    () => buildStudentNav(menuItems).flatMap((section) => section.items).slice(0, 8),
+    [menuItems],
+  );
+
+  if (loading && items.length === 0) {
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+        ))}
+      </div>
+    );
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
+              <Icon size={20} />
+            </span>
+            <span className="text-sm font-semibold text-slate-800">{item.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 /**
  * The student's main /dashboard landing page — the PAL "Hello, {name}"
@@ -80,13 +126,13 @@ export default function StudentDashboard() {
   }, [load]);
 
   return (
-    <div className="flex-1 overflow-auto p-8">
+    <div className="mx-auto w-full space-y-8 px-4 py-6 sm:px-6 lg:px-8">
       {/* The greeting and the shape of the page are known before any request
           returns, so they paint immediately. */}
+     
+
       {loading && (
         <>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user?.name || 'Student'}</h1>
-          <p className="mt-1 text-sm text-slate-500">See where you are. Every student starts from the same concept.</p>
           <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="h-24 animate-pulse rounded-lg border border-slate-200 bg-slate-50" />
@@ -103,8 +149,6 @@ export default function StudentDashboard() {
 
       {!loading && !error && noContent && (
         <>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user?.name || 'Student'}</h1>
-          <p className="mt-1 text-sm text-slate-500">See where you are. Every student starts from the same concept.</p>
           <div className="mt-6">
             <EmptyState message="Diagnostic questions aren't available for your subjects yet. Please check back soon." />
           </div>
@@ -134,7 +178,7 @@ export default function StudentDashboard() {
       )}
 
       {!loading && (
-        <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">Alumni</h2>
           <p className="mt-1 text-sm text-slate-600">Jobs and internships from people who studied here, and mentors who can guide you.</p>
           <Link href="/alumni/student" className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800">

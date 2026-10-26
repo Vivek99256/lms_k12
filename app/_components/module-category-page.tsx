@@ -36,6 +36,8 @@ import {
   type ModuleCategoryItem,
 } from '@/app/_lib/module-categories-api';
 import { friendlyError } from '@/lib/user-messages';
+import { getStoredMenuContext } from '@/app/hooks/useMenuRights';
+import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { getModuleScreenRegistry } from '@/app/_lib/module-screen-registry';
 
 /**
@@ -88,7 +90,10 @@ type LoadState = 'loading' | 'ready' | 'error';
 
 const TAB_PARAM = 'tab';
 
-/** More tabs than this and the bar is one scrolling line with an "All" menu rather than underlined text. */
+/**
+ * More tabs than this and the bar is one scrolling line with an "All" menu rather than underlined text.
+ * A student's bar always uses the scrolling line, so it looks the same as the staff one whatever it holds.
+ */
 const PILL_TAB_THRESHOLD = 6;
 
 /**
@@ -951,7 +956,7 @@ export function ModuleCategoryPage({
             * tabs the bar is a single line that scrolls sideways, with an "All"
             * menu to jump to any screen. Short bars keep the underline style.
             */}
-          {tabs.length > PILL_TAB_THRESHOLD ? (
+          {tabs.length > PILL_TAB_THRESHOLD || isStudentProfile(getStoredMenuContext()?.user_profile_name) ? (
             <ScrollableTabStrip
               items={tabs.map((tab) => ({
                 id: tab.id,

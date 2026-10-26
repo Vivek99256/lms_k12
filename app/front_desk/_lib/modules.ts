@@ -34,6 +34,8 @@ export type FrontDeskModule = {
   submitLabel?: string;
   report?: boolean;
   supportsPrint?: boolean;
+  /** Folder under the Laravel `storage/` disk holding this module's uploaded files; makes the File column a link. */
+  fileFolder?: string;
 };
 
 export const frontDeskModules = {
@@ -123,6 +125,7 @@ export const frontDeskModules = {
       { key: 'file_name', label: 'File' },
     ],
     submitLabel: 'Publish circular',
+    fileFolder: 'circular',
   },
   examSchedule: {
     title: 'Exam schedule',
@@ -152,6 +155,7 @@ export const frontDeskModules = {
       { key: 'file_name', label: 'File' },
     ],
     submitLabel: 'Publish schedule',
+    fileFolder: 'exam_schedule',
   },
   calendar: {
     title: 'Calendar',

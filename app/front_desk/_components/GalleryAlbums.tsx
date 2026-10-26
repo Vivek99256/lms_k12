@@ -1,5 +1,7 @@
 'use client';
 
+import { getStoredMenuContext } from '@/app/hooks/useMenuRights';
+import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import {
   useCallback,
   useEffect,
@@ -53,6 +55,8 @@ type Album = {
 };
 
 export default function GalleryAlbums() {
+  // Students browse albums; adding media is for staff.
+  const isStudent = isStudentProfile(getStoredMenuContext()?.user_profile_name);
   const [rows, setRows] = useState<JsonRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -181,7 +185,7 @@ export default function GalleryAlbums() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 md:p-6">
+    <main className="min-h-screen p-4 md:p-6">
       <div className="mx-auto max-w-[1600px] space-y-5">
         <PageHeader
           icon={Images}
@@ -196,14 +200,16 @@ export default function GalleryAlbums() {
               <Button type="button" variant="outline" onClick={() => void load()} disabled={loading}>
                 <RefreshCw className="h-4 w-4" /> Refresh
               </Button>
-              <Button type="button" onClick={() => setShowForm((value) => !value)}>
-                <Plus className="h-4 w-4" /> {showForm ? 'Close' : 'Add media'}
-              </Button>
+              {!isStudent && (
+                <Button type="button" onClick={() => setShowForm((value) => !value)}>
+                  <Plus className="h-4 w-4" /> {showForm ? 'Close' : 'Add media'}
+                </Button>
+              )}
             </>
           }
         />
 
-        {showForm ? (
+        {showForm && !isStudent ? (
           <form onSubmit={submit} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             {galleryModule.classFields?.length ? (
               <SearchDropdown
@@ -249,7 +255,7 @@ export default function GalleryAlbums() {
         ) : (
           <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white text-slate-500">
             <FolderOpen className="h-8 w-8 text-slate-300" />
-            No albums yet. Add media to create the first one.
+            {isStudent ? 'No albums have been shared yet.' : 'No albums yet. Add media to create the first one.'}
           </div>
         )}
       </div>
