@@ -89,7 +89,7 @@ export default function StudentHomeworkListPage() {
   const totalSubjects = new Set(rows.map((r) => r.subjectId)).size;
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    <main className="mx-auto   space-y-6 p-4 sm:p-6">
       {/* Page header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

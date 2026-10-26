@@ -106,6 +106,10 @@ export interface OnlineExamListItem {
   openDate: string;
   closeDate: string;
   activeExam: boolean;
+  /** How many times the signed-in student has attempted this exam. */
+  attempts: number;
+  /** Attempts the exam allows; results unlock once all of them are used. */
+  attemptsAllowed: number;
 }
 
 export interface SubmitResult {
@@ -132,6 +136,10 @@ export interface ExamResult {
   totalRight: number;
   totalWrong: number;
   questions: ResultQuestion[];
+  /** The student has not attempted this exam, so there is nothing to review. */
+  noAttempt: boolean;
+  /** Attempts still left before the review unlocks (0 when it is open). */
+  attemptsRemaining: number;
 }
 
 export interface BreakdownRow {
@@ -189,6 +197,8 @@ export async function listOnlineExams(
         openDate: readString(r.open_date),
         closeDate: readString(r.close_date),
         activeExam: Boolean(r.active_exam),
+        attempts: readNumber(r.total_attempt),
+        attemptsAllowed: Math.max(1, readNumber(r.attempt_allowed)),
       };
     })
     .filter((e) => e.id)
@@ -361,6 +371,8 @@ export async function fetchExamResult(
     totalRight,
     totalWrong: readNumber(oe.total_wrong),
     questions,
+    noAttempt: Boolean(raw.no_attempt),
+    attemptsRemaining: readNumber(raw.attempts_remaining),
   };
 }
 

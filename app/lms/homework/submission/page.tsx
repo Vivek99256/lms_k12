@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   Download,
@@ -60,7 +59,6 @@ export default function HomeworkSubmissionEntryPage() {
 }
 
 function StudentHomeworkSubmissionView() {
-  const router = useRouter();
   const [rows, setRows] = useState<MySubmissionRow[]>([]);
   const [files, setFiles] = useState<Record<number, File>>({});
   const [loading, setLoading] = useState(true);
@@ -250,13 +248,24 @@ function StudentHomeworkSubmissionView() {
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>{row.subjectName || "-"}</TableCell>
                       <TableCell>
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/lms/homework/${row.id}`)}
-                          className="text-left text-sm font-medium text-blue-600 hover:underline"
-                        >
-                          {row.title || "Untitled homework"}
-                        </button>
+                        {row.referenceFileUrl ? (
+                          // The title opens the homework's own file (the PDF), as it always did.
+                          <a
+                            href={row.referenceFileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-left text-sm font-medium text-blue-600 hover:underline"
+                          >
+                            {row.title || "Untitled homework"}
+                          </a>
+                        ) : (
+                          <span
+                            className="text-sm font-medium text-slate-800"
+                            title="This homework has no file attached"
+                          >
+                            {row.title || "Untitled homework"}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>{row.dateFmt || row.date || "-"}</TableCell>
                       <TableCell>

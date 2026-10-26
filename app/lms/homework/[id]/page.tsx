@@ -132,7 +132,7 @@ export default function HomeworkDetailPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
+    <main className="mx-auto space-y-5 p-4 sm:p-6">
       {/* Back button */}
       <Button
         type="button"
