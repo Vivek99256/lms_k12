@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { addMessage, getMessages, getSession } from '@/lib/live-chat/store';
+import { dbAddMessage, dbGetMessages, dbGetSession } from '@/lib/live-chat/db';
 import type { SendMessageRequest } from '@/lib/live-chat/types';
 
 export const runtime = 'nodejs';
@@ -15,13 +16,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
     }
 
-    const session = getSession(sessionId);
+    let session = await dbGetSession(sessionId).catch(() => null);
+    if (!session) {
+      session = getSession(sessionId) || null;
+    }
+
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    const messages = getMessages(sessionId, since);
-    return NextResponse.json({ messages, sessionStatus: session.status, meetUrl: session.meetUrl });
+    let messages = await dbGetMessages(sessionId, since).catch(() => null);
+    if (!messages || messages.length === 0) {
+      messages = getMessages(sessionId, since);
+    }
+
+    return NextResponse.json({
+      messages: messages || [],
+      sessionStatus: session.status,
+      meetUrl: session.activeMeetUrl || (session as any).meetUrl,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to retrieve messages', detail: String(error) },
@@ -41,7 +54,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const message = addMessage({
+    const payload: SendMessageRequest = {
       sessionId: body.sessionId,
       senderId: body.senderId,
       senderName: body.senderName || 'Anonymous',
@@ -49,7 +62,16 @@ export async function POST(request: Request) {
       text: body.text.trim(),
       type: body.type || 'text',
       meetUrl: body.meetUrl,
+    };
+
+    let message = await dbAddMessage(payload).catch((err) => {
+      console.warn('[LiveChat API] Failed to add message to DB:', err);
+      return null;
     });
+
+    if (!message) {
+      message = addMessage(payload);
+    }
 
     if (!message) {
       return NextResponse.json({ error: 'Session not found or closed' }, { status: 404 });
