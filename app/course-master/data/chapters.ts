@@ -597,6 +597,8 @@ export interface ChapterContentAsset {
   topic_name?: string | null;
   /** Canonical URL of a study deck's classroom PDF. Only present when the PDF is really stored. */
   pdf_url?: string;
+  /** Section of the Videos tab this video is filed under ('chapter', 'concept', 'morning-circle', 'sustainable-cities'), or null. */
+  video_group?: string | null;
   /**
    * Set by the server on a stored study deck (Classroom Presentation or branching scenario), read from the item's own file
    * name and from the run that stored it. A value the server cannot tell is null; see lib/coursePresentation/resourceCard.

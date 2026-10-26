@@ -200,6 +200,7 @@ import { documentKindOf } from '@/lib/study-document/document';
 import type { DocumentKind } from '@/lib/study-document/types';
 import { pdfFileNameFromTitle } from '@/lib/study-deck/pdf';
 import { documentTarget } from '@/lib/documentUrl';
+import { groupVideos } from '@/lib/videoGroups';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import { useCurriculumMeta } from '../../data/curriculum';
@@ -557,6 +558,8 @@ interface ChapterContentItem {
   prayogshala: PrayogshalaActivity | null;
   /** The study deck's classroom PDF, reported by the backend. A second file of the same item; Open is unchanged. */
   pdfUrl?: string;
+  /** The Videos-tab section the server filed this video under; null or absent when it has none (see lib/videoGroups). */
+  videoGroup?: string | null;
   /**
    * Set (by the server) when this row is a study document: revision notes, a remedial class or classroom activities. Its PDF
    * is its primary file and it opens in place in the document viewer, with an online practice beside the PDF.
@@ -723,6 +726,7 @@ function buildApiChapterContentItems(
         summary: type === 'Prayogshala' ? (asset.prayogshala?.objective ?? asset.description ?? null) : null,
         prayogshala: asset.prayogshala ?? null,
         pdfUrl: asset.pdf_url,
+        videoGroup: asset.video_group ?? null,
         studyDocKind: documentKindOf(asset),
         activity: asset.activity_code ? { code: asset.activity_code, steps: Number(asset.activity_steps) || 0 } : undefined,
         chapterId: chapter.id,
@@ -2523,6 +2527,12 @@ export default function ChapterListPage() {
         contentMatchesTab(item, activeContentLibraryTab)
       ),
     [contentItemsForActiveLane, activeContentLibraryTab]
+  );
+
+  // The Videos tab is shown in sections only once the chapter's videos carry a section; otherwise it stays one flat list.
+  const videoSections = useMemo(
+    () => (activeContentLibraryTab === 'Videos' ? groupVideos(filteredChapterContentItems) : null),
+    [activeContentLibraryTab, filteredChapterContentItems]
   );
 
   /**
@@ -6541,7 +6551,37 @@ export default function ChapterListPage() {
                   ))}
                 </div>
               );
-            })() : (
+            })() : videoSections ? (
+              <div className="space-y-10" data-testid="video-sections">
+                {videoSections.map((section) => (
+                  <section key={section.key} data-testid={`video-section-${section.key}`}>
+                    <div className="mb-4 flex items-center gap-3">
+                      <h2 className="text-[20px] font-bold leading-7 text-slate-950">{section.label}</h2>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200">
+                        {section.items.length} video{section.items.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    {section.items.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-8 text-center text-sm text-slate-500">
+                        {section.emptyMessage}
+                      </div>
+                    ) : (
+                      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
+                        {section.items.map((item) => (
+                          <ContentCard
+                            key={item.id}
+                            item={item}
+                            onOpen={() => handleOpenContent(item)}
+                            onDownloadPdf={() => handleDownloadPdf(item)}
+                            hideChapter
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                ))}
+              </div>
+            ) : (
               <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
                 {filteredChapterContentItems.map((item) => (
                   <ContentCard
