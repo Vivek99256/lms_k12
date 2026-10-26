@@ -105,7 +105,9 @@ import {
 import { filterCardAssets } from '@/lib/prayogshala/cardEligibility';
 import { CoursePresentationFlow } from '@/components/coursePresentation/CoursePresentationFlow';
 import { COURSE_PRESENTATION_CARD_ID, routeCardOpen, shouldShowCoursePresentationCard } from '@/lib/coursePresentation/card';
+import { showsInLane } from '@/lib/classroomResources';
 import { coursePresentationEnabledFor } from '@/lib/coursePresentation/scope';
+import { CREATE_CARD_TITLE, resourceTitle, viewTarget, type StoredDeckMetadata } from '@/lib/coursePresentation/resourceCard';
 import { readCpState, startState, withCpState, withoutCpState, type CpState } from '@/lib/coursePresentation/urlState';
 import { PrayogshalaLab } from './PrayogshalaLab';
 import { PrayogshalaTopicPanel } from './PrayogshalaTopicPanel';
@@ -197,6 +199,7 @@ import { DocumentViewer, type DocumentViewerItem } from '@/components/study-docu
 import { documentKindOf } from '@/lib/study-document/document';
 import type { DocumentKind } from '@/lib/study-document/types';
 import { pdfFileNameFromTitle } from '@/lib/study-deck/pdf';
+import { documentTarget } from '@/lib/documentUrl';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import { useCurriculumMeta } from '../../data/curriculum';
@@ -370,6 +373,7 @@ const CONTENT_CREATE_DENIED_HINT =
 const CONTENT_LIBRARY_TABS = [
   'All content',
   'Presentations',
+  'Educational Posters',
   'Videos',
   'Revision notes',
   'Classroom activity',
@@ -478,7 +482,9 @@ type ChapterContentType =
   | 'Interactive'
   | 'Vocabulary cards'
   | 'Flash cards'
-  | 'Prayogshala';
+  | 'Prayogshala'
+  | 'Educational Posters'
+  | 'Educational posters';
 type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded' | 'Authored';
 
 /**
@@ -556,12 +562,16 @@ interface ChapterContentItem {
    * is its primary file and it opens in place in the document viewer, with an online practice beside the PDF.
    */
   studyDocKind?: DocumentKind | null;
+  /** Set for an interactive classroom activity: its printed code ("A1") and step count; the card shows both and its progress. */
+  activity?: { code: string; steps: number };
   chapterId?: string;
   /**
    * Set only on the dedicated Course Presentation card of a pilot chapter (lib/coursePresentation). It is what sends
    * a click to the two-choice screen; no other card carries it.
    */
   coursePresentationPilot?: boolean;
+  /** Teaching method, content format, status and ids of a stored study deck, as the server reported them. Absent on other items. */
+  resource?: StoredDeckMetadata;
   slides: {
     id: string;
     number: number;
@@ -576,7 +586,7 @@ interface ChapterContentItem {
 function buildCoursePresentationCard(chapter: Chapter): ChapterContentItem {
   return {
     id: COURSE_PRESENTATION_CARD_ID,
-    title: 'Course Presentation',
+    title: CREATE_CARD_TITLE,
     subtitle: 'Classroom Presentation',
     chapterTitle: chapter.title,
     conceptTitle: 'Classroom Presentation',
@@ -613,6 +623,14 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   // no case at all and fell through to the 'Revision notes' default, which
   // mislabelled 12,965 rows - every Remedial Class, Worksheet, Lesson Plan and
   // My Course row in the table - and left them with no tab to appear under.
+  if (
+    contentCategory === 'educational posters' ||
+    contentCategory === 'educational poster' ||
+    normalizedCategory === 'educational posters' ||
+    normalizedCategory === 'educational poster'
+  ) {
+    return 'Educational Posters';
+  }
   if (contentCategory === 'remedial class') return 'Remedial class';
   if (contentCategory === 'worksheet') return 'Worksheet';
   if (contentCategory === 'lesson plan') return 'Lesson plan';
@@ -663,9 +681,24 @@ function buildApiChapterContentItems(
           : String(asset.concept_id).trim();
       const source = resolveContentSource(asset.source);
 
+      // A stored study deck says what it was made as; its card is titled and badged from that, never from its siblings.
+      const resource: StoredDeckMetadata | undefined = asset.content_format
+        ? {
+            content_id: asset.content_id,
+            teaching_method: asset.teaching_method,
+            teaching_method_label: asset.teaching_method_label,
+            teaching_method_short: asset.teaching_method_short,
+            content_format: asset.content_format,
+            content_format_label: asset.content_format_label,
+            generation_status: asset.generation_status,
+            generation_run_id: asset.generation_run_id,
+          }
+        : undefined;
+
       return {
         id: String(asset.id),
-        title: asset.title || 'Untitled content',
+        title: resource ? resourceTitle(chapter.title, resource, asset.title || 'Untitled content') : asset.title || 'Untitled content',
+        resource,
         subtitle: category,
         chapterTitle: chapter.title,
         conceptTitle: category,
@@ -691,6 +724,7 @@ function buildApiChapterContentItems(
         prayogshala: asset.prayogshala ?? null,
         pdfUrl: asset.pdf_url,
         studyDocKind: documentKindOf(asset),
+        activity: asset.activity_code ? { code: asset.activity_code, steps: Number(asset.activity_steps) || 0 } : undefined,
         chapterId: chapter.id,
       };
     })
@@ -929,6 +963,7 @@ function getChapterContentType(index: number): ChapterContentType {
 }
 
 function getChapterContentPreview(type: ChapterContentType): ChapterContentPreview {
+  if (type === 'Educational Posters' || type === 'Educational posters') return 'notes';
   if (type === 'Interactive') return 'video';
   if (type === 'Vocabulary cards' || type === 'Flash cards') return 'activity';
   if (type === 'Video') return 'video';
@@ -1077,6 +1112,9 @@ function contentMatchesTab(item: ChapterContentItem, tab: string): boolean {
       return (
         item.type === 'Classroom presentation' || item.type === 'Teacher training presentation'
       );
+    case 'Educational Posters':
+    case 'Educational posters':
+      return item.type === 'Educational Posters' || item.type === 'Educational posters';
     case 'Videos':
       return item.type === 'Video';
     case 'Revision notes':
@@ -2474,7 +2512,8 @@ export default function ChapterListPage() {
       const matchesResourceType =
         isAudienceNeutral || (contentResourceType === 'teacher' ? isTeacherTraining : !isTeacherTraining);
 
-      return matchesSearch && matchesSource && matchesResourceType;
+      // Single-word flashcards are hidden here; the chapter's vocabulary deck ('Vocabulary cards') stays.
+      return matchesSearch && matchesSource && matchesResourceType && showsInLane(item, contentResourceType);
     });
   }, [chapterContentItems, contentResourceType, contentSearch, contentSourceFilter]);
 
@@ -3064,6 +3103,15 @@ export default function ChapterListPage() {
     // An H5P item is not a file - it is a route. It opens in its existing editor
     // in-app, which is what keeps all the H5P CRUD reachable now that H5P is a
     // filter value rather than a top-level destination (tracker row 2).
+    // A stored study deck opens only the link that names its own content id; a link that points at any other item of the
+    // chapter is refused rather than followed.
+    if (item.resource) {
+      const target = viewTarget(item.deepLink, item.id);
+      if (target) router.push(target);
+      else setContentError('This resource could not be opened because its own link is missing. Reload the page and try again.');
+      return;
+    }
+
     if (item.deepLink) {
       router.push(item.deepLink);
       return;
@@ -3075,9 +3123,15 @@ export default function ChapterListPage() {
       return;
     }
 
-    if (!item.contentUrl) return;
-
-    window.open(item.contentUrl, '_blank', 'noopener,noreferrer');
+    // A document opens at its own complete public URL (a PDF in the browser's viewer, a .docx as a download). A missing or
+    // incomplete URL is reported, never opened and never silently ignored.
+    const target = documentTarget(item.contentUrl);
+    if (!target.ok) {
+      setContentError(target.message);
+      return;
+    }
+    setContentError('');
+    window.open(target.url, '_blank', 'noopener,noreferrer');
   };
 
   /** Open a topic's lab full-screen, addressed by the URL like any other Prayogshala activity. */

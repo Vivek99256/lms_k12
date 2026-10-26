@@ -9,11 +9,14 @@ import {
   Eye,
   FileText,
   FlaskConical,
+  GitBranch,
   GraduationCap,
+  Image as ImageIcon,
   Layers3,
   LifeBuoy,
   MonitorPlay,
   PencilLine,
+  Plus,
   Play,
   Presentation,
   Sparkles,
@@ -22,6 +25,8 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { NOT_CONFIGURED_LABEL, resourceBadges, type StoredDeckMetadata } from '@/lib/coursePresentation/resourceCard';
+import { useActivityStatus } from '@/lib/classroom-activity/useActivityStatus';
 
 /**
  * The one content card used by Classroom Resource and Teacher Workspace.
@@ -69,6 +74,12 @@ export interface ContentCardItem {
   actionLabel: 'Open' | 'Play';
   /** Set by the backend for a study deck whose classroom PDF is stored. Open is unaffected. */
   pdfUrl?: string;
+  /** Set on the entry card that creates a Classroom Presentation; it is drawn as an action, not as a generated resource. */
+  coursePresentationPilot?: boolean;
+  /** Method, format, status and ids of a stored study deck. Absent on other items. */
+  resource?: StoredDeckMetadata;
+  /** Set on an interactive classroom activity: its printed code and step count. Absent on every other item. */
+  activity?: { code: string; steps: number };
 }
 
 /**
@@ -88,6 +99,20 @@ const TYPE_STYLES: Record<
     text: 'text-violet-600',
     ring: 'ring-violet-200',
     icon: Presentation,
+  },
+  'Educational Posters': {
+    band: 'from-blue-100 via-blue-50/60 to-transparent',
+    chip: 'bg-blue-100 text-blue-700',
+    text: 'text-blue-600',
+    ring: 'ring-blue-200',
+    icon: ImageIcon,
+  },
+  'Educational posters': {
+    band: 'from-blue-100 via-blue-50/60 to-transparent',
+    chip: 'bg-blue-100 text-blue-700',
+    text: 'text-blue-600',
+    ring: 'ring-blue-200',
+    icon: ImageIcon,
   },
   'Teacher training presentation': {
     band: 'from-indigo-100 via-indigo-50/60 to-transparent',
@@ -197,6 +222,22 @@ const FALLBACK_STYLE = {
   icon: BookOpen,
 };
 
+const CREATE_STYLE = {
+  band: 'from-indigo-100 via-indigo-50/60 to-transparent',
+  chip: 'bg-indigo-600 text-white',
+  text: 'text-indigo-600',
+  ring: 'ring-indigo-300',
+  icon: Plus,
+};
+
+const BRANCHING_STYLE = {
+  band: 'from-emerald-100 via-emerald-50/60 to-transparent',
+  chip: 'bg-emerald-100 text-emerald-800',
+  text: 'text-emerald-700',
+  ring: 'ring-emerald-200',
+  icon: GitBranch,
+};
+
 function styleFor(type: string) {
   return TYPE_STYLES[type] ?? FALLBACK_STYLE;
 }
@@ -219,9 +260,24 @@ interface ContentCardProps {
   hideChapter?: boolean;
 }
 
+/** The label of the action on an interactive activity's card, from how far the learner has got. */
+function activityActionLabel(state: 'not_started' | 'in_progress' | 'completed' | undefined): string {
+  return state === 'completed' ? 'Review activity' : state === 'in_progress' ? 'Continue activity' : 'Start activity';
+}
+
 export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }: ContentCardProps) {
-  const style = styleFor(item.type);
-  const TypeIcon = style.icon;
+  const isCreate = item.coursePresentationPilot === true;
+  // An interactive activity says how far the learner is. Every other card passes steps 0 and ignores the answer.
+  const progress = useActivityStatus(item.id, item.activity?.steps ?? 0);
+  const badges = item.resource ? resourceBadges(item.resource) : null;
+  // The create card, a PowerPoint and a branching scenario each get their own colour and icon, so they read apart unopened.
+  const style = isCreate
+    ? CREATE_STYLE
+    : badges?.kind === 'branching_scenario'
+      ? BRANCHING_STYLE
+      : styleFor(item.type);
+  const TypeIcon = isCreate ? Plus : badges?.kind === 'branching_scenario' ? GitBranch : badges?.kind === 'powerpoint' ? Presentation : style.icon;
+  const typeLabel = isCreate ? 'New' : badges?.kind === 'branching_scenario' ? 'Branching scenario' : badges?.kind === 'powerpoint' ? 'PowerPoint' : item.type;
   const fileType = item.statValue?.trim();
   // 'link' is how the table records an external URL; it is not a file format,
   // so it is worth saying plainly rather than showing as an extension.
@@ -242,7 +298,7 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
           onOpen(item);
         }
       }}
-      className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_4px_14px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-[0_8px_20px_rgba(15,23,42,0.10)]"
+      className={`group flex h-full cursor-pointer flex-col overflow-hidden rounded-xl border ${isCreate ? 'border-2 border-dashed border-indigo-300 bg-indigo-50/30' : 'border-slate-200/80 bg-white'} shadow-[0_4px_14px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-[0_8px_20px_rgba(15,23,42,0.10)]`}
     >
       {/* Header band, tinted by type. The tint is the scanning cue - one grey
           gradient for every type is what made the grid unreadable.
@@ -258,7 +314,7 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${style.chip}`}
         >
           <TypeIcon size={10} />
-          {item.type}
+          {typeLabel}
         </span>
 
       </div>
@@ -312,9 +368,43 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
         {/* The line that separates two cards sharing a title. file_type is set
             on 99% of rows and the date on all of them, so this is the reliable
             differentiator - and updatedAt was already computed and thrown away. */}
+        {isCreate ? (
+          <p className="mt-1 text-[11px] leading-4 text-slate-600">Choose a teaching method and a content format, then create.</p>
+        ) : badges ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1" data-testid="resource-badges">
+            {badges.method ? (
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">{badges.method}</span>
+            ) : null}
+            {badges.format ? (
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${style.chip}`}>
+                <TypeIcon size={10} />
+                {badges.format}
+              </span>
+            ) : null}
+            {badges.missing ? (
+              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">{NOT_CONFIGURED_LABEL}</span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500">
-          {fileLabel && <span className="font-medium text-slate-600">{fileLabel}</span>}
+          {item.activity ? (
+            <span className="font-medium text-slate-600" data-testid="activity-meta">
+              Activity {item.activity.code}
+              {item.activity.steps > 0 ? ` · ${item.activity.steps} steps` : ''}
+            </span>
+          ) : (
+            fileLabel && !isCreate && <span className="font-medium text-slate-600">{fileLabel}</span>
+          )}
+          {badges?.status ? <span className="capitalize">{badges.status}</span> : null}
         </div>
+        {item.activity && progress ? (
+          <p
+            className={`mt-1 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${progress.state === 'completed' ? 'bg-emerald-100 text-emerald-900' : progress.state === 'in_progress' ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-700'}`}
+            data-testid="activity-status"
+          >
+            {progress.state === 'completed' ? 'Completed' : progress.state === 'in_progress' ? `In progress · ${progress.stepsDone} of ${progress.totalSteps} steps` : 'Not started'}
+          </p>
+        ) : null}
 
         {/* Stops the card's own onClick from firing when the gap between the
             buttons is clicked - only the designated area above should open
@@ -331,11 +421,25 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
               event.stopPropagation();
               onOpen(item);
             }}
-            aria-label={item.actionLabel === 'Play' ? `Play: ${item.title}` : `${item.pdfUrl ? 'Open PDF' : 'Open'}: ${item.title}`}
+            aria-label={isCreate ? item.title : item.actionLabel === 'Play' ? `Play: ${item.title}` : `${item.pdfUrl ? 'View PDF' : 'View'}: ${item.title}`}
             className="h-7 w-7 shrink-0 rounded-full bg-slate-100 p-0 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
           >
-            {item.actionLabel === 'Play' ? <Play size={13} /> : <Eye size={13} />}
+            {isCreate ? <Plus size={13} /> : item.actionLabel === 'Play' ? <Play size={13} /> : <Eye size={13} />}
           </Button>
+          {item.activity ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen(item);
+              }}
+              className="h-7 flex-1 justify-end rounded-full px-2 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50 hover:text-emerald-950"
+            >
+              {activityActionLabel(progress?.state)}
+              <Play size={11} className="ml-1" />
+            </Button>
+          ) : null}
           {item.pdfUrl && onDownloadPdf ? (
             <Button
               type="button"
