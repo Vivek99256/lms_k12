@@ -39,6 +39,7 @@ import {
   toBlanksPayload,
   toCoursePresentationPayload,
   toDragDropPayload,
+  toImageHotspotsPayload,
   toMemoryGamePayload,
   toSingleChoiceSetPayload,
   toTrueFalsePayload,
@@ -235,6 +236,42 @@ export interface RuntimeMemoryCard {
  */
 export interface RuntimeDragDrop extends RowBase, Omit<DragDropPlayerPayload, 'title' | 'description'> {}
 
+export interface RuntimeImageHotspotPoint {
+  id: number;
+  image_hotspots_id: number;
+  position_x: number;
+  position_y: number;
+  header: string | null;
+  popup_type: string;
+  body_text: string | null;
+  popup_image: string | null;
+  popup_image_alt: string | null;
+  icon_name: string | null;
+  icon_color: string | null;
+  icon_image: string | null;
+  tooltip: string | null;
+  aria_label: string | null;
+  popup_width: number;
+  sort_order: number;
+}
+
+export interface RuntimeImageHotspots extends RowBase {
+  task_description: string | null;
+  background_image: string | null;
+  background_alt: string | null;
+  image_width: number | null;
+  image_height: number | null;
+  default_icon: string;
+  default_icon_color: string;
+  show_hotspot_numbers: boolean;
+  points_per_hotspot: number;
+  pass_percentage: number;
+  enable_retry: boolean;
+  single_popup_open: boolean;
+  feedback_bands: FeedbackBandInput[] | null;
+  points: RuntimeImageHotspotPoint[];
+}
+
 export interface RuntimeMemoryGame extends RowBase {
   task_description: string | null;
   pairs_to_use: number;
@@ -359,6 +396,7 @@ export type RuntimeActivity =
   | { kind: 'mark_the_words'; item: RuntimeTextActivity }
   | { kind: 'memory_game'; item: RuntimeMemoryGame }
   | { kind: 'drag_drop'; item: RuntimeDragDrop }
+  | { kind: 'image_hotspots'; item: RuntimeImageHotspots }
   | { kind: 'flashcards'; item: RuntimeFlashcards }
   | { kind: 'course_presentation'; item: RuntimeCoursePresentation }
   | { kind: 'essay'; item: RuntimeEssay };
@@ -842,6 +880,44 @@ export function mapQuestionToPlayerPayload(
             enable_check: payload.enable_check,
             enable_retry: payload.enable_retry,
             enable_show_solution: payload.enable_show_solution,
+          },
+        },
+      };
+    }
+
+    case 'image_hotspots': {
+      const payload = toImageHotspotsPayload(question, context);
+
+      if (!payload) {
+        return { ok: false, mapping, reason: 'Hotspots or image URL are missing or invalid, so the activity could not be played.' };
+      }
+
+      return {
+        ok: true,
+        mapping,
+        activity: {
+          kind: 'image_hotspots',
+          item: {
+            ...rowBase(question, scope, payload.title, payload.description, mapping.target.library),
+            task_description: payload.task_description,
+            background_image: payload.background_image,
+            background_alt: payload.background_alt,
+            image_width: payload.image_width,
+            image_height: payload.image_height,
+            default_icon: payload.default_icon,
+            default_icon_color: payload.default_icon_color,
+            show_hotspot_numbers: payload.show_hotspot_numbers,
+            points_per_hotspot: payload.points_per_hotspot,
+            pass_percentage: payload.pass_percentage,
+            enable_retry: payload.enable_retry,
+            single_popup_open: payload.single_popup_open,
+            feedback_bands: null,
+            max_score: payload.points_per_hotspot * payload.points.length,
+            points: payload.points.map((p, idx) => ({
+              ...p,
+              id: syntheticId(id, 1 + idx),
+              image_hotspots_id: syntheticId(id),
+            })),
           },
         },
       };

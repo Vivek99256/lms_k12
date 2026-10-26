@@ -14,6 +14,7 @@ import { MarkTheWordsPlayer } from './MarkTheWordsPlayer';
 import { MatchingPlayer } from './MatchingPlayer';
 import { MultipleChoicePlayer } from './MultipleChoicePlayer';
 import { TrueFalsePlayer } from './TrueFalsePlayer';
+import { ImageHotspotsPlayer } from './ImageHotspotsPlayer';
 import { NotPlayable, scopeOfQuestion } from './shared';
 import type { PlayerProps } from './types';
 
@@ -83,6 +84,8 @@ export function QuestionPlayer(props: PlayerProps & { as?: H5pTargetKind }) {
       return <EssayPlayer {...props} />;
     case 'drag_drop':
       return <DragDropPlayer {...props} />;
+    case 'image_hotspots':
+      return <ImageHotspotsPlayer {...props} />;
   }
 }
 

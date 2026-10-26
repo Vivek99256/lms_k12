@@ -132,8 +132,8 @@ export const BANK_SOURCE_BY_ROUTE: Record<string, H5pTargetKind | null> = {
   h5p_flashacard: 'flashcards',
   h5p_course_presentation: 'course_presentation',
 
-  h5p_drag_drop: null,
-  h5p_image_hotspots: null,
+  h5p_drag_drop: 'drag_drop',
+  h5p_image_hotspots: 'image_hotspots',
   h5p_interactive_video: null,
   h5p_arithmetic_quiz: null,
   scenario_based: null,
