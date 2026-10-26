@@ -154,8 +154,27 @@ export async function purgeClientState(): Promise<void> {
 }
 
 /**
+ * What a signed-in user keeps across a build change: the login itself and the year/term they
+ * were working in. Dropping these on every deploy signed people out in the middle of their work
+ * (and, since storage is shared, every other open tab with them), when all the purge is for is
+ * stale caches and per-feature state. Only a real sign-out clears them.
+ */
+const SESSION_KEYS_KEPT_ACROSS_BUILDS = [
+  'auth',
+  'menuContext',
+  'userData',
+  'token',
+  'selectedAcademicYear',
+  'selectedAcademicTerm',
+  'syear',
+  'term_id',
+  'sub_institute_id',
+];
+
+/**
  * Compare the running build against the one this browser last saw, and take the
- * browser to a clean copy of the new build if they differ.
+ * browser to a clean copy of the new build if they differ. The signed-in session survives;
+ * everything else is dropped.
  *
  * Returns true when a reload was triggered, so the caller can stop rendering work
  * that is about to be thrown away.
@@ -178,7 +197,26 @@ export async function syncAppBuild(): Promise<boolean> {
     return false;
   }
 
+  const kept: Array<[string, string]> = [];
+  try {
+    const local = safeStorage('local');
+    for (const key of SESSION_KEYS_KEPT_ACROSS_BUILDS) {
+      const value = local?.getItem(key);
+      if (value !== null && value !== undefined) kept.push([key, value]);
+    }
+  } catch {
+    /* nothing readable to keep */
+  }
+
   await purgeClientState();
+
+  try {
+    const local = safeStorage('local');
+    for (const [key, value] of kept) local?.setItem(key, value);
+  } catch {
+    /* storage unavailable; the user signs in again */
+  }
+
   recordBuildId();
   window.location.reload();
   return true;
