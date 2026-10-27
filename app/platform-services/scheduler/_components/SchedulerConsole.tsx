@@ -171,6 +171,24 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
     return [...byComponent.entries()];
   }, [payload]);
 
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const offTasks = (payload?.tasks ?? []).filter((row) => row.has_job && row.disabled);
+
+  /** Switch on every task in view that has a job and is off, one saved change per task, as if each toggle were pressed. */
+  const switchAllOn = async () => {
+    if (!mayEdit || bulkBusy || offTasks.length === 0) return;
+    setBulkBusy(true);
+    let done = 0;
+    for (const row of offTasks) {
+      if (await saveTask(row, { disabled: false }, `${row.label} switched on.`)) done += 1;
+    }
+    setNote({
+      tone: done === offTasks.length ? 'ok' : 'error',
+      text: `Switched on ${done} of ${offTasks.length} tasks.`,
+    });
+    setBulkBusy(false);
+  };
+
   if (registryLoading) return <div className="p-6"><LoadingState label="Loading the platform registry" /></div>;
   if (registryError || !registry) return <div className="p-6"><ErrorState message={registryError ?? 'The registry is unavailable.'} onRetry={reload} /></div>;
 
@@ -196,7 +214,21 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
         setComponentKey(null);
         setEditing(null);
       }}
-      actions={<RefreshButton onClick={() => load(true)} busy={loading} />}
+      actions={
+        <div className="flex items-center gap-2">
+          {mayEdit && offTasks.length > 0 && (
+            <button
+              type="button"
+              onClick={switchAllOn}
+              disabled={bulkBusy}
+              className="inline-flex items-center rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {bulkBusy ? 'Switching on…' : `Switch all on (${offTasks.length})`}
+            </button>
+          )}
+          <RefreshButton onClick={() => load(true)} busy={loading} />
+        </div>
+      }
     >
       {note && <Note tone={note.tone} text={note.text} onDismiss={() => setNote(null)} />}
 
