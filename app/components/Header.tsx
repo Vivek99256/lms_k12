@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { publishSelectedAcademicYear } from '@/lib/academic-year';
 import { useRouter } from 'next/navigation';
 import HeaderMenuSearch from '@/app/components/HeaderMenuSearch';
+import NotificationBell from '@/app/components/NotificationBell';
 import type { MenuItem } from '@/app/data/menuItems';
 import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { AI_CAPABILITIES, capabilityHref } from '@shared/ai-intelligence-core';
@@ -615,10 +616,7 @@ const logoUrl = (() => {
           </div>
         </button>
 
-        {/* No notification feed is wired yet, so the bell carries no count — an invented number is worse than none. */}
-        <span className="hidden p-1 text-slate-500 lg:block" aria-hidden>
-          <Bell size={20} />
-        </span>
+        <NotificationBell />
 
         <div className="flex items-center gap-2">
           <button

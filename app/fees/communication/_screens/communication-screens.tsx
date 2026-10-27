@@ -1,8 +1,9 @@
 'use client';
 
-import { BellRing } from 'lucide-react';
+import { BellRing, History } from 'lucide-react';
 
 import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
+import { FeesDeliveryLog } from '@/app/fees/communication/_components/FeesDeliveryLog';
 import { FeesNotificationSettings } from '@/app/fees/communication/_components/FeesNotificationSettings';
 
 /**
@@ -19,5 +20,11 @@ export const FEES_COMMUNICATION_SCREENS: ModuleStaticScreen[] = [
     label: 'Notification settings',
     icon: BellRing,
     render: () => <FeesNotificationSettings />,
+  },
+  {
+    id: 'delivery-log',
+    label: 'Delivery log',
+    icon: History,
+    render: () => <FeesDeliveryLog />,
   },
 ];

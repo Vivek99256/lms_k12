@@ -368,10 +368,22 @@ export interface NotificationLogRow {
 }
 
 export async function fetchNotificationLog(
-  filters: { status?: string; channel?: string; page?: number; per_page?: number } = {},
+  filters: { status?: string; channel?: string; event_prefix?: string; page?: number; per_page?: number } = {},
 ): Promise<{ rows: NotificationLogRow[]; meta: PageMeta }> {
   const result = await callEnvelope<NotificationLogRow[]>(`/notifications/log${query({ ...filters })}`);
   return { rows: result.data ?? [], meta: result.meta as PageMeta };
+}
+
+export interface NotificationInboxRow {
+  id: number;
+  event_key: string;
+  subject: string | null;
+  body: string | null;
+  created_at: string;
+}
+
+export function fetchNotificationInbox(): Promise<NotificationInboxRow[]> {
+  return call<NotificationInboxRow[]>('/notifications/inbox');
 }
 
 export async function runScheduledTaskNow(taskKey: string): Promise<{ status: string; message: string }> {
