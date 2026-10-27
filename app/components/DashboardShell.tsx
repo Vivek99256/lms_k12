@@ -190,6 +190,24 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
     label: 'AI tools',
     href: '/pal/new/ai-stack',
   },
+  // Learning Intelligence — registered by 2026_10_26_120000_add_new_pal_
+  // learning_intelligence_submodule_menus (all 4 rows exist in
+  // tblmenumaster). Knowledge Graph and Teacher Insights (re-enabled with
+  // the class-wide learning map as its centerpiece) are listed here.
+  // Learning Journey / Context Inspector are still deliberately not listed
+  // — their pages/routes exist (not deleted) but are soft-disabled (see
+  // each page's own "temporarily unavailable" state) and are not surfaced
+  // as reachable tabs until that changes.
+  {
+    id: 'pal-knowledge-graph',
+    label: 'Knowledge Graph',
+    href: '/pal/learning-intelligence/knowledge-graph',
+  },
+  {
+    id: 'pal-teacher-insights',
+    label: 'Teacher Insights',
+    href: '/pal/learning-intelligence/teacher-insights',
+  },
 ];
 
 /**
@@ -212,6 +230,8 @@ const NEW_PAL_LEVEL3_DB_NAMES: Record<string, string> = {
   'pal-gamification': 'Gamification',
   'pal-eso': 'ESO',
   'pal-ai-stack': 'AI Stack',
+  'pal-knowledge-graph': 'Knowledge Graph',
+  'pal-teacher-insights': 'Teacher Insights',
 };
 
 /** `href` itself, or a page nested under it — never a sibling that merely shares a prefix. */

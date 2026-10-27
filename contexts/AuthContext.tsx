@@ -160,14 +160,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/api-login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // `Accept` (not just `Content-Type`) is what Laravel's exception handler
+        // checks via expectsJson() to decide whether a thrown error (rate limit,
+        // 500, maintenance mode) renders as JSON or as its HTML error page.
+        // Without it, a plain fetch() reads as a browser navigation and a
+        // non-happy-path response comes back as HTML that res.json() can't parse.
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ email, password, type: 'API' }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (res.ok && data) {
         clearTeachAssistantStorage();
         persistLoginPayload(data as Record<string, unknown>);
         return { success: true };
+      }
+      if (!data) {
+        return { success: false, error: 'The server returned an unexpected response. Please try again shortly.' };
       }
       return { success: false, error: data?.message || 'Invalid credentials. Please try again.' };
     } catch (err) {
