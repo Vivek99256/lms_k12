@@ -964,7 +964,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               </div>
 
               <div
-                className="min-h-0 flex-none overflow-hidden"
+                className="min-h-0 h-full flex-none overflow-hidden"
                 style={{ width: assistantPanel.width }}
               >
                 <ChatbotPanel
