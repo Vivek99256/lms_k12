@@ -66,7 +66,10 @@ export default function NotificationBell() {
         }
       }
       merged.sort((a, b) => b.createdAt - a.createdAt);
-      setItems(merged.slice(0, 30));
+      // The same notice can arrive from both feeds; keep one per key.
+      const seenKeys = new Set<string>();
+      const unique = merged.filter((item) => (seenKeys.has(item.key) ? false : (seenKeys.add(item.key), true)));
+      setItems(unique.slice(0, 30));
     });
   }, []);
 

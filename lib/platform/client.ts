@@ -389,7 +389,7 @@ export function fetchNotificationInbox(): Promise<NotificationInboxRow[]> {
 /** One notice addressed to the signed-in person, merged server-side from the per-person notification tables. */
 export interface MyNotificationRow {
   key: string;
-  source: 'app' | 'pal' | 'brain';
+  source: 'app' | 'pal' | 'brain' | 'platform';
   subject: string;
   body: string;
   created_at: string;
