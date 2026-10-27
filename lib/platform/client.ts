@@ -386,6 +386,21 @@ export function fetchNotificationInbox(): Promise<NotificationInboxRow[]> {
   return call<NotificationInboxRow[]>('/notifications/inbox');
 }
 
+/** One notice addressed to the signed-in person, merged server-side from the per-person notification tables. */
+export interface MyNotificationRow {
+  key: string;
+  source: 'app' | 'pal' | 'brain';
+  subject: string;
+  body: string;
+  created_at: string;
+  /** true/false where the source table tracks it, null where it does not. */
+  read: boolean | null;
+}
+
+export function fetchMyNotifications(): Promise<MyNotificationRow[]> {
+  return call<MyNotificationRow[]>('/notifications/mine');
+}
+
 export async function runScheduledTaskNow(taskKey: string): Promise<{ status: string; message: string }> {
   return call<{ status: string; message: string }>('/scheduler/run-now', { method: 'POST', body: { task_key: taskKey } });
 }
