@@ -601,6 +601,19 @@ const EXECUTORS: Record<string, Executor> = {
       }),
     ).then((output) => ({ output })),
 
+  'teach_learn.content_model_coverage': (args, context) =>
+    readViaMcp(
+      context,
+      'teach_learn.content_model_coverage',
+      given({
+        standard_id: count(args.standard_id ?? args.class_id),
+        standard: count(args.standard),
+        subject_id: count(args.subject_id),
+        subject: text(args.subject ?? args.subject_name),
+        limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
   // ---- Curriculum Planning ---------------------------------------------------
 
   'curriculum_planning.status': (args, context) =>
@@ -1997,6 +2010,27 @@ const EXECUTORS: Record<string, Executor> = {
 
     return { output: { heading, message, point_count: points.length, word_count: wordCount(message), sends: false } };
   },
+
+  /**
+   * Teach/Learn Course Catalogue & complete 5-tier content hierarchy validation.
+   * Backed by MCP tool `lms.courses`.
+   */
+  'teach_learn.courses': (args, context) =>
+    readViaMcp(
+      context,
+      'lms.courses',
+      given({
+        standard_id: count(args.standard_id),
+        standard_name: text(args.standard_name),
+        subject_id: count(args.subject_id),
+        category: text(args.category),
+        query: text(args.query),
+        include_chapters: typeof args.include_chapters === 'boolean' ? args.include_chapters : true,
+        validate_hierarchy: typeof args.validate_hierarchy === 'boolean' ? args.validate_hierarchy : true,
+        force: typeof args.force === 'boolean' ? args.force : false,
+        limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
 };
 
 export function hasExecutor(toolKey: string): boolean {

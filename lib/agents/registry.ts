@@ -1518,6 +1518,17 @@ export const AGENT_TOOLS: AgentTool[] = [
     available: true,
     exampleInput: { standard_id: null, days_ahead: 7, days_back: 7, limit: 50 },
   },
+  {
+    key: 'teach_learn.content_model_coverage',
+    label: 'Analyze content model coverage',
+    description:
+      'Analyzes content model coverage across institute chapters, identifying covered and missing content mappings to support curriculum and content planning. Changes nothing.',
+    module: 'teach_learn',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { standard: null, subject: '', limit: 50 },
+  },
 
   // ---- Curriculum Planning --------------------------------------------------
   {
@@ -1634,6 +1645,19 @@ export const AGENT_TOOLS: AgentTool[] = [
     kind: 'mcp',
     available: true,
     exampleInput: { standard_id: null, subject_id: null, limit: 50 },
+  },
+
+  // ---- Teach/Learn --------------------------------------------------------
+  {
+    key: 'teach_learn.courses',
+    label: 'Course catalogue & hierarchy',
+    description:
+      'Reads published courses and chapters for this institute and validates the complete 5-tier content hierarchy (Standard -> Subject -> Chapter -> Topic -> Intelligence). Changes nothing.',
+    module: 'teach_learn',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { standard_id: null, subject_id: null, validate_hierarchy: true, limit: 50 },
   },
 
   // ---- Shared -------------------------------------------------------------

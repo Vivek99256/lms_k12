@@ -76,6 +76,7 @@ import { logModuleOperation, readModuleWorkspaceSession } from '@/lib/module-ai/
 import { ModuleApprovalQueue } from './module-approval-queue';
 import { AiStackCard, AiStackCardHeading, AiStackPill, formatWhen } from './ai-stack-chrome';
 import { aiStackRbacKey, type AiStackBoundAgent, type AiStackModule } from './ai-stack-module';
+import { CatalogueAgentControlCard } from './catalogue-agent-control-card';
 
 /** The manifest as `/api/ai/agents` returns it. Loosely typed — it is a config row. */
 interface AgentManifestRow {
@@ -198,7 +199,9 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
 
   return (
     <div className="space-y-6">
-      {module.boundAgent ? (
+      {module.boundAgent?.agentKey === 'k12_course_catalogue' ? (
+        <CatalogueAgentControlCard />
+      ) : module.boundAgent ? (
         <BoundAgentPanel module={module} agent={module.boundAgent} />
       ) : (
         <NoBoundAgentPanel module={module} />
