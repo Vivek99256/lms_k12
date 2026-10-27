@@ -24,11 +24,11 @@ export function getDbPool(): Pool {
     return globalThis.__liveChatDbPool;
   }
 
-  const host = process.env.DB_HOST || '202.47.117.220';
-  const user = process.env.DB_USERNAME || 'vivek_user';
-  const password = process.env.DB_PASSWORD || 'vivek@sql';
-  const database = process.env.DB_DATABASE || 'vivek_erp';
-  const port = Number(process.env.DB_PORT || 3306);
+  const host = process.env.LIVE_CHAT_DB_HOST || '202.47.117.220';
+  const user = process.env.LIVE_CHAT_DB_USER || process.env.LIVE_CHAT_DB_USERNAME || 'vivek_user';
+  const password = process.env.LIVE_CHAT_DB_PASSWORD || 'vivek@sql';
+  const database = process.env.LIVE_CHAT_DB_DATABASE || process.env.LIVE_CHAT_DB_NAME || 'vivek_erp';
+  const port = Number(process.env.LIVE_CHAT_DB_PORT || 3306);
 
   const pool = createPool({
     host,

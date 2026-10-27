@@ -339,7 +339,7 @@ export function useLiveAdminChat({
             if (chosenSession) {
               setSession(chosenSession);
               currentSessionIdRef.current = chosenId;
-              if (!prevActive || prevActive !== chosenId) {
+              if (!prevActive || prevActive !== chosenId || (chosenSession.unreadCountForAdmin && chosenSession.unreadCountForAdmin > 0)) {
                 void fetchMessages(chosenId);
               }
             }
@@ -773,8 +773,6 @@ export function useLiveAdminChat({
     if (!enabled) return;
 
     const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-
       const sid = currentSessionIdRef.current;
       if (sid) {
         void fetchMessages(sid);
