@@ -264,7 +264,9 @@ export default function ChatbotPanel({
   // decide Enterprise Brain access — one rule, not a second opinion about who is staff.
   const canSeeTrace = useMemo(() => canSeeInternalView(), []);
   const isAdminUser = useMemo(() => canSeeInternalView(), []);
-  const [panelMode, setPanelMode] = useState<'ai' | 'live_admin' | 'admin_queue'>('ai');
+  const [panelMode, setPanelMode] = useState<'ai' | 'live_admin' | 'admin_queue'>(() => {
+    return canSeeInternalView() ? 'live_admin' : 'ai';
+  });
 
   // What the page says it is showing — filters, search, KPI tiles, visible rows, the
   // record it is about. Empty for a page that registers nothing, which is every page
@@ -868,6 +870,15 @@ export default function ChatbotPanel({
               >
                 <Headphones className="size-3.5 text-[#0D6EFD]" />
                 <span className="hidden sm:inline">Admin</span>
+                {!isAdminUser ? (
+                  <span
+                    className={cn(
+                      'size-2 rounded-full',
+                      liveChat.isAdminOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
+                    )}
+                    title={liveChat.isAdminOnline ? 'Admin Online' : 'Admin Offline'}
+                  />
+                ) : null}
                 {liveChat.notification ? (
                   <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
                 ) : liveChat.session?.unreadCountForUser ? (
