@@ -3,10 +3,24 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 
-import { fetchNotificationInbox, type NotificationInboxRow } from '@/lib/platform/client';
+import { fetchMyNotifications, fetchNotificationInbox } from '@/lib/platform/client';
 
-const SEEN_KEY = 'notification-bell-last-seen-id';
+const SEEN_KEY = 'notification-bell-seen-at';
 const POLL_MS = 60_000;
+
+interface BellItem {
+  key: string;
+  subject: string;
+  body: string;
+  createdAt: number;
+  /** true/false where the source tracks it; null means the bell's own last-seen time decides. */
+  read: boolean | null;
+}
+
+function toTime(value: string): number {
+  const time = new Date(value.replace(' ', 'T')).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
 
 function readSeen(): number {
   try {
@@ -16,18 +30,44 @@ function readSeen(): number {
   }
 }
 
-/** Header bell: the in-app notifications the platform really delivered. Hidden for users who cannot read the feed. */
+/**
+ * Header bell. Merges the platform's admin feed (only for users allowed to read it) with the
+ * notices addressed to the signed-in person: student app notices, PAL badges, Enterprise Brain
+ * notices. Hidden only when neither feed can be read.
+ */
 export default function NotificationBell() {
-  const [rows, setRows] = useState<NotificationInboxRow[]>([]);
+  const [items, setItems] = useState<BellItem[]>([]);
   const [allowed, setAllowed] = useState(true);
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
-    fetchNotificationInbox()
-      .then(setRows)
-      .catch(() => setAllowed(false));
+    Promise.allSettled([fetchNotificationInbox(), fetchMyNotifications()]).then(([platform, mine]) => {
+      if (platform.status === 'rejected' && mine.status === 'rejected') {
+        setAllowed(false);
+        return;
+      }
+      const merged: BellItem[] = [];
+      if (platform.status === 'fulfilled') {
+        for (const row of platform.value) {
+          merged.push({
+            key: `platform:${row.id}`,
+            subject: row.subject ?? '',
+            body: row.body ?? '',
+            createdAt: toTime(row.created_at),
+            read: null,
+          });
+        }
+      }
+      if (mine.status === 'fulfilled') {
+        for (const row of mine.value) {
+          merged.push({ key: row.key, subject: row.subject, body: row.body, createdAt: toTime(row.created_at), read: row.read });
+        }
+      }
+      merged.sort((a, b) => b.createdAt - a.createdAt);
+      setItems(merged.slice(0, 30));
+    });
   }, []);
 
   useEffect(() => {
@@ -54,13 +94,16 @@ export default function NotificationBell() {
     );
   }
 
-  const unread = rows.filter((row) => row.id > seen).length;
+  // The server cannot record a read yet, so what this browser has already opened (seen) decides
+  // too: a notice stays unread only if its source has not marked it read AND it is newer than that.
+  const isUnread = (item: BellItem) => item.read !== true && item.createdAt > seen;
+  const unread = items.filter(isUnread).length;
 
   const toggle = () => {
     const next = !open;
     setOpen(next);
-    if (!next && rows.length) {
-      const newest = Math.max(...rows.map((row) => row.id));
+    if (!next && items.length) {
+      const newest = Math.max(...items.map((item) => item.createdAt));
       setSeen(newest);
       try {
         window.localStorage.setItem(SEEN_KEY, String(newest));
@@ -91,15 +134,15 @@ export default function NotificationBell() {
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" role="menu">
           <p className="border-b border-slate-100 px-3 py-2 text-sm font-semibold text-slate-900">Notifications</p>
-          {rows.length === 0 ? (
+          {items.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-slate-500">Nothing new.</p>
           ) : (
             <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
-              {rows.map((row) => (
-                <li key={row.id} className={`px-3 py-2 ${row.id > seen ? 'bg-indigo-50/50' : ''}`}>
-                  <p className="text-sm font-medium text-slate-900">{row.subject}</p>
-                  <p className="text-xs text-slate-600">{row.body}</p>
-                  <p className="mt-0.5 text-[11px] text-slate-400">{new Date(row.created_at.replace(' ', 'T')).toLocaleString()}</p>
+              {items.map((item) => (
+                <li key={item.key} className={`px-3 py-2 ${isUnread(item) ? 'bg-indigo-50/50' : ''}`}>
+                  <p className="text-sm font-medium text-slate-900">{item.subject}</p>
+                  <p className="text-xs text-slate-600">{item.body}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</p>
                 </li>
               ))}
             </ul>
