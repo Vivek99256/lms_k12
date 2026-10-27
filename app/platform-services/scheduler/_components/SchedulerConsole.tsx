@@ -6,6 +6,7 @@ import { AlertTriangle, Clock, Lock, Pencil, RotateCcw, Save, X } from 'lucide-r
 import { usePermissions } from '@/app/hooks/usePermission';
 import { fetchScheduledTasks, PlatformApiError, runScheduledTaskNow, saveScheduledTask } from '@/lib/platform/client';
 import { CRON_FIELDS, describeSchedule, scheduleProblem, scheduleToString } from '@/lib/platform/cron';
+import { canRunOrToggle, lastRunSummary, NO_JOB_HINT, NO_JOB_LABEL } from '@/lib/platform/scheduler-display';
 import type { CronSchedule, ScheduledTaskRow, SchedulerPayload } from '@/lib/platform/types';
 
 import {
@@ -353,18 +354,23 @@ function TaskRow({
       <div className="flex flex-wrap items-start gap-3">
         <div className="pt-0.5">
           <Switch
-            checked={!task.disabled}
+            checked={canRunOrToggle(task) && !task.disabled}
             onChange={toggleDisabled}
-            disabled={!mayEdit || busy}
+            disabled={!mayEdit || busy || !canRunOrToggle(task)}
             label={`${task.label} running`}
-            title={mayEdit ? `Switch ${task.label} ${task.disabled ? 'on' : 'off'}` : rightsReason}
+            title={!canRunOrToggle(task) ? NO_JOB_HINT : mayEdit ? `Switch ${task.label} ${task.disabled ? 'on' : 'off'}` : rightsReason}
           />
         </div>
 
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-slate-900">
             {task.label}
-            {task.disabled && <Pill tone="gray">off</Pill>}
+            {!canRunOrToggle(task) && (
+              <span title={NO_JOB_HINT}>
+                <Pill tone="gray">{NO_JOB_LABEL}</Pill>
+              </span>
+            )}
+            {canRunOrToggle(task) && task.disabled && <Pill tone="gray">off</Pill>}
             {task.customised && <Pill tone="blue">custom schedule</Pill>}
             {task.disabled_by_default && !task.overridden && <Pill tone="amber">off by default</Pill>}
             {task.last_run_status === 'failed' && (
@@ -381,6 +387,11 @@ function TaskRow({
               {sentence && <span>{sentence}</span>}
               {task.has_job ? (
                 <>
+                  {lastRunSummary(task) && (
+                    <span className="text-slate-700" title="Result of the last run">
+                      Last run: {lastRunSummary(task)}
+                    </span>
+                  )}
                   <button
                     type="button"
                     disabled={!mayEdit || busy}
