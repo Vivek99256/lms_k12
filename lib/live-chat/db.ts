@@ -69,9 +69,9 @@ export async function dbUpdateAdminPresence(
 
   await pool.query(
     `INSERT INTO ai_live_admin_presence (admin_id, admin_name, sub_institute_id, status, last_seen, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE admin_name = VALUES(admin_name), status = VALUES(status), last_seen = VALUES(last_seen), updated_at = VALUES(updated_at)`,
-    [String(adminId), adminName || 'Admin Staff', subInst, status, now, now]
+     VALUES (?, ?, ?, ?, NOW(), NOW())
+     ON DUPLICATE KEY UPDATE admin_name = VALUES(admin_name), sub_institute_id = VALUES(sub_institute_id), status = VALUES(status), last_seen = NOW(), updated_at = NOW()`,
+    [String(adminId), adminName || 'Admin Staff', subInst, status]
   );
 
   // If newly available, automatically assign waiting sessions
@@ -82,14 +82,14 @@ export async function dbUpdateAdminPresence(
 
     for (const w of waitingRows) {
       await pool.query(
-        `UPDATE ai_live_chat_sessions SET status = 'active', admin_id = ?, admin_name = ?, initial_greeting_sent = 1, last_message_text = ?, last_message_time = ?, unread_count_for_user = 1, updated_at = ? WHERE id = ?`,
-        [String(adminId), adminName, INITIAL_ADMIN_GREETING, now, now, w.id]
+        `UPDATE ai_live_chat_sessions SET status = 'active', admin_id = ?, admin_name = ?, initial_greeting_sent = 1, last_message_text = ?, last_message_time = NOW(), unread_count_for_user = 1, updated_at = NOW() WHERE id = ?`,
+        [String(adminId), adminName, INITIAL_ADMIN_GREETING, w.id]
       );
 
       await pool.query(
         `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'admin', 'text', ?, ?, ?)`,
-        [uuidv4(), w.id, String(adminId), adminName, INITIAL_ADMIN_GREETING, now, now]
+         VALUES (?, ?, ?, ?, 'admin', 'text', ?, NOW(), NOW())`,
+        [uuidv4(), w.id, String(adminId), adminName, INITIAL_ADMIN_GREETING]
       );
     }
   }
@@ -109,19 +109,30 @@ export async function dbGetAdminPresence(subInstituteId?: string | number): Prom
   primaryAdmin?: AdminPresence;
 }> {
   const pool = getDbPool();
-  const cutoff = new Date(Date.now() - 60 * 1000); // 60 seconds heartbeat threshold
 
-  let sql = `SELECT * FROM ai_live_admin_presence WHERE status = 'available' AND last_seen >= ?`;
-  const params: unknown[] = [cutoff];
+  let sql = `SELECT * FROM ai_live_admin_presence WHERE status = 'available' AND last_seen >= DATE_SUB(NOW(), INTERVAL 120 SECOND)`;
+  const params: unknown[] = [];
 
-  if (subInstituteId && String(subInstituteId) !== '' && String(subInstituteId) !== '0') {
-    sql += ` AND (sub_institute_id = ? OR sub_institute_id = '1')`;
-    params.push(String(subInstituteId));
+  const subInstStr = subInstituteId != null ? String(subInstituteId) : '';
+  if (subInstStr && subInstStr !== '0' && subInstStr !== '1') {
+    sql += ` AND (sub_institute_id = ? OR sub_institute_id = '1' OR sub_institute_id IS NULL OR sub_institute_id = '')`;
+    params.push(subInstStr);
   }
 
   sql += ` ORDER BY last_seen DESC`;
 
-  const [rows] = (await pool.query(sql, params)) as [Array<Record<string, unknown>>, unknown];
+  let [rows] = (await pool.query(sql, params)) as [Array<Record<string, unknown>>, unknown];
+
+  // Fallback: If no admin found for this specific sub-institute, check if ANY admin is online anywhere
+  if (rows.length === 0) {
+    const [allAdmins] = (await pool.query(
+      `SELECT * FROM ai_live_admin_presence WHERE status = 'available' AND last_seen >= DATE_SUB(NOW(), INTERVAL 120 SECOND) ORDER BY last_seen DESC`
+    )) as [Array<Record<string, unknown>>, unknown];
+    if (allAdmins.length > 0) {
+      rows = allAdmins;
+    }
+  }
+
   const list: AdminPresence[] = rows.map((r) => ({
     adminId: String(r.admin_id),
     adminName: String(r.admin_name || 'Admin'),
@@ -167,13 +178,12 @@ export async function dbGetOrCreateUserSession(
 
   // Create new session
   const sessionId = `chat-${uuidv4()}`;
-  const now = new Date();
   const userRole = user.userRole || 'Student';
 
   await pool.query(
     `INSERT INTO ai_live_chat_sessions 
      (id, sub_institute_id, client_id, user_id, user_name, user_role, status, page_path, page_title, initial_message, initial_greeting_sent, unread_count_for_admin, unread_count_for_user, messages_exchanged_count, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, 0, 0, 0, 0, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, 0, 0, 0, 0, NOW(), NOW())`,
     [
       sessionId,
       subInst,
@@ -184,8 +194,6 @@ export async function dbGetOrCreateUserSession(
       pagePath,
       pageTitle,
       initialMessage || null,
-      now,
-      now,
     ]
   );
 
@@ -196,39 +204,37 @@ export async function dbGetOrCreateUserSession(
 
   await pool.query(
     `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
-     VALUES (?, ?, 'system', 'System', 'system', 'system', ?, ?, ?)`,
-    [uuidv4(), sessionId, statusNote, now, now]
+     VALUES (?, ?, 'system', 'System', 'system', 'system', ?, NOW(), NOW())`,
+    [uuidv4(), sessionId, statusNote]
   );
 
   // Initial user message if sent
   if (initialMessage && initialMessage.trim()) {
     const trimmed = initialMessage.trim();
-    const msgTime = new Date(Date.now() + 100);
     await pool.query(
       `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'user', 'text', ?, ?, ?)`,
-      [uuidv4(), sessionId, userId, user.userName || 'Student', trimmed, msgTime, msgTime]
+       VALUES (?, ?, ?, ?, 'user', 'text', ?, NOW(), NOW())`,
+      [uuidv4(), sessionId, userId, user.userName || 'Student', trimmed]
     );
 
     await pool.query(
-      `UPDATE ai_live_chat_sessions SET last_message_text = ?, last_message_time = ?, messages_exchanged_count = 1, unread_count_for_admin = 1, updated_at = ? WHERE id = ?`,
-      [trimmed, msgTime, msgTime, sessionId]
+      `UPDATE ai_live_chat_sessions SET last_message_text = ?, last_message_time = NOW(), messages_exchanged_count = 1, unread_count_for_admin = 1, updated_at = NOW() WHERE id = ?`,
+      [trimmed, sessionId]
     );
   }
 
   // Automatic greeting if admin is online
   if (presence.isOnline && presence.primaryAdmin) {
     const admin = presence.primaryAdmin;
-    const greetTime = new Date(Date.now() + 200);
     await pool.query(
       `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'admin', 'text', ?, ?, ?)`,
-      [uuidv4(), sessionId, admin.adminId, admin.adminName, INITIAL_ADMIN_GREETING, greetTime, greetTime]
+       VALUES (?, ?, ?, ?, 'admin', 'text', ?, NOW(), NOW())`,
+      [uuidv4(), sessionId, admin.adminId, admin.adminName, INITIAL_ADMIN_GREETING]
     );
 
     await pool.query(
-      `UPDATE ai_live_chat_sessions SET status = 'active', admin_id = ?, admin_name = ?, initial_greeting_sent = 1, last_message_text = ?, last_message_time = ?, unread_count_for_user = 1, updated_at = ? WHERE id = ?`,
-      [admin.adminId, admin.adminName, INITIAL_ADMIN_GREETING, greetTime, greetTime, sessionId]
+      `UPDATE ai_live_chat_sessions SET status = 'active', admin_id = ?, admin_name = ?, initial_greeting_sent = 1, last_message_text = ?, last_message_time = NOW(), unread_count_for_user = 1, updated_at = NOW() WHERE id = ?`,
+      [admin.adminId, admin.adminName, INITIAL_ADMIN_GREETING, sessionId]
     );
   }
 
@@ -271,14 +277,26 @@ export async function dbListSessions(filters?: {
     sql += ` AND status IN ('waiting', 'active')`;
   }
 
-  if (filters?.subInstituteId != null && String(filters.subInstituteId) !== '' && String(filters.subInstituteId) !== '0') {
+  const subInstStr = filters?.subInstituteId != null ? String(filters.subInstituteId) : '';
+  if (subInstStr && subInstStr !== '0' && subInstStr !== '1') {
     sql += ` AND (sub_institute_id = ? OR sub_institute_id IS NULL OR sub_institute_id = '1')`;
-    params.push(String(filters.subInstituteId));
+    params.push(subInstStr);
   }
 
   sql += ` ORDER BY updated_at DESC`;
 
-  const [rows] = (await pool.query(sql, params)) as [Array<Record<string, unknown>>, unknown];
+  let [rows] = (await pool.query(sql, params)) as [Array<Record<string, unknown>>, unknown];
+
+  // Fallback: If no sessions returned for a specific sub-institute, check all waiting/active student sessions
+  // so no student query is lost across multi-device testing with differing test logins
+  if (rows.length === 0 && subInstStr && subInstStr !== '0' && subInstStr !== '1') {
+    const fallbackSql = `SELECT * FROM ai_live_chat_sessions WHERE user_role NOT IN ('Admin', 'Administrator') AND status IN ('waiting', 'active') ORDER BY updated_at DESC`;
+    const [allRows] = (await pool.query(fallbackSql)) as [Array<Record<string, unknown>>, unknown];
+    if (allRows.length > 0) {
+      rows = allRows;
+    }
+  }
+
   return rows.map((r) => formatSessionRow(r));
 }
 
@@ -293,29 +311,28 @@ export async function dbAssignAdmin(
   ];
   if (rows.length === 0) return null;
   const s = rows[0];
-  const now = new Date();
 
   if (!s.initial_greeting_sent) {
     await pool.query(
-      `UPDATE ai_live_chat_sessions SET status = 'active', admin_id = ?, admin_name = ?, initial_greeting_sent = 1, last_message_text = ?, last_message_time = ?, unread_count_for_user = 1, updated_at = ? WHERE id = ?`,
-      [admin.adminId, admin.adminName, INITIAL_ADMIN_GREETING, now, now, sessionId]
+      `UPDATE ai_live_chat_sessions SET status = 'active', admin_id = ?, admin_name = ?, initial_greeting_sent = 1, last_message_text = ?, last_message_time = NOW(), unread_count_for_user = 1, updated_at = NOW() WHERE id = ?`,
+      [admin.adminId, admin.adminName, INITIAL_ADMIN_GREETING, sessionId]
     );
 
     await pool.query(
       `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'admin', 'text', ?, ?, ?)`,
-      [uuidv4(), sessionId, admin.adminId, admin.adminName, INITIAL_ADMIN_GREETING, now, now]
+       VALUES (?, ?, ?, ?, 'admin', 'text', ?, NOW(), NOW())`,
+      [uuidv4(), sessionId, admin.adminId, admin.adminName, INITIAL_ADMIN_GREETING]
     );
   } else {
     await pool.query(
-      `UPDATE ai_live_chat_sessions SET status = 'active', admin_id = ?, admin_name = ?, updated_at = ? WHERE id = ?`,
-      [admin.adminId, admin.adminName, now, sessionId]
+      `UPDATE ai_live_chat_sessions SET status = 'active', admin_id = ?, admin_name = ?, updated_at = NOW() WHERE id = ?`,
+      [admin.adminId, admin.adminName, sessionId]
     );
 
     await pool.query(
       `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
-       VALUES (?, ?, 'system', 'System', 'system', 'system', ?, ?, ?)`,
-      [uuidv4(), sessionId, `${admin.adminName} (Administrator) has joined the chat.`, now, now]
+       VALUES (?, ?, 'system', 'System', 'system', 'system', ?, NOW(), NOW())`,
+      [uuidv4(), sessionId, `${admin.adminName} (Administrator) has joined the chat.`]
     );
   }
 
@@ -327,14 +344,13 @@ export async function dbCloseSession(
   closedBy?: { id: string; name: string; role: string }
 ): Promise<LiveChatSession | null> {
   const pool = getDbPool();
-  const now = new Date();
-  await pool.query(`UPDATE ai_live_chat_sessions SET status = 'closed', updated_at = ? WHERE id = ?`, [now, sessionId]);
+  await pool.query(`UPDATE ai_live_chat_sessions SET status = 'closed', updated_at = NOW() WHERE id = ?`, [sessionId]);
 
   const closerName = closedBy?.name || 'Administrator';
   await pool.query(
     `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
-     VALUES (?, ?, 'system', 'System', 'system', 'system', ?, ?, ?)`,
-    [uuidv4(), sessionId, `Live chat ended by ${closerName}.`, now, now]
+     VALUES (?, ?, 'system', 'System', 'system', 'system', ?, NOW(), NOW())`,
+    [uuidv4(), sessionId, `Live chat ended by ${closerName}.`]
   );
 
   return dbGetSession(sessionId);
@@ -343,7 +359,7 @@ export async function dbCloseSession(
 export async function dbMarkAsRead(sessionId: string, role: 'user' | 'admin'): Promise<void> {
   const pool = getDbPool();
   const field = role === 'user' ? 'unread_count_for_user' : 'unread_count_for_admin';
-  await pool.query(`UPDATE ai_live_chat_sessions SET ${field} = 0 WHERE id = ?`, [sessionId]);
+  await pool.query(`UPDATE ai_live_chat_sessions SET ${field} = 0, updated_at = NOW() WHERE id = ?`, [sessionId]);
 }
 
 export async function dbAddMessage(req: SendMessageRequest): Promise<LiveChatMessage | null> {
@@ -354,7 +370,7 @@ export async function dbAddMessage(req: SendMessageRequest): Promise<LiveChatMes
 
   await pool.query(
     `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, meet_url, booking_details, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       messageId,
       req.sessionId,
@@ -365,14 +381,12 @@ export async function dbAddMessage(req: SendMessageRequest): Promise<LiveChatMes
       req.text,
       req.meetUrl || null,
       bookingJson,
-      now,
-      now,
     ]
   );
 
   // Update session
-  let updateSql = `UPDATE ai_live_chat_sessions SET updated_at = ?, last_message_text = ?, last_message_time = ?`;
-  const updateParams: unknown[] = [now, req.text, now];
+  let updateSql = `UPDATE ai_live_chat_sessions SET updated_at = NOW(), last_message_text = ?, last_message_time = NOW()`;
+  const updateParams: unknown[] = [req.text];
 
   if (req.senderRole === 'user') {
     updateSql += `, unread_count_for_admin = unread_count_for_admin + 1, messages_exchanged_count = messages_exchanged_count + 1`;
@@ -391,16 +405,13 @@ export async function dbAddMessage(req: SendMessageRequest): Promise<LiveChatMes
       unknown
     ];
     if (sRows.length > 0 && Number(sRows[0].messages_exchanged_count) >= 3 && !sRows[0].meet_suggested) {
-      const suggestTime = new Date(Date.now() + 300);
       await pool.query(
         `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
-         VALUES (?, ?, 'system', 'System', 'system', 'meet_suggestion', ?, ?, ?)`,
+         VALUES (?, ?, 'system', 'System', 'system', 'meet_suggestion', ?, NOW(), NOW())`,
         [
           uuidv4(),
           req.sessionId,
           'Would you like to schedule a 1:1 Google Meet session with the administrator to resolve this quickly?',
-          suggestTime,
-          suggestTime,
         ]
       );
       await pool.query(`UPDATE ai_live_chat_sessions SET meet_suggested = 1 WHERE id = ?`, [req.sessionId]);

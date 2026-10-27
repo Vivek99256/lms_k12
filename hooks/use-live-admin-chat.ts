@@ -412,10 +412,22 @@ export function useLiveAdminChat({
    */
   const sendMessage = useCallback(
     async (text: string) => {
-      const targetSessionId = currentSessionIdRef.current;
-      if (!targetSessionId || !text.trim() || isSending) return;
-
+      if (!text.trim() || isSending) return;
       const trimmed = text.trim();
+      let targetSessionId = currentSessionIdRef.current;
+
+      if (!targetSessionId) {
+        if (!isAdmin) {
+          setIsSending(true);
+          try {
+            await startLiveSession(trimmed);
+          } finally {
+            setIsSending(false);
+          }
+        }
+        return;
+      }
+
       const senderRole = isAdmin ? 'admin' : 'user';
 
       // Optimistic message update
@@ -741,6 +753,8 @@ export function useLiveAdminChat({
   useEffect(() => {
     if (!enabled || !isAdmin) return;
 
+    void sendAdminHeartbeat(adminAvailability);
+
     const heartbeatInterval = setInterval(() => {
       void sendAdminHeartbeat();
     }, 15000);
@@ -750,7 +764,7 @@ export function useLiveAdminChat({
     return () => {
       clearInterval(heartbeatInterval);
     };
-  }, [enabled, isAdmin, sendAdminHeartbeat]);
+  }, [adminAvailability, enabled, isAdmin, sendAdminHeartbeat]);
 
   /**
    * Active Polling: Sync messages, presence & expiration check every 2 seconds
