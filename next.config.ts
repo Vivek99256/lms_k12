@@ -83,7 +83,32 @@ const nextConfig: NextConfig = {
     serverSourceMaps: false,
   },
   async headers() {
-    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+    return [
+      { source: "/:path*", headers: SECURITY_HEADERS },
+      // Matching rules are all applied, and a later one overrides an earlier one on the same header, so the rules below sit after the
+      // catch-all: the SECURITY_HEADERS above (framing, CSP, HSTS...) still apply to /sim-runtime/* and only the headers named here change.
+      {
+        // The Simulation Runtime (public/sim-runtime, the vendored g2g runtime build) is embedded in a sandboxed frame WITHOUT
+        // allow-same-origin, so it runs on an opaque origin ("null"): its module scripts, fonts and 3D models are fetched cross-origin and
+        // need CORS and CORP. These are public static files - no cookies, no credentials, nothing per-user - so `*` exposes nothing.
+        source: "/sim-runtime/:path*",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
+      },
+      {
+        // Vite names these by content hash, so a changed file is a new URL and the old one can be cached for good.
+        source: "/sim-runtime/assets/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      {
+        // The page that names the hashed files must never be stale, or it would point at assets a newer build removed.
+        source: "/sim-runtime/index.html",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+    ];
   },
   // Pin the Turbopack workspace root to this project.
   //
