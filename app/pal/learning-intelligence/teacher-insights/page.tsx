@@ -129,8 +129,8 @@ export default function TeacherInsightsPage() {
 
       <div className="mx-auto max-w-6xl">
         {!scope ? (
-          <div className="mx-auto max-w-lg">
-            <ClassScopePicker onSelect={setScope} />
+          <div className="mx-auto max-w-2xl">
+            <ClassScopePicker onSelect={setScope} size="lg" />
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">

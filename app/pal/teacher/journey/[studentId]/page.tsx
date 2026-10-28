@@ -2,8 +2,9 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import { MountainJourneyView } from '@/app/pal/journey/_components/MountainJourneyView';
@@ -60,6 +61,7 @@ function TeacherJourneyView() {
   if (!studentId || !chapterId) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
+        <BackButton router={router} />
         <Card className="border-amber-200 bg-amber-50">
           <CardHeader>
             <CardTitle className="text-base text-amber-900">Chapter required</CardTitle>
@@ -75,7 +77,23 @@ function TeacherJourneyView() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
+      <BackButton router={router} />
       <MountainJourneyView chapterId={chapterId} viewContext={{ mode: 'monitor', studentId, readOnly: true }} />
     </div>
+  );
+}
+
+/**
+ * Plain `router.back()`, not a hardcoded href to the roster — this page is
+ * only ever reached by an in-app click (the "Jump to one student" search or
+ * a mastery-by-chapter row on Teacher Learning Insights), never a bookmark,
+ * so browser history already points at the right place.
+ */
+function BackButton({ router }: { router: ReturnType<typeof useRouter> }) {
+  return (
+    <Button variant="outline" size="sm" onClick={() => router.back()} className="mb-4 gap-1.5 bg-white">
+      <ArrowLeft aria-hidden className="h-4 w-4" />
+      Back
+    </Button>
   );
 }

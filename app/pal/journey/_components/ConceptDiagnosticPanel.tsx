@@ -25,6 +25,10 @@ import {
  */
 export interface ConceptDiagnosticPanelProps {
   chapterId: string;
+  /** The concept the 12-stage map above is currently focused on — marks that one row "Viewing" so it is obvious which concept's path is on screen, distinct from `entry.isCurrent` (the engine's own next-up concept, which is often a different one). */
+  activeConceptId?: string | null;
+  /** Set by the caller to make rows clickable. Omitted keeps this panel exactly as read-only as before. */
+  onSelectConcept?: (conceptId: string) => void;
 }
 
 const STATUS_META: Record<
@@ -38,7 +42,7 @@ const STATUS_META: Record<
 
 type Filter = 'all' | ConceptDiagnosticStatus;
 
-export function ConceptDiagnosticPanel({ chapterId }: ConceptDiagnosticPanelProps) {
+export function ConceptDiagnosticPanel({ chapterId, activeConceptId = null, onSelectConcept }: ConceptDiagnosticPanelProps) {
   const [summary, setSummary] = useState<ConceptDiagnosticSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -146,7 +150,24 @@ export function ConceptDiagnosticPanel({ chapterId }: ConceptDiagnosticPanelProp
 
           <ul className="-mx-1 flex-1 space-y-1.5 overflow-y-auto px-1 py-2">
             {filteredConcepts.map((entry, index) => (
-              <ConceptRow key={entry.conceptId} entry={entry} index={index + 1} />
+              <ConceptRow
+                key={entry.conceptId}
+                entry={entry}
+                index={index + 1}
+                isActive={entry.conceptId === activeConceptId}
+                onSelect={
+                  onSelectConcept
+                    ? () => {
+                        onSelectConcept(entry.conceptId);
+                        // Close the drawer so the map above is immediately
+                        // visible — otherwise the learner just picked a
+                        // concept and has no way to see that anything
+                        // happened without manually closing it themselves.
+                        setDrawerOpen(false);
+                      }
+                    : undefined
+                }
+              />
             ))}
             {filteredConcepts.length === 0 && (
               <li className="py-6 text-center text-sm text-slate-400">No concepts in this status.</li>
@@ -193,27 +214,38 @@ function FilterChip({
   );
 }
 
-function ConceptRow({ entry, index }: { entry: ConceptDiagnosticEntry; index: number }) {
+function ConceptRow({
+  entry,
+  index,
+  isActive = false,
+  onSelect,
+}: {
+  entry: ConceptDiagnosticEntry;
+  index: number;
+  /** This concept is what the map above is currently showing — not the same thing as `entry.isCurrent` (the engine's own next-up concept), so both badges can be on, one, or neither. */
+  isActive?: boolean;
+  onSelect?: () => void;
+}) {
   const meta = STATUS_META[entry.status];
   const Icon = meta.icon;
 
-  return (
-    <li
-      className={cn(
-        'flex items-center gap-2.5 rounded-lg border p-2.5',
-        entry.isCurrent ? 'border-indigo-300 bg-indigo-50/70' : 'border-slate-200 bg-white'
-      )}
-    >
+  const content = (
+    <>
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">
         {index}
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <p className="truncate text-sm font-semibold text-slate-800">{entry.name}</p>
           {entry.isCurrent && (
             <span className="shrink-0 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
               Current
+            </span>
+          )}
+          {isActive && (
+            <span className="shrink-0 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+              Viewing
             </span>
           )}
         </div>
@@ -231,6 +263,31 @@ function ConceptRow({ entry, index }: { entry: ConceptDiagnosticEntry; index: nu
           Mastered
         </span>
       )}
+    </>
+  );
+
+  const rowClassName = cn(
+    'flex w-full items-center gap-2.5 rounded-lg border p-2.5 text-left',
+    isActive
+      ? 'border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200'
+      : entry.isCurrent
+        ? 'border-indigo-300 bg-indigo-50/70'
+        : 'border-slate-200 bg-white'
+  );
+
+  if (!onSelect) {
+    return <li className={rowClassName}>{content}</li>;
+  }
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onSelect}
+        className={cn(rowClassName, 'transition-colors hover:border-emerald-300 hover:bg-emerald-50/50')}
+      >
+        {content}
+      </button>
     </li>
   );
 }

@@ -1,10 +1,14 @@
 'use client';
 
-import React from 'react';
 import { Check, Lock, MapPin } from 'lucide-react';
 import { milestoneStatusStyle, type JourneyData, type MilestoneKey } from '@/app/pal/journey/data/pal-journey';
 import { JOURNEY_STAGE_BY_KEY, JOURNEY_STAGES } from '@/app/pal/_components/journey-stages';
 import { MILESTONE_2D_POSITIONS, NODE_RADIUS, VIEW_HEIGHT, VIEW_WIDTH, smoothPathD, type Point } from './path-layout';
+
+const LEARN_INDEX = JOURNEY_STAGES.findIndex((stage) => stage.key === 'learn');
+const MASTERY_INDEX = JOURNEY_STAGES.findIndex((stage) => stage.key === 'mastery');
+const FULLY_MASTERED_HEX = '#059669';
+const REWORK_HEX = '#e11d48';
 
 /**
  * The journey map, as a flat 2D "level map" — a single winding dashed path
@@ -65,6 +69,38 @@ function LegendDot({ colorClass, label }: { colorClass: string; label: string })
 }
 
 /**
+ * A small glowing bead that travels the full length of a road, looping
+ * forever — this map's own motion signature, deliberately NOT the crawling-
+ * dash "rope bridge" texture `IsometricClassBoard.tsx` (Teacher Learning
+ * Insights' class map) uses for its own connecting lines. Both maps draw a
+ * dashed track, so a drifting `stroke-dashoffset` on this one too would have
+ * read as the same animation reskinned — this is motion ALONG the route
+ * instead, via native SVG `<animateMotion>` against the exact path string
+ * already computed for the stroke underneath it, not a second approximation
+ * of the curve.
+ *
+ * Two staggered beads (`begin="0s"` and half a lap later) keep a long road
+ * from ever looking empty while one bead is on the far side; the short
+ * rework overlay gets only one, passed `dur` lower by its one caller.
+ */
+function PathSpark({ d, hex, dur }: { d: string; hex: string; dur: number }) {
+  if (!d) return null;
+  return (
+    <>
+      {[0, dur / 2].map((begin) => (
+        <g key={begin}>
+          <animateMotion dur={`${dur}s`} begin={`${begin}s`} repeatCount="indefinite" path={d} rotate="auto" />
+          <circle r={10} fill={hex} opacity={0.3}>
+            <animate attributeName="opacity" values="0.15;0.4;0.15" dur="1.3s" repeatCount="indefinite" />
+          </circle>
+          <circle r={4} fill="#ffffff" />
+        </g>
+      ))}
+    </>
+  );
+}
+
+/**
  * A glowing map-pin badge marking the learner's current step — replaces the
  * old plain-text "You are here" pill with something that reads at a glance
  * and matches the path's own warm "current" colouring (the current node and
@@ -102,17 +138,43 @@ export function PathJourneyView({ data, currentIndex, selected, onSelect }: Path
   const traveledPathD = smoothPathD(orderedPoints.slice(0, currentIndex + 1));
   const remainingPathD = smoothPathD(orderedPoints.slice(currentIndex));
 
+  // Every measurable concept in the chapter mastered (not just this one's 12
+  // stages) — the whole road turns a single colour rather than staying split
+  // into traveled/remaining, since there is no "ahead" left once the chapter
+  // itself is done.
+  const fullyMastered = data.chapterFullyMastered;
+  const fullPathD = fullyMastered ? smoothPathD(orderedPoints) : '';
+
+  // Check passed → remediation fired → still unresolved: the engine has sent
+  // this concept back through Learn. `fullyMastered` wins if both are
+  // somehow true at once (shouldn't happen — an active remediation implies
+  // the focus concept itself isn't mastered yet — but the chapter-wide
+  // "done" colouring should never lose to a stale per-concept flag).
+  const needsRework = !fullyMastered && Boolean(data.remediationBranch?.active);
+  const reworkPathD = needsRework ? smoothPathD(orderedPoints.slice(LEARN_INDEX, MASTERY_INDEX + 1)) : '';
+
   return (
-    <div className="relative h-full w-full overflow-hidden bg-gradient-to-br from-indigo-600 via-fuchsia-500 to-amber-400">
+    <div
+      className={`relative h-full w-full overflow-hidden bg-gradient-to-br transition-colors duration-700 ${
+        fullyMastered ? 'from-emerald-500 via-teal-500 to-amber-400' : 'from-indigo-600 via-fuchsia-500 to-amber-400'
+      }`}
+    >
       {/* Soft colour blobs for depth — plain CSS, no image asset */}
       <div className="pointer-events-none absolute -left-16 -top-16 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-20 -right-10 h-64 w-64 rounded-full bg-cyan-300/25 blur-3xl" />
       <div className="pointer-events-none absolute right-1/3 top-1/4 h-32 w-32 rounded-full bg-rose-300/20 blur-2xl" />
 
       <div className="pointer-events-none absolute right-3 top-3 z-10 flex gap-2.5 rounded-full bg-white/90 px-3 py-1.5 text-[10px] font-semibold text-slate-700 shadow">
-        <LegendDot colorClass="bg-blue-600" label="Completed" />
-        <LegendDot colorClass="bg-amber-500" label="Current" />
-        <LegendDot colorClass="bg-slate-400" label="Upcoming" />
+        {fullyMastered ? (
+          <LegendDot colorClass="bg-emerald-600" label="All concepts mastered" />
+        ) : (
+          <>
+            <LegendDot colorClass="bg-blue-600" label="Completed" />
+            <LegendDot colorClass="bg-amber-500" label="Current" />
+            <LegendDot colorClass="bg-slate-400" label="Upcoming" />
+            {needsRework && <LegendDot colorClass="bg-rose-600" label="Needs rework" />}
+          </>
+        )}
       </div>
 
       <svg
@@ -120,21 +182,59 @@ export function PathJourneyView({ data, currentIndex, selected, onSelect }: Path
         preserveAspectRatio="xMidYMid meet"
         className="pointer-events-none absolute inset-0 h-full w-full"
       >
-        {/* Remaining road — pale, ahead of the learner */}
-        <path d={remainingPathD} stroke="#ffffff" strokeOpacity={0.4} strokeWidth={16} fill="none" strokeLinecap="round" />
-        <path d={remainingPathD} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={4} strokeDasharray="1.5 15" strokeLinecap="round" fill="none" />
+        {fullyMastered ? (
+          <>
+            {/* One continuous, solid "done" road — no traveled/remaining split once nothing is left ahead. Dashes are static texture now; PathSpark below carries the motion. */}
+            <path d={fullPathD} stroke="#ffffff" strokeWidth={16} fill="none" strokeLinecap="round" />
+            <path d={fullPathD} stroke={FULLY_MASTERED_HEX} strokeWidth={6} strokeDasharray="1.5 15" strokeLinecap="round" fill="none" />
+            <PathSpark d={fullPathD} hex={FULLY_MASTERED_HEX} dur={5.5} />
+          </>
+        ) : (
+          <>
+            {/* Remaining road — pale, ahead of the learner */}
+            <path d={remainingPathD} stroke="#ffffff" strokeOpacity={0.4} strokeWidth={16} fill="none" strokeLinecap="round" />
+            <path
+              d={remainingPathD}
+              stroke="#ffffff"
+              strokeOpacity={0.55}
+              strokeWidth={4}
+              strokeDasharray="1.5 15"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <PathSpark d={remainingPathD} hex="#ffffff" dur={4.5} />
 
-        {/* Traveled road — bright and solid, behind the learner */}
-        <path d={traveledPathD} stroke="#ffffff" strokeWidth={16} fill="none" strokeLinecap="round" />
-        <path d={traveledPathD} stroke="#fbbf24" strokeWidth={6} strokeDasharray="1.5 15" strokeLinecap="round" fill="none" />
+            {/* Traveled road — bright and solid, behind the learner */}
+            <path d={traveledPathD} stroke="#ffffff" strokeWidth={16} fill="none" strokeLinecap="round" />
+            <path d={traveledPathD} stroke="#fbbf24" strokeWidth={6} strokeDasharray="1.5 15" strokeLinecap="round" fill="none" />
+            <PathSpark d={traveledPathD} hex="#fbbf24" dur={4.5} />
+
+            {/* Learn → Mastery rework overlay — painted last so it reads on
+                top of whichever of the two roads above it crosses. Only the
+                segment the loop actually revisits gets recoloured; Diagnostic/
+                Concept diagnostic/Plan before it and Recall after it are not
+                part of the loop, so they keep their normal colouring. */}
+            {needsRework && (
+              <>
+                <path d={reworkPathD} stroke={REWORK_HEX} strokeWidth={7} strokeDasharray="2 12" strokeLinecap="round" fill="none" />
+                <PathSpark d={reworkPathD} hex={REWORK_HEX} dur={2.2} />
+              </>
+            )}
+          </>
+        )}
 
         {data.milestones.map((milestone, index) => {
           const point = MILESTONE_2D_POSITIONS[milestone.key];
           const style = milestoneStatusStyle(milestone.status);
           const current = index === currentIndex;
+          const onReworkSegment = needsRework && index >= LEARN_INDEX && index <= MASTERY_INDEX;
 
           return (
-            <g key={milestone.key}>
+            <g
+              key={milestone.key}
+              className="node-pop-in"
+              style={{ animationDelay: `${index * 55}ms`, transformBox: 'fill-box', transformOrigin: 'center' }}
+            >
               {current && (
                 <circle cx={point.x} cy={point.y} r={NODE_RADIUS + 6} fill="none" stroke="#ffffff" strokeWidth={3} opacity={0.7}>
                   <animate
@@ -144,6 +244,12 @@ export function PathJourneyView({ data, currentIndex, selected, onSelect }: Path
                     repeatCount="indefinite"
                   />
                   <animate attributeName="opacity" values="0.7;0.1;0.7" dur="1.8s" repeatCount="indefinite" />
+                </circle>
+              )}
+              {onReworkSegment && !current && (
+                <circle cx={point.x} cy={point.y} r={NODE_RADIUS + 5} fill="none" stroke={REWORK_HEX} strokeWidth={2.5} opacity={0.6}>
+                  <animate attributeName="r" values={`${NODE_RADIUS + 5};${NODE_RADIUS + 11};${NODE_RADIUS + 5}`} dur="1.6s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.6;0.15;0.6" dur="1.6s" repeatCount="indefinite" />
                 </circle>
               )}
               <circle
@@ -175,7 +281,14 @@ export function PathJourneyView({ data, currentIndex, selected, onSelect }: Path
           const top = topPct(point);
 
           return (
-            <React.Fragment key={milestone.key}>
+            // A plain `<div>` wrapper, not `<React.Fragment>` — only so the
+            // staggered entrance fade (opacity-only; see the style block
+            // below for why nothing here animates `transform`) has somewhere
+            // to attach. `position: static` by default, so it is not a new
+            // positioning context: every absolutely-positioned child below
+            // still resolves against the real ancestor, the `inset-0`
+            // container two levels up.
+            <div key={milestone.key} className="node-fade-in" style={{ animationDelay: `${index * 55}ms` }}>
               <button
                 type="button"
                 onClick={() => onSelect(milestone.key)}
@@ -218,10 +331,43 @@ export function PathJourneyView({ data, currentIndex, selected, onSelect }: Path
                   {milestone.index}. {milestone.label}
                 </span>
               </div>
-            </React.Fragment>
+            </div>
           );
         })}
       </div>
+
+      <style jsx>{`
+        .node-pop-in {
+          animation: nodePopIn 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+        .node-fade-in {
+          animation: nodeFadeIn 420ms ease both;
+        }
+        @keyframes nodePopIn {
+          from {
+            opacity: 0;
+            transform: scale(0.6);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @keyframes nodeFadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .node-pop-in,
+          .node-fade-in {
+            animation: none;
+          }
+        }
+      `}</style>
     </div>
   );
 }
