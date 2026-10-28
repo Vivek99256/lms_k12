@@ -139,6 +139,18 @@ function resolveBaseUrl(context: IntelligenceContext): string {
     return process.env.NEXT_PUBLIC_AI_BASE_URL.replace(/\/$/, '');
   }
 
+  // When running in local development (npm run dev on localhost), use local Laravel backend
+  if (typeof window !== 'undefined') {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocal) {
+      return (
+        context.baseUrl ||
+        process.env.NEXT_PUBLIC_API_BASE_URL_DEV ||
+        'http://127.0.0.1:8000'
+      ).replace(/\/$/, '');
+    }
+  }
+
   const candidate = (context.baseUrl || '').trim().replace(/\/$/, '');
   if (candidate && !candidate.includes('localhost') && !candidate.includes('127.0.0.1')) {
     return candidate;
