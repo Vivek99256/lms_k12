@@ -111,6 +111,8 @@ import { CREATE_CARD_TITLE, resourceTitle, viewTarget, type StoredDeckMetadata }
 import { readCpState, startState, withCpState, withoutCpState, type CpState } from '@/lib/coursePresentation/urlState';
 import { PrayogshalaLab } from './PrayogshalaLab';
 import { PrayogshalaTopicPanel } from './PrayogshalaTopicPanel';
+import { SimulationsProvider } from './simulations/SimulationsProvider';
+import { SimulationsSection } from './simulations/SimulationsSection';
 import { deletePrayogshalaActivity, type PrayogshalaActivity } from '../../data/prayogshala';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
@@ -6469,14 +6471,22 @@ export default function ChapterListPage() {
           ) : null}
 
           {activeContentLibraryTab === 'Prayogshala' && activeLibraryChapter && /^\d+$/.test(activeLibraryChapter.id) ? (
-            <PrayogshalaTopicPanel
+            <SimulationsProvider
               key={activeLibraryChapter.id}
               chapterId={Number(activeLibraryChapter.id)}
               canManage={canCreateContent !== false}
-              reloadKey={contentReloadKey}
-              onOpenLab={openPrayogshalaLab}
-              onChanged={reloadChapterContent}
-            />
+              canCreate={canCreateContent === true}
+            >
+              <PrayogshalaTopicPanel
+                key={activeLibraryChapter.id}
+                chapterId={Number(activeLibraryChapter.id)}
+                canManage={canCreateContent !== false}
+                reloadKey={contentReloadKey}
+                onOpenLab={openPrayogshalaLab}
+                onChanged={reloadChapterContent}
+              />
+              <SimulationsSection />
+            </SimulationsProvider>
           ) : null}
 
           {contentError ? (
