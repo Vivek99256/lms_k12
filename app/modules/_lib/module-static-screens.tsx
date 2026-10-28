@@ -30,6 +30,7 @@ import { CERTIFICATE_AI_STACK_SCREENS } from '@/app/student/student_certificate/
 import { STUDENT_ICARD_AI_STACK_SCREENS } from '@/app/student/student_icard/ai-stack/_screens/ai-stack-screens';
 import { STUDENT_MEDICAL_AI_STACK_SCREENS } from '@/app/student/student_infirmary/ai-stack/_screens/ai-stack-screens';
 import { USER_ICARD_AI_STACK_SCREENS } from '@/app/student/user_icard/ai-stack/_screens/ai-stack-screens';
+import { STUDENT_COMMUNICATION_SCREENS } from '@/app/student/communication/_screens/student-communication-screens';
 import { STUDENT_REQUEST_AI_STACK_SCREENS } from '@/app/students/requests/ai-stack/_screens/ai-stack-screens';
 import { TRANSPORT_AI_STACK_SCREENS } from '@/app/Transportation/ai-stack/_screens/ai-stack-screens';
 import { INWARD_AI_STACK_SCREENS } from '@/app/inward_outward/ai-stack/_screens/ai-stack-screens';
@@ -125,6 +126,10 @@ const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   'ptm:ai-stack': PTM_AI_STACK_SCREENS,
   'sqaa:ai-stack': SQAA_AI_STACK_SCREENS,
   'student:ai-stack': STUDENTS_AI_STACK_SCREENS,
+  // Student → Communication opens on the SMS and emails already sent, listed outright so
+  // nobody has to run a report search to see them. The Send SMS Report / Email Report menus
+  // stay beside it as tabs for the filtered views.
+  'student:communication': STUDENT_COMMUNICATION_SCREENS,
   // `student-i-card:` and `user-i-card:` are two different modules. One prints a card for
   // a child from the student record, the other for a member of staff from the staff
   // record, and neither screen list can reach the other's tools.

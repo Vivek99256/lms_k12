@@ -140,7 +140,7 @@ export default function OnlineExamListPage() {
                     {examTypeLabel(exam.examType)}
                   </span>
                   <span className="text-xs text-slate-500">
-                    {exam.totalQuestions} questions · {exam.totalMarks} marks
+                    {exam.totalQuestions} questions · {exam.totalMarks} marks · Attempts {Math.min(exam.attempts, exam.attemptsAllowed)}/{exam.attemptsAllowed}
                   </span>
                 </div>
 
@@ -154,8 +154,14 @@ export default function OnlineExamListPage() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button
                     onClick={() => router.push(`/exam/online/${exam.id}`)}
-                    disabled={!exam.activeExam}
-                    title={exam.activeExam ? undefined : 'This exam is closed'}
+                    disabled={!exam.activeExam || exam.attempts >= exam.attemptsAllowed}
+                    title={
+                      !exam.activeExam
+                        ? 'This exam is closed'
+                        : exam.attempts >= exam.attemptsAllowed
+                          ? 'You have used all attempts'
+                          : undefined
+                    }
                     className="bg-[#4f46e5] text-white hover:bg-[#4338ca]"
                   >
                     <PlayCircle className="size-4" />
@@ -164,6 +170,12 @@ export default function OnlineExamListPage() {
                   <Button
                     variant="outline"
                     onClick={() => router.push(`/exam/online/${exam.id}/result`)}
+                    disabled={exam.attempts < exam.attemptsAllowed}
+                    title={
+                      exam.attempts < exam.attemptsAllowed
+                        ? `Results unlock after all ${exam.attemptsAllowed} attempt${exam.attemptsAllowed === 1 ? '' : 's'} are used`
+                        : undefined
+                    }
                   >
                     <BarChart3 className="size-4" />
                     Results

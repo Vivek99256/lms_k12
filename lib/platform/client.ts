@@ -368,10 +368,37 @@ export interface NotificationLogRow {
 }
 
 export async function fetchNotificationLog(
-  filters: { status?: string; channel?: string; page?: number; per_page?: number } = {},
+  filters: { status?: string; channel?: string; event_prefix?: string; page?: number; per_page?: number } = {},
 ): Promise<{ rows: NotificationLogRow[]; meta: PageMeta }> {
   const result = await callEnvelope<NotificationLogRow[]>(`/notifications/log${query({ ...filters })}`);
   return { rows: result.data ?? [], meta: result.meta as PageMeta };
+}
+
+export interface NotificationInboxRow {
+  id: number;
+  event_key: string;
+  subject: string | null;
+  body: string | null;
+  created_at: string;
+}
+
+export function fetchNotificationInbox(): Promise<NotificationInboxRow[]> {
+  return call<NotificationInboxRow[]>('/notifications/inbox');
+}
+
+/** One notice addressed to the signed-in person, merged server-side from the per-person notification tables. */
+export interface MyNotificationRow {
+  key: string;
+  source: 'app' | 'pal' | 'brain' | 'platform';
+  subject: string;
+  body: string;
+  created_at: string;
+  /** true/false where the source table tracks it, null where it does not. */
+  read: boolean | null;
+}
+
+export function fetchMyNotifications(): Promise<MyNotificationRow[]> {
+  return call<MyNotificationRow[]>('/notifications/mine');
 }
 
 export async function runScheduledTaskNow(taskKey: string): Promise<{ status: string; message: string }> {

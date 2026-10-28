@@ -583,7 +583,9 @@ const EXECUTORS: Record<string, Executor> = {
         subject_id: count(args.subject_id),
         category: text(args.category),
         query: text(args.query),
-        include_chapters: args.include_chapters === false ? false : undefined,
+        include_chapters: typeof args.include_chapters === 'boolean' ? args.include_chapters : true,
+        validate_hierarchy: typeof args.validate_hierarchy === 'boolean' ? args.validate_hierarchy : true,
+        force: typeof args.force === 'boolean' ? args.force : false,
         limit: count(args.limit),
       }),
     ).then((output) => ({ output })),
@@ -597,6 +599,19 @@ const EXECUTORS: Record<string, Executor> = {
         student_id: count(args.student_id),
         days_ahead: count(args.days_ahead),
         days_back: count(args.days_back),
+        limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  'teach_learn.content_model_coverage': (args, context) =>
+    readViaMcp(
+      context,
+      'teach_learn.content_model_coverage',
+      given({
+        standard_id: count(args.standard_id ?? args.class_id),
+        standard: count(args.standard),
+        subject_id: count(args.subject_id),
+        subject: text(args.subject ?? args.subject_name),
         limit: count(args.limit),
       }),
     ).then((output) => ({ output })),

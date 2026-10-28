@@ -2,13 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Banknote, CalendarDays, ChevronDown, History, Loader2, Printer } from 'lucide-react';
+import { ArrowLeft, Loader2, Printer } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -16,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { FeesAiAssist } from '@/app/fees/_components/fees-ai-assist';
 import { logFeesOperation } from '@/lib/fees/fees-ai-stack';
 import { sanitizeHtml } from '@/lib/security/sanitize-html';
@@ -112,12 +109,6 @@ type ReceiptResponse = {
   receipt_html?: unknown;
   message?: string;
 };
-
-const currencyFormatter = new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  maximumFractionDigits: 0,
-});
 
 export default function FeesCollectionStudentPage() {
   const router = useRouter();
@@ -322,18 +313,29 @@ export default function FeesCollectionStudentPage() {
       .flatMap((month) => month.particulars.map((particular) => ({ ...particular, monthId: month.id })));
   }, [months, selectedMonthIds]);
 
+  const groupedParticulars = useMemo(() => {
+    const grouped = new Map<string, { id: string; particular: string; amount: number; collectionAmount: number }>();
+    selectedParticulars.forEach((item) => {
+      const current = grouped.get(item.id);
+      grouped.set(item.id, {
+        id: item.id,
+        particular: item.particular,
+        amount: (current?.amount ?? 0) + item.amount,
+        collectionAmount: (current?.collectionAmount ?? 0) + item.collectionAmount,
+      });
+    });
+    return [...grouped.values()];
+  }, [selectedParticulars]);
+
   const totalAmount = selectedParticulars.reduce((total, item) => total + item.collectionAmount, 0);
   const grandTotal = Math.max(totalAmount - discount + fine, 0);
   const isCashPayment = paymentMode.trim().toLowerCase() === 'cash';
   const showBankFields = Boolean(paymentMode) && !isCashPayment;
-  const showChequeDate = showBankFields;
   const showBranch = showBankFields;
   const totalSummaryFees = summaryRows.reduce((total, row) => total + row.fees, 0);
   const totalSummaryPaid = summaryRows.reduce((total, row) => total + row.paid, 0);
   const totalSummaryDiscount = summaryRows.reduce((total, row) => total + row.discount, 0);
   const totalSummaryRemaining = summaryRows.reduce((total, row) => total + row.remaining, 0);
-  const selectedMonthCount = selectedMonthIds.length;
-  const selectedParticularCount = selectedParticulars.length;
   const selectedBankName = useMemo(() => {
     const selectedBank = banks.find((bank) => bank.id === selectedBankId);
     return selectedBank?.label ?? '';
@@ -342,9 +344,6 @@ export default function FeesCollectionStudentPage() {
     () => sanitizeHtml(normalizeReceiptHtml(receiptHtml, selectedBankId, selectedBankName), { document: true }),
     [receiptHtml, selectedBankId, selectedBankName]
   );
-  const collectionProgress = totalSummaryFees > 0
-    ? Math.min(100, Math.round(((totalSummaryPaid + grandTotal + totalSummaryDiscount) / totalSummaryFees) * 100))
-    : 0;
 
   const returnToCollectDashboard = useCallback(() => {
     if (printCompletionHandledRef.current) return;
@@ -392,21 +391,23 @@ export default function FeesCollectionStudentPage() {
     return () => window.clearTimeout(printTimer);
   }, [printReceiptOnLoad, printViewOpen, printableReceiptHtml]);
 
-  const handleParticularAmountChange = (monthId: string, particularId: string, amount: number) => {
-    setMonths((currentMonths) =>
-      currentMonths.map((month) => {
-        if (month.id !== monthId) return month;
-
+  // One amount per fee head: spread the typed total over the selected months, capped at each month's due.
+  const handleHeadAmountChange = (particularId: string, amount: number) => {
+    setMonths((currentMonths) => {
+      let remaining = Math.max(amount, 0);
+      return currentMonths.map((month) => {
+        if (!selectedMonthIds.includes(month.id)) return month;
         return {
           ...month,
-          particulars: month.particulars.map((particular) =>
-            particular.id === particularId
-              ? { ...particular, collectionAmount: Math.min(Math.max(amount, 0), particular.amount) }
-              : particular
-          ),
+          particulars: month.particulars.map((particular) => {
+            if (particular.id !== particularId) return particular;
+            const applied = Math.min(remaining, particular.amount);
+            remaining -= applied;
+            return { ...particular, collectionAmount: applied };
+          }),
         };
-      })
-    );
+      });
+    });
   };
 
   const toggleMonth = (monthId: string, checked: boolean) => {
@@ -532,6 +533,11 @@ export default function FeesCollectionStudentPage() {
         throw new Error(payload.message || "Couldn't save fee collection. Try again.");
       }
 
+      // Laravel answers 200 with status "0" when it inserted nothing; that is a failure, not a receipt.
+      if (String(asRecord(payload).status ?? '') === '0') {
+        throw new Error(readString(asRecord(payload).message) || "Couldn't save fee collection. Try again.");
+      }
+
       // The money is taken and the receipt exists by this point. Recording is
       // fire-and-forget on purpose: a busy audit table must never cost a parent their
       // receipt, so this returns nothing to await and swallows its own failures.
@@ -569,6 +575,7 @@ export default function FeesCollectionStudentPage() {
 
       router.replace('/fees/collect');
     } catch (saveError) {
+      console.error('Fee collection save failed', saveError);
       setError(saveError instanceof Error ? saveError.message : "Couldn't save fee collection. Try again.");
     } finally {
       setSaving(false);
@@ -605,290 +612,224 @@ export default function FeesCollectionStudentPage() {
 
   return (
     <div className="min-h-screen ">
-      <div data-print-exclude="true" className="mx-auto max-w-[1500px] space-y-6 p-3 sm:p-4 md:p-6 lg:p-8">
-        <section className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/95 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur">
-          <div className="grid gap-6 px-5 py-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-6 lg:py-6">
-            <div className="space-y-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl bg-white" onClick={() => router.push('/fees/collect')}>
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
-                    Fee collection
-                  </div>
-                  <h1 className="mt-3 truncate text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{student.studentName || 'Student fee collection'}</h1>
-                  <p className="mt-2 text-sm text-slate-500">
-                    Review the same fee data, select due months, adjust charges if needed, and continue with the existing save and receipt flow.
-                  </p>
-                </div>
-              </div>
+      <div data-print-exclude="true" className="mx-auto max-w-[1500px] space-y-4 p-3 sm:p-4 md:p-6">
+        <div className="flex items-center gap-3">
+          <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-md bg-white" onClick={() => router.push('/fees/collect')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-semibold text-slate-900">Fees Collect</h1>
+        </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <SummaryStatCard label="Outstanding amount" value={currencyFormatter.format(student.pendingFees)} tone="rose" />
-                <SummaryStatCard label="Selected months" value={String(selectedMonthCount)} tone="sky" />
-                <SummaryStatCard label="Line items" value={String(selectedParticularCount)} tone="amber" />
-                <SummaryStatCard label="Current total" value={currencyFormatter.format(grandTotal)} tone="emerald" />
-              </div>
-            </div>
-
-            <Card className="border-0 bg-slate-950 text-white ring-0">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold text-white">Collection progress</CardTitle>
-                <p className="text-sm text-slate-300">Current academic-year position for this student.</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-300">
-                    <span>Paid and adjusted</span>
-                    <span>{collectionProgress}%</span>
-                  </div>
-                  <div className="h-2.5 rounded-full bg-white/10">
-                    <div className="h-2.5 rounded-full bg-emerald-400" style={{ width: `${collectionProgress}%` }} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <MiniInfo label="Assigned" value={currencyFormatter.format(totalSummaryFees)} />
-                  <MiniInfo label="Paid" value={currencyFormatter.format(totalSummaryPaid)} />
-                  <MiniInfo label="Discount" value={currencyFormatter.format(totalSummaryDiscount)} />
-                  <MiniInfo label="Outstanding" value={currencyFormatter.format(totalSummaryRemaining)} />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        {error && <div className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
+        {error && <div className="rounded-md border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
 
         {printableReceiptHtml && !printViewOpen && (
-          <Card className="border-emerald-200 bg-white shadow-sm">
-            <CardHeader className="flex flex-col gap-3 border-b border-emerald-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-base font-bold text-emerald-800">Receipt preview</CardTitle>
-              <div className="text-sm text-emerald-700">Saved receipt preview</div>
-            </CardHeader>
-            <CardContent className="overflow-x-auto bg-slate-50 p-4">
-              <div className="mx-auto min-w-[720px] max-w-[900px] bg-white p-4 shadow-sm" dangerouslySetInnerHTML={{ __html: printableReceiptHtml }} />
-            </CardContent>
-          </Card>
+          <div className="rounded-md border border-emerald-200 bg-white">
+            <div className="border-b border-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800">Receipt preview</div>
+            <div className="overflow-x-auto bg-slate-50 p-4">
+              <div className="mx-auto min-w-[720px] max-w-[900px] bg-white p-4" dangerouslySetInnerHTML={{ __html: printableReceiptHtml }} />
+            </div>
+          </div>
         )}
 
-        <Card className="border-slate-200/80 bg-white shadow-sm">
-          <CardHeader className="border-b border-slate-100 px-5 py-4">
-            <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-800">
-              <Banknote className="h-4 w-4 text-[#0D6EFD]" />
-              Student information
-            </CardTitle>
-            <p className="text-sm text-slate-500">Core profile values returned by the fee collection API.</p>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-3 p-4 sm:p-5 md:grid-cols-2 xl:grid-cols-3">
-            <Info label="Unique ID" value={student?.uniqueId} />
-            <Info label="Student name" value={student?.studentName} />
-            <Info label="GR no." value={student?.grNo} />
-            <Info label="Admission year" value={student?.admissionYear} />
-            <Info label="Standard / Division" value={student?.standardDivision} />
-            <Info label="Father name" value={student?.fatherName} />
-            <Info label="Contact number" value={student?.contactNumber} />
-            <Info label="Parent email" value={student?.parentEmail} />
-            <Info label="Student quota" value={student?.studentQuota} />
-            <Info label="Outstanding fees" value={currencyFormatter.format(student?.pendingFees ?? 0)} valueClassName="font-bold text-rose-600" />
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
-          <div className="min-w-0 space-y-5">
-            <Card className="border-slate-200/80 bg-white shadow-sm">
-              <CardHeader className="border-b border-slate-100 px-5 py-4">
-                <CardTitle className="text-base font-bold text-slate-800">Fee summary</CardTitle>
-                <p className="text-sm text-slate-500">Month-wise totals already returned for this student record.</p>
-              </CardHeader>
-              <CardContent className="p-0">
-                <DataTable
-                  headers={['Month', 'Fees', 'Paid', 'Discount', 'Outstanding']}
-                  rows={summaryRows.map((row) => [
-                    row.label,
-                    currencyFormatter.format(row.fees),
-                    currencyFormatter.format(row.paid),
-                    currencyFormatter.format(row.discount),
-                    currencyFormatter.format(row.remaining),
-                  ])}
-                  emptyMessage="Fee summary is not available."
-                />
-                <div className="border-t border-slate-100 px-5 py-4">
-                  <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg bg-white">
-                    <History className="mr-2 h-4 w-4" />
-                    Paid history
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200/80 bg-white shadow-sm">
-              <CardHeader className="border-b border-slate-100 px-5 py-4">
-                <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-800">
-                  <CalendarDays className="h-4 w-4 text-[#0D6EFD]" />
-                  Month selection
-                </CardTitle>
-                <p className="text-sm text-slate-500">Choose the fee months to include. Expanding a month shows the same line items and editable collection amounts.</p>
-              </CardHeader>
-              <CardContent className="space-y-3 p-4 sm:p-5">
-                {months.map((month) => {
-                  const isExpanded = expandedMonthId === month.id;
-                  const isSelected = selectedMonthIds.includes(month.id);
-                  const monthCollection = month.particulars.reduce((total, item) => total + item.collectionAmount, 0);
-                  const monthAmount = month.particulars.reduce((total, item) => total + item.amount, 0);
-
-                  return (
-                    <div key={month.id} className={`rounded-2xl border ${isSelected ? 'border-sky-200 bg-sky-50/40' : 'border-slate-200 bg-white'}`}>
-                      <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
-                        <input type="checkbox" checked={isSelected} onChange={(event) => toggleMonth(month.id, event.target.checked)} className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#0D6EFD]" />
-                        <button type="button" className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left" onClick={() => setExpandedMonthId(isExpanded ? null : month.id)}>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-slate-800">{month.label}</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {month.particulars.length} line item{month.particulars.length === 1 ? '' : 's'} • {currencyFormatter.format(monthCollection)} selected of {currencyFormatter.format(monthAmount)}
-                            </p>
-                          </div>
-                          <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                        </button>
-                      </div>
-                      {isExpanded && (
-                        <div className="border-t border-slate-100 p-3 sm:p-4">
-                          <FeeParticularsTable month={month} onAmountChange={handleParticularAmountChange} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {months.length === 0 && <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No unpaid fee months available.</div>}
-              </CardContent>
-            </Card>
+        <div className="grid grid-cols-1 gap-6 rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-900 lg:grid-cols-3">
+          {/* Fees Structure */}
+          <div className="min-w-0">
+            <h2 className="mb-2 font-semibold">Fees Structure</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-slate-300">
+                    <th className="px-2 py-2 font-semibold">Month</th>
+                    <th className="px-2 py-2 font-semibold">Fees</th>
+                    <th className="px-2 py-2 font-semibold">Paid</th>
+                    <th className="px-2 py-2 font-semibold">Discount</th>
+                    <th className="px-2 py-2 font-semibold">Remaining</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summaryRows.map((row, index) => (
+                    <tr key={`${row.label}-${index}`} className="border-b border-slate-100">
+                      <td className="px-2 py-2">{row.label}</td>
+                      <td className="px-2 py-2">{row.fees}</td>
+                      <td className="px-2 py-2">{row.paid + row.discount}</td>
+                      <td className="px-2 py-2">{row.discount}</td>
+                      <td className="px-2 py-2">{row.remaining}</td>
+                    </tr>
+                  ))}
+                  {summaryRows.length === 0 && (
+                    <tr><td colSpan={5} className="px-2 py-6 text-center text-slate-500">Fee summary is not available.</td></tr>
+                  )}
+                  {summaryRows.length > 0 && (
+                    <tr className="font-semibold">
+                      <td className="px-2 py-2">Total</td>
+                      <td className="px-2 py-2">{totalSummaryFees}</td>
+                      <td className="px-2 py-2">{totalSummaryPaid + totalSummaryDiscount}</td>
+                      <td className="px-2 py-2">{totalSummaryDiscount}</td>
+                      <td className="px-2 py-2">{totalSummaryRemaining}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div className="min-w-0 space-y-5">
-            <Card className="border-slate-200/80 bg-white shadow-sm">
-              <CardHeader className="border-b border-slate-100 px-5 py-4">
-                <CardTitle className="text-base font-bold text-slate-800">Fee adjustment</CardTitle>
-                <p className="text-sm text-slate-500">Optional adjustments applied before the final save request.</p>
-              </CardHeader>
-              <CardContent className="space-y-4 p-4 sm:p-5">
-                <Field label="Remarks">
-                  <Textarea value={remarks} onChange={(event) => setRemarks(event.target.value)} placeholder="Enter remarks" className="min-h-24 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
-                  {/* Generative AI on the one free-text field in this form. The prompt,
-                      the policy check and the usage record all come from the Fees AI
-                      Stack; this screen only supplies the fee data and receives text. */}
-                  <FeesAiAssist
-                    className="mt-2"
-                    operation="remarks_drafted"
-                    label="Draft remarks with AI"
-                    student={{ id: Number(studentId) || null, name: student?.studentName ?? null }}
-                    variables={{
-                      student_name: student?.studentName ?? '',
-                      standard_division: student?.standardDivision ?? '',
-                      enrollment_no: student?.grNo ?? '',
-                      total_amount: totalAmount,
-                      discount,
-                      fine,
-                      payment_mode: paymentMode,
-                      receipt_date: receiptDate,
-                      pending_fees: student?.pendingFees ?? 0,
-                    }}
-                    onInsert={(text) => setRemarks(text)}
-                  />
-                </Field>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Discount">
-                    <Input type="number" min="0" value={discount} onChange={(event) => setDiscount(readNumber(event.target.value))} className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
-                  </Field>
-                  <Field label="Fine">
-                    <Input type="number" min="0" value={fine} onChange={(event) => setFine(readNumber(event.target.value))} className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
-                  </Field>
-                </div>
-                <Field label="Grand total">
-                  <Input value={currencyFormatter.format(grandTotal)} readOnly className="h-10 rounded-lg border-emerald-200 bg-emerald-50 text-sm font-bold text-emerald-700" />
-                </Field>
-              </CardContent>
-            </Card>
+          {/* Fees Collection */}
+          <div className="min-w-0 lg:col-span-2">
+            <h2 className="mb-2 font-semibold">Fees Collection</h2>
 
-            <Card className="border-slate-200/80 bg-white shadow-sm">
-              <CardHeader className="border-b border-slate-100 px-5 py-4">
-                <CardTitle className="text-base font-bold text-slate-800">Payment information</CardTitle>
-                <p className="text-sm text-slate-500">Receipt metadata and banking details sent with the same request.</p>
-              </CardHeader>
-              <CardContent className="space-y-4 p-4 sm:p-5">
-                <Field label="Payment mode">
-                  <Select value={paymentMode} onValueChange={(value) => setPaymentMode(value ?? '')}>
-                    <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
-                      <SelectValue placeholder="Select payment mode" />
+            <div className="grid grid-cols-1 gap-x-6 md:grid-cols-2">
+              <table className="w-full text-left">
+                <tbody>
+                  <InfoRow label="Unique ID" value={student.uniqueId} />
+                  <InfoRow label="Student Name" value={student.studentName} />
+                  <InfoRow label="Admission Year" value={student.admissionYear} />
+                  <InfoRow label="Father Name" value={student.fatherName} />
+                  <InfoRow label="Student Quota" value={student.studentQuota} />
+                </tbody>
+              </table>
+              <table className="w-full text-left">
+                <tbody>
+                  <InfoRow label="GR No." value={student.grNo} />
+                  <InfoRow label="Standard / Division" value={student.standardDivision} />
+                  <InfoRow label="Contact No" value={student.contactNumber} />
+                  <InfoRow label="Parent Email" value={student.parentEmail} />
+                  <InfoRow label="Pending Fees" value={String(student.pendingFees)} className="text-red-600" />
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t-2 border-slate-900 pt-3 sm:grid-cols-3 lg:grid-cols-6">
+              {months.map((month) => (
+                <label key={month.id} className="flex cursor-pointer items-center gap-2">
+                  <input type="checkbox" checked={selectedMonthIds.includes(month.id)} onChange={(event) => toggleMonth(month.id, event.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-[#0D6EFD]" />
+                  {month.label}
+                </label>
+              ))}
+              {months.length === 0 && <p className="col-span-full text-slate-500">No unpaid fee months available.</p>}
+            </div>
+
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[460px] text-left">
+                <thead>
+                  <tr className="border-b border-slate-300">
+                    <th className="px-2 py-2 font-semibold">Particular</th>
+                    <th className="px-2 py-2 font-semibold">Amount</th>
+                    <th className="px-2 py-2 font-semibold">Collection Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedParticulars.map((particular) => (
+                    <tr key={particular.id} className="border-b border-slate-100">
+                      <td className="px-2 py-2">{particular.particular}</td>
+                      <td className="px-2 py-2">{particular.amount}</td>
+                      <td className="px-2 py-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          max={particular.amount}
+                          value={particular.collectionAmount}
+                          onChange={(event) => handleHeadAmountChange(particular.id, readNumber(event.target.value))}
+                          className="h-9 max-w-[200px] rounded-md border-slate-300 bg-white text-sm"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-b border-slate-300 font-semibold">
+                    <td className="px-2 py-2">Total</td>
+                    <td className="px-2 py-2">{groupedParticulars.reduce((total, item) => total + item.amount, 0)}</td>
+                    <td className="px-2 py-2">{totalAmount}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto_1fr] md:items-center">
+              <span>Remarks</span>
+              <div className="md:col-span-3">
+                <Input value={remarks} onChange={(event) => setRemarks(event.target.value)} autoComplete="off" className="h-9 rounded-md border-slate-300 bg-white text-sm" />
+                {/* Generative AI on the one free-text field in this form. The prompt,
+                    the policy check and the usage record all come from the Fees AI
+                    Stack; this screen only supplies the fee data and receives text. */}
+                <FeesAiAssist
+                  className="mt-2"
+                  operation="remarks_drafted"
+                  label="Draft remarks with AI"
+                  student={{ id: Number(studentId) || null, name: student?.studentName ?? null }}
+                  variables={{
+                    student_name: student?.studentName ?? '',
+                    standard_division: student?.standardDivision ?? '',
+                    enrollment_no: student?.grNo ?? '',
+                    total_amount: totalAmount,
+                    discount,
+                    fine,
+                    payment_mode: paymentMode,
+                    receipt_date: receiptDate,
+                    pending_fees: student?.pendingFees ?? 0,
+                  }}
+                  onInsert={(text) => setRemarks(text)}
+                />
+              </div>
+
+              <span>Discount</span>
+              <Input type="number" min="0" value={discount} onChange={(event) => setDiscount(readNumber(event.target.value))} className="h-9 rounded-md border-slate-300 bg-white text-sm md:col-span-3 md:max-w-[240px]" />
+
+              <span>Fine (Include Cheque return charges)</span>
+              <Input type="number" min="0" value={fine} onChange={(event) => setFine(readNumber(event.target.value))} className="h-9 rounded-md border-slate-300 bg-white text-sm md:col-span-3 md:max-w-[240px]" />
+
+              <span className="font-semibold">Grand Total</span>
+              <Input value={grandTotal} readOnly className="h-9 rounded-md border-slate-300 bg-slate-50 text-sm font-semibold md:col-span-3 md:max-w-[240px]" />
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 border-t-2 border-slate-900 pt-3 sm:grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto_1fr] md:items-center">
+              <span>Payment Mode</span>
+              <Select value={paymentMode} onValueChange={(value) => setPaymentMode(value ?? '')}>
+                <SelectTrigger className="h-9 w-full rounded-md border-slate-300 bg-white text-sm">
+                  <SelectValue placeholder="Select Payment Mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentModes.map((mode) => (
+                    <SelectItem key={mode.id} value={mode.id}>{mode.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span>Receipt Date</span>
+              <Input type="date" value={receiptDate} onChange={(event) => setReceiptDate(event.target.value)} className="h-9 rounded-md border-slate-300 bg-white text-sm" />
+
+              {showBankFields && (
+                <>
+                  <span>Cheque/DD Date</span>
+                  <Input type="date" value={chequeDate} onChange={(event) => setChequeDate(event.target.value)} className="h-9 rounded-md border-slate-300 bg-white text-sm" />
+                  <span>Cheque/DD No/Transaction No</span>
+                  <Input value={transactionNo} onChange={(event) => setTransactionNo(event.target.value)} className="h-9 rounded-md border-slate-300 bg-white text-sm" />
+                  <span>Bank Name</span>
+                  <Select value={selectedBankId} onValueChange={(value) => setSelectedBankId(value ?? '')}>
+                    <SelectTrigger className="h-9 w-full rounded-md border-slate-300 bg-white text-sm">
+                      <SelectValue placeholder="Select Bank Name">
+                        {selectedBankName || 'Select Bank Name'}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {paymentModes.map((mode) => (
-                        <SelectItem key={mode.id} value={mode.id}>{mode.label}</SelectItem>
+                      {banks.map((bank) => (
+                        <SelectItem key={bank.id} value={bank.id}>{bank.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </Field>
-                <Field label="Receipt date">
-                  <Input type="date" value={receiptDate} onChange={(event) => setReceiptDate(event.target.value)} className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
-                </Field>
-                {showChequeDate && (
-                  <Field label="Cheque/DD date">
-                    <Input type="date" value={chequeDate} onChange={(event) => setChequeDate(event.target.value)} className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
-                  </Field>
-                )}
-                {showBankFields && (
-                  <Field label="Cheque/DD/Transaction No.">
-                    <Input value={transactionNo} onChange={(event) => setTransactionNo(event.target.value)} placeholder="Enter reference number" className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
-                  </Field>
-                )}
-                {showBankFields && (
-                  <Field label="Bank name">
-                    <Select value={selectedBankId} onValueChange={(value) => setSelectedBankId(value ?? '')}>
-                      <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
-                        <SelectValue placeholder="Select bank">
-                          {selectedBankName || 'Select bank'}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {banks.map((bank) => (
-                          <SelectItem key={bank.id} value={bank.id}>{bank.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                )}
-                {showBranch && (
-                  <Field label="Bank branch">
-                    <Input value={bankBranch} onChange={(event) => setBankBranch(event.target.value)} placeholder="Enter bank branch" className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
-                  </Field>
-                )}
-                <label className="flex h-10 cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/70 px-3 text-sm font-medium text-slate-700">
-                  <input type="checkbox" checked={sendSms} onChange={(event) => setSendSms(event.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-[#0D6EFD]" />
-                  Send SMS
-                </label>
-              </CardContent>
-            </Card>
+                  <span>Bank Branch</span>
+                  <Input value={bankBranch} onChange={(event) => setBankBranch(event.target.value)} className="h-9 rounded-md border-slate-300 bg-white text-sm" />
+                </>
+              )}
 
-           
-          </div>
-        </div>
-      </div>
+              <span>Send SMS</span>
+              <input type="checkbox" checked={sendSms} onChange={(event) => setSendSms(event.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-[#0D6EFD]" />
+            </div>
 
-      <div data-print-exclude="true" className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
-        <div className="mx-auto flex max-w-[1500px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-medium text-slate-500">Grand total</p>
-            <p className="text-xl font-bold text-slate-900">{currencyFormatter.format(grandTotal)}</p>
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-row">
-            <Button type="button" variant="outline" className="h-10 rounded-lg bg-white" onClick={() => router.push('/fees/collect')} disabled={saving}>Cancel</Button>
-            {/* <Button type="button" className="h-10 rounded-lg bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90" onClick={() => saveCollection(false)} disabled={saving || selectedMonthIds.length === 0}>
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Save
-            </Button> */}
-            <Button type="button" className="h-10 rounded-lg bg-slate-900 text-white hover:bg-slate-800" onClick={() => saveCollection(true)} disabled={saving || selectedMonthIds.length === 0}>
-              <Printer className="mr-2 h-4 w-4" />
-              Save & Print Receipt
-            </Button>
+            <div className="mt-5 flex justify-center gap-2 border-t-2 border-slate-900 pt-4">
+              <Button type="button" variant="outline" className="h-10 rounded-md bg-white" onClick={() => router.push('/fees/collect')} disabled={saving}>Cancel</Button>
+              <Button type="button" className="h-10 rounded-md bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => saveCollection(true)} disabled={saving || selectedMonthIds.length === 0}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+                Save &amp; Print Receipt
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -941,171 +882,12 @@ export default function FeesCollectionStudentPage() {
   );
 }
 
-function FeeParticularsTable({ month, onAmountChange }: { month: FeeMonth; onAmountChange: (monthId: string, particularId: string, amount: number) => void }) {
-  const totalAmount = month.particulars.reduce((total, item) => total + item.amount, 0);
-  const totalCollection = month.particulars.reduce((total, item) => total + item.collectionAmount, 0);
-
+function InfoRow({ label, value, className = '' }: { label: string; value?: string; className?: string }) {
   return (
-    <div>
-      <div className="space-y-3 sm:hidden">
-        {month.particulars.map((particular) => (
-          <div key={particular.id} className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="break-words text-sm font-semibold text-slate-800">{particular.particular}</p>
-                <p className="mt-1 text-xs text-slate-500">Amount: {currencyFormatter.format(particular.amount)}</p>
-              </div>
-            </div>
-            <Label className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Collection amount</Label>
-            <Input
-              type="number"
-              min="0"
-              max={particular.amount}
-              value={particular.collectionAmount}
-              onChange={(event) => onAmountChange(month.id, particular.id, readNumber(event.target.value))}
-              className="mt-2 h-9 rounded-lg border-slate-200 bg-white text-sm"
-            />
-          </div>
-        ))}
-        <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-900 p-3 text-sm font-bold text-white">
-          <div>
-            <p className="text-xs font-medium text-slate-300">Amount</p>
-            <p>{currencyFormatter.format(totalAmount)}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-slate-300">Collection</p>
-            <p>{currencyFormatter.format(totalCollection)}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="hidden overflow-x-auto sm:block">
-        <table className="w-full min-w-[520px] text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
-            <th className="px-3 py-2 font-semibold">Particular</th>
-            <th className="px-3 py-2 font-semibold">Amount</th>
-            <th className="px-3 py-2 font-semibold">Collection amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {month.particulars.map((particular) => (
-            <tr key={particular.id} className="border-b border-slate-100 last:border-0">
-              <td className="px-3 py-3 font-medium text-slate-800">{particular.particular}</td>
-              <td className="px-3 py-3 text-slate-600">{currencyFormatter.format(particular.amount)}</td>
-              <td className="px-3 py-3">
-                <Input type="number" min="0" max={particular.amount} value={particular.collectionAmount} onChange={(event) => onAmountChange(month.id, particular.id, readNumber(event.target.value))} className="h-9 max-w-[160px] rounded-lg border-slate-200 bg-white text-sm" />
-              </td>
-            </tr>
-          ))}
-          <tr className="bg-slate-50/80 font-bold text-slate-900">
-            <td className="px-3 py-3">Total</td>
-            <td className="px-3 py-3">{currencyFormatter.format(totalAmount)}</td>
-            <td className="px-3 py-3">{currencyFormatter.format(totalCollection)}</td>
-          </tr>
-        </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function DataTable({ headers, rows, emptyMessage }: { headers: string[]; rows: string[][]; emptyMessage: string }) {
-  return (
-    <div>
-      <div className="space-y-3 p-4 sm:hidden">
-        {rows.map((row, index) => (
-          <div key={`${row[0]}-${index}`} className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
-            <p className="text-sm font-bold text-slate-900">{row[0]}</p>
-            <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-              {row.slice(1).map((cell, cellIndex) => (
-                <div key={`${cell}-${cellIndex}`}>
-                  <p className="font-medium text-slate-500">{headers[cellIndex + 1]}</p>
-                  <p className="mt-1 font-semibold text-slate-800">{cell}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        {rows.length === 0 && <div className="px-5 py-8 text-center text-sm text-slate-500">{emptyMessage}</div>}
-      </div>
-
-      <div className="hidden overflow-x-auto sm:block">
-        <table className="w-full min-w-[620px] text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
-            {headers.map((header) => <th key={header} className="px-5 py-3 font-semibold">{header}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={`${row[0]}-${index}`} className="border-b border-slate-100 last:border-0">
-              {row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className="px-5 py-4 text-slate-700">{cell}</td>)}
-            </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={headers.length} className="px-5 py-10 text-center text-sm text-slate-500">{emptyMessage}</td>
-            </tr>
-          )}
-        </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-function Info({ label, value, valueClassName = 'text-slate-900' }: { label: string; value?: string; valueClassName?: string }) {
-  return (
-    <div className="grid min-w-0 grid-cols-1 gap-1 rounded-2xl border border-slate-100 bg-slate-50/60 px-3 py-3 text-sm sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-4 sm:px-4">
-      <span className="font-medium text-slate-500">{label}</span>
-      <span className={`min-w-0 break-words ${valueClassName}`}>{value || '-'}</span>
-    </div>
-  );
-}
-
-function SummaryStatCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: 'rose' | 'sky' | 'amber' | 'emerald';
-}) {
-  const toneClasses = {
-    rose: 'border-rose-100 bg-rose-50 text-rose-700',
-    sky: 'border-sky-100 bg-sky-50 text-sky-700',
-    amber: 'border-amber-100 bg-amber-50 text-amber-700',
-    emerald: 'border-emerald-100 bg-emerald-50 text-emerald-700',
-  } satisfies Record<'rose' | 'sky' | 'amber' | 'emerald', string>;
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</p>
-      <p className="mt-3 text-xl font-bold text-slate-950">{value}</p>
-      <div className={`mt-3 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${toneClasses[tone]}`}>
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function MiniInfo({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
-      <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">{label}</p>
-      <p className={`mt-2 text-sm ${strong ? 'font-bold text-white' : 'font-semibold text-slate-100'}`}>{value}</p>
-    </div>
+    <tr className="border-b border-slate-100">
+      <td className={`px-2 py-2 ${className}`}>{label}</td>
+      <td className={`px-2 py-2 ${className}`}>{value || '-'}</td>
+    </tr>
   );
 }
 
@@ -1366,6 +1148,9 @@ function extractHtmlFromUnknown(value: unknown): string {
     }
     return '';
   }
+
+  // Only objects can nest a receipt; recursing into undefined/primitives never ends.
+  if (!value || typeof value !== 'object') return '';
 
   const record = asRecord(value);
   for (const key of ['data', 'html', 'receipt', 'receipt_html', 'receiptHtml']) {

@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ExternalLink, FileDown, Loader2 } from 'lucide-react';
 import { splitSectionsByContent } from '@/lib/question-paper/sections';
+import { buildSessionContext, createAuthHeaders } from '@/lib/erp-client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -174,6 +175,39 @@ const pdfButtonClassName =
   'inline-flex h-8 items-center justify-center gap-1.5 rounded-[8px] border border-[#CFD9E6] bg-white px-3 text-[12px] font-semibold text-[#5846EA] transition hover:border-[#5846EA] hover:bg-[#F5F4FF] disabled:cursor-not-allowed disabled:opacity-50';
 
 /**
+ * Opens the stored PDF in a new tab. The file route needs the bearer token, which a plain
+ * new-tab navigation cannot send, so it is fetched with the session's headers and shown from a
+ * blob URL. The tab is opened first, inside the click, so the browser does not treat it as a popup.
+ */
+async function openStoredPdf(href: string) {
+  const tab = window.open('', '_blank');
+  const say = (message: string) => {
+    if (tab) tab.document.body.textContent = message;
+    else window.alert(message);
+  };
+  say('Opening PDF…');
+
+  try {
+    const response = await fetch(href, {
+      headers: { ...createAuthHeaders(buildSessionContext()), Accept: 'application/pdf, application/json' },
+    });
+    const type = response.headers.get('content-type') ?? '';
+
+    if (!response.ok || !type.includes('pdf')) {
+      const body = type.includes('json') ? ((await response.json().catch(() => null)) as { message?: string } | null) : null;
+      throw new Error(body?.message || 'The PDF could not be opened.');
+    }
+
+    const url = URL.createObjectURL(await response.blob());
+    if (tab) tab.location.href = url;
+    else window.open(url, '_blank');
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    say(error instanceof Error ? error.message : 'The PDF could not be opened.');
+  }
+}
+
+/**
  * The per-row action: this exam, the chosen template, as a PDF.
  *
  * `openHref` is opt-in (Worksheet and Project pass it; Exam/tab 242 does
@@ -225,7 +259,7 @@ export function ExamPdfButton({
         <ChevronDown size={12} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => window.open(openHref, '_blank', 'noopener,noreferrer')}>
+        <DropdownMenuItem onClick={() => void openStoredPdf(openHref)}>
           <ExternalLink size={14} />
           Open PDF
         </DropdownMenuItem>

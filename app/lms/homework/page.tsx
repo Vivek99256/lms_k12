@@ -15,7 +15,6 @@ import {
   Layers,
   ChevronDown,
   AlertCircle,
-  UserCheck,
   UsersRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,7 +50,7 @@ import {
   type StudentRow,
 } from "@/app/lms/homework/api";
 import RequireStaff from "@/app/lms/_shared/RequireStaff";
-import type { StudentScope } from "@/app/lms/_shared/StudentScopeToggle";
+import { StudentScopeToggle, type StudentScope } from "@/app/lms/_shared/StudentScopeToggle";
 
 type HomeworkSource = "chapter" | "attachment" | "exam_paper";
 
@@ -489,7 +488,7 @@ export default function StudentHomeworkPage() {
 
   return (
     <RequireStaff>
-      <main className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
+      <main className="mx-auto  space-y-5 p-4 sm:p-6">
         {/* Page header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -531,109 +530,8 @@ export default function StudentHomeworkPage() {
           </div>
 
           <div className="p-5 space-y-5">
-            {/* Scope toggle — visually prominent */}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {/* Student wise tile */}
-              <button
-                type="button"
-                onClick={() => changeScope("student_wise")}
-                className={`group flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                  scope === "student_wise"
-                    ? "border-indigo-400 bg-indigo-50 shadow-sm"
-                    : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50"
-                }`}
-              >
-                <div
-                  className={`flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                    scope === "student_wise"
-                      ? "bg-indigo-500 text-white"
-                      : "bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600"
-                  }`}
-                >
-                  <UserCheck className="size-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={`text-sm font-bold ${
-                      scope === "student_wise" ? "text-indigo-700" : "text-slate-700"
-                    }`}
-                  >
-                    Student wise
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    Pick individual students from the class roster
-                  </p>
-                </div>
-                <div
-                  className={`mt-0.5 size-4 shrink-0 rounded-full border-2 transition-colors ${
-                    scope === "student_wise"
-                      ? "border-indigo-500 bg-indigo-500"
-                      : "border-slate-300"
-                  }`}
-                >
-                  {scope === "student_wise" && (
-                    <div className="m-auto mt-0.5 size-1.5 rounded-full bg-white" />
-                  )}
-                </div>
-              </button>
-
-              {/* All students tile */}
-              <button
-                type="button"
-                onClick={() => changeScope("all_students")}
-                className={`group flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                  scope === "all_students"
-                    ? "border-violet-400 bg-violet-50 shadow-sm"
-                    : "border-slate-200 bg-white hover:border-violet-200 hover:bg-slate-50"
-                }`}
-              >
-                <div
-                  className={`flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                    scope === "all_students"
-                      ? "bg-violet-500 text-white"
-                      : "bg-slate-100 text-slate-500 group-hover:bg-violet-100 group-hover:text-violet-600"
-                  }`}
-                >
-                  <UsersRound className="size-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={`text-sm font-bold ${
-                      scope === "all_students" ? "text-violet-700" : "text-slate-700"
-                    }`}
-                  >
-                    All students
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    Assign to every student in the selected class at once
-                  </p>
-                </div>
-                <div
-                  className={`mt-0.5 size-4 shrink-0 rounded-full border-2 transition-colors ${
-                    scope === "all_students"
-                      ? "border-violet-500 bg-violet-500"
-                      : "border-slate-300"
-                  }`}
-                >
-                  {scope === "all_students" && (
-                    <div className="m-auto mt-0.5 size-1.5 rounded-full bg-white" />
-                  )}
-                </div>
-              </button>
-            </div>
-
-            {/* Scope description banner */}
-            {scope === "all_students" ? (
-              <div className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50 px-4 py-2.5 text-xs font-medium text-violet-700">
-                <UsersRound className="size-4 shrink-0 text-violet-500" />
-                Assign to every student enrolled in the selected section, standard and division
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-xs font-medium text-indigo-700">
-                <UserCheck className="size-4 shrink-0 text-indigo-500" />
-                Choose specific students from the list below after selecting the class
-              </div>
-            )}
+            {/* Same segmented control the Assignment, Worksheet and Project screens use. */}
+            <StudentScopeToggle value={scope} onChange={changeScope} name="homework-scope" />
 
             {/* Class filters */}
             <SearchDropdown

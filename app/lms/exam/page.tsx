@@ -230,6 +230,7 @@ type QuestionPaperDetail = {
   taxonomy_distribution: unknown;
   sections_config: unknown;
   question_arr: QuestionDetail[];
+  answer_arr?: Record<string, Array<{ id: number; answer: string | null }>> | unknown[] | null;
 };
 
 type QuestionPaperDetailResponse = {
@@ -736,78 +737,11 @@ function PrintableQuestionPaper({
 }
 
 function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-  const [submitSuccess, setSubmitSuccess] = useState(false);
-
-  const handleAnswerChange = (questionId: number, value: string) => {
-    setAnswers((current) => ({ ...current, [questionId]: value }));
-  };
-
-  const handleSubmitExam = async () => {
-    const session = getCreateExamSession();
-
-    if (!session.subInstituteId || !session.userId) {
-      setSubmitError('Your session has expired. Please sign in again and retry.');
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      setSubmitError('');
-
-      const formData = new FormData();
-      formData.append('questionpaper_id', String(paper.id));
-      formData.append('sub_institute_id', session.subInstituteId);
-      formData.append('user_id', session.userId);
-      formData.append('type', 'JSON');
-
-      (paper.question_arr || []).forEach((question) => {
-        formData.append(`answer_narrative[${question.id}]`, answers[question.id] ?? '');
-      });
-
-      const response = await fetch(`${API_BASE_URL}/lms/online_exam`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          Accept: 'application/json',
-          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
-        },
-      });
-
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok || Number(result?.status_code) !== 1) {
-        throw new Error(result?.message || 'Couldn’t submit the exam. Please try again.');
-      }
-
-      setSubmitSuccess(true);
-    } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : 'Couldn’t submit the exam. Please try again.'
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  if (submitSuccess) {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-        <CheckCircle2 className="mx-auto mb-3 text-emerald-500" size={40} />
-        <p className="text-lg font-semibold text-slate-900">Exam submitted</p>
-        <p className="mt-1 text-sm text-slate-500">Your answers have been recorded.</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="mt-5 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
-        >
-          Back to exams
-        </button>
-      </div>
-    );
-  }
+  // Read-only paper view: MCQ options are listed, answers are submitted from
+  // the Online Exam flow, so there is no answer input or submit button here.
+  const answerArr = paper.answer_arr;
+  const optionsByQuestion: Record<string, Array<{ id: number; answer: string | null }>> =
+    answerArr && !Array.isArray(answerArr) ? answerArr : {};
 
   return (
     <div className="space-y-6">
@@ -903,16 +837,21 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
                 </span>
               </div>
 
-              <div className="mt-5">
-                <textarea
-                  name={`answer_${question.id}`}
-                  rows={4}
-                  value={answers[question.id] ?? ''}
-                  onChange={(event) => handleAnswerChange(question.id, event.target.value)}
-                  placeholder="Write your answer here..."
-                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
-                />
-              </div>
+              {(optionsByQuestion[String(question.id)] ?? []).length > 0 ? (
+                <ol className="mt-5 space-y-2">
+                  {(optionsByQuestion[String(question.id)] ?? []).map((option, optionIndex) => (
+                    <li
+                      key={option.id}
+                      className="flex items-start gap-3 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800"
+                    >
+                      <span className="font-semibold text-violet-700">
+                        {String.fromCharCode(65 + optionIndex)}.
+                      </span>
+                      <span>{option.answer}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
             </article>
           ))
         ) : (
@@ -927,21 +866,6 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
         )}
       </div>
 
-      {paper.question_arr?.length > 0 ? (
-        <div className="sticky bottom-4 flex flex-col items-end gap-2 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
-          {submitError ? (
-            <p className="text-sm font-medium text-red-600">{submitError}</p>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleSubmitExam}
-            disabled={isSubmitting}
-            className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isSubmitting ? 'Submitting…' : 'Submit Exam'}
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }

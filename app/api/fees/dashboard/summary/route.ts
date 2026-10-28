@@ -1,6 +1,15 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { resolveBackendBaseUrl } from '@/lib/security/trusted-backend';
 
+export const dynamic = 'force-dynamic';
+
+export async function GET() {
+  return NextResponse.json(
+    { status: '0', message: 'Method Not Allowed. Use POST for fees dashboard summary.' },
+    { status: 405 }
+  );
+}
+
 /**
  * Server-side proxy for the Fees dashboard aggregate endpoint.
  *

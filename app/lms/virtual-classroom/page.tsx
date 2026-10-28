@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { getStoredMenuContext } from '@/app/hooks/useMenuRights';
+import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import {
   createVirtualSession,
   fetchVirtualSessions,
@@ -351,6 +353,8 @@ function JoinRoomModal({
 /* -------------------------------------------------------------------------- */
 
 export default function VirtualClassroomPage() {
+  // Students join the classes that are scheduled; creating them is for staff.
+  const isStudent = isStudentProfile(getStoredMenuContext()?.user_profile_name);
   const [sessions, setSessions] = useState<VirtualClassroomSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -417,14 +421,16 @@ export default function VirtualClassroomPage() {
             <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
             Refresh
           </button>
-          <button
-            type="button"
-            onClick={() => setShowScheduleModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md transition hover:bg-indigo-700"
-          >
-            <Plus className="size-4" />
-            Schedule Class
-          </button>
+          {!isStudent && (
+            <button
+              type="button"
+              onClick={() => setShowScheduleModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md transition hover:bg-indigo-700"
+            >
+              <Plus className="size-4" />
+              Schedule Class
+            </button>
+          )}
         </div>
       </header>
 
@@ -595,20 +601,22 @@ export default function VirtualClassroomPage() {
           <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
             {search || activeTab !== 'all'
               ? 'No live or scheduled classrooms match your current filter search.'
-              : 'No virtual classroom sessions have been scheduled yet.'}
+              : isStudent ? 'No live classes are scheduled for you yet. Check back soon.' : 'No virtual classroom sessions have been scheduled yet.'}
           </p>
-          <button
-            type="button"
-            onClick={() => setShowScheduleModal(true)}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700"
-          >
-            <Plus className="size-4" />
-            Schedule Session
-          </button>
+          {!isStudent && (
+            <button
+              type="button"
+              onClick={() => setShowScheduleModal(true)}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700"
+            >
+              <Plus className="size-4" />
+              Schedule Session
+            </button>
+          )}
         </div>
       )}
 
-      {showScheduleModal ? (
+      {showScheduleModal && !isStudent ? (
         <ScheduleVirtualModal
           onClose={() => setShowScheduleModal(false)}
           onCreated={(newSess) => {

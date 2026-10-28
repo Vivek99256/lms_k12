@@ -6,6 +6,7 @@ import { AlertTriangle, Clock, Lock, Pencil, RotateCcw, Save, X } from 'lucide-r
 import { usePermissions } from '@/app/hooks/usePermission';
 import { fetchScheduledTasks, PlatformApiError, runScheduledTaskNow, saveScheduledTask } from '@/lib/platform/client';
 import { CRON_FIELDS, describeSchedule, scheduleProblem, scheduleToString } from '@/lib/platform/cron';
+import { canRunOrToggle, lastRunSummary, NO_JOB_HINT, NO_JOB_LABEL } from '@/lib/platform/scheduler-display';
 import type { CronSchedule, ScheduledTaskRow, SchedulerPayload } from '@/lib/platform/types';
 
 import {
@@ -170,6 +171,24 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
     return [...byComponent.entries()];
   }, [payload]);
 
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const offTasks = (payload?.tasks ?? []).filter((row) => row.has_job && row.disabled);
+
+  /** Switch on every task in view that has a job and is off, one saved change per task, as if each toggle were pressed. */
+  const switchAllOn = async () => {
+    if (!mayEdit || bulkBusy || offTasks.length === 0) return;
+    setBulkBusy(true);
+    let done = 0;
+    for (const row of offTasks) {
+      if (await saveTask(row, { disabled: false }, `${row.label} switched on.`)) done += 1;
+    }
+    setNote({
+      tone: done === offTasks.length ? 'ok' : 'error',
+      text: `Switched on ${done} of ${offTasks.length} tasks.`,
+    });
+    setBulkBusy(false);
+  };
+
   if (registryLoading) return <div className="p-6"><LoadingState label="Loading the platform registry" /></div>;
   if (registryError || !registry) return <div className="p-6"><ErrorState message={registryError ?? 'The registry is unavailable.'} onRetry={reload} /></div>;
 
@@ -195,7 +214,21 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
         setComponentKey(null);
         setEditing(null);
       }}
-      actions={<RefreshButton onClick={() => load(true)} busy={loading} />}
+      actions={
+        <div className="flex items-center gap-2">
+          {mayEdit && offTasks.length > 0 && (
+            <button
+              type="button"
+              onClick={switchAllOn}
+              disabled={bulkBusy}
+              className="inline-flex items-center rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {bulkBusy ? 'Switching on…' : `Switch all on (${offTasks.length})`}
+            </button>
+          )}
+          <RefreshButton onClick={() => load(true)} busy={loading} />
+        </div>
+      }
     >
       {note && <Note tone={note.tone} text={note.text} onDismiss={() => setNote(null)} />}
 
@@ -314,8 +347,7 @@ function TaskRow({
 
   const [runResult, setRunResult] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // Runs the task once through the same dispatcher the minute tick uses. A task
-  // with no registered job says so rather than reporting success.
+  // Runs the task once through the same dispatcher the minute tick uses.
   const runNow = async () => {
     setBusy(true);
     setRunResult(null);
@@ -354,18 +386,23 @@ function TaskRow({
       <div className="flex flex-wrap items-start gap-3">
         <div className="pt-0.5">
           <Switch
-            checked={!task.disabled}
+            checked={canRunOrToggle(task) && !task.disabled}
             onChange={toggleDisabled}
-            disabled={!mayEdit || busy}
+            disabled={!mayEdit || busy || !canRunOrToggle(task)}
             label={`${task.label} running`}
-            title={mayEdit ? `Switch ${task.label} ${task.disabled ? 'on' : 'off'}` : rightsReason}
+            title={!canRunOrToggle(task) ? NO_JOB_HINT : mayEdit ? `Switch ${task.label} ${task.disabled ? 'on' : 'off'}` : rightsReason}
           />
         </div>
 
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-slate-900">
             {task.label}
-            {task.disabled && <Pill tone="gray">off</Pill>}
+            {!canRunOrToggle(task) && (
+              <span title={NO_JOB_HINT}>
+                <Pill tone="gray">{NO_JOB_LABEL}</Pill>
+              </span>
+            )}
+            {canRunOrToggle(task) && task.disabled && <Pill tone="gray">off</Pill>}
             {task.customised && <Pill tone="blue">custom schedule</Pill>}
             {task.disabled_by_default && !task.overridden && <Pill tone="amber">off by default</Pill>}
             {task.last_run_status === 'failed' && (
@@ -380,18 +417,27 @@ function TaskRow({
             <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
               <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">{task.expression}</span>
               {sentence && <span>{sentence}</span>}
-              <button
-                type="button"
-                disabled={!mayEdit || busy}
-                title={mayEdit ? 'Run this task once, now' : rightsReason}
-                onClick={runNow}
-                className="rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Run now
-              </button>
-              {runResult && (
-                <span className={runResult.ok ? 'text-emerald-700' : 'text-amber-700'}>{runResult.text}</span>
-              )}
+              {task.has_job ? (
+                <>
+                  {lastRunSummary(task) && (
+                    <span className="text-slate-700" title="Result of the last run">
+                      Last run: {lastRunSummary(task)}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!mayEdit || busy}
+                    title={mayEdit ? 'Run this task once, now' : rightsReason}
+                    onClick={runNow}
+                    className="rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Run now
+                  </button>
+                  {runResult && (
+                    <span className={runResult.ok ? 'text-emerald-700' : 'text-amber-700'}>{runResult.text}</span>
+                  )}
+                </>
+              ) : null}
             </div>
           )}
 
@@ -490,7 +536,11 @@ function TaskRow({
                 answer and stops the row implying it is about to happen. */}
             Next: {task.disabled ? 'not while switched off' : formatWhen(task.next_run_at)}
           </span>
-          <span>Last: {formatWhen(task.last_run_at)}</span>
+          <span>
+            Last run: {formatWhen(task.last_run_at)}
+            {task.last_run_status === 'ok' && <span className="ml-1 text-emerald-700">· succeeded</span>}
+            {task.last_run_status === 'failed' && <span className="ml-1 text-red-700">· failed</span>}
+          </span>
           {task.fail_delay > 0 && <span className="text-slate-500">Retries after {task.fail_delay} min</span>}
           {!editing && (
             <button

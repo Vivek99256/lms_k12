@@ -1,130 +1,238 @@
-# EduERP Design System
-
-An enterprise design system for a **cloud-based, multi-tenant K–12 school ERP** platform. It is desktop-first, accessibility-first (WCAG 2.2 AA), and tuned for data-heavy workflows — forms, dashboards, reports, and complex tables — across 15+ business modules and four roles (Admin, Teacher, Staff, Parent).
-
-The design language prioritises **consistency, scalability, readability and long-duration usage** over decoration. No gradients, glassmorphism, neumorphism, or ornament.
+# Scholar Suite — Frontend CLAUDE.md
+> Persistent project instructions for Claude Code. Read this before touching any file.
 
 ---
 
-## Sources
+## 1. Project identity
 
-Built from a written specification (no prior code) mounted read-only at `ERP Design System/`:
-
-- `foundation/01_design_foundation.md` — constitutional principles (vision, roles, UX/design principles, a11y, density, navigation).
-- `foundation/02_design_tokens.yaml` — the two-tier token system (primitives → semantic roles, 4 themes, 3 density modes). **Ground truth for `tokens/`.**
-- `foundation/03_layout_system.yaml` — application frame + layout archetypes.
-- `templates/04_page_templates.yaml` — 18 page templates + 4 state templates.
-- `components/05_component_library.yaml` — \~55 components, categories, and the anti-duplication map. **Ground truth for `components/`.**
-- `patterns/06_pattern_library.yaml` — 27 end-to-end UX patterns.
-- `rules/07_module_rules.yaml` — module registry + governance.
-- `prompts/08_prompt_library.md` — reuse/consistency prompt library.
-
-No logo or font binaries were supplied — see *Font substitution* and *Iconography* below.
-
----
-
-## What's here (manifest)
-
-- **`styles.css`** — the single entry point consumers link. Import-only; pulls in fonts → tokens → base → component CSS.
-- **`tokens/`** — CSS custom properties: `colors.css` (primitives + 4 themes), `typography.css`, `fonts.css`, `spacing.css` (+ density), `shape.css` (radius/border/shadow/sizing/icon/opacity), `motion.css`, `layout.css` (breakpoints/containers/z-index), `base.css` (resets + type-role utility classes).
-- **`components/`** — 74 React components (`.jsx` + `.d.ts` + `.prompt.md`) across 16 groups; per-group CSS in `components/_css/`; one `@dsCard` HTML per group.
-- **`ui_kits/admin/`** — interactive Admin console recreation (dashboard, students, admissions, fees).
-- **`guidelines/`** — foundation specimen cards (colors, type, spacing, shape, motion, brand) shown on the Design System tab.
-- **`assets/`** — `logo.svg` (placeholder monogram).
-- **`SKILL.md`** — Agent-Skill-compatible entry so this system can be used standalone.
-
-Compiler outputs (`_ds_bundle.js`, `_ds_manifest.json`, `_adherence.oxlintrc.json`) are generated automatically — do not edit.
-
-### Component groups
-
-`buttons` (Button, IconButton, ButtonGroup, SplitButton) · `inputs` (TextField, Textarea, SearchInput, DatePicker) · `selection` (Checkbox, RadioGroup, Toggle, Select, Combobox, SegmentedControl) · `data-display` (Badge, Tag, Avatar, DescriptionList, ListRow, FilterBar, EventChip, CalendarGrid, AgendaList, DocumentPreview) · `cards` (Card, MetricCard, SectionPanel) · `tables` (DataTable) · `feedback` (AlertBanner, InlineMessage, Toast, Spinner, Skeleton, ProgressBar, StatusView) · `overlays` (Modal, ConfirmationDialog, Drawer, Popover, Tooltip) · `navigation` (SidebarNav, Sidebar — composable multi-level with SidebarProvider/SidebarTrigger/SidebarMenu/SidebarMenuSub, TopbarNav, Breadcrumb, Tabs, ModuleTabBar, CommandPalette, Stepper, Pagination, TreeView, Menu, BottomNav) · `layout` (Resizable / ResizablePanelGroup / ResizablePanel / ResizableHandle split panes) · `utilities` (Icon, Divider, Accordion, DensityToggle, ThemeToggle) · `charts` (Chart, Sparkline, ChartLegend, ChartTile) · `workflow` (ApprovalCard, TimelineItem, ActivityFeed, AuditEntry) · `communication` (NotificationItem, CommentThread, AssistantPanel, AssistantLauncher) · `auth` (AuthForm, OtpInput, PasswordStrengthMeter) · `uploads` (FileUpload) · `blocks` (Carousel, Collapsible, ToggleButton, ToggleButtonGroup, ScrollArea, AspectRatio, Kbd) · `chat` (Bubble, Message, MessageScroller, Attachment, Item, Field, Marker).
-
-**shadcn-parity additions (Batch 1):** composable `Sidebar` family, structural `Table` family (Table/TableHeader/TableBody/TableFooter/TableRow/TableHead/TableCell/TableCaption), `DataTable` density-toggle variant, `Resizable` split panes, validated `Form` family (Form/FormField/FormItem/FormLabel/FormControl/FormDescription/FormMessage), `Slider`, standalone `Calendar`, and `NativeSelect`. These share the existing token + class system; `Combobox`, `RadioGroup`, and `OtpInput` already provided parity.
-
-**shadcn-parity additions (Batch 2):** composable `Sheet` family (Sheet/SheetContent/SheetHeader/SheetTitle/SheetDescription/SheetBody/SheetFooter/SheetClose) on the Drawer surface, `Drawer edge="bottom-sheet"` mobile dock (grab handle, slide-up), `Toaster` Sonner-style stacked toasts (Toaster.toast/.success/.error/.warning/.info), `NavigationMenu` family (NavigationMenu/NavigationMenuItem/NavigationMenuLink) for portal headers, `Menubar` family (Menubar/MenubarMenu) desktop-app strip, `ContextMenu` right-click actions, and `HoverCard` info-on-hover. Modal, ConfirmationDialog, Popover, Tooltip, Toast, AlertBanner, ProgressBar, Skeleton, Menu, Breadcrumb, Pagination, Tabs, and CommandPalette already provided the rest of the batch's parity.
-
-**shadcn-parity additions (Batch 3):** UI blocks — `Carousel` (embla-style track), `Collapsible` (single disclosure, vs Accordion's set), `ToggleButton` + `ToggleButtonGroup` (pressable `aria-pressed`, single/multiple; distinct from switch `Toggle` and from `SegmentedControl`), `ScrollArea` (thin cross-browser scrollbars), `AspectRatio`, and `Kbd`. Chat primitives — `Bubble` (system/user/outline + typing), `Message` (avatar + meta + bubbles), `MessageScroller` (bottom-stick thread), `Attachment` (file/image chip), `Item` (structured list row), `Field` (label/value pair), and `Marker` (day/status divider). Chat bubbles reuse `--action-primary` (user) and `--surface-subtle` (system); `AssistantPanel` remains the batteries-included docked surface built on these primitives.
- `Badge` is the status indicator (no `status-badge`); `MetricCard` covers stat/kpi; `StatusView` covers empty/error/success; `DescriptionList` is the key/value list; `Menu` is the dropdown; `TreeView` is the settings nav; `DataTable` covers the editable grid. Reuse variants, never fork.
+| Item | Value |
+|---|---|
+| Product | Scholar Suite — cloud-based multi-tenant K–12 school ERP |
+| Frontend | Next.js 16 (App Router) · React 19 · TypeScript 5 (strict) |
+| Styling | Tailwind CSS 4 · class-variance-authority · tailwind-merge |
+| UI primitives | Radix UI · shadcn · Base UI |
+| Forms | react-hook-form 7 · Zod 4 |
+| Charts | Recharts · Chart.js / react-chartjs-2 |
+| Rich text | Tiptap 3 |
+| AI SDK | Vercel AI SDK 7 (`ai` package) · `@ai-sdk/google` |
+| Auth | JWT stored in `localStorage` (`auth` key) · `AuthContext` · Google OAuth |
+| Backend | Laravel 12 (PHP 8.2) — see `BACKEND.md` for setup; **called remotely via the URL in `NEXT_PUBLIC_APP_ENV`** — never hardcode `localhost` or any absolute path |
+| Monorepo | `packages/ai-intelligence-core`, `packages/conversational-ai-core` as internal workspace packages |
+| Tests | Node built-in test runner via `tsx`; run with `npm test` |
+| Type check | `npm run typecheck` (tsc --noEmit) |
+| Lint | `npm run lint` (ESLint 9) |
 
 ---
 
-## Content fundamentals
+## 2. Before you change anything
 
-The product personality is **competent, calm, respectful, quietly reassuring** — never playful, edgy, or clever. Personality is expressed through restraint.
-
-- **Voice:** professional, warm, jargon-free. Plain language, especially on parent-facing surfaces (lowest reasonable reading level).
-- **Person:** address the user as *you*; refer to the system impersonally ("Receipt issued"), never anthropomorphised ("Oops!").
-- **Casing:** **Sentence case** everywhere — buttons, labels, headings, menu items ("Add student", "Collect fee", not "Add Student"). All-caps is reserved for the overline type role (short section labels, table headers) with wide tracking.
-- **Tone by moment:** quiet confirmation for routine saves; prominent, reassuring confirmation for money/records (durable receipts with reference numbers); steady, blame-free language for errors that says *what happened + what to do next*.
-- **Buttons are verbs:** "Approve", "Collect ₹12,500", "Add student" — action-first, specific over generic ("Save changes" over "OK").
-- **Numbers & currency:** tabular figures; Indian grouping and ₹ (e.g. `₹18.4L`, `₹42,500`); IDs in mono (`ADM-2026-0421`, `FEE-2026-0912`).
-- **No emoji.** Meaning is carried by text + icon + shape, never color or emoji alone.
-
-Examples: *"Term-2 fees are due on 15 July for 42 students."* · *"Admission number already exists."* · *"Payment received — receipt FEE-2026-0912 issued."*
+1. **Read the existing implementation first.** Never assume — grep the codebase, read the component, check the API route.
+2. **Check memory files** in the Claude project memory directory for prior architectural decisions.
+3. **Read `docs/`** for the area you are working in. Key files:
+   - `docs/universal-conversational-ai-platform.md` — AI/chatbot architecture
+   - `docs/security-hardening.md` — security constraints, environment variables
+   - `docs/conversational-ai-architecture.md` — chatbot lifecycle
+4. **Run `npm run typecheck` and `npm run lint`** before reporting a task as done.
+5. **Never introduce a breaking change** to an existing API route, component prop signature, or `localStorage` key without checking all call sites first.
 
 ---
 
-## Visual foundations
+## 3. Architecture decisions (do not override)
 
-- **Color:** brand is **indigo** (`--action-primary #4f46e5`); neutrals are **slate**; feedback is emerald / amber / red / blue. UI consumes **semantic roles only** (`--surface-*`, `--content-*`, `--border-*`, `--action-*`, `--feedback-*`, `--focus-*`) so all four themes (light, dark, high-contrast light/dark via `[data-theme]`) work by construction. Backgrounds are flat — canvas is `--surface-canvas` (slate-50), panels are white.
-- **Type:** **Inter** for all UI (display → caption), **JetBrains Mono** for IDs/codes/amounts. Modular scale 11 → 60px; headings use tight tracking; overlines use widest tracking + uppercase. Minimum body text 14px on dense surfaces.
-- **Spacing:** 4px base rhythm; layout composed from semantic intents (`--inset-*`, `--stack-*`, `--inline-*`, `--gutter-*`, `--section-*`). Three density modes (`[data-density]`): comfortable (48px rows), cozy (40px, default), compact (32px).
-- **Shape:** radii — control 6px, surface 8px, overlay 12px, **button 12px (pill-leaning rounded)**, pill full. Cards = 1px `--border-subtle` + `--shadow-raised` (subtle) + 8px radius. Hairline 1px borders throughout; no heavy rules.
-- **Elevation:** a layered, low-opacity slate shadow ramp with hairline rings (raised → sticky → dropdown → overlay → modal), plus molded control shadows (`--shadow-btn`, `--shadow-btn-primary`) that give buttons quiet depth. Signals layering, never decoration.
-- **Backgrounds:** solid fills only. **No gradients, no glass, no textures, no blur** (overlays use a flat slate scrim). Imagery is limited to avatars and document previews.
-- **Motion:** quick and functional, with a **tactile layer** for premium feel. Durations 100–300ms; standard easing `cubic-bezier(0.2,0,0,1)`, plus an out-quint (`--ease-emphasized`) for hover/enter and a gentle spring (`--ease-spring`) for press-release. Interactive controls (buttons, chips, nav items, toggles, cards) **press-scale** on `:active` and spring back; the active indicator on Tabs and ModuleTabBar **slides** to its target; menus/popovers/modals scale-in from their origin. No infinite loops, no decorative motion. All of it collapses to instant under `prefers-reduced-motion` (duration tokens zero out).
-- **Hover / press:** hover shifts to `--surface-hover` (or one brand step darker for solids); press to `--surface-active` / next brand step **plus a subtle press-scale** on buttons, chips and nav items (`--press-scale` ≈ 0.97). Dense rows and table cells do **not** transform, so data stays stable during interaction.
-- **Focus:** a 2px `--focus-ring` outline at 2px offset on `:focus-visible`, never obscured by sticky regions (WCAG 2.2). Targets ≥ 24px (44–48px on mobile/parent surfaces).
-- **Corners & cards:** softly rounded (6–12px), quietly bordered, gently shadowed — calm and legible at high information density.
+### 3.1 API calls
+- All Laravel API calls go through `lib/erp-client.ts`. Use `SessionContext` helpers (`readString`, `readNumber`, `normalizeNumericId`).
+- The base URL is resolved by `app/components/utils/api_url.tsx`. **Never hardcode a URL.**
+- Next.js API routes under `app/api/` are thin proxies only — no business logic lives there. They relay to Laravel and translate SSE for the AI SDK.
+- The backend is at `https://dev.triz.co.in` for development. `NEXT_PUBLIC_APP_ENV` controls which backend is used.
 
----
+### 3.2 Auth
+- Session state lives in `AuthContext` (`contexts/AuthContext.tsx`). Read it with `useAuth()`.
+- `localStorage` keys: `auth` (user object), `menuContext`, `userData`, `selectedAcademicYear`, `selectedAcademicTerm`.
+- JWT is validated server-side using `LARAVEL_JWT_SECRET`. Never skip this check in new server routes.
+- Mobile web handoff uses a single-use ticket via `/api/mobile/web-handoff/claims` — do not expose raw tokens.
 
-## Premium interaction layer
+### 3.3 Menu / RBAC
+- Menu items come from `tblmenumaster` in Laravel. A new screen is invisible until a `tblmenumaster` row exists **and** `tblgroupwise_rights` / `tblindividual_rights` rows grant access.
+- The header user-menu items (`platformServicesItems`, `platformSetupItems`, `aiIntelligenceItems`) are defined in `app/components/Header.tsx` and driven by `packages/ai-intelligence-core/src/registry.ts`.
+- **Never add a menu item by editing only the frontend.** The Laravel migration also needs to exist.
 
-A 2026 pass benchmarked the system against the interaction quality of modern enterprise/productivity apps (Linear, Vercel, Stripe, Notion, Gamma, Intercom) and closed the gaps that read as "generic" — while keeping the enterprise restraint (no gradients, glass, or ornament). Premium here means **craft**, not decoration: tactile press feedback, sliding indicators, layered hairline shadows, and a global command surface.
+### 3.4 AI capabilities
+- All AI capability metadata lives in `packages/ai-intelligence-core/src/registry.ts`. Add or rename capabilities there — no other file changes should be needed for the menu to update.
+- Per-module AI Stack screens are built by `app/_components/ai-stack/build-ai-stack-screens.tsx`. Add new modules there.
+- The chatbot (`app/components/ChatbotPanel.tsx`) is a presentation component — it contains no model, no tool list, no key. It streams from `/api/ai/ask/stream`.
+- AI model configuration is in `config/ai.php` (Laravel). The frontend reads the active model from the central catalogue — never hardcode a model ID in frontend code.
 
-**Upgraded (existing components):**
+### 3.5 Platform services
+- All eight platform services (RBAC, Workflow, Notification, Scheduler, Document, Integration, Audit, Event Bus) read a single registry at `config/platform_services.php`. Do not create module-specific versions.
 
-- **Tabs** — a single indicator now *slides* to the active tab (underline bar / enclosed pill) instead of snapping, using the spring release curve. The framer-style layout animation is the clearest "premium tab" signal.
-- **Breadcrumb** — segments are hover-chips, the root takes an `icon` (e.g. `house`), and the trail collapses its middle into a `…` overflow menu past `maxItems`.
-- **Buttons / controls** — molded depth + `press-scale` spring (added earlier); buttons use the pill-leaning `--radius-button`.
-
-**New components** (the anti-duplication map has no equivalent — each is a distinct IA level or capability, so a new component *is* required):
-
-- **ModuleTabBar** (`navigation`) — horizontal **sub-module** navigation, i.e. the `module → sub-module` level of the specced IA (foundation §17, §11). The sidebar picks the module; this bar picks the sub-module. Distinct from `Tabs` (in-page peer sections *within* one sub-module): it carries the module label, a sliding filled indicator, horizontal scrolling and overflow chevrons for the "hundreds of sub-modules" the foundation calls out. *Requested by the product team; matches their Fees module screen.*
-- **CommandPalette** (`navigation`) — the global **⌘K / Ctrl-K** command + jump-to surface anticipated by the spec ("global command/search entry point," foundation §11; `TopbarNav` future-reuse: "command palette"). Type to filter across 15 modules, ↑/↓ to move, ↵ to run. The single biggest modern-enterprise premium signal; pairs with global search.
-- **AssistantPanel** + **AssistantLauncher** (`communication`) — a docked **AI copilot / agent** surface (right dock) with chat thread, suggestion chips, typing indicator and composer, plus a floating agent rail for the collapsed state. This is a **genuinely new capability** — the source spec predates the product's AI direction and has no assistant/copilot surface — modelled on Gamma / Notion AI / Intercom, rebuilt in the enterprise language (flat surfaces, hairlines, brand indigo, no glass). *Requested by the product team.*
-
-  **These are presentation components — they contain no AI.** The shipped assistant is
-  `app/components/ChatbotPanel.tsx`, and every turn it takes is answered by Laravel's
-  governed twelve-stage lifecycle, not by a model in this app. The panel sends a
-  question to `/api/ai/ask/stream` — a thin proxy that translates Laravel's SSE into
-  the AI SDK's UI message protocol — and renders what comes back: the answer text as
-  it streams, the lifecycle ladder filling in stage by stage, the sources each claim
-  rests on, and any action the turn is asking a person to approve. Approving is a
-  question like any other, carrying the id of the record it applies to, so a button
-  and a typed sentence go down the same audited path.
-
-  What that means when reusing these components: they take content and emit events.
-  Do not give them a model, a tool list, or a key. See
-  `docs/universal-conversational-ai-platform.md` §9.
-
-All five honour keyboard nav, visible focus, and `prefers-reduced-motion`. Live demos: the **Motion → Premium Interactions** card, the three new **Components** cards (Module tab bar, Command palette, Assistant), and the **Admin console** UI kit, which wires the ModuleTabBar under the top bar, the ⌘K palette, and the docked assistant together.
-
-## Iconography
-
-- **Library:** [Lucide](https://lucide.dev) — the spec assumes a line-icon set; Lucide matches the required 1.5–2px stroke weights and rounded caps. The `Icon` component renders any Lucide glyph by name (`<Icon name="calendar" />`) from the Lucide UMD global, which cards and UI kits load from CDN (`lucide@0.544.0`).
-- **Sizing:** icon tokens 12–40px; 16px inline with dense text, 20px default in controls. Stroke tokens: thin 1.5 / regular 1.75 / bold 2.
-- **Usage:** icons **supplement** labels and status (paired with text), never replace an accessible name; icon-only buttons require a `label`. **No emoji**, no decorative illustration. The only bespoke SVG is `assets/logo.svg` — a placeholder graduation-cap monogram (Lucide glyph, ISC) standing in until the institution's real logo is supplied.
+### 3.6 PAL / adaptive learning
+- PAL content (chapters, concepts, misconceptions, ULUs) is authored and stored in Laravel. The Next.js PAL routes under `app/pal/` are read-only consumers.
+- Adaptive routing logic lives in `packages/ai-intelligence-core`. Do not duplicate it in page components.
 
 ---
 
-## Font substitution ⚠️
+## 4. Code quality rules
 
-The spec names **Inter** and **JetBrains Mono** but shipped no font binaries. `tokens/fonts.css` therefore loads both from **Google Fonts** (their canonical source). If you have licensed/self-hosted copies, drop them in and swap the `@import` for local `@font-face` rules. *Please confirm this is acceptable or provide the font files.*
+### TypeScript
+- `strict: true` is set in `tsconfig.json`. No `any` without an explicit cast and a comment explaining why.
+- Use the path alias `@/*` for project-root imports. Use `@shared/ai-intelligence-core` for the AI registry.
+- Prefer `unknown` over `any` for API responses; narrow with type guards or Zod schemas.
+- Never use `// @ts-ignore` — fix the type.
+
+### React / Next.js
+- App Router only. No Pages Router patterns.
+- Mark components `'use client'` only when they need browser APIs, hooks or event handlers. Server components are the default.
+- Keep client components small. Lift data fetching to Server Components or dedicated API route handlers.
+- Never call `localStorage` at module level — wrap in `useEffect` or `typeof window !== 'undefined'` guards (SSR).
+- Use `isomorphic-dompurify` (already in deps) before rendering any HTML string. No raw `dangerouslySetInnerHTML` without sanitisation.
+
+### Styling
+- Tailwind utility classes only. No inline `style={{}}` for design tokens.
+- Use the EduERP design system tokens (`--action-primary`, `--surface-*`, `--content-*`, `--border-*`) defined in `styles.css` and `tokens/`. Never hardcode hex colours.
+- Follow the design language: sentence case labels, no gradients, no glassmorphism. See `CLAUDE.md` in the `ERP Design System/` directory for full rules.
+
+### Components
+- Prefer the existing component library (`components/`, `app/_components/`, design system under `components/`). Check the anti-duplication map in `ERP Design System/components/05_component_library.yaml` before creating a new component.
+- Keep components focused. Extract when a component exceeds ~200 lines or handles more than one responsibility.
+- Every icon-only button needs an `aria-label`. Every interactive element needs a visible `:focus-visible` ring.
+
+### Naming
+- Files: `kebab-case.tsx` for pages and components, `camelCase.ts` for utilities and hooks.
+- Hooks: `use-` prefix, kebab-case file name, camelCase export.
+- Route segments: `kebab-case`.
+- React components: PascalCase export.
 
 ---
 
-## Themes & density
+## 5. Security (non-negotiable)
 
-Set `data-theme="light | dark | high-contrast-light | high-contrast-dark"` and `data-density="comfortable | cozy | compact"` on `<html>` (or any ancestor). Semantic tokens re-resolve automatically. `ThemeToggle` and `DensityToggle` components drive these.
+- **Never expose secrets in `NEXT_PUBLIC_*` variables.** The build warns on `SERVICE_ROLE`, `SECRET`, `PRIVATE`, `PASSWORD`, `API_KEY` patterns — fix the warning, do not suppress it.
+- **Never log auth tokens, JWT payloads, or personally identifiable data** in `console.log` or error messages.
+- **Sanitise all HTML** with `isomorphic-dompurify` before `dangerouslySetInnerHTML`.
+- **SSRF guard**: the backend URL is validated against `TRUSTED_BACKEND_ORIGINS`. Never bypass this check or accept an arbitrary backend URL from user input.
+- **Upload validation**: all file uploads must validate MIME type and size before sending to Laravel. Use the `MAX_UPLOAD_BYTES` env var (default 50 MB).
+- **Rate limiting**: new AI-facing API routes must respect the rate limits set in `config/ai.php` on the Laravel side. Do not call AI endpoints in loops.
+- **Frame embedding**: the `FRAME_ANCESTORS` env var controls `Content-Security-Policy: frame-ancestors`. Do not remove or weaken this header.
+- **`APP_DEBUG=false`** must be set in any non-development Laravel environment. The Next.js proxy must not forward raw PHP stack traces to the browser.
+- Input coming from URL params, query strings, or `localStorage` must be validated before use. Use Zod schemas at system boundaries.
+
+---
+
+## 6. Performance
+
+- **Route-level code splitting** is automatic via App Router. Do not import heavy libraries (jspdf, html2canvas-pro, recharts) at the top of a page — use dynamic `import()` with `{ ssr: false }`.
+- **Images**: use `next/image` for school logos and avatars. Never render a raw `<img>` for user-supplied content without width/height constraints.
+- **API pagination**: all list endpoints from Laravel are paginated. Never fetch unbounded lists. Use cursor or page-based pagination in `erp-client.ts` helpers.
+- **Caching**: Laravel API responses can be cached at the `Cache-Control` layer. Do not cache authentication-sensitive responses. Use `revalidate` options on server fetches.
+- **Bundle size**: run `next build` and inspect bundle output before adding a new dependency. If a package adds more than ~50 KB gzipped for a single feature, evaluate a lighter alternative.
+- **Framer Motion**: `framer-motion` is available for premium interactions. Use it only for the approved interactive patterns (press-scale, sliding indicators, scale-in overlays). Do not animate layout-heavy properties (`width`, `height`, `top`, `left`).
+- **`prefers-reduced-motion`**: all motion must collapse to instant under this media query. Duration tokens in `tokens/motion.css` zero out automatically — use them.
+
+---
+
+## 7. Database & backend (Laravel — see `BACKEND.md` for local path)
+
+> Frontend engineers: changes here require coordination with the backend. Leave a comment in the PR if a new screen needs a migration.
+
+- **Migrations** are numbered `YYYY_MM_DD_HHMMSS_description.php`. Every new menu item needs a migration that inserts into `tblmenumaster` and seeds `tblgroupwise_rights` for the super-admin group.
+- **Eloquent models** go in `app/Models/`. Use `$fillable` — never `$guarded = []` in production models.
+- **Indexes**: any column used in a `WHERE`, `JOIN`, or `ORDER BY` on a large table (`tblstudent`, `fees_*`, `ai_*`) needs a migration that adds the index.
+- **Transactions**: fee collection, payroll, and any multi-table write must be wrapped in `DB::transaction()`.
+- **Soft deletes**: use `SoftDeletes` on all student, staff, and fee records — never hard-delete.
+- **AI keys** (`ai_api_keys` table): credentials are write-only. The read endpoint must return only a masked preview. The central `config/ai.php` maps retired model IDs forward — never use a raw model string in a Laravel controller.
+
+---
+
+## 8. Error handling
+
+- **API routes**: return structured JSON `{ success: boolean, message: string, data?: unknown }`. Use HTTP status codes correctly (400 validation, 401 auth, 403 RBAC, 404 not found, 500 server).
+- **Client side**: wrap API calls in try/catch. Show the `message` field from the envelope to the user via `Toast`. Never show a raw exception message or stack trace.
+- **AI routes**: if a model call fails, return a non-streaming error response with a safe message. Log the full error server-side with the module name and the template ID.
+- **Streaming**: SSE streams from `/api/ai/ask/stream` must close cleanly on error. The `ChatbotPanel` already handles `error` events — do not swallow them.
+- **Form validation errors**: use react-hook-form + Zod. Field-level errors display inline, not as toasts.
+- **Loading states**: every async operation needs a Skeleton or Spinner. Use the `Skeleton` and `Spinner` components from the design system.
+
+---
+
+## 9. Testing
+
+- Test files live alongside source: `lib/foo.test.ts`, `packages/*/src/*.test.ts`.
+- Run with `npm test` (Node built-in test runner via tsx).
+- **Before completing any task**: run `npm run typecheck` and `npm run lint`. Fix all errors — do not ignore them.
+- Unit tests are required for: pure utility functions in `lib/`, AI registry logic in `packages/`, and any validation logic using Zod schemas.
+- Integration tests are required for: new `app/api/` route handlers that talk to Laravel.
+- **Do not mock the database** in backend tests — use a real test database connection.
+
+---
+
+## 10. API design (Next.js route handlers)
+
+- Route handler files: `app/api/[resource]/route.ts`.
+- Always validate the request body with a Zod schema at the top of the handler.
+- Always verify the JWT with `LARAVEL_JWT_SECRET` before processing.
+- Return `{ success: true, data: ... }` or `{ success: false, message: '...' }`.
+- **AI streaming routes**: use the Vercel AI SDK's `streamText` / `createStreamableValue`. Never write raw SSE manually.
+- Rate-limit all AI-facing routes. Use the `x-institute-id` header for per-tenant rate limiting.
+- New routes need a corresponding Laravel endpoint — do not replicate business logic in Next.js.
+
+---
+
+## 11. Dependency management
+
+- Before adding a package: check if the existing deps already provide the capability (e.g. `date-fns` for dates, `zod` for validation, `isomorphic-dompurify` for sanitisation).
+- Do not add: jQuery, Lodash (use native ES2017+), Moment.js (use `date-fns`), Axios (use native `fetch`).
+- Pin major versions. Check `npm audit` after adding any package.
+- Packages with known security vulnerabilities must be updated or replaced before merging to `master`.
+
+---
+
+## 12. Environment variables
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_APP_ENV` | Frontend | `production` / `staging` / `development` |
+| `LARAVEL_JWT_SECRET` | Server only | JWT signature verification |
+| `TRUSTED_BACKEND_ORIGINS` | Server only | SSRF allowlist |
+| `FRAME_ANCESTORS` | Server only | CSP frame-ancestors |
+| `MAX_UPLOAD_BYTES` | Server only | Upload size cap |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Frontend | Google OAuth client ID only — not an API key |
+
+**Never** put `NEXT_PUBLIC_*` on secrets. **Never** commit `.env.local` or `.env.production`.
+
+---
+
+## 13. Git and PR hygiene
+
+- Branch from `master`. Name branches `<type>/<short-description>` (e.g. `feat/fees-online-gateway`, `fix/pal-diagnostic-score`).
+- Commit messages: `<type>(<scope>): <what changed>` (e.g. `feat(fees): add NACH S2 import`).
+- Every PR needs: a description of what changed and why, a test plan, and a note if a Laravel migration is required.
+- Do not commit: `node_modules/`, `.env.*`, `.next/`, `.kilo/`, `AUDIT/`, `*.docx`, large binary files.
+- Run `npm run typecheck && npm run lint && npm test` before pushing.
+
+---
+
+## 14. Design system compliance
+
+This project ships with the EduERP Design System under `ERP Design System/` (read-only) and its compiled output in `tokens/`, `components/`, `styles.css`.
+
+- **Sentence case** everywhere — labels, buttons, headings, menu items. Never Title Case or ALL CAPS except overline roles.
+- **No emoji** in UI text. Meaning is carried by text + Lucide icon.
+- **Buttons are verbs**: "Collect fee", "Approve", "Add student" — not "OK", "Submit", "Yes".
+- **Currency**: `₹` with Indian grouping (`₹18.4L`, `₹42,500`). Tabular figures for amounts.
+- **IDs**: monospace (`ADM-2026-0421`, `FEE-2026-0912`).
+- Icons from Lucide (`lucide-react`). Sized at 16px inline, 20px in controls. Never replace text with icon alone without an `aria-label`.
+- Themes: light / dark / high-contrast light / dark via `data-theme` on `<html>`. Density: comfortable / cozy / compact via `data-density`. Use semantic tokens — never hardcode a colour.
+- **No gradients, no glassmorphism, no blur, no neumorphism.** Flat surfaces, hairline borders, subtle shadows only.
+
+---
+
+## 15. AI coding guidelines
+
+1. **Analyse before coding.** Read the existing module's page, components, API routes and types before writing anything.
+2. **Make focused changes.** Fix the specific bug or add the specific feature. Do not refactor surrounding code unless it is blocking the task.
+3. **Never assume requirements.** If a requirement is ambiguous (e.g. "add AI to fees"), ask which specific capability is needed.
+4. **Explain non-obvious decisions.** Leave a one-line comment when you make a technical choice that is not self-evident (a workaround, an invariant, a deliberate constraint). Do not comment what the code does.
+5. **No half-finished work.** A feature either works end-to-end or is not committed. Stub components with a `TODO` comment are acceptable in a draft PR but not in `master`.
+6. **Preserve architectural decisions.** The patterns in this file exist for a reason. Do not introduce a new pattern (e.g. a second auth system, a second state manager, a second HTTP client) without explicit agreement.
+7. **Check the AI registry** (`packages/ai-intelligence-core/src/registry.ts`) before adding AI-related UI. The capability may already be defined.
+8. **The chatbot is a presentation component.** `ChatbotPanel.tsx` has no model, no tool, no key. Never add AI calls to it directly.

@@ -38,7 +38,7 @@ import type { ModuleIntelligenceContract } from './contract';
  *   L4 — reasoning: a stated cause, labelled as unconfirmed where it is.
  *   L5 — the action loop: recommendation, decision, execution, outcome, memory.
  *
- * Every module below except PAL and Career now reaches L5: their findings are
+ * Every module below except PAL now reaches L5: their findings are
  * written into `hpbrain_signals` by `ModuleSignalBridge`, reasoned over by the
  * same `Reasoner` that serves Fees, and read back through `ModuleLoop`.
  *
@@ -287,19 +287,26 @@ export const INTELLIGENCE_MODULES: RegisteredIntelligenceModule[] = [
     key: 'career',
     label: 'Career Intelligence',
     route: '/career-intelligence',
-    // Career Intelligence IS the module rather than a tab inside one, so its
-    // screen is the route itself. `${route}/intelligence` would 404.
-    intelligenceHref: '/career-intelligence',
-    // NOT PROMOTED, for a simpler reason than PAL: there is no tenant data at
-    // all. `s_competency_career_paths` holds 1 row and
-    // `s_competency_career_path_steps` holds 2, across the whole database.
-    // `onet_career_cluster` holds 1,011 rows and is a REFERENCE TAXONOMY — the
-    // O*NET occupational catalogue — carrying no institute, no student and no
-    // year. A native Intelligence screen needs an institute's own records to
-    // analyse, and this module has none to analyse yet.
+    // `/career-intelligence` is the counselling workspace (one student at a
+    // time); the Brain's cohort screen lives one segment below it.
+    intelligenceHref: '/career-intelligence/intelligence',
+    // `partial`, deliberately. The screen, the signal bridge and the L5 loop are
+    // wired (mod_career_* rules, ModuleLoop), but not promoted to `live`:
+    //   - the ledger is nearly empty. evidence_events held 11 rows in total
+    //     (all source_type = assessment, 3 students, one institute) when this
+    //     was written, so what the screen mostly reports is that coverage is ~0%;
+    //   - the cohort figure (students on the roll in Grade 9-10, read from the
+    //     class name) has not been reconciled against the school's own roll;
+    //   - it has no menu `nav` matcher, because no tblmenumaster row for this
+    //     screen has been verified. It is reached by URL until one is.
     status: 'partial',
-    ladder: 'L2',
-    note: 'No tenant-scoped records exist: 1 career path and 2 steps database-wide, and onet_career_cluster is a reference taxonomy with no institute, student or year. Nothing to analyse until institutes use it.',
+    ladder: 'L5',
+    loadContract: async () => (await import('./contracts/career')).careerIntelligenceContract,
+    note:
+      'Built on evidence_events and student_aspirations, which carry no institute column, so rows are attributed ' +
+      'to an institute through student enrolment (Grade 9-10, first digits of the class name). Four rules: ' +
+      'coverage gap, aspirations without evidence, stale evidence, revised rows. Counts only, never student ids. ' +
+      'Ledger is almost empty (11 rows, all assessment, one institute) and the cohort count is not reconciled.',
   },
   {
     key: 'result',

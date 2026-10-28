@@ -84,9 +84,13 @@ export function CrossModuleWorkflowSection({
       // Refresh execution history
       void loadData();
     } catch (err) {
+      let msg = err instanceof Error ? err.message : 'Couldn’t initiate workflow.';
+      if (msg.includes('Brain permission')) {
+        msg = 'Your LMS role does not grant permission to initiate this workflow. Academic workflows (such as Lesson Plan Review) can only be initiated by Teachers, Academic Heads, or Administrators.';
+      }
       setTriggerMessage({
         type: 'error',
-        text: err instanceof Error ? err.message : 'Couldn’t initiate workflow.',
+        text: msg,
       });
     } finally {
       setTriggering(false);

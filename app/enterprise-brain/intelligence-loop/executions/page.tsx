@@ -1,7 +1,7 @@
 'use client';
 
-import ScreenView from '../../_components/ScreenView';
+import ExecutionCenter from './_components/ExecutionCenter';
 
 export default function ExecutionsPage() {
-  return <ScreenView screen="executions" />;
+  return <ExecutionCenter />;
 }
