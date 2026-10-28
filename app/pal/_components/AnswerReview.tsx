@@ -21,6 +21,7 @@ import type { DiagnosticQuestionResult } from '@/app/pal/data/pal-diagnostic';
 // -- a result page never does, so without this import the classes would be
 // inert names with no matching rules loaded at all.
 import '@/app/h5p/h5p.css';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 /**
  * The post-submission "Review Answers" screen: every question the learner
@@ -232,7 +233,7 @@ function QuestionReviewCard({
 
       <div
         className="mb-4 text-base font-medium text-slate-900 [&_img]:max-w-full"
-        dangerouslySetInnerHTML={{ __html: question.title }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
       />
 
       {question.options.length > 0 && (
@@ -256,7 +257,7 @@ function QuestionReviewCard({
                     String.fromCharCode(65 + optionIndex)
                   )}
                 </span>
-                <span className="min-w-0 flex-1 [&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: option.answer }} />
+                <span className="min-w-0 flex-1 [&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 {isSelected && !isCorrectOption && (
                   <span className="shrink-0 text-[11px] font-semibold text-rose-600">Your answer</span>
                 )}

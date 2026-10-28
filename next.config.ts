@@ -59,6 +59,9 @@ const FRAME_ANCESTORS = ["'self'", ...(process.env.FRAME_ANCESTORS || "").split(
  */
 const SECURITY_HEADERS = [
   { key: "Content-Security-Policy", value: `frame-ancestors ${FRAME_ANCESTORS}; object-src 'none'; base-uri 'self'` },
+  // REPORT-ONLY: nothing is blocked. It reports what a real script-src/connect-src policy would stop,
+  // to /api/csp-report, so the policy can be tightened from evidence (see docs/security-hardening.md).
+  { key: "Content-Security-Policy-Report-Only", value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https: wss:; frame-src https:; form-action 'self' https:; report-uri /api/csp-report" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(self), payment=(self), usb=()" },
