@@ -25,6 +25,10 @@ export interface MilestoneDetailPanelProps {
    * rendering one that does nothing.
    */
   onOpenKnowledgeGraph?: ((milestone: JourneyMilestone) => void) | null;
+  /** The concept the 12-stage map is currently focused on — forwarded to `ConceptDiagnosticPanel` so it can mark that one row as "Viewing" among the chapter's full concept list. */
+  focusConceptId?: string | null;
+  /** Set when a learner picks a different concept out of `ConceptDiagnosticPanel`'s drawer — `MountainJourneyView` re-fetches the whole map around it. Omitted hides the picker's click affordance entirely (nothing to call back into). */
+  onSelectConcept?: (conceptId: string) => void;
 }
 
 const KNOWLEDGE_GRAPH_MILESTONES = new Set(['adaptive', 'mastery']);
@@ -64,6 +68,8 @@ export function MilestoneDetailPanel({
   chapterId,
   readOnly = false,
   onOpenKnowledgeGraph = null,
+  focusConceptId = null,
+  onSelectConcept,
 }: MilestoneDetailPanelProps) {
   const style = milestoneStatusStyle(milestone.status);
   const href = stageHref(milestone.key, { chapterId, conceptId: milestone.conceptId });
@@ -101,7 +107,9 @@ export function MilestoneDetailPanel({
           <p className="text-sm text-slate-500">{milestone.unavailableReason}</p>
         )}
 
-        {milestone.key === 'adaptive' && <ConceptDiagnosticPanel chapterId={chapterId} />}
+        {milestone.key === 'adaptive' && (
+          <ConceptDiagnosticPanel chapterId={chapterId} activeConceptId={focusConceptId} onSelectConcept={onSelectConcept} />
+        )}
 
         {milestone.key === 'mastery' && milestone.status === 'mastered' && <MasteryAchievedBanner />}
 

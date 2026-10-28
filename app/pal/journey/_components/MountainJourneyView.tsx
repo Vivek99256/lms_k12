@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, PartyPopper } from 'lucide-react';
 import {
   fetchJourneyData,
@@ -56,6 +56,29 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
   const [attempt, setAttempt] = useState(0);
   const [kgMilestone, setKgMilestone] = useState<JourneyData['milestones'][number] | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
+  // Which concept the map/detail panel are focused on — null keeps the
+  // backend's own default (the first ESO-ready concept). Set when a learner
+  // picks a different concept out of the Concept Diagnostic drawer
+  // (`ConceptDiagnosticPanel`, via `MilestoneDetailPanel`), so the 12-stage
+  // map re-renders around THAT concept's own real stages instead of staying
+  // stuck on whichever one the backend happened to pick first.
+  const [focusConceptOverride, setFocusConceptOverride] = useState<string | null>(null);
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const mountedRef = useRef(false);
+
+  // Scrolls the map back into view when a concept is picked from the drawer
+  // below it — otherwise "the map updates" is invisible if the drawer was
+  // opened from partway down the page, which is the normal case since the
+  // drawer lives inside the detail panel under the map. Skipped on mount
+  // (`mountedRef`): this only reacts to an actual concept switch, not the
+  // page's own first load.
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusConceptOverride]);
 
   // Fires the chapter-complete celebration once per chapter, not on every
   // revisit — gated on localStorage rather than a backend flag, since
@@ -69,7 +92,12 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
     const required = data.milestones.filter((entry) => !entry.untracked);
     const allRequiredDone =
       required.length > 0 && required.every((entry) => entry.status === 'completed' || entry.status === 'mastered');
-    if (!allRequiredDone) return;
+    // Both conditions, not just the first: a learner can finish this one
+    // concept's own 12 stages while other concepts in the chapter are still
+    // untouched — `allRequiredDone` alone celebrated that too early. Gating
+    // on `chapterFullyMastered` too is what makes this "once ALL concepts
+    // are mastered", not "once this one concept's journey is done".
+    if (!allRequiredDone || !data.chapterFullyMastered) return;
 
     const storageKey = `pal_journey_celebrated_${data.chapterId}`;
     try {
@@ -92,7 +120,7 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
       if (controller.signal.aborted) return;
       setLoading(true);
       setError(null);
-      fetchJourneyData(chapterId, controller.signal, viewContext.studentId)
+      fetchJourneyData(chapterId, controller.signal, viewContext.studentId, focusConceptOverride)
         .then((result) => {
           if (controller.signal.aborted) return;
           setData(result);
@@ -108,7 +136,7 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
     });
 
     return () => controller.abort();
-  }, [chapterId, attempt, viewContext.studentId]);
+  }, [chapterId, attempt, viewContext.studentId, focusConceptOverride]);
 
   if (loading) {
     return (
@@ -200,7 +228,7 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
         </dl>
       </header>
 
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl shadow-[0_8px_30px_rgba(99,102,241,0.25)]">
+      <div ref={mapRef} className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl shadow-[0_8px_30px_rgba(99,102,241,0.25)]">
         <PathJourneyView
           data={data}
           currentIndex={currentIndex}
@@ -214,6 +242,8 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
         chapterId={data.chapterId}
         readOnly={readOnly}
         onOpenKnowledgeGraph={setKgMilestone}
+        focusConceptId={data.focusConceptId}
+        onSelectConcept={setFocusConceptOverride}
       />
 
       <KnowledgeGraphPanel milestone={kgMilestone} viewContext={viewContext} onClose={() => setKgMilestone(null)} />

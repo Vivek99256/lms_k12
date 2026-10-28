@@ -160,7 +160,7 @@ export function IsometricClassBoard({ positionsByMilestone, onSelectStudent }: I
       style={{ aspectRatio: `${VIEW_WIDTH} / ${VIEW_HEIGHT}` }}
     >
       <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} className="pointer-events-none absolute inset-0 h-full w-full">
-        {/* Bridges first, so a tile's own body always paints over the segment crossing its footprint — only the gap between platforms stays visible, reading as a rope bridge between islands. */}
+        {/* Bridges first, so a tile's own body always paints over the segment crossing its footprint — only the gap between platforms stays visible, reading as a rope bridge between islands. The dashes drift along the line (iso-bridge) so the path reads as a route being travelled, not a static dotted border. */}
         {JOURNEY_STAGES.slice(0, -1).map((stage, i) => {
           const next = JOURNEY_STAGES[i + 1];
           const a = isoCenter(GRID[stage.key].col, GRID[stage.key].row);
@@ -168,6 +168,7 @@ export function IsometricClassBoard({ positionsByMilestone, onSelectStudent }: I
           return (
             <line
               key={stage.key}
+              className="iso-bridge"
               x1={a.x}
               y1={a.y}
               x2={b.x}
@@ -181,10 +182,14 @@ export function IsometricClassBoard({ positionsByMilestone, onSelectStudent }: I
           );
         })}
 
-        {drawOrder.map((stage) => {
+        {drawOrder.map((stage, i) => {
           const center = isoCenter(GRID[stage.key].col, GRID[stage.key].row);
           return (
-            <g key={stage.key}>
+            <g
+              key={stage.key}
+              className="iso-tile"
+              style={{ animationDelay: `${i * 45}ms`, transformBox: 'fill-box', transformOrigin: 'center' }}
+            >
               <ellipse
                 cx={center.x}
                 cy={center.y + TILE_H / 2 + 5}
@@ -217,7 +222,7 @@ export function IsometricClassBoard({ positionsByMilestone, onSelectStudent }: I
             <React.Fragment key={stage.key}>
               {students.length === 0 && (
                 <div
-                  className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center text-white/85"
+                  className="iso-idle-icon pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center text-white/85"
                   style={{ left: `${left}%`, top: `${top}%` }}
                 >
                   <Icon className="h-4 w-4" />
@@ -236,13 +241,18 @@ export function IsometricClassBoard({ positionsByMilestone, onSelectStudent }: I
                     className="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
                     style={{ left: `calc(${left}% + ${pctW(dx)}%)`, top: `calc(${top}% + ${pctH(dy)}%)` }}
                   >
-                    <span
-                      className="flex items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white shadow transition-transform hover:z-10 hover:scale-125"
-                      style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, backgroundColor: style.hex }}
-                    >
-                      {(student.name ?? '?').trim().charAt(0).toUpperCase() || '?'}
+                    {/* Bob animation lives on this inner wrapper, never on the
+                        positioned button above — animating `transform` there
+                        would clobber the -50%/-50% centring translate. */}
+                    <span className="iso-pawn-bob flex flex-col items-center" style={{ animationDelay: `${(i * 260) % 1700}ms` }}>
+                      <span
+                        className="flex items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white shadow transition-transform hover:z-10 hover:scale-125"
+                        style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, backgroundColor: style.hex }}
+                      >
+                        {(student.name ?? '?').trim().charAt(0).toUpperCase() || '?'}
+                      </span>
+                      <span className="-mt-0.5 h-1 w-3 rounded-full bg-black/20 blur-[1px]" />
                     </span>
-                    <span className="-mt-0.5 h-1 w-3 rounded-full bg-black/20 blur-[1px]" />
                   </button>
                 );
               })}
@@ -279,6 +289,65 @@ export function IsometricClassBoard({ positionsByMilestone, onSelectStudent }: I
           );
         })}
       </div>
+
+      <style jsx>{`
+        .iso-tile {
+          animation: isoTileIn 420ms ease both;
+        }
+        .iso-bridge {
+          animation: isoBridgeFlow 1.4s linear infinite;
+        }
+        .iso-pawn-bob {
+          animation: isoPawnBob 2.6s ease-in-out infinite;
+        }
+        .iso-idle-icon {
+          animation: isoIdlePulse 2.8s ease-in-out infinite;
+        }
+        @keyframes isoTileIn {
+          from {
+            opacity: 0;
+            transform: translateY(8px) scale(0.92);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        @keyframes isoBridgeFlow {
+          from {
+            stroke-dashoffset: 0;
+          }
+          to {
+            stroke-dashoffset: -30;
+          }
+        }
+        @keyframes isoPawnBob {
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-3px);
+          }
+        }
+        @keyframes isoIdlePulse {
+          0%,
+          100% {
+            opacity: 0.55;
+          }
+          50% {
+            opacity: 0.95;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .iso-tile,
+          .iso-bridge,
+          .iso-pawn-bob,
+          .iso-idle-icon {
+            animation: none;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -164,6 +164,15 @@ export interface JourneyData {
   hasAnyActivity: boolean;
   /** Null when remediation has never been triggered for this concept — true for most concepts. See `RemediationBranchSummary`. */
   remediationBranch: RemediationBranchSummary | null;
+  /**
+   * Every measurable concept in the WHOLE chapter is mastered — not just the
+   * focus concept's own `mastery` milestone. Same signal `recallMilestone()`
+   * already derives from `fetchChapterMastery` via `chapterCompletionFromRows()`,
+   * exposed here too so the map (full-path "completed" recolour) and the
+   * chapter-complete celebration can both gate on "every concept mastered"
+   * instead of "this one concept's 12 stages are done".
+   */
+  chapterFullyMastered: boolean;
 }
 
 // --- status -> colour, the one function every visual piece reads ----------
@@ -766,7 +775,18 @@ function recallMilestone(
 export async function fetchJourneyData(
   chapterId: string,
   signal?: AbortSignal,
-  asStudentId?: string
+  asStudentId?: string,
+  /**
+   * Shows a DIFFERENT concept's own stages instead of the auto-picked focus
+   * concept — set when a learner picks a concept out of the Concept
+   * Diagnostic drawer (`ConceptDiagnosticPanel`) rather than leaving the map
+   * on whichever concept `fetchChapterConcepts`/`fetchLearningPlan` would
+   * have picked by default. Most other concepts genuinely have no ESO
+   * activity yet, so this commonly renders as an honestly mostly-locked map
+   * — never invented progress, same as the default focus concept's own
+   * "no data yet" states.
+   */
+  focusConceptIdOverride?: string | null
 ): Promise<JourneyData> {
   const learnerId = asStudentId || defaultLearnerId();
   const chapterIdNum = Number(chapterId);
@@ -798,7 +818,8 @@ export async function fetchJourneyData(
   // endpoint doesn't blank out most of the 12 milestones that have a
   // perfectly good second source for the same fact.
   const focusConceptId =
-    concepts[0]?.id != null ? String(concepts[0].id) : plan?.concepts.find((c) => c.esoReady)?.conceptId ?? null;
+    focusConceptIdOverride ??
+    (concepts[0]?.id != null ? String(concepts[0].id) : plan?.concepts.find((c) => c.esoReady)?.conceptId ?? null);
 
   const dashboardSection = dashboard?.chapterSections.find((s) => String(s.conceptId) === focusConceptId) ?? null;
   // Only meaningful when the dashboard's own notion of "current concept"
@@ -868,6 +889,12 @@ export async function fetchJourneyData(
           attempts: remediationAttemptsList,
         };
 
+  // Same helper + same `mastery.concepts` rows `recallMilestone()` above
+  // already reduced for its own "all measurable concepts mastered" fact —
+  // read again here rather than threaded out of that call, to keep this
+  // function's shape unchanged for every other milestone builder.
+  const chapterFullyMastered = mastery ? chapterCompletionFromRows(mastery.concepts).isComplete : false;
+
   return {
     chapterId,
     chapterName: history?.chapterName || plan?.chapterName || mastery?.chapterName || null,
@@ -875,5 +902,6 @@ export async function fetchJourneyData(
     milestones,
     hasAnyActivity,
     remediationBranch,
+    chapterFullyMastered,
   };
 }
