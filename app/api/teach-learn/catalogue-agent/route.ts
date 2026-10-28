@@ -5,9 +5,11 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 function getBackendBaseUrl(): string {
-  const prod = (process.env.NEXT_PUBLIC_AI_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL_PROD || '').trim().replace(/\/$/, '');
-  const dev = (process.env.NEXT_PUBLIC_AI_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL_DEV || 'http://127.0.0.1:8000').trim().replace(/\/$/, '');
-  return process.env.NODE_ENV === 'production' ? (prod || dev) : (dev || prod);
+  const envUrl = (process.env.NEXT_PUBLIC_AI_BASE_URL || '').trim().replace(/\/$/, '');
+  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+    return envUrl;
+  }
+  return 'https://dev.triz.co.in';
 }
 
 function mintDevToken(): string {

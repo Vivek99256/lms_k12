@@ -132,11 +132,40 @@ export interface CatalogueAgentStateResponse {
   server_time: string;
 }
 
-function resolveEndpoint(context: IntelligenceContext, action?: string): string {
-  if (typeof window !== 'undefined') {
-    return action ? `/api/teach-learn/catalogue-agent?action=${action}` : '/api/teach-learn/catalogue-agent';
+const DEV_TRIZ_BACKEND = 'https://dev.triz.co.in';
+
+function resolveBaseUrl(context: IntelligenceContext): string {
+  if (process.env.NEXT_PUBLIC_AI_BASE_URL) {
+    return process.env.NEXT_PUBLIC_AI_BASE_URL.replace(/\/$/, '');
   }
-  const baseUrl = resolveAiBaseUrl(context.baseUrl);
+
+  // When running in local development (npm run dev on localhost), use local Laravel backend
+  if (typeof window !== 'undefined') {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocal) {
+      return (
+        context.baseUrl ||
+        process.env.NEXT_PUBLIC_API_BASE_URL_DEV ||
+        'http://127.0.0.1:8000'
+      ).replace(/\/$/, '');
+    }
+  }
+
+  const candidate = (context.baseUrl || '').trim().replace(/\/$/, '');
+  if (candidate && !candidate.includes('localhost') && !candidate.includes('127.0.0.1')) {
+    return candidate;
+  }
+
+  const resolved = resolveAiBaseUrl(context.baseUrl);
+  if (resolved && !resolved.includes('localhost') && !resolved.includes('127.0.0.1') && !resolved.includes('erp.triz.co.in')) {
+    return resolved;
+  }
+
+  return DEV_TRIZ_BACKEND;
+}
+
+function resolveEndpoint(context: IntelligenceContext, action?: string): string {
+  const baseUrl = resolveBaseUrl(context);
   const path = action === 'start' ? '/start'
     : action === 'stop' ? '/stop'
     : action === 'interval' ? '/interval'
@@ -153,9 +182,7 @@ function buildHeaders(context: IntelligenceContext): HeadersInit {
     Accept: 'application/json',
     'Content-Type': 'application/json',
     ...(context.token ? { Authorization: `Bearer ${context.token}` } : {}),
-    ...(context.instituteId != null && `${context.instituteId}`.trim()
-      ? { 'X-MCP-Institute-Id': String(context.instituteId) }
-      : {}),
+    'X-MCP-Institute-Id': String(context.instituteId || '1'),
   };
 }
 
@@ -297,7 +324,8 @@ export async function getContentTasksLedger(
   status?: string
 ): Promise<{ tasks: ContentTaskRecord[]; stats: ContentStats; server_time: string }> {
   const baseUrl = resolveEndpoint(context, 'content-tasks');
-  const url = `${baseUrl}&limit=${limit}${status ? `&status=${encodeURIComponent(status)}` : ''}`;
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  const url = `${baseUrl}${separator}limit=${encodeURIComponent(limit)}${status ? `&status=${encodeURIComponent(status)}` : ''}`;
   const res = await fetch(url, {
     method: 'GET',
     headers: buildHeaders(context),
