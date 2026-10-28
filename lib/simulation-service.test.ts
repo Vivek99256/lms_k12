@@ -114,6 +114,15 @@ describe('reading the answers', () => {
     assert.equal(readLinks({ links: [{ id: 1, concept_id: 2 }] }).length, 1)
   })
 
+  it('reads `mapped` only when the server sent a boolean', () => {
+    assert.equal(readCard({ id: 1, mapped: false }).mapped, false)
+    assert.equal(readCard({ id: 1, mapped: true }).mapped, true)
+    assert.equal(readCard({ id: 1 }).mapped, undefined, 'no field: unknown, so no flag')
+    assert.equal(readCard({ id: 1, mapped: 'no' }).mapped, undefined, 'only a real boolean counts')
+    assert.equal(readCard({ id: 1, mapped: 0 }).mapped, undefined)
+    assert.equal(readList({ simulations: [{ id: 1, mapped: false }, { id: 2, mapped: true }] }).simulations.map((c) => c.mapped).join(), 'false,true')
+  })
+
   it('reads the backend list flag `can_manage`, also for an EMPTY library where no card can say `editable`', () => {
     assert.equal(readList({ simulations: [], can_manage: true }).editable, true)
     assert.equal(readList({ simulations: [], can_manage: false }).editable, false)

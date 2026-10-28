@@ -166,6 +166,17 @@ export function linksChanged(drafts: readonly LinkDraft[], saved: readonly Simul
 
 export const isPendingReview = (link: Pick<SimulationLink, 'review_status'>): boolean => link.review_status !== 'published'
 
+/** The words of the flag drawn on a simulation that no published link maps to a concept and topic yet. */
+export const NOT_MAPPED_LABEL = 'Not mapped yet to a concept and topic'
+
+/** True only on the server's word (`mapped: false`): an answer without the field is never flagged. */
+export const isUnmapped = (card: { mapped?: boolean | null }): boolean => card.mapped === false
+
+/** Mapped simulations first, the unmapped (flagged) ones after them; within each group the order the server gave. */
+export function mappedFirst<C extends { mapped?: boolean | null }>(cards: readonly C[]): C[] {
+  return [...cards].sort((a, b) => Number(isUnmapped(a)) - Number(isUnmapped(b)))
+}
+
 /** A learner sees published links only; staff also see the ones still in review (drawn as pending). The server already filters; this keeps the page honest if it ever did not. */
 export function visibleLinks<L extends Pick<SimulationLink, 'review_status'>>(links: readonly L[] | null | undefined, staff: boolean): L[] {
   return (links ?? []).filter((link) => staff || !isPendingReview(link))
@@ -173,6 +184,7 @@ export function visibleLinks<L extends Pick<SimulationLink, 'review_status'>>(li
 
 interface Linked {
   links?: readonly SimulationLink[] | null
+  mapped?: boolean | null
 }
 
 /** Simulations with at least one visible link satisfying `match`, in the order given. */
@@ -180,8 +192,9 @@ function withLink<C extends Linked>(cards: readonly C[], staff: boolean, match: 
   return cards.filter((card) => visibleLinks(card.links, staff).some(match))
 }
 
+/** Mirrors the server's chapter filter: the simulations linked to this chapter, plus every one NOT MAPPED yet (they show in every chapter, flagged). */
 export const simulationsForChapter = <C extends Linked>(cards: readonly C[], chapterId: number, staff: boolean): C[] =>
-  withLink(cards, staff, (link) => link.chapter_id === chapterId)
+  cards.filter((card) => isUnmapped(card) || visibleLinks(card.links, staff).some((link) => link.chapter_id === chapterId))
 
 export const simulationsForTopic = <C extends Linked>(cards: readonly C[], topicId: number, staff: boolean): C[] =>
   withLink(cards, staff, (link) => link.topic_id === topicId)

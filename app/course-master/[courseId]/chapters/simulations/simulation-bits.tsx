@@ -1,11 +1,11 @@
 'use client'
 
-import { CheckCircle2, FlaskConical, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, Flag, FlaskConical, type LucideIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
 import type { SimulationCard, SimulationStatus } from '@/app/course-master/data/simulations'
 import { coverSrc } from '@/lib/simulation-format'
-import { isPendingReview, type SimulationLink } from '@/lib/simulation-links'
+import { NOT_MAPPED_LABEL, isPendingReview, type SimulationLink } from '@/lib/simulation-links'
 import { cn } from '@/lib/utils'
 
 /** The chip beside a simulation's title: the experiment icon on the Prayogshala indigo. */
@@ -75,6 +75,26 @@ export function PendingBadge({ className, children = 'Pending review' }: { class
   return (
     <span className={cn('inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold leading-none text-amber-900', className)}>
       {children}
+    </span>
+  )
+}
+
+/**
+ * A small flag: this simulation is not mapped to a concept and topic yet (no published link). On a card cover it is an icon only, with the words as a
+ * tooltip and for a screen reader; `withText` draws the words too (the detail sheet). Drawn only on the server's word, see isUnmapped.
+ */
+export function NotMappedFlag({ withText = false, className }: { withText?: boolean; className?: string }) {
+  return (
+    <span
+      title={NOT_MAPPED_LABEL}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 text-amber-900 shadow-sm',
+        withText ? 'px-2 py-0.5 text-[11px] font-semibold leading-none' : 'size-6 justify-center',
+        className,
+      )}
+    >
+      <Flag className={withText ? 'size-3' : 'size-3.5'} aria-hidden="true" />
+      {withText ? NOT_MAPPED_LABEL : <span className="sr-only">{NOT_MAPPED_LABEL}</span>}
     </span>
   )
 }

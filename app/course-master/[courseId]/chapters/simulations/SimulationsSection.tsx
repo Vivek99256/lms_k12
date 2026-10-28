@@ -6,10 +6,10 @@ import React, { useState } from 'react';
 import type { SimulationCard } from '@/app/course-master/data/simulations';
 import { Button } from '@/components/ui/button';
 import { difficultyOf, minutesLabel, missionsLabel, startLabel } from '@/lib/simulation-format';
-import { conceptChipsFor, pendingReviewCount } from '@/lib/simulation-links';
+import { conceptChipsFor, isUnmapped, mappedFirst, pendingReviewCount } from '@/lib/simulation-links';
 import { cn } from '@/lib/utils';
 
-import { DifficultyBars, ConceptChip, MetaItem, PendingBadge, ProgressPill, SimulationCover, StatusPill } from './simulation-bits';
+import { DifficultyBars, ConceptChip, MetaItem, NotMappedFlag, PendingBadge, ProgressPill, SimulationCover, StatusPill } from './simulation-bits';
 import { useSimulationsContext } from './SimulationsProvider';
 
 const MAX_CHIPS = 4;
@@ -26,14 +26,17 @@ function SimulationCardView({ card, chapterId, staff }: { card: SimulationCard; 
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-      <button
-        type="button"
-        onClick={() => ctx?.openDetail(card)}
-        className="block aspect-[16/9] w-full overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-        aria-label={`Details of ${card.title}`}
-      >
-        <SimulationCover simulation={card} />
-      </button>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => ctx?.openDetail(card)}
+          className="block aspect-[16/9] w-full overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+          aria-label={`Details of ${card.title}`}
+        >
+          <SimulationCover simulation={card} />
+        </button>
+        {isUnmapped(card) ? <NotMappedFlag className="pointer-events-none absolute right-2 top-2" /> : null}
+      </div>
       <div className="flex flex-1 flex-col gap-2 p-3.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <StatusPill status={card.status} />
@@ -138,9 +141,10 @@ function SimulationLibrary() {
 }
 
 /**
- * The chapter-level Simulations section of the Prayogshala tab: the simulations linked to any concept of this chapter. A learner sees published
- * simulations through published links and nothing at all when there are none; staff also see links still in review, marked as pending. The Add
- * button and the library appear only when the server said this session may author.
+ * The chapter-level Simulations section of the Prayogshala tab: the simulations linked to a concept of this chapter, then every simulation that is not
+ * mapped to any concept yet, each of those with a small flag (the server decides, `mapped: false`). A learner sees published links only and nothing at all
+ * when there are no simulations; staff also see links still in review, marked as pending. The Add button and the library appear only when the server
+ * said this session may author.
  */
 export function SimulationsSection() {
   const ctx = useSimulationsContext();
@@ -191,7 +195,7 @@ export function SimulationsSection() {
         </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {simulations.map((card) => (
+          {mappedFirst(simulations).map((card) => (
             <SimulationCardView key={card.id} card={card} chapterId={chapterId} staff={staff} />
           ))}
         </div>

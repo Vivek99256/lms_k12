@@ -65,6 +65,11 @@ export interface SimulationCard {
   links: SimulationLink[];
   /** True only when this session may change the row (platform-tenant staff). */
   editable: boolean | undefined;
+  /**
+   * False when no PUBLISHED link maps the simulation to a concept yet: the page shows it in every chapter's tab, flagged. Undefined when the
+   * server did not say (an older answer), and then no flag is drawn.
+   */
+  mapped: boolean | undefined;
 }
 
 export interface SimulationSpecPreview {
@@ -341,6 +346,7 @@ export function readCard(value: unknown): SimulationCard {
       : null,
     links: readLinks(raw.links),
     editable: typeof raw.editable === 'boolean' ? raw.editable : undefined,
+    mapped: typeof raw.mapped === 'boolean' ? raw.mapped : undefined,
   };
 }
 

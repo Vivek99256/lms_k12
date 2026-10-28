@@ -10,9 +10,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { SimulationActions } from '@/hooks/use-simulations';
 import { difficultyOf, minutesLabel, missionsLabel, readSpec, startLabel } from '@/lib/simulation-format';
 import { assetCreditLines } from '@/lib/simulation-host';
-import { conceptChipsFor, isPendingReview } from '@/lib/simulation-links';
+import { conceptChipsFor, isPendingReview, isUnmapped } from '@/lib/simulation-links';
 
-import { DifficultyBars, MetaItem, PendingBadge, ProgressPill, SimulationCover, StatusPill } from './simulation-bits';
+import { DifficultyBars, MetaItem, NotMappedFlag, PendingBadge, ProgressPill, SimulationCover, StatusPill } from './simulation-bits';
 
 const PRIMARY = 'bg-indigo-600 text-white hover:bg-indigo-700';
 
@@ -95,6 +95,7 @@ export function SimulationDetailSheet({
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={card.status} />
               <ProgressPill progress={card.progress} />
+              {isUnmapped(card) ? <NotMappedFlag withText /> : null}
               {pending ? <PendingBadge>Link pending review</PendingBadge> : null}
             </div>
             <SheetTitle className="text-xl font-semibold text-slate-900">{card.title}</SheetTitle>

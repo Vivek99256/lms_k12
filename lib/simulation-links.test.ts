@@ -12,6 +12,7 @@ import { describe, it } from 'node:test'
 import { coverSrc } from './simulation-format'
 import {
   CITATION_MAX,
+  NOT_MAPPED_LABEL,
   REASON_MAX,
   authoringAllowed,
   buildConceptQuery,
@@ -21,8 +22,10 @@ import {
   conceptChipsFor,
   draftsFromLinks,
   isPendingReview,
+  isUnmapped,
   linkDraftProblems,
   linksChanged,
+  mappedFirst,
   pendingReviewCount,
   shouldProbeAuthoring,
   simulationsForChapter,
@@ -175,6 +178,34 @@ describe('who sees which links', () => {
     assert.deepEqual(simulationsForTopic(all, 1000, true).map((c) => c.id), [1, 2])
     assert.deepEqual(simulationsForTopic(all, 2000, true).map((c) => c.id), [3])
     assert.deepEqual(simulationsForChapter(all, 999, true), [])
+  })
+
+  it('shows a simulation that is not mapped yet in EVERY chapter, flagged, but never under a topic or a concept', () => {
+    const mapped = { id: 1, mapped: true, links: [published] }
+    const unmappedLoose = { id: 2, mapped: false, links: [] as SimulationLink[] }
+    const unmappedInReview = { id: 3, mapped: false, links: [review] }
+    const elsewhere = { id: 4, mapped: true, links: [link({ id: 4, chapter_id: 200, topic_id: 2000 })] }
+    const noAnswer = { id: 5, links: [] as SimulationLink[] }
+    const all = [mapped, unmappedLoose, unmappedInReview, elsewhere, noAnswer]
+
+    // chapter 100: its own mapped one, plus every unmapped one; the one mapped to chapter 200 is not here; an answer without `mapped` is never treated as unmapped
+    assert.deepEqual(simulationsForChapter(all, 100, false).map((c) => c.id), [1, 2, 3])
+    assert.deepEqual(simulationsForChapter(all, 999, false).map((c) => c.id), [2, 3], 'a chapter with nothing mapped to it still shows the unmapped ones')
+    assert.deepEqual(simulationsForChapter(all, 200, false).map((c) => c.id), [2, 3, 4])
+    // a topic is precise: the unmapped ones never match it (a learner has no review link to match, staff have)
+    assert.deepEqual(simulationsForTopic(all, 1000, false).map((c) => c.id), [1])
+    assert.deepEqual(simulationsForTopic(all, 1000, true).map((c) => c.id), [1, 3])
+  })
+
+  it('flags only on the server\'s word, and lists the mapped simulations before the flagged ones', () => {
+    assert.equal(isUnmapped({ mapped: false }), true)
+    assert.equal(isUnmapped({ mapped: true }), false)
+    assert.equal(isUnmapped({ mapped: undefined }), false, 'an answer without the field is not flagged')
+    assert.equal(isUnmapped({ mapped: null }), false)
+    assert.equal(NOT_MAPPED_LABEL, 'Not mapped yet to a concept and topic')
+    const cards = [{ id: 1, mapped: false }, { id: 2, mapped: true }, { id: 3, mapped: false }, { id: 4 }, { id: 5, mapped: true }]
+    assert.deepEqual(mappedFirst(cards).map((c) => c.id), [2, 4, 5, 1, 3], 'stable inside each group')
+    assert.deepEqual(cards.map((c) => c.id), [1, 2, 3, 4, 5], 'the input is not reordered in place')
   })
 
   it('draws one chip per concept, main concepts first, within the scope asked', () => {
