@@ -1,63 +1,65 @@
 'use client';
 
 /**
- * How a concept gets chosen, before the map has a centre.
+ * Curriculum Explorer & Concept Deck.
  *
- * WHY THERE IS A DECK AT ALL
- * The focus map needs a root, and there is no safe way to pick one automatically. A
- * good fraction of concepts have no prerequisite links whatsoever (`stats.isolated` is
- * 91 of 633 on Science Grade 9), so auto-centring risks opening on a single card in an
- * empty field, which reads as a broken screen rather than as a true fact about the
- * curriculum. Making the choice explicit also means the teacher arrives at the map
- * already knowing what they came to look at.
+ * Strict hierarchical drill-down flow:
+ * Unit ➔ Chapter ➔ Topic ➔ Concept ➔ Coherence Knowledge Map
  *
- * Unit > Chapter > Topic > Concept, as stacked cards. The stack depth is not
- * decoration: it shows how much is inside before you open it, which is the same thing
- * the reference's variable-height card stacks communicate.
+ * Features:
+ * - Left side: Curriculum Explorer Sidebar (matching exact reference design)
+ * - Right side: Visual Stage (Unit ➔ Chapter ➔ Topic ➔ Concept Grid with Concept Intelligence)
+ * - Seamless synchronization: clicking any node in the sidebar tree updates the stage
+ * - Real-time search and breadcrumb navigation
  */
 
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Layers, Search } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Brain,
+  ChevronRight,
+  Layers,
+  Lightbulb,
+  ListTree,
+  Network,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react';
 
 import type { CoherenceMap, CoherenceNode } from '@/app/course-master/data/coherenceMap';
 
+import { colorForId, LEVEL_THEMES } from './colorPalette';
+import {
+  capitalize,
+  conceptGlance,
+  difficultyChipClass,
+  useConceptIntelligenceEntry,
+} from './conceptIntelligence';
+import { CurriculumExplorerSidebar } from './CurriculumExplorerSidebar';
 import { buildForest, conceptsUnder, type TreeNode } from './graphLayout';
 
 const ALL_LEVELS = new Set(['unit', 'chapter', 'topic', 'concept'] as const);
-
-/**
- * Neutral elevation that deepens with how much the card contains - the same
- * shadow colour the app's own `.card` class uses (app/globals.css), not a
- * brand-tinted glow.
- */
-function stackShadow(count: number): string {
-  if (count >= 12) return 'shadow-[0_18px_32px_-10px_rgba(0,0,0,0.22)]';
-  if (count >= 5) return 'shadow-[0_14px_24px_-10px_rgba(0,0,0,0.18)]';
-  if (count >= 2) return 'shadow-[0_10px_18px_-10px_rgba(0,0,0,0.14)]';
-
-  return 'shadow-[0_6px_12px_-8px_rgba(0,0,0,0.12)]';
-}
 
 export function ConceptDeck({
   map,
   onPick,
   initialChapterId = null,
+  onClose,
 }: {
   map: CoherenceMap;
   onPick: (conceptId: string) => void;
-  /** Pre-selects a chapter, so the deck opens straight into its topics (or its
-   *  concept list, for a chapter with no topic level) instead of the unit grid. */
   initialChapterId?: string | null;
+  onClose: () => void;
 }) {
   const [openUnit, setOpenUnit] = useState<string | null>(null);
   const [openChapter, setOpenChapter] = useState<string | null>(initialChapterId);
   const [openTopic, setOpenTopic] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // The parent only remounts this deck when the hook's map itself changes (a
-  // different subject/grade); switching to another chapter of the SAME map
-  // just passes a new `initialChapterId` prop, so without this the drill-down
-  // state here would keep pointing at whichever chapter was opened first.
   const [seenChapterId, setSeenChapterId] = useState(initialChapterId);
 
   if (seenChapterId !== initialChapterId) {
@@ -82,8 +84,7 @@ export function ConceptDeck({
     return index;
   }, [forest]);
 
-  // Search short-circuits the whole drill-down. With 233 concepts, someone who knows
-  // what they want should not have to remember which chapter it lives in.
+  // Global search across all concepts
   const matches = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (term.length < 2) return null;
@@ -91,7 +92,7 @@ export function ConceptDeck({
     return map.nodes
       .filter((n) => n.type === 'concept' && n.label.toLowerCase().includes(term))
       .sort(connectedFirst)
-      .slice(0, 60);
+      .slice(0, 80);
   }, [query, map.nodes]);
 
   const unitTrees = forest.filter((t) => t.node.type === 'unit' || t.node.type === 'chapter');
@@ -102,119 +103,656 @@ export function ConceptDeck({
     ? openChapterTree.children.filter((c) => c.node.type === 'topic')
     : [];
 
-  // Concepts parented straight to the chapter (no topic_id) alongside real topics -
-  // folded into one trailing card below rather than dropped from the deck.
   const looseConcepts = openChapterTree
     ? openChapterTree.children.filter((c) => c.node.type === 'concept')
     : [];
 
   const topicCardsForChapter: TreeNode[] =
     topicChildren.length === 0
-      ? [] // no topic step for this chapter - falls through to the flat list, as before
+      ? []
       : looseConcepts.length === 0
         ? topicChildren
         : [...topicChildren, looseConceptsCard(openChapterTree!, looseConcepts)];
 
   const hasTopicStep = topicCardsForChapter.length > 0;
 
-  // Looked up within this chapter's own cards, not the global `byId` index - the
-  // synthetic "Other concepts" card is never inserted into `byId`.
   const openTopicTree = openTopic
     ? topicCardsForChapter.find((t) => t.node.id === openTopic) ?? null
     : null;
 
+  // Total statistics for header
+  const totalConceptsCount = useMemo(
+    () => map.nodes.filter((n) => n.type === 'concept').length,
+    [map.nodes]
+  );
+  const totalChaptersCount = useMemo(
+    () => map.nodes.filter((n) => n.type === 'chapter').length,
+    [map.nodes]
+  );
+
+  // Active step in the Unit -> Chapter -> Topic -> Concept flow
+  const currentLevel: 'unit' | 'chapter' | 'topic' | 'concept' = matches
+    ? 'concept'
+    : openTopicTree
+      ? 'concept'
+      : openChapterTree
+        ? hasTopicStep
+          ? 'topic'
+          : 'concept'
+        : openUnitTree
+          ? 'chapter'
+          : 'unit';
+
+  const canGoBack = Boolean(openUnitTree || openChapterTree || openTopicTree);
+
+  const handleBack = () => {
+    if (openTopicTree) {
+      setOpenTopic(null);
+    } else if (openChapterTree) {
+      setOpenChapter(null);
+    } else if (openUnitTree) {
+      setOpenUnit(null);
+    }
+  };
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slate-50">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2.5">
-        <div className="relative min-w-[16rem] flex-1">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search concepts"
-            aria-label="Search concepts"
-            className="h-9 w-full rounded-full border border-slate-200 bg-white pl-8 pr-3 text-[13px] text-slate-800 outline-none transition-[border-color,box-shadow] placeholder:text-slate-400 focus-visible:border-[#4f46e5] focus-visible:ring-2 focus-visible:ring-[#4f46e5]/30"
-          />
+    <div className="flex h-full min-h-0 flex-col bg-slate-50/70">
+      {/* ── Top Header Toolbar ──────────────────────────────────────── */}
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-5 py-3 shadow-xs backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#2563EB] text-white shadow-sm">
+            <Network size={18} strokeWidth={2.2} aria-hidden />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-[14px] font-bold text-slate-900">Curriculum Coherence Map</h2>
+              {/* Level indicator badge */}
+              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${LEVEL_THEMES[currentLevel].badge}`}>
+                {currentLevel === 'unit' && '1. Select Unit'}
+                {currentLevel === 'chapter' && '2. Select Chapter'}
+                {currentLevel === 'topic' && '3. Select Topic'}
+                {currentLevel === 'concept' && '4. Select Concept to Map'}
+              </span>
+            </div>
+            <p className="text-[11px] font-medium text-slate-500">
+              Unit ➔ Chapter ➔ Topic ➔ Concept Knowledge Graph ({totalChaptersCount} Chapters · {totalConceptsCount} Concepts)
+            </p>
+          </div>
         </div>
 
-        {(openUnitTree || openChapterTree) && !matches && (
-          <button
-            type="button"
-            onClick={() => {
-              if (openTopicTree) setOpenTopic(null);
-              else if (openChapterTree) setOpenChapter(null);
-              else setOpenUnit(null);
-            }}
-            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[12.5px] font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
-          >
-            <ArrowLeft size={13} strokeWidth={2} aria-hidden />
-            Back
-          </button>
-        )}
+        {/* Global Search Bar */}
+        <div className="relative min-w-[16rem] max-w-sm flex-1">
+          <Search
+            size={14}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            aria-hidden
+          />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search any concept in this curriculum..."
+            aria-label="Search all concepts"
+            className="h-8.5 w-full rounded-full border border-slate-200 bg-slate-50/80 pl-9 pr-9 text-[12px] font-medium text-slate-800 placeholder:text-slate-400 outline-none transition-all duration-150 focus:border-[#059669] focus:bg-white focus:ring-2 focus:ring-[#059669]/20"
+          />
+          {query.trim().length > 0 && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+              aria-label="Clear search"
+            >
+              <X size={13} strokeWidth={2.2} />
+            </button>
+          )}
+        </div>
 
-        <p className="text-[12px] text-slate-500">
-          {openChapterTree && !openTopicTree && hasTopicStep && !matches
-            ? 'Pick a topic to see its concepts.'
-            : 'Pick a concept to map its prerequisites.'}
-        </p>
-      </div>
+        {/* Close Button */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-2xs transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669]"
+          aria-label="Close coherence map"
+          title="Close explorer"
+        >
+          <X size={16} strokeWidth={2.2} />
+        </button>
+      </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
-        {matches ? (
-          <ConceptList
-            heading={`${matches.length} matching concept${matches.length === 1 ? '' : 's'}`}
-            concepts={matches}
-            onPick={onPick}
-          />
-        ) : openTopicTree ? (
-          <ConceptList
-            heading={openTopicTree.node.label}
-            concepts={conceptsUnder(openTopicTree).sort(connectedFirst)}
-            onPick={onPick}
-          />
-        ) : openChapterTree ? (
-          hasTopicStep ? (
-            <CardGrid
-              heading={openChapterTree.node.label}
-              trees={topicCardsForChapter}
-              onOpen={(tree) => setOpenTopic(tree.node.id)}
-            />
-          ) : (
-            <ConceptList
-              heading={openChapterTree.node.label}
-              concepts={conceptsUnder(openChapterTree).sort(connectedFirst)}
-              onPick={onPick}
-            />
-          )
-        ) : openUnitTree ? (
-          <CardGrid
-            heading={openUnitTree.node.label}
-            trees={openUnitTree.children.length > 0 ? openUnitTree.children : [openUnitTree]}
-            onOpen={(tree) => setOpenChapter(tree.node.id)}
-          />
-        ) : (
-          <CardGrid
-            heading="Choose a unit"
-            trees={unitTrees}
-            onOpen={(tree) =>
-              tree.node.type === 'unit' ? setOpenUnit(tree.node.id) : setOpenChapter(tree.node.id)
-            }
-          />
-        )}
+      {/* ── Main Workspace: Sidebar Beside Main Stage ──────────────── */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* LEFT: Curriculum Explorer Sidebar (Reference Design) */}
+        <CurriculumExplorerSidebar
+          map={map}
+          selectedUnitId={openUnit}
+          selectedChapterId={openChapter}
+          selectedTopicId={openTopic}
+          onSelectConcept={onPick}
+          onSelectUnit={(id) => {
+            setOpenUnit(id);
+            setOpenChapter(null);
+            setOpenTopic(null);
+          }}
+          onSelectChapter={(id) => {
+            setOpenChapter(id);
+            setOpenTopic(null);
+          }}
+          onSelectTopic={(id) => {
+            setOpenTopic(id);
+          }}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+        />
+
+        {/* RIGHT: Visual Stage Area */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50/50">
+          {/* Breadcrumb Bar */}
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 bg-white/80 px-5 py-2.5 backdrop-blur-xs">
+            <div className="flex items-center gap-2 overflow-x-auto text-[12px]">
+              {/* Back button */}
+              {canGoBack && !matches && (
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11.5px] font-bold text-slate-700 shadow-2xs transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-95"
+                >
+                  <ArrowLeft size={13} strokeWidth={2.4} />
+                  <span>Back</span>
+                </button>
+              )}
+
+              {/* Breadcrumb Steps */}
+              <nav className="flex items-center gap-1.5 font-medium" aria-label="Curriculum drill-down">
+                {/* Step 1: All Units */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenUnit(null);
+                    setOpenChapter(null);
+                    setOpenTopic(null);
+                  }}
+                  className={[
+                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors text-[11.5px]',
+                    !openUnitTree && !openChapterTree
+                      ? 'bg-indigo-600 font-bold text-white shadow-xs'
+                      : 'bg-indigo-50 font-semibold text-indigo-700 hover:bg-indigo-100',
+                  ].join(' ')}
+                >
+                  <Layers size={11} strokeWidth={2.2} />
+                  <span>1. All Units</span>
+                </button>
+
+                {/* Step 2: Unit */}
+                {openUnitTree && (
+                  <>
+                    <ChevronRight size={13} className="text-slate-400" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenChapter(null);
+                        setOpenTopic(null);
+                      }}
+                      className={[
+                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors text-[11.5px]',
+                        !openChapterTree
+                          ? 'bg-sky-600 font-bold text-white shadow-xs'
+                          : 'bg-sky-50 font-semibold text-sky-700 hover:bg-sky-100',
+                      ].join(' ')}
+                    >
+                      <BookOpen size={11} strokeWidth={2.2} />
+                      <span>2. {openUnitTree.node.label}</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Step 3: Chapter */}
+                {openChapterTree && (
+                  <>
+                    <ChevronRight size={13} className="text-slate-400" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenTopic(null);
+                      }}
+                      className={[
+                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors text-[11.5px]',
+                        !openTopicTree
+                          ? 'bg-purple-600 font-bold text-white shadow-xs'
+                          : 'bg-purple-50 font-semibold text-purple-700 hover:bg-purple-100',
+                      ].join(' ')}
+                    >
+                      <ListTree size={11} strokeWidth={2.2} />
+                      <span>3. {openChapterTree.node.label}</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Step 4: Topic */}
+                {openTopicTree && (
+                  <>
+                    <ChevronRight size={13} className="text-slate-400" />
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 font-bold text-white shadow-xs text-[11.5px]">
+                      <Lightbulb size={11} strokeWidth={2.2} />
+                      <span>4. {openTopicTree.node.label}</span>
+                    </span>
+                  </>
+                )}
+              </nav>
+            </div>
+
+            {/* Step Guide Tag */}
+            <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+              <span className="flex items-center gap-1 text-slate-400">
+                <span>Unit</span>
+                <ChevronRight size={10} />
+                <span>Chapter</span>
+                <ChevronRight size={10} />
+                <span>Topic</span>
+                <ChevronRight size={10} />
+                <span className="font-bold text-emerald-700">Concept</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Main Stage Content */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+            {matches ? (
+              /* ── Search Results ── */
+              <div>
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Search Results for &ldquo;{query}&rdquo;
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Found {matches.length} matching concept{matches.length === 1 ? '' : 's'}. Click any concept to map its prerequisites.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQuery('')}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-2xs hover:bg-slate-50"
+                  >
+                    Clear Search
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {matches.map((concept) => (
+                    <ConceptTile key={concept.id} concept={concept} onPick={onPick} />
+                  ))}
+                </div>
+              </div>
+            ) : openTopicTree ? (
+              /* ── Level 4: Topic -> Concepts List ── */
+              <div>
+                <div className="mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xs">
+                      <Lightbulb size={14} strokeWidth={2.2} />
+                    </span>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">
+                        Concepts in &ldquo;{openTopicTree.node.label}&rdquo;
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Select a concept below to launch its full Coherence Knowledge Graph
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {conceptsUnder(openTopicTree)
+                    .sort(connectedFirst)
+                    .map((concept) => (
+                      <ConceptTile
+                        key={concept.id}
+                        concept={concept}
+                        onPick={onPick}
+                        accent={colorForId(openTopicTree.node.id)}
+                      />
+                    ))}
+                </div>
+              </div>
+            ) : openChapterTree ? (
+              /* ── Level 3: Chapter -> Topics (or direct concepts if no topics) ── */
+              hasTopicStep ? (
+                <div>
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 text-white shadow-xs">
+                        <ListTree size={14} strokeWidth={2.2} />
+                      </span>
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900">
+                          Topics in &ldquo;{openChapterTree.node.label}&rdquo;
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Step 3: Click a topic to view its individual concepts
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {topicCardsForChapter.map((tree) => {
+                      const conCount = conceptsUnder(tree).length;
+                      const hex = colorForId(tree.node.id);
+
+                      return (
+                        <button
+                          key={tree.node.id}
+                          type="button"
+                          onClick={() => setOpenTopic(tree.node.id)}
+                          className="group relative flex h-36 flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-4 text-left shadow-2xs transition-all duration-200 hover:-translate-y-1 hover:border-purple-300 hover:shadow-md"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 border border-purple-200/60">
+                              <ListTree size={10} strokeWidth={2.2} />
+                              <span>Topic</span>
+                            </span>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-600">
+                              {conCount} {conCount === 1 ? 'concept' : 'concepts'}
+                            </span>
+                          </div>
+
+                          <div className="my-auto">
+                            <h4 className="line-clamp-2 text-[14px] font-bold text-slate-800 group-hover:text-purple-950 transition-colors">
+                              {tree.node.label}
+                            </h4>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                            <span
+                              className="h-1.5 w-6 rounded-full transition-all duration-200 group-hover:w-12"
+                              style={{ backgroundColor: hex }}
+                            />
+                            <span className="inline-flex items-center gap-1 font-semibold text-purple-700">
+                              <span>View Concepts</span>
+                              <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* Chapter has no topics — shows concepts directly */
+                <div>
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xs">
+                        <Lightbulb size={14} strokeWidth={2.2} />
+                      </span>
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900">
+                          Concepts in &ldquo;{openChapterTree.node.label}&rdquo;
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Select a concept below to launch its Coherence Knowledge Graph
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {conceptsUnder(openChapterTree)
+                      .sort(connectedFirst)
+                      .map((concept) => (
+                        <ConceptTile
+                          key={concept.id}
+                          concept={concept}
+                          onPick={onPick}
+                          accent={colorForId(openChapterTree.node.id)}
+                        />
+                      ))}
+                  </div>
+                </div>
+              )
+            ) : openUnitTree ? (
+              /* ── Level 2: Unit -> Chapters Grid ── */
+              <div>
+                <div className="mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-xs">
+                      <BookOpen size={14} strokeWidth={2.2} />
+                    </span>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">
+                        Chapters in &ldquo;{openUnitTree.node.label}&rdquo;
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Step 2: Click a chapter to explore its topics and concepts
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {openUnitTree.children.map((chTree) => {
+                    const topicCount = chTree.children.filter((c) => c.node.type === 'topic').length;
+                    const conCount = conceptsUnder(chTree).length;
+                    const hex = colorForId(chTree.node.id);
+
+                    return (
+                      <button
+                        key={chTree.node.id}
+                        type="button"
+                        onClick={() => setOpenChapter(chTree.node.id)}
+                        className="group relative flex h-36 flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-4 text-left shadow-2xs transition-all duration-200 hover:-translate-y-1 hover:border-sky-300 hover:shadow-md"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-700 border border-sky-200/60">
+                            <BookOpen size={10} strokeWidth={2.2} />
+                            <span>Chapter</span>
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-600">
+                            {topicCount > 0 ? `${topicCount} topics` : `${conCount} concepts`}
+                          </span>
+                        </div>
+
+                        <div className="my-auto">
+                          <h4 className="line-clamp-2 text-[14px] font-bold text-slate-800 group-hover:text-sky-950 transition-colors">
+                            {chTree.node.label}
+                          </h4>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                          <span
+                            className="h-1.5 w-6 rounded-full transition-all duration-200 group-hover:w-12"
+                            style={{ backgroundColor: hex }}
+                          />
+                          <span className="inline-flex items-center gap-1 font-semibold text-sky-700">
+                            <span>{topicCount > 0 ? 'View Topics' : 'View Concepts'}</span>
+                            <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* ── Level 1: All Units Grid ── */
+              <div>
+                <div className="mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white shadow-xs">
+                      <Layers size={14} strokeWidth={2.2} />
+                    </span>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">
+                        Curriculum Units
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Step 1: Choose a unit to drill down into chapters, topics, and concepts
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {unitTrees.map((tree) => {
+                    const isUnit = tree.node.type === 'unit';
+                    const chCount = tree.children.filter((c) => c.node.type === 'chapter').length;
+                    const conCount = conceptsUnder(tree).length;
+                    const hex = colorForId(tree.node.id);
+
+                    return (
+                      <button
+                        key={tree.node.id}
+                        type="button"
+                        onClick={() => {
+                          if (isUnit) {
+                            setOpenUnit(tree.node.id);
+                          } else {
+                            // Direct chapter at root level
+                            setOpenChapter(tree.node.id);
+                          }
+                        }}
+                        className="group relative flex h-38 flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-4 text-left shadow-2xs transition-all duration-200 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 border border-indigo-200/60">
+                            <Layers size={10} strokeWidth={2.2} />
+                            <span>{isUnit ? 'Unit' : 'Chapter'}</span>
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-600">
+                            {isUnit ? `${chCount} Chapters` : `${conCount} Concepts`}
+                          </span>
+                        </div>
+
+                        <div className="my-auto">
+                          <h4 className="line-clamp-2 text-[14.5px] font-bold text-slate-800 group-hover:text-indigo-950 transition-colors">
+                            {tree.node.label}
+                          </h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{conCount} concepts mapped</p>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                          <span
+                            className="h-1.5 w-6 rounded-full transition-all duration-200 group-hover:w-12"
+                            style={{ backgroundColor: hex }}
+                          />
+                          <span className="inline-flex items-center gap-1 font-semibold text-indigo-600">
+                            <span>{isUnit ? 'Open Chapters' : 'Explore'}</span>
+                            <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-/**
- * A chapter can have some concepts tagged with a topic and some without. The loose
- * ones are folded into one trailing card rather than dropped from the deck - shaped
- * like a real TreeNode so CardGrid and conceptsUnder need no special case for it.
- */
+/* ──────────────────────────────────────────────────────────────────────── */
+/* ConceptTile Component with AI Concept Intelligence glance               */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function ConceptTile({
+  concept,
+  onPick,
+  accent,
+}: {
+  concept: CoherenceNode;
+  onPick: (id: string) => void;
+  accent?: string;
+}) {
+  const meta = concept.meta as Record<string, unknown>;
+  const chapterId = typeof meta.chapter_id === 'number' ? meta.chapter_id : null;
+  const { entry } = useConceptIntelligenceEntry(chapterId, concept.label);
+  const glance = conceptGlance(entry);
+
+  const links = concept.prereq_count + concept.dependent_count;
+  const cardAccent = accent ?? colorForId(concept.id);
+
+  return (
+    <div className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-3.5 text-left shadow-2xs transition-all duration-200 hover:-translate-y-1 hover:border-emerald-400 hover:shadow-md">
+      <div>
+        {/* Top Header: Concept Badge + AI Concept Intelligence */}
+        <div className="flex items-center justify-between gap-1 mb-2">
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800 border border-emerald-200/60">
+            <Sparkles size={9} className="text-emerald-600" />
+            <span>Concept</span>
+          </span>
+
+          {/* AI Concept Intelligence Pill: Difficulty */}
+          {glance?.difficulty ? (
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${difficultyChipClass(
+                glance.difficulty
+              )}`}
+              title={`Concept Intelligence Difficulty: ${glance.difficulty}`}
+            >
+              <Brain size={10} strokeWidth={2.2} />
+              <span>{capitalize(glance.difficulty)}</span>
+            </span>
+          ) : (
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: cardAccent }}
+              title="Chapter color"
+            />
+          )}
+        </div>
+
+        {/* Concept Title */}
+        <h4 className="line-clamp-2 text-[13px] font-bold leading-snug text-slate-800 group-hover:text-emerald-950 transition-colors">
+          {concept.label}
+        </h4>
+      </div>
+
+      {/* Footer: Connections & Map Launch Button */}
+      <div className="mt-3 pt-2.5 border-t border-slate-100">
+        <div className="flex flex-wrap items-center gap-1 text-[10.5px] mb-2.5">
+          {concept.prereq_count > 0 && (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-sky-50 px-2 py-0.5 font-semibold text-sky-700 border border-sky-200/60">
+              <span>← {concept.prereq_count} before</span>
+            </span>
+          )}
+          {concept.dependent_count > 0 && (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-teal-50 px-2 py-0.5 font-semibold text-teal-700 border border-teal-200/60">
+              <span>{concept.dependent_count} after →</span>
+            </span>
+          )}
+          {links === 0 && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700 border border-amber-200/60">
+              Not linked yet
+            </span>
+          )}
+        </div>
+
+        {/* Launch Knowledge Graph */}
+        <button
+          type="button"
+          onClick={() => onPick(concept.id)}
+          className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-50 py-1.5 text-[11px] font-bold text-emerald-700 border border-slate-200/80 transition-all duration-150 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 active:scale-95 shadow-2xs"
+        >
+          <Network size={12} strokeWidth={2.2} />
+          <span>Map Knowledge Graph</span>
+          <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Helper Functions                                                        */
+/* ──────────────────────────────────────────────────────────────────────── */
+
 function looseConceptsCard(chapter: TreeNode, loose: TreeNode[]): TreeNode {
   return {
     node: {
-      id: `${chapter.node.id}::other`, // sentinel; real refs never contain "::"
+      id: `${chapter.node.id}::other`,
       type: 'topic',
       entity_id: -1,
       label: 'Other concepts',
@@ -232,144 +770,9 @@ function looseConceptsCard(chapter: TreeNode, loose: TreeNode[]): TreeNode {
   };
 }
 
-/** Well-connected concepts first: those are the ones with a map worth looking at. */
 function connectedFirst(a: CoherenceNode, b: CoherenceNode): number {
   const linksA = a.prereq_count + a.dependent_count;
   const linksB = b.prereq_count + b.dependent_count;
 
   return linksB - linksA || a.order - b.order || a.label.localeCompare(b.label);
-}
-
-/**
- * What a card counts, by its OWN level - not what is recursively beneath it.
- *
- * A Unit card says how many Chapters it holds, a Chapter card how many Topics,
- * and only a Topic (or a chapter with no topic step, shown as its concept list
- * rather than a card) says how many Concepts. Counting concepts on every card
- * regardless of level is what made Unit and Chapter cards both show the same
- * recursive total.
- */
-function cardCount(tree: TreeNode): { count: number; noun: string } {
-  switch (tree.node.type) {
-    case 'unit':
-      return {
-        count: tree.children.filter((c) => c.node.type === 'chapter').length,
-        noun: 'chapter',
-      };
-    case 'chapter':
-      return {
-        count: tree.children.filter((c) => c.node.type === 'topic').length,
-        noun: 'topic',
-      };
-    default:
-      return { count: conceptsUnder(tree).length, noun: 'concept' };
-  }
-}
-
-function CardGrid({
-  heading,
-  trees,
-  onOpen,
-}: {
-  heading: string;
-  trees: TreeNode[];
-  onOpen: (tree: TreeNode) => void;
-}) {
-  return (
-    <>
-      <h3 className="mb-4 text-[12px] font-semibold uppercase tracking-wide text-slate-500">{heading}</h3>
-
-      <div className="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {trees.map((tree) => {
-          const { count, noun } = cardCount(tree);
-
-          return (
-            <button
-              key={tree.node.id}
-              type="button"
-              onClick={() => onOpen(tree)}
-              className={[
-                'flex h-36 flex-col items-center justify-center gap-1.5 rounded-2xl bg-[#4F46E5] px-4 text-center transition-[transform,box-shadow] duration-200',
-                'hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2',
-                'motion-reduce:transition-none motion-reduce:hover:translate-y-0',
-                stackShadow(count),
-              ].join(' ')}
-            >
-              <span className="text-[10px] font-medium uppercase tracking-wider text-white/70">
-                {tree.node.type === 'unit' ? 'Unit' : tree.node.type === 'chapter' ? 'Chapter' : 'Topic'}
-              </span>
-              <span className="line-clamp-3 text-[15px] font-semibold leading-snug text-white">
-                {tree.node.label}
-              </span>
-              <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-white/70">
-                <Layers size={10} strokeWidth={2} aria-hidden />
-                {count} {noun}
-                {count === 1 ? '' : 's'}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-function ConceptList({
-  heading,
-  concepts,
-  onPick,
-}: {
-  heading: string;
-  concepts: CoherenceNode[];
-  onPick: (conceptId: string) => void;
-}) {
-  return (
-    <>
-      <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-slate-500">{heading}</h3>
-
-      {concepts.length === 0 ? (
-        <p className="text-[13px] text-slate-500">No concepts here yet.</p>
-      ) : (
-        <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {concepts.map((concept) => {
-            const links = concept.prereq_count + concept.dependent_count;
-
-            return (
-              <li key={concept.id}>
-                <button
-                  type="button"
-                  onClick={() => onPick(concept.id)}
-                  className="flex w-full flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-[border-color,background-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-[0_8px_16px_-8px_rgba(0,0,0,0.15)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-                >
-                  <span className="text-[13px] font-semibold leading-snug text-slate-900">
-                    {concept.label}
-                  </span>
-
-                  <span className="flex flex-wrap items-center gap-1.5 text-[10.5px]">
-                    {concept.prereq_count > 0 && (
-                      <span className="rounded-full bg-slate-100 px-1.5 py-px font-medium text-slate-600">
-                        {concept.prereq_count} before
-                      </span>
-                    )}
-                    {concept.dependent_count > 0 && (
-                      <span className="rounded-full bg-slate-100 px-1.5 py-px font-medium text-slate-600">
-                        {concept.dependent_count} after
-                      </span>
-                    )}
-                    {/* Said plainly rather than hidden: a concept nobody has linked is
-                        a gap in the curriculum map, which is worth seeing. */}
-                    {links === 0 && (
-                      <span className="rounded-full bg-amber-50 px-1.5 py-px font-medium text-amber-800">
-                        Not linked yet
-                      </span>
-                    )}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </>
-  );
 }

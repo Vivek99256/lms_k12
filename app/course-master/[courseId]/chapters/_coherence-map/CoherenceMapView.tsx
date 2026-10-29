@@ -2,28 +2,8 @@
 
 /**
  * The coherence map screen.
- *
- * Renders whatever the backend returns. There is no curriculum in this file: no unit,
- * chapter, topic or concept is named, no prerequisite is decided, and no relationship
- * is inferred. Adding a concept to the database puts it on the map; approving an edge
- * changes the map. Nothing here needs editing for either.
- *
- * WHAT THE SCREEN IS FOR
- * Four questions: what must be learned before this, what depends on it, where does it
- * sit in the curriculum, and which of those claims has a person actually confirmed.
- *
- * The first two are the canvas. One concept is centred, its prerequisites fan left and
- * the things it unlocks fan right, two hops each way - so the answer IS the picture,
- * rather than something to be traced out of a picture of everything.
- *
- * The third moved off the canvas into the breadcrumb and the card header. Drawing
- * containment and dependency in the same channel is what made the previous version
- * unreadable: 233 concepts each claiming a row made the canvas some 15,000px tall and
- * fitView shrank it to an illegible smear.
- *
- * The fourth is the dashed/solid distinction, which is never decorative: a dashed edge
- * is a machine's guess nobody has agreed with yet. Solid indigo is either a curator's
- * approval or a row from the authored map.
+ * Redesigned with modern glassmorphism panels, responsive HUD controls,
+ * polished network statistics, and smooth view transitions.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -32,6 +12,7 @@ import {
   BackgroundVariant,
   Controls,
   MarkerType,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
@@ -42,7 +23,19 @@ import {
   type Node,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { AlertTriangle, Check, Loader2, Network, X } from 'lucide-react';
+import './coherence-map-theme.css';
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  Filter,
+  Layers,
+  Loader2,
+  Network,
+  RotateCcw,
+  Sparkles,
+  X,
+} from 'lucide-react';
 
 import {
   applyEdgeTo,
@@ -61,6 +54,7 @@ import { ConceptDeck } from './ConceptDeck';
 import { nodeTypes, type ConceptCardData } from './ConceptCard';
 import { FocusBreadcrumb, crumbsFor } from './FocusBreadcrumb';
 import { MapInteractionContext, edgeTypes, markerColour, type LaneEdgeData } from './LaneEdge';
+import { CurriculumExplorerSidebar } from './CurriculumExplorerSidebar';
 import {
   isDependencyEdge,
   layoutFocusMap,
@@ -68,13 +62,18 @@ import {
   type FocusNode,
 } from './focusLayout';
 
+const GRID_DOT = '#CBD5E1';
+const PANEL_FRAME =
+  'relative flex h-[calc(100vh-180px)] min-h-[580px] flex-col overflow-hidden rounded-[24px] border border-slate-200/90 bg-slate-50/50 shadow-[0_4px_32px_rgba(15,23,42,0.06),0_1px_3px_rgba(15,23,42,0.04)]';
+
+const FLOATING_CHROME =
+  'rounded-2xl border border-slate-200/90 bg-white/95 shadow-[0_4px_20px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.05)] backdrop-blur-md';
+
 type Props = {
   subjectId: string;
   standardId?: string;
-  /** Header text, so the map matches the page it opened from. */
   title: string;
   onClose: () => void;
-  /** Opens the deck straight into this chapter's concepts instead of the full subject. */
   initialChapterId?: string | null;
 };
 
@@ -92,27 +91,12 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
     standardId
   );
 
-  /**
-   * A map fetched for a DIFFERENT scope, after walking into another grade.
-   *
-   * The hook is keyed on the subject and grade this screen opened with, so following a
-   * prerequisite into class 9 cannot go through it. When one is loaded it takes over as
-   * the active map; picking again from the deck drops back to the hook's.
-   */
   const [walked, setWalked] = useState<CoherenceMap | null>(null);
   const [walking, setWalking] = useState(false);
 
   const active = walked ?? map;
 
   const [rootId, setRootId] = useState<string | null>(null);
-  /**
-   * Where we have been, each entry remembering WHICH map it belongs to.
-   *
-   * A bare id is not enough once the walk crosses a grade: concept ids are only
-   * meaningful inside the scope that returned them, so stepping back to a concept from
-   * the original map while a walked map is still active would look the id up in the
-   * wrong map, find nothing, and render an empty canvas.
-   */
   const [rootStack, setRootStack] = useState<{ id: string; walked: CoherenceMap | null }[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -122,21 +106,11 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
   });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn' | 'error'; text: string } | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const { setCenter, getViewport, setViewport } = useReactFlow();
   const savedViewport = useRef<{ x: number; y: number; zoom: number } | null>(null);
 
-  /**
-   * A new scope from the hook - a different subject, or a different academic year -
-   * invalidates everything about where we had walked to. Opening a different chapter
-   * of the SAME subject/grade does too: the hook's `map` is unchanged (it is scoped to
-   * subject+grade, not chapter), but the root concept picked for the previous chapter
-   * has no business staying centred once a different chapter was asked for.
-   *
-   * Adjusted during render rather than in an effect. React restarts the render before
-   * committing, so the canvas never paints one frame of the old concept against the new
-   * map; an effect would do exactly that, and would also cascade a second render.
-   */
   const [seenMap, setSeenMap] = useState(map);
   const [seenChapterId, setSeenChapterId] = useState(initialChapterId);
 
@@ -161,12 +135,6 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
-  /**
-   * Safe to key on expandedId: opening a card moves the columns apart, and that is a
-   * user action, not something the ResizeObserver can cause. The dimension changes
-   * xyflow feeds back through onNodesChange touch none of these deps, so measuring a
-   * resized card cannot re-enter this memo and start a resize loop.
-   */
   const layout = useMemo(() => {
     if (!active || !rootId) return null;
 
@@ -178,14 +146,6 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
     [active]
   );
 
-  // -- Mutations ------------------------------------------------------
-  /**
-   * Write the result wherever the map actually lives.
-   *
-   * On the hook's own map that is applyEdge; on a walked map the hook knows nothing
-   * about it, so the same pure helper is applied locally. Both go through one function,
-   * so a rejected edge disappears the same way on either.
-   */
   const commitEdge = useCallback(
     (edge: CoherenceEdge) => {
       if (walked) setWalked((current) => (current ? applyEdgeTo(current, edge) : current));
@@ -215,9 +175,6 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
       setBusy(true);
 
       try {
-        // Dragging right-edge -> left-edge means "this comes first", so the drag source
-        // IS the prerequisite. Same direction the arrows point. Reverse it and a wrong
-        // curriculum rule is written with no error.
         const result = await createRelation(session, connection.source, connection.target);
         commitEdge(result.relation);
 
@@ -225,9 +182,9 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
           result.warnings?.includes('creates_cycle')
             ? {
                 tone: 'warn',
-                text: 'Prerequisite added - but it forms a loop: these two now require each other.',
+                text: 'Prerequisite added - but forms a cycle with an existing prerequisite.',
               }
-            : { tone: 'ok', text: 'Prerequisite added and approved.' }
+            : { tone: 'ok', text: 'Prerequisite successfully added and approved.' }
         );
       } catch (e) {
         setNotice({
@@ -288,7 +245,6 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
     [session, dropEdge]
   );
 
-  // -- Navigation -----------------------------------------------------
   const collapse = useCallback(() => {
     setExpandedId(null);
 
@@ -299,14 +255,6 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
     }
   }, [setViewport, reduceMotion]);
 
-  /**
-   * Centre the map on a concept, fetching another grade's map if it lives there.
-   *
-   * An off-map node is a prerequisite the server pulled in from outside this scope; it
-   * arrives as a label and a pair of ids and nothing else, so centring on it means
-   * asking the server for ITS map. Everything already in scope is a pure recompute with
-   * no network call, which is what makes walking the chain feel immediate.
-   */
   const mapConcept = useCallback(
     async (id: string) => {
       const node = active?.nodes.find((n) => n.id === id);
@@ -348,20 +296,12 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
     const previous = rootStack[rootStack.length - 1];
     if (previous === undefined) return;
 
-    // Restore the map that id came from, not just the id.
     setWalked(previous.walked);
     setRootId(previous.id);
     setExpandedId(previous.id);
     setRootStack((stack) => stack.slice(0, -1));
   }, [rootStack]);
 
-  /**
-   * Leaving the canvas has to drop the walk as well.
-   *
-   * The deck lists the subject this screen opened with. Returning to it while a walked
-   * map was still active meant the next pick handed a concept id from one map to a
-   * layout running over another - the same empty-canvas failure by a different route.
-   */
   const backToDeck = useCallback(() => {
     setWalked(null);
     setRootId(null);
@@ -374,15 +314,6 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
       savedViewport.current = getViewport();
       setExpandedId(id);
 
-      // Normalise the zoom on open. Without this, someone who had zoomed out reads the
-      // detail at whatever scale they left the canvas on - and this is the one moment
-      // the text actually has to be legible.
-      //
-      // `node` is the card at its CURRENT size, and its centre is the right target
-      // because a card does not move when it opens: the column being opened is the one
-      // column `columnX` leaves in place, and growth is symmetric about the centre.
-      // Measuring against the expanded size instead would aim 224px right and 154px
-      // low, which lands the viewport on the card's bottom-right corner.
       setCenter(node.x + node.width / 2, node.y + node.height / 2, {
         zoom: 1,
         duration: reduceMotion ? 0 : 240,
@@ -391,7 +322,6 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
     [getViewport, setCenter, reduceMotion]
   );
 
-  // -- Flow elements --------------------------------------------------
   const computedNodes = useMemo<Node[]>(() => {
     if (!layout || !active) return [];
 
@@ -423,14 +353,12 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
         position: { x: node.x, y: node.y },
         width: node.width,
         height: node.height,
-        // Manual z, so the open card sits above the lines and its neighbours.
         zIndex: expanded ? 10 : 1,
         selected: expanded,
         data: data as unknown as Record<string, unknown>,
         ariaRole: 'button',
         ariaLabel: `${node.label}. ${node.prereq_count} prerequisites, ${node.dependent_count} dependents.`,
-        className:
-          'rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2',
+        className: 'rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669]',
       } satisfies Node;
     });
   }, [layout, active, expandedId, filters, labelOf, busy, mapConcept, collapse, review, remove]);
@@ -450,8 +378,6 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
         source: edge.source,
         target: edge.target,
         type: 'lane',
-        // Related links are not directional - an arrowhead would claim an order the
-        // data does not assert.
         markerEnd:
           edge.kind === 'cross_curricular'
             ? undefined
@@ -467,19 +393,6 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
   useEffect(() => setNodes(computedNodes), [computedNodes, setNodes]);
   useEffect(() => setEdges(computedEdges), [computedEdges, setEdges]);
 
-  /**
-   * Re-frame on the centred concept - at zoom 1, deliberately NOT fit-to-view.
-   *
-   * Fitting looks tidier and is wrong here. A concept with eleven dependents makes the
-   * neighbourhood about 1,850px tall (measured on Science Grade 6), which fit-to-view
-   * resolves by dropping to roughly 0.3 zoom - cards 61px wide with 4px labels. That is
-   * the exact failure this redesign exists to remove, reintroduced by a convenience.
-   *
-   * Centring at 1:1 keeps every card readable and puts the concept you asked about
-   * under the cursor; a tall column is reached by scrolling, and the card's own
-   * "11 after" chip says there is more than the viewport shows. The fit-to-view button
-   * in the controls is still there for anyone who does want the overview.
-   */
   useEffect(() => {
     if (!rootId || !layout) return;
 
@@ -496,20 +409,8 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
     );
 
     return () => window.clearTimeout(timer);
-    // `layout` is intentionally out of the deps: it changes on every filter toggle and
-    // on every expand, and re-centring the canvas because someone hid suggestions would
-    // yank the view out from under them.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rootId, setCenter, reduceMotion]);
 
-  /**
-   * The hovered card and everything one edge from it.
-   *
-   * Keyed on the layout rather than rebuilt per frame, and deliberately NOT written
-   * into node data: putting it there would replace every node object in the xyflow
-   * store on each mouseenter. Through context, only the handful of cards and edges
-   * whose appearance actually changes re-render.
-   */
   const related = useMemo(() => {
     if (!hoveredId || !layout) return null;
 
@@ -528,13 +429,21 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
     [hoveredId, related, rootId]
   );
 
-  // -- States ---------------------------------------------------------
   if (loading) {
     return (
       <Shell title={title} onClose={onClose}>
-        <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
-          <Loader2 size={26} className="animate-spin motion-reduce:animate-none" aria-hidden />
-          <p className="text-sm">Building the coherence map...</p>
+        <div className="flex h-full flex-col items-center justify-center gap-3.5 text-slate-500">
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100">
+            <Loader2
+              size={28}
+              className="animate-spin text-[#059669] motion-reduce:animate-none"
+              aria-hidden
+            />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-bold text-slate-800">Building Coherence Knowledge Map</p>
+            <p className="text-xs text-slate-400 mt-0.5">Assembling prerequisite hierarchy and relationships...</p>
+          </div>
         </div>
       </Shell>
     );
@@ -544,14 +453,16 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
     return (
       <Shell title={title} onClose={onClose}>
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-          <AlertTriangle size={26} className="text-amber-500" aria-hidden />
-          <p className="max-w-md text-sm text-slate-700">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
+            <AlertTriangle size={24} aria-hidden />
+          </div>
+          <p className="max-w-md text-sm font-medium text-slate-700">
             {error ?? 'The coherence map couldn’t be loaded.'}
           </p>
           <button
             type="button"
             onClick={reload}
-            className="rounded-xl bg-[#4f46e5] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
+            className="mt-2 rounded-full bg-[#059669] px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95"
           >
             Try again
           </button>
@@ -561,43 +472,39 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
   }
 
   if (map.stats.chapters === 0) {
-    // Two situations land here and look identical on screen: the subject has no
-    // curriculum at all, or it has one under a different academic year than the app is
-    // pointed at. Only the server knows which, so it says - and when a year does have
-    // curriculum, the teacher can open it from here rather than going to find the
-    // academic-year selector, which lives on another screen entirely.
     const years = map.meta.available_syears ?? [];
 
     return (
       <Shell title={title} onClose={onClose}>
-        <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-          <Network size={26} className="text-slate-400" aria-hidden />
+        <div className="flex h-full flex-col items-center justify-center gap-2.5 px-6 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+            <Network size={26} aria-hidden />
+          </div>
 
           {years.length === 0 ? (
             <>
-              <p className="text-sm font-medium text-slate-800">No curriculum to map yet</p>
-              <p className="max-w-md text-sm text-slate-600">
-                Add chapters and concepts to this subject and they will appear here automatically.
+              <p className="text-base font-bold text-slate-800">No curriculum mapped yet</p>
+              <p className="max-w-md text-xs text-slate-500">
+                Add chapters and concepts to this subject and they will automatically populate here.
               </p>
             </>
           ) : (
             <>
-              <p className="text-sm font-medium text-slate-800">
-                Nothing to map for {map.meta.syear ?? 'the selected year'}
+              <p className="text-base font-bold text-slate-800">
+                Nothing mapped for academic year {map.meta.syear ?? 'selected'}
               </p>
-              <p className="max-w-md text-sm text-slate-600">
-                This subject has curriculum for {years.join(', ')}. The academic year in use is{' '}
-                {map.meta.syear ?? 'not set'}, which has no chapters for it.
+              <p className="max-w-md text-xs text-slate-500">
+                This subject has curriculum authored for {years.join(', ')}. Select a year to view:
               </p>
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                 {years.map((year) => (
                   <button
                     key={year}
                     type="button"
                     onClick={() => viewYear(year)}
-                    className="rounded-full bg-[#4F46E5] px-3.5 py-1.5 text-[13px] font-medium text-white transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:active:scale-100"
+                    className="rounded-full bg-[#059669] px-4 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95"
                   >
-                    Show {year}
+                    View {year}
                   </button>
                 ))}
               </div>
@@ -611,62 +518,65 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
   const rootNode = layout?.nodes.find((n) => n.isRoot) ?? null;
   const crumbs = active ? crumbsFor(active, rootNode, backToDeck) : [];
 
-  return (
-    <Shell
-      title={title}
-      onClose={onClose}
-      crumbs={
-        rootId ? (
-          <FocusBreadcrumb crumbs={crumbs} onBack={goBack} canGoBack={rootStack.length > 0} />
-        ) : null
-      }
+  const notice_ = notice && (
+    <div
+      role="status"
+      className={[
+        'animate-in fade-in flex items-center gap-2 rounded-full px-4 py-2 text-[12.5px] font-semibold shadow-lg backdrop-blur-md duration-200',
+        notice.tone === 'ok'
+          ? 'bg-emerald-600 text-white shadow-emerald-600/20'
+          : notice.tone === 'warn'
+            ? 'bg-amber-500 text-white shadow-amber-500/20'
+            : 'bg-red-600 text-white shadow-red-600/20',
+      ].join(' ')}
     >
-      <MapInteractionContext.Provider value={interaction}>
-        <div className="flex h-full min-h-0 flex-col">
-          {notice && (
-            <div
-              role="status"
-              className={[
-                'animate-in fade-in slide-in-from-top-1 flex items-center gap-2 border-b px-4 py-2 text-[13px] duration-200',
-                notice.tone === 'ok'
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                  : notice.tone === 'warn'
-                    ? 'border-amber-200 bg-amber-50 text-amber-900'
-                    : 'border-red-200 bg-red-50 text-red-800',
-              ].join(' ')}
-            >
-              {notice.tone === 'ok' ? (
-                <Check size={14} aria-hidden />
-              ) : (
-                <AlertTriangle size={14} aria-hidden />
-              )}
-              {notice.text}
-            </div>
-          )}
+      {notice.tone === 'ok' ? (
+        <CheckCircle2 size={15} aria-hidden />
+      ) : (
+        <AlertTriangle size={15} aria-hidden />
+      )}
+      <span>{notice.text}</span>
+    </div>
+  );
 
-          {!rootId ? (
+  return (
+    <div className={PANEL_FRAME}>
+      <MapInteractionContext.Provider value={interaction}>
+        {!rootId ? (
+          <div className="animate-in fade-in min-h-0 flex-1 duration-300 motion-reduce:animate-none">
             <ConceptDeck
               map={map}
               initialChapterId={initialChapterId}
+              onClose={onClose}
               onPick={(id) => {
-                // The deck always lists the hook's own map, so any walk must already be
-                // cleared by the time a pick from it is laid out.
                 setWalked(null);
                 setRootId(id);
                 setExpandedId(id);
               }}
             />
-          ) : (
+          </div>
+        ) : (
+          <div className="animate-in fade-in flex min-h-0 flex-1 duration-300 motion-reduce:animate-none overflow-hidden">
+            {/* Left: Curriculum Explorer Sidebar (matching user's design) */}
+            <CurriculumExplorerSidebar
+              map={active ?? map}
+              selectedConceptId={rootId}
+              onSelectConcept={(id) => mapConcept(id)}
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+            />
+
+            {/* Right: ReactFlow Canvas Area */}
             <div className="relative min-h-0 flex-1">
               {walking && (
-                <div className="animate-in fade-in absolute inset-0 z-20 flex items-center justify-center bg-white/70 duration-150">
-                  <span className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[13px] text-slate-600 shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
+                <div className="animate-in fade-in absolute inset-0 z-30 flex items-center justify-center bg-white/70 backdrop-blur-xs duration-150">
+                  <span className="flex items-center gap-2.5 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-slate-700 shadow-xl">
                     <Loader2
-                      size={14}
-                      className="animate-spin text-[#4F46E5] motion-reduce:animate-none"
+                      size={16}
+                      className="animate-spin text-[#059669] motion-reduce:animate-none"
                       aria-hidden
                     />
-                    Opening that grade&apos;s map...
+                    <span>Loading cross-grade curriculum map...</span>
                   </span>
                 </div>
               )}
@@ -692,33 +602,117 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
                 onPaneClick={collapse}
                 fitView
                 fitViewOptions={{ padding: 0.18, minZoom: 1, maxZoom: 1 }}
-                // 0.05 is what allowed the old canvas to render as a smear. The focus
-                // map is 1360px wide and fits the shell at zoom 1, so nothing below a
-                // quarter scale is ever a useful view of it.
                 minZoom={0.25}
-                maxZoom={1.4}
+                maxZoom={1.5}
                 nodesDraggable={false}
                 nodesConnectable
                 zIndexMode="manual"
                 nodeClickDistance={4}
-                className="bg-slate-50"
+                className="coherence-map-canvas bg-slate-50/70 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-50/30 via-slate-50/60 to-slate-100/50"
               >
-                {/* Flat dots, no gradient or blur. */}
-                <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#cbd5e1" />
-                <Controls showInteractive={false} className="!shadow-sm" />
+                <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} color={GRID_DOT} />
+                <Controls
+                  showInteractive={false}
+                  className="!border-slate-200/90 !bg-white/95 !shadow-[0_4px_20px_rgba(15,23,42,0.08)] !rounded-2xl overflow-hidden [&>button]:!border-slate-100 [&>button]:!bg-white [&>button]:!fill-slate-600 [&>button:hover]:!bg-slate-50"
+                />
+
+                {/* Top-Left: Header Pill + Return to Units */}
+                <Panel position="top-left">
+                  <div className={`${FLOATING_CHROME} flex items-center gap-3 px-3.5 py-2`}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#2563EB] text-white shadow-sm">
+                      <Network size={16} strokeWidth={2.2} aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <h2 className="truncate text-[13px] font-bold leading-tight text-slate-900">
+                        Coherence Map
+                      </h2>
+                      <p className="truncate text-[11px] font-medium leading-tight text-slate-500">{title}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={backToDeck}
+                      className="ml-2 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-2xs transition-colors hover:bg-slate-100 hover:text-slate-900"
+                      title="Return to Curriculum Units & Explorer"
+                    >
+                      <Layers size={11} strokeWidth={2.2} />
+                      <span>All Units</span>
+                    </button>
+                  </div>
+                </Panel>
+
+                {/* Top-Center: Breadcrumbs & Status Alerts */}
+                <Panel position="top-center">
+                  <div className="flex flex-col items-center gap-2">
+                    {crumbs.length > 0 && (
+                      <div className={`${FLOATING_CHROME} px-3 py-1.5`}>
+                        <FocusBreadcrumb
+                          crumbs={crumbs}
+                          onBack={goBack}
+                          canGoBack={rootStack.length > 0}
+                        />
+                      </div>
+                    )}
+
+                    {/* Flow Direction Indicator Banner */}
+                    <div className="hidden md:flex items-center gap-4 rounded-full border border-slate-200/80 bg-white/90 px-3.5 py-1 text-[11px] font-bold text-slate-500 shadow-2xs backdrop-blur-md">
+                      <span className="flex items-center gap-1 text-sky-700">
+                        <span>← Prerequisites</span>
+                        <span className="text-[9.5px] font-normal text-slate-400">(Must Learn First)</span>
+                      </span>
+                      <span className="h-3 w-px bg-slate-200" />
+                      <span className="flex items-center gap-1 text-emerald-800">
+                        <Sparkles size={11} className="text-emerald-600" />
+                        <span>Current Focus</span>
+                      </span>
+                      <span className="h-3 w-px bg-slate-200" />
+                      <span className="flex items-center gap-1 text-teal-700">
+                        <span>Unlocks Next →</span>
+                        <span className="text-[9.5px] font-normal text-slate-400">(Dependents)</span>
+                      </span>
+                    </div>
+
+                    {notice_}
+                  </div>
+                </Panel>
+
+                {/* Top-Right: Explorer & Close Button */}
+                <Panel position="top-right">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={backToDeck}
+                      className={`${FLOATING_CHROME} inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669]`}
+                      title="Browse full curriculum"
+                    >
+                      <Layers size={13} strokeWidth={2.2} />
+                      <span>Explorer</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className={`${FLOATING_CHROME} flex h-9 w-9 items-center justify-center text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669] focus-visible:ring-offset-2`}
+                      aria-label="Close the coherence map"
+                    >
+                      <X size={16} strokeWidth={2.2} />
+                    </button>
+                  </div>
+                </Panel>
+
+                {/* Bottom-Right: Interactive Legend & Filter Controls */}
+                <Panel position="bottom-right">
+                  <Legend
+                    stats={active?.stats ?? map.stats}
+                    filters={filters}
+                    onToggle={(key) => setFilters((current) => ({ ...current, [key]: !current[key] }))}
+                  />
+                </Panel>
               </ReactFlow>
             </div>
-          )}
-
-          <Legend
-            stats={active?.stats ?? map.stats}
-            filters={filters}
-            onToggle={(key) => setFilters((current) => ({ ...current, [key]: !current[key] }))}
-            showFilters={rootId !== null}
-          />
-        </div>
+          </div>
+        )}
       </MapInteractionContext.Provider>
-    </Shell>
+    </div>
   );
 }
 
@@ -736,30 +730,27 @@ function Shell({
   crumbs?: React.ReactNode;
 }) {
   return (
-    <div className="flex h-[calc(100vh-180px)] min-h-[560px] flex-col overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06)]">
-      <header className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+    <div className={PANEL_FRAME}>
+      <header className="flex flex-wrap items-center gap-3 border-b border-slate-200/90 bg-white/95 px-5 py-3.5 backdrop-blur-sm">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4F46E5]">
-            <Network size={16} strokeWidth={1.9} aria-hidden />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#2563EB] text-white shadow-sm">
+            <Network size={16} strokeWidth={2.2} aria-hidden />
           </span>
           <div className="min-w-0">
-            <h2 className="truncate text-[15px] font-semibold text-slate-900">Coherence map</h2>
-            <p className="truncate text-[12.5px] text-slate-500">{title}</p>
+            <h2 className="truncate text-[15px] font-bold text-slate-900">Coherence Map</h2>
+            <p className="truncate text-[12px] font-medium text-slate-500">{title}</p>
           </div>
         </div>
 
-        {/* The trail takes the centre of the header, where the stats used to sit. They
-            moved to the legend strip: a count of concepts is a footnote, and it was
-            competing with the one control that says where you are. */}
         <div className="order-last w-full sm:order-none sm:w-auto sm:flex-1">{crumbs}</div>
 
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
+          className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669]"
           aria-label="Close the coherence map"
         >
-          <X size={15} strokeWidth={2} />
+          <X size={15} strokeWidth={2.2} />
         </button>
       </header>
 
@@ -772,7 +763,6 @@ function Legend({
   stats,
   filters,
   onToggle,
-  showFilters,
 }: {
   stats: {
     concepts: number;
@@ -783,40 +773,47 @@ function Legend({
   };
   filters: FocusFilters;
   onToggle: (key: keyof FocusFilters) => void;
-  showFilters: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-200 bg-white px-4 py-2 text-[11.5px] text-slate-600">
-      <LegendKey colour="#4F46E5" label="Prerequisite - approved" />
-      <LegendKey colour="#d97706" dashed label="Prerequisite - suggested, not yet approved" />
-      <LegendKey colour="#0d9488" dashed label="Related across subjects" />
-      <LegendKey colour="#b45309" dashed label="Loop - points backwards" />
+    <div className={`${FLOATING_CHROME} flex w-60 flex-col gap-2.5 p-3.5 text-[11px] text-slate-600`}>
+      <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+        <span className="font-bold text-[11.5px] uppercase tracking-wider text-slate-700">Map Legend</span>
+        <Filter size={12} className="text-slate-400" />
+      </div>
 
-      {showFilters && (
-        <span className="flex items-center gap-1.5">
-          <FilterToggle
-            pressed={filters.includeSuggested}
-            onClick={() => onToggle('includeSuggested')}
-            label="Suggestions"
-          />
-          <FilterToggle
-            pressed={filters.includeRelated}
-            onClick={() => onToggle('includeRelated')}
-            label="Related"
-          />
-        </span>
-      )}
+      <div className="flex flex-col gap-1.5">
+        <LegendKey colour="#059669" label="Approved Prerequisite" />
+        <LegendKey colour="#D97706" dashed label="Suggested Prerequisite" />
+        <LegendKey colour="#0D9488" dashed label="Cross-Curricular Link" />
+        <LegendKey colour="#B45309" dashed label="Loop (Prerequisite Cycle)" />
+      </div>
 
-      <span className="ml-auto flex items-center gap-3 tabular-nums text-slate-500">
-        <span>{stats.concepts} concepts</span>
-        <span>{stats.approved} approved</span>
-        <span>{stats.draft} suggested</span>
+      <div className="flex items-center gap-1.5 border-t border-slate-100 pt-2">
+        <FilterToggle
+          pressed={filters.includeSuggested}
+          onClick={() => onToggle('includeSuggested')}
+          label="Suggested"
+        />
+        <FilterToggle
+          pressed={filters.includeRelated}
+          onClick={() => onToggle('includeRelated')}
+          label="Related"
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-slate-100 pt-2 tabular-nums text-[10.5px] text-slate-500 font-medium">
+        <span><strong className="font-bold text-slate-800">{stats.concepts}</strong> concepts</span>
+        <span>•</span>
+        <span><strong className="font-bold text-emerald-700">{stats.approved}</strong> approved</span>
+        <span>•</span>
+        <span><strong className="font-bold text-amber-700">{stats.draft}</strong> suggested</span>
         {!stats.acyclic && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-            {stats.cycle_nodes.length} in a loop
-          </span>
+          <div className="mt-1 w-full flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 font-semibold text-amber-800 border border-amber-200/70">
+            <RotateCcw size={10} strokeWidth={2.4} />
+            <span>{stats.cycle_nodes.length} concepts in a loop</span>
+          </div>
         )}
-      </span>
+      </div>
     </div>
   );
 }
@@ -836,21 +833,21 @@ function FilterToggle({
       aria-pressed={pressed}
       onClick={onClick}
       className={[
-        'rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-1',
+        'flex-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-all duration-150',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669] focus-visible:ring-offset-1',
         pressed
-          ? 'border-transparent bg-[#4F46E5] text-white'
+          ? 'border-emerald-600 bg-emerald-600 text-white shadow-2xs'
           : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50',
       ].join(' ')}
     >
-      {label}
+      {pressed ? `✓ ${label}` : label}
     </button>
   );
 }
 
 function LegendKey({ colour, dashed, label }: { colour: string; dashed?: boolean; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-2">
       <svg width="22" height="8" aria-hidden className="shrink-0">
         <line
           x1="0"
@@ -858,11 +855,11 @@ function LegendKey({ colour, dashed, label }: { colour: string; dashed?: boolean
           x2="22"
           y2="4"
           stroke={colour}
-          strokeWidth="2"
+          strokeWidth="2.4"
           strokeDasharray={dashed ? '5 3' : undefined}
         />
       </svg>
-      {label}
+      <span className="text-[11px]">{label}</span>
     </span>
   );
 }
