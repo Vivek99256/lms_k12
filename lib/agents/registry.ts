@@ -185,7 +185,7 @@ export const AGENT_MODULES: AgentModule[] = [
   // duplicate key in `config/ai.php` silently kept the wrong block.
   { key: 'institute', label: 'Institute', description: 'The academic structure of the school.' },
   /*
-  | The six modules under the LMS + PAL menu group, whose AI Stacks were added together.
+  | The modules under the LMS + PAL menu group.
   |
   | `teach_learn` reads the SAME course/chapter/activity records as `lms` above — it is a
   | teacher-facing presentation layer over the existing LMS catalogue, not a second copy of
@@ -193,9 +193,10 @@ export const AGENT_MODULES: AgentModule[] = [
   | tools `lms` already uses. That is deliberate reuse, not a leak: the two modules' pages
   | are different, the records behind them are not.
   |
-  | `exam_assessment` is NOT a key here. The existing `exam` module above already covers
-  | Exam & Assessment; adding a second key for the same records is exactly the duplication
-  | this registry's own comments warn against.
+  | `exam_assessment` is the LMS online-delivery domain (online exams, homework,
+  | assignments, worksheets, projects; tblmenumaster id 276). It is a distinct module
+  | from `exam` (Mark Entry / Results; tblmenumaster id 67), with its own registered
+  | `agents.exam_assessment` RBAC key and distinct MCP tools.
   |
   | `curriculum_planning` promotes what was a tab inside `lms` (`/lms/curriculum-planning`)
   | to its own module key, at the school's request — its pages stay at the same URL.
@@ -206,6 +207,11 @@ export const AGENT_MODULES: AgentModule[] = [
   | genuinely empty-until-used touchpoint log (`interaction_logs`), because nothing like it
   | existed to reuse.
   */
+  {
+    key: 'exam_assessment',
+    label: 'Exam & Assessment',
+    description: 'Online exam attempts, homework, assignments, worksheets and projects.',
+  },
   {
     key: 'teach_learn',
     label: 'Teach/Learn',
@@ -1658,6 +1664,48 @@ export const AGENT_TOOLS: AgentTool[] = [
     kind: 'mcp',
     available: true,
     exampleInput: { standard_id: null, subject_id: null, validate_hierarchy: true, limit: 50 },
+  },
+
+  // ---- Exam & Assessment ----------------------------------------------------
+  {
+    key: 'exam_assessment.online_exam_summary',
+    label: 'Read online exam performance',
+    description:
+      'Reads online exam performance: attempts recorded, average score and attempts below the passing bar. Excludes PAL-generated papers. Changes nothing.',
+    module: 'exam_assessment',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { standard_id: null, subject_id: null, student_id: null, at_risk_percent: 40, limit: 50 },
+  },
+  {
+    key: 'exam_assessment.assignment_status',
+    label: 'Read assignment, worksheet and project status',
+    description:
+      'Reads counts submitted, reviewed and not-submitted for assignments, worksheets and projects, plus the not-submitted list. Changes nothing.',
+    module: 'exam_assessment',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { standard_id: null, division_id: null, subject_id: null, student_id: null, work_type: 'assignment', limit: 50 },
+  },
+  {
+    key: 'exam_assessment.draft_review_note',
+    label: 'Draft an assessment review note',
+    description:
+      'Turns an online exam or assignment performance into a factual review note for teacher follow-up. Changes nothing and sends nothing.',
+    module: 'exam_assessment',
+    risk: 'draft',
+    kind: 'local',
+    available: true,
+    exampleInput: {
+      student_name: 'Aarav Shah',
+      class_name: 'Grade 8-A',
+      assessment_title: 'Unit Test 1',
+      score: 35,
+      total_marks: 100,
+      work_type: 'online exam',
+    },
   },
 
   // ---- Shared -------------------------------------------------------------
