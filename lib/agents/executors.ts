@@ -2038,14 +2038,16 @@ const EXECUTORS: Record<string, Executor> = {
     const student = text(args.student_name, 'the student');
     const className = text(args.class_name);
     const assessment = text(args.assessment_title, 'the assessment');
-    const score = count(args.score);
-    const total = count(args.total_marks);
+    const rawScore = typeof args.score === 'number' ? args.score : Number(String(args.score ?? '').trim());
+    const rawTotal = typeof args.total_marks === 'number' ? args.total_marks : Number(String(args.total_marks ?? '').trim());
+    const score = Number.isFinite(rawScore) && rawScore >= 0 ? rawScore : undefined;
+    const total = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : undefined;
     const workType = text(args.work_type, 'assessment');
 
     const scoreLine =
-      score !== null && total !== null
+      score !== undefined && total !== undefined
         ? `Score: ${score} / ${total}${total > 0 ? ` (${Math.round((score / total) * 100)}%)` : ''}.`
-        : score !== null
+        : score !== undefined
           ? `Score: ${score}.`
           : `An attempt was recorded for ${assessment}.`;
 
