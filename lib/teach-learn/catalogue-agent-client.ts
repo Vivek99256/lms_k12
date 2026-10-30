@@ -438,6 +438,29 @@ export async function runTeachLearnPipeline(
   return handleResponse<{ report: UnifiedTeachLearnReport; server_time: string }>(res);
 }
 
+export interface AgentEsoStructuredObject {
+  knowledge: {
+    summary: string;
+    items: string[];
+    tables_and_sources?: string[];
+  };
+  activities: {
+    summary: string;
+    items: string[];
+  };
+  abilities: {
+    summary: string;
+    skills: string[];
+    constraints_and_safeguards?: string[];
+  };
+  usage: {
+    summary: string;
+    step_by_step_flow: string[];
+    upstream_dependencies?: string;
+    downstream_handoff?: string;
+  };
+}
+
 export interface AgentEsoDetail {
   order: number;
   name: string;
@@ -467,6 +490,7 @@ export interface AgentEsoDetail {
     enforcement: string;
     rules: string[];
   };
+  eso?: AgentEsoStructuredObject;
 }
 
 export interface ExpertSystemOverviewData {
@@ -493,7 +517,7 @@ export interface ExpertSystemOverviewData {
 }
 
 /**
- * Fetch the live Expert System Overview (ESO) for all three Teach/Learn agents.
+ * Fetch the live Executive Skill Object (ESO) for all three Teach/Learn agents.
  */
 export async function getExpertSystemOverview(
   context: IntelligenceContext

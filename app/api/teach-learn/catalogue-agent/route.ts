@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'node:crypto';
+import { getAgentStore } from '@/lib/agents/store';
+import { readRequestSession } from '@/lib/agents/acting-user';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,8 +65,8 @@ export async function GET(request: NextRequest) {
       cache: 'no-store',
     });
 
-    const data = await upstream.json().catch(() => ({ success: false, message: 'Upstream returned invalid JSON' }));
-    return NextResponse.json(data, { status: upstream.status });
+    const getData = await upstream.json().catch(() => ({ success: false, message: 'Upstream returned invalid JSON' }));
+    return NextResponse.json(getData, { status: upstream.status });
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : 'Proxy failed' },
@@ -108,8 +110,54 @@ export async function POST(request: NextRequest) {
       cache: 'no-store',
     });
 
-    const data = await upstream.json().catch(() => ({ success: false, message: 'Upstream returned invalid JSON' }));
-    return NextResponse.json(data, { status: upstream.status });
+    const postData = await upstream.json().catch(() => ({ success: false, message: 'Upstream returned invalid JSON' }));
+
+    if (upstream.ok && (action === 'pipeline' || action === 'run-now')) {
+      try {
+        const session = readRequestSession(request);
+        const report = postData.data?.report || postData.report || postData;
+        const steps = report.pipeline_execution?.steps || [];
+        const store = getAgentStore();
+        const now = new Date();
+
+        for (const step of steps) {
+          if (!step.agent_id) continue;
+          await store.appendRun({
+            id: `run_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+            agent_id: step.agent_id,
+            agent_name: step.agent_name || 'Course catalogue reader',
+            module: 'teach_learn',
+            tenant_id: session.tenant_id || String(instituteId) || '1',
+            started_at: new Date(now.getTime() - (step.duration_ms || 100)).toISOString(),
+            acting_user_id: session.user_id || '7013',
+            acting_user_name: session.user_name || 'Kalpesh1 Sheth1',
+            acting_profile_id: session.profile_id || '1',
+            acting_profile_name: session.profile_name || 'Admin',
+            trigger: action === 'pipeline' ? 'pipeline' : 'manual',
+            input: {
+              tool: step.tool,
+              arguments: step.input || {},
+            },
+            status: step.status === 'success' ? 'success' : 'failure',
+            output: {
+              tool: step.tool,
+              result: {
+                summary: step.output_summary,
+                pipeline_step: step.step,
+              },
+            },
+            tools_used: [step.tool],
+            error: step.status === 'success' ? null : (step.error || 'Pipeline step failed'),
+            finished_at: now.toISOString(),
+            duration_ms: step.duration_ms || 100,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to sync teach_learn pipeline runs to agent store:', err);
+      }
+    }
+
+    return NextResponse.json(postData, { status: upstream.status });
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : 'Proxy failed' },
