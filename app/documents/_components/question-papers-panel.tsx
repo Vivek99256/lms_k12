@@ -25,6 +25,10 @@ function formatWhen(value: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function isScheduled(job: QuestionPaperJob): job is QuestionPaperJob & { scheduled_at: string } {
+  return job.status === 'queued' && job.scheduled_at !== null && new Date(job.scheduled_at).getTime() > Date.now();
+}
+
 function badgeClass(status: QuestionPaperJob['status']): string {
   switch (status) {
     case 'completed':
@@ -39,6 +43,7 @@ function badgeClass(status: QuestionPaperJob['status']): string {
 }
 
 function jobStatusText(job: QuestionPaperJob): string {
+  if (isScheduled(job)) return 'Scheduled';
   return job.status === 'queued' && job.stage === 'saving' ? 'Waiting to resume saving' : STATUS_TEXT[job.status];
 }
 
@@ -102,7 +107,7 @@ export function QuestionPapersPanel({ focusJobId }: { focusJobId?: string | null
     }
   }, []);
 
-  // Poll while something is running and the tab is visible; stop (no requests at all) when nothing is.
+  // Poll running jobs while visible; scheduled jobs are revisited when their due time arrives.
   useEffect(() => {
     let cancelled = false;
 
@@ -110,8 +115,17 @@ export function QuestionPapersPanel({ focusJobId }: { focusJobId?: string | null
       const list = await loadList();
       if (selectedId) await loadDetail(selectedId);
       if (cancelled) return;
-      const active = (list ?? jobs).some((job) => ACTIVE_STATUSES.includes(job.status));
-      if (active && !document.hidden) timer.current = window.setTimeout(tick, POLL_MS);
+      const activeJobs = (list ?? jobs).filter((job) => ACTIVE_STATUSES.includes(job.status));
+      if (activeJobs.length > 0 && !document.hidden) {
+        const running = activeJobs.some((job) => !isScheduled(job));
+        const nextScheduledAt = Math.min(
+          ...activeJobs.filter(isScheduled).map((job) => new Date(job.scheduled_at).getTime()),
+        );
+        const delay = running || !Number.isFinite(nextScheduledAt)
+          ? POLL_MS
+          : Math.min(2_147_000_000, Math.max(1000, nextScheduledAt - Date.now() + 1000));
+        timer.current = window.setTimeout(tick, delay);
+      }
     };
 
     const onVisible = () => {
@@ -171,7 +185,8 @@ export function QuestionPapersPanel({ focusJobId }: { focusJobId?: string | null
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                   <span className="text-xs text-slate-500">{formatWhen(job.created_at)}</span>
-                  {ACTIVE_STATUSES.includes(job.status) && job.stage && <span className="text-xs text-slate-700">{STAGE_TEXT[job.stage]}</span>}
+                  {job.scheduled_at && <span className="text-xs text-slate-700">Scheduled for {formatWhen(job.scheduled_at)}</span>}
+                  {ACTIVE_STATUSES.includes(job.status) && job.stage && !isScheduled(job) && <span className="text-xs text-slate-700">{STAGE_TEXT[job.stage]}</span>}
                   <Counts job={job} />
                 </div>
                 <ProgressBar job={job} />
@@ -256,7 +271,7 @@ function JobDetail({ job, onChanged, onDeleted }: { job: QuestionPaperJob; onCha
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4" aria-live="polite">
       <div className="flex items-center gap-2">
-        {ACTIVE_STATUSES.includes(job.status) && <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />}
+        {ACTIVE_STATUSES.includes(job.status) && !isScheduled(job) && <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />}
         {job.status === 'completed' && <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
         {(job.status === 'failed' || job.status === 'completed_with_warnings') && <AlertTriangle className={`h-5 w-5 ${job.status === 'failed' ? 'text-red-600' : 'text-amber-600'}`} />}
         <h3 className="min-w-0 flex-1 truncate text-base font-semibold text-slate-900">{job.file_name ?? 'Question paper'}</h3>
@@ -306,13 +321,15 @@ function JobDetail({ job, onChanged, onDeleted }: { job: QuestionPaperJob; onCha
 
       <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
         <div><dt className="inline text-slate-500">Uploaded: </dt><dd className="inline text-slate-800">{formatWhen(job.created_at)}</dd></div>
+        {job.scheduled_at && <div><dt className="inline text-slate-500">Scheduled for: </dt><dd className="inline text-slate-800">{formatWhen(job.scheduled_at)}</dd></div>}
         {job.finished_at && <div><dt className="inline text-slate-500">Finished: </dt><dd className="inline text-slate-800">{formatWhen(job.finished_at)}</dd></div>}
-        {job.stage && ACTIVE_STATUSES.includes(job.status) && <div><dt className="inline text-slate-500">Stage: </dt><dd className="inline text-slate-800">{STAGE_TEXT[job.stage]}</dd></div>}
+        {job.stage && ACTIVE_STATUSES.includes(job.status) && !isScheduled(job) && <div><dt className="inline text-slate-500">Stage: </dt><dd className="inline text-slate-800">{STAGE_TEXT[job.stage]}</dd></div>}
         {job.total_pages !== null && <div><dt className="inline text-slate-500">Pages read: </dt><dd className="inline tabular-nums text-slate-800">{job.processed_pages} / {job.total_pages}</dd></div>}
         <div><dt className="inline text-slate-500">Questions extracted: </dt><dd className="inline tabular-nums text-slate-800">{job.questions_extracted}</dd></div>
         <div><dt className="inline text-slate-500">Questions saved: </dt><dd className="inline tabular-nums text-slate-800">{job.questions_saved}</dd></div>
         {job.questions_needing_review > 0 && <div><dt className="inline text-slate-500">Need review: </dt><dd className="inline tabular-nums text-slate-800">{job.questions_needing_review}</dd></div>}
-        {job.questions_skipped > 0 && <div><dt className="inline text-slate-500">Skipped: </dt><dd className="inline tabular-nums text-slate-800">{job.questions_skipped}</dd></div>}
+        <div><dt className="inline text-slate-500">Duplicates skipped: </dt><dd className="inline tabular-nums text-slate-800">{job.questions_duplicates ?? job.breakdown?.duplicate ?? 0}</dd></div>
+        <div><dt className="inline text-slate-500">Failed questions: </dt><dd className="inline tabular-nums text-slate-800">{job.questions_failed ?? job.breakdown?.skipped ?? 0}</dd></div>
         {job.used_ocr && <div className="text-slate-600">Scanned pages were read with OCR.</div>}
         {job.attempts > 1 && <div><dt className="inline text-slate-500">Attempts: </dt><dd className="inline tabular-nums text-slate-800">{job.attempts}</dd></div>}
       </dl>
