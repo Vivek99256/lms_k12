@@ -19,6 +19,7 @@ import {
 import { nextPosition, pendingHint, previousPosition, stepsOf } from '@/lib/study-deck/stage';
 import { THEMES, themeOf, themeVars } from '@/lib/study-deck/theme';
 import type { StudyDeck } from '@/lib/study-deck/types';
+import { ImageEditButton, ImageEditingProvider, type ImageEditing } from './ImageEditing';
 import { OutlineDrawer } from './OutlinePanel';
 import { slidePlays } from '@/lib/study-document/play';
 import { PracticeDialog } from './PracticeDialog';
@@ -37,6 +38,11 @@ export interface StudyDeckPlayerProps {
   storage?: StorageLike | null;
   /** Open on this slide instead of where the learner left off (a link from the PDF names one). Ignored if the deck has no such slide. */
   startSlide?: number | null;
+  /**
+   * Editing mode, offered only while a teacher reviews a draft: a Change image button on every slide with a picture. The player itself
+   * stays read-only; it only reports which slide the teacher wants to change, and the caller opens the editor.
+   */
+  imageEditing?: Omit<ImageEditing, 'slide'> | null;
 }
 
 /**
@@ -50,7 +56,7 @@ export interface StudyDeckPlayerProps {
  * It does not open the PPTX. Nothing is written to the database by the lesson itself: progress lives in this browser
  * (see lib/study-deck/progress.ts), and the practice questions are the existing shared players.
  */
-export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null, startSlide = null }: StudyDeckPlayerProps) {
+export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null, startSlide = null, imageEditing = null }: StudyDeckPlayerProps) {
   const router = useRouter();
   const chapterId = deck.chapter.id;
   const storeKey = progressKey(userKey, chapterId);
@@ -174,6 +180,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
     'inline-flex items-center gap-1.5 rounded-xl px-5 py-2 text-sm font-semibold shadow-sm transition active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sd-accent';
 
   return (
+    <ImageEditingProvider value={imageEditing ? { ...imageEditing, slide: slide.n } : null}>
     <section
       aria-label="Study lesson"
       data-sd-theme={theme.key}
@@ -187,6 +194,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
         </button>
         <p className="min-w-0 flex-1 truncate text-sm font-semibold text-sd-strong">{deck.chapter.name}</p>
         <p className="shrink-0 text-xs font-medium text-slate-700">{finished ? 'Finished' : `Slide ${slide.n} of ${deck.slides.length}`}</p>
+        {!finished ? <ImageEditButton target={{ slide: slide.n }} /> : null}
         {!finished && (slide.activities.length > 0 || slidePlays(deck.concepts, slide).length > 0) ? (
           <button
             type="button"
@@ -303,5 +311,6 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
         <PracticeDialog deck={deck} slide={slide} bank={bankMap} progress={progress} onResult={onResult} onClose={() => setPracticeOpen(false)} />
       ) : null}
     </section>
+    </ImageEditingProvider>
   );
 }

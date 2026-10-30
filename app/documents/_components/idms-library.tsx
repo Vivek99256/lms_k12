@@ -21,6 +21,7 @@ import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { DocumentDetailPanel } from '@/app/documents/_components/document-detail-panel';
 import { UploadReviewModal } from '@/app/documents/_components/upload-review-modal';
 import { TrashDialog } from '@/app/documents/_components/trash-dialog';
+import { QuestionPapersPanel } from '@/app/documents/_components/question-papers-panel';
 import {
   IdmsApi,
   type BrowseTreeItem,
@@ -43,7 +44,7 @@ import {
  * a tree number or a snippet that was fetched first and filtered after.
  */
 
-type LibraryTab = 'library' | 'audit';
+type LibraryTab = 'library' | 'question-papers' | 'audit';
 
 /** The structured filters a chip can carry. Keys are search-service params. */
 interface ActiveFilters {
@@ -191,6 +192,18 @@ function TreeNode({
 
 export function IdmsLibrary() {
   const [tab, setTab] = useState<LibraryTab>('library');
+  const [focusJob, setFocusJob] = useState<string | null>(null);
+
+  // A notification links to ?tab=question-papers&job=<id>; honour it once on arrival.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'question-papers') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL is only readable after hydration
+      setTab('question-papers');
+      const job = params.get('job');
+      if (job && /^[0-9a-f-]{36}$/i.test(job)) setFocusJob(job);
+    }
+  }, []);
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<ActiveFilters>(EMPTY_FILTERS);
   const [chips, setChips] = useState<Array<{ field: string; label: string; value: string }>>([]);
@@ -414,7 +427,7 @@ export function IdmsLibrary() {
       </section>
 
       <div className="flex gap-1 border-b border-slate-200">
-        {(['library', 'audit'] as LibraryTab[]).map((value) => (
+        {(['library', 'question-papers', 'audit'] as LibraryTab[]).map((value) => (
           <button
             key={value}
             type="button"
@@ -426,7 +439,7 @@ export function IdmsLibrary() {
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            {value === 'library' ? 'Library' : 'Activity'}
+            {value === 'library' ? 'Library' : value === 'question-papers' ? 'Question papers' : 'Activity'}
           </button>
         ))}
       </div>
@@ -605,6 +618,8 @@ export function IdmsLibrary() {
             )}
           </section>
         </div>
+      ) : tab === 'question-papers' ? (
+        <QuestionPapersPanel focusJobId={focusJob} />
       ) : (
         <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-4 py-3">
@@ -642,6 +657,7 @@ export function IdmsLibrary() {
       <UploadReviewModal
         isOpen={uploadOpen}
         onClose={() => setUploadOpen(false)}
+        onOpenQuestionPapers={() => setTab('question-papers')}
         onFinished={({ published, failed }) => {
           void loadDocuments();
           loadNavigation();
