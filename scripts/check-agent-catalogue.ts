@@ -45,6 +45,7 @@ import { PETTY_CASH_AI_STACK } from '@/lib/petty-cash/petty-cash-ai-stack';
 import { TRANSPORT_AI_STACK } from '@/lib/transport/transport-ai-stack';
 import { USER_ICARD_AI_STACK } from '@/lib/user-icard/user-icard-ai-stack';
 import { VISITOR_AI_STACK } from '@/lib/visitor/visitor-ai-stack';
+import { EXAM_ASSESSMENT_AI_STACK } from '@/lib/exam-assessment/exam-assessment-ai-stack';
 
 /** The modules whose AI Stacks were added on 2026-09-24 and 2026-09-25. */
 const RECENT: AgentModuleKey[] = [
@@ -68,6 +69,7 @@ const RECENT: AgentModuleKey[] = [
   'library',
   'lms',
   'institute',
+  'exam_assessment',
 ];
 
 console.log(`Agent catalogue: ${AGENT_MODULES.length} modules, ${AGENT_TOOLS.length} tools\n`);
@@ -126,6 +128,8 @@ const crossings: Array<[AgentModuleKey, string]> = [
   ['easy_com', 'parent_communication.messages'],
   ['library', 'sqaa.evidence'],
   ['sqaa', 'library.circulation'],
+  ['exam_assessment', 'fees.arrears'],
+  ['exam_assessment', 'exam.results'],
 ];
 
 let allowed = 0;
@@ -172,6 +176,7 @@ const descriptors = [
   LIBRARY_AI_STACK,
   LMS_AI_STACK,
   INSTITUTE_AI_STACK,
+  EXAM_ASSESSMENT_AI_STACK,
 ];
 
 let brokenPresets = 0;

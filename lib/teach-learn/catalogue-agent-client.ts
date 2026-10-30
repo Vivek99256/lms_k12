@@ -173,6 +173,8 @@ function resolveEndpoint(context: IntelligenceContext, action?: string): string 
     : action === 'auto-generate-toggle' ? '/auto-generate/toggle'
     : action === 'auto-generate-batch' ? '/auto-generate/batch'
     : action === 'content-tasks' ? '/content-tasks'
+    : action === 'pipeline' ? '/pipeline'
+    : action === 'eso' ? '/eso'
     : '/state';
   return `${baseUrl}/api/ai/teach-learn/catalogue-agent${path}`;
 }
@@ -332,4 +334,175 @@ export async function getContentTasksLedger(
     cache: 'no-store',
   });
   return handleResponse<{ tasks: ContentTaskRecord[]; stats: ContentStats; server_time: string }>(res);
+}
+
+export interface PipelineStep {
+  step: number;
+  agent_name: string;
+  agent_id: string;
+  tool: string;
+  status: 'success' | 'failed';
+  duration_ms: number;
+  input: Record<string, unknown>;
+  output_summary: string;
+}
+
+export interface PipelineGate {
+  gate: number;
+  name: string;
+  status: 'passed' | 'failed';
+  [key: string]: unknown;
+}
+
+export interface UnifiedTeachLearnReport {
+  success: boolean;
+  pipeline_status: 'completed' | 'failed';
+  sub_institute_id: number;
+  generated_at: string;
+  total_duration_ms: number;
+  standard: {
+    id: number;
+    name: string;
+    total_subjects: number;
+    total_chapters: number;
+  };
+  curriculum: {
+    subjects: Array<{ subject_id: number; subject_name: string; category: string; chapter_count: number }>;
+    chapters_sample: Array<{ chapter_id: number; chapter_name: string; subject_id: number; subject_name: string }>;
+    total_chapters: number;
+  };
+  activity_timeline: {
+    total_activities: number;
+    window: string;
+    activities: Array<{
+      id: number | null;
+      kind: string;
+      title: string;
+      subject: string;
+      date: string | null;
+      status: string;
+      when: string;
+    }>;
+  };
+  content_readiness: {
+    total_chapters_analyzed: number;
+    fully_covered: number;
+    partially_covered: number;
+    missing_components_summary: Record<string, number>;
+    four_type_model: Record<string, unknown>;
+    chapter_details: Array<{
+      id: number;
+      name: string;
+      standard: string;
+      subject: string;
+      concepts_count: number;
+      status: string;
+      coverage_pct: number;
+      missing: string[];
+      covered: string[];
+    }>;
+  };
+  pipeline_execution: {
+    steps: PipelineStep[];
+    gates: PipelineGate[];
+  };
+}
+
+export interface RunPipelineOptions {
+  standard_name?: string;
+  standard_id?: number;
+  subject_id?: number;
+  days_back?: number;
+  days_ahead?: number;
+  limit?: number;
+  content_limit?: number;
+}
+
+/**
+ * Execute the complete 3-agent synchronized Teach/Learn pipeline:
+ *   1. Course Catalogue Agent -> Gate 1
+ *   2. Activity Timeline Agent -> Gate 2
+ *   3. Content Model Coverage Agent -> Gate 3 -> Unified Teach/Learn Report
+ */
+export async function runTeachLearnPipeline(
+  context: IntelligenceContext,
+  options: RunPipelineOptions = {}
+): Promise<{ report: UnifiedTeachLearnReport; server_time: string }> {
+  const url = resolveEndpoint(context, 'pipeline');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: buildHeaders(context),
+    body: JSON.stringify(options),
+    cache: 'no-store',
+  });
+  return handleResponse<{ report: UnifiedTeachLearnReport; server_time: string }>(res);
+}
+
+export interface AgentEsoDetail {
+  order: number;
+  name: string;
+  agent_id: string;
+  backend_key: string;
+  module: string;
+  status: string;
+  trigger: string;
+  tool_key: string;
+  tool_alias: string;
+  role_description: string;
+  knowledge_requirements: Record<string, unknown>;
+  database_resources: {
+    primary_tables: string[];
+    live_metrics: Record<string, number>;
+  };
+  input_schema: {
+    type?: string;
+    properties?: Record<string, unknown>;
+    required?: string[];
+  };
+  inputs_received_from_upstream?: Record<string, string>;
+  outputs: Record<string, string>;
+  validation_rules: {
+    gate: number;
+    name: string;
+    enforcement: string;
+    rules: string[];
+  };
+}
+
+export interface ExpertSystemOverviewData {
+  overview: {
+    system_name: string;
+    module: string;
+    sub_institute_id: number;
+    architecture: string;
+    generated_at: string;
+    total_agents: number;
+    status: string;
+  };
+  agents: {
+    agent_1: AgentEsoDetail;
+    agent_2: AgentEsoDetail;
+    agent_3: AgentEsoDetail;
+  };
+  execution_workflow: {
+    pattern: string;
+    execution_order: string[];
+    data_flow: Record<string, string>;
+    isolation_and_safety: Record<string, boolean>;
+  };
+}
+
+/**
+ * Fetch the live Expert System Overview (ESO) for all three Teach/Learn agents.
+ */
+export async function getExpertSystemOverview(
+  context: IntelligenceContext
+): Promise<{ eso: ExpertSystemOverviewData; server_time: string }> {
+  const url = resolveEndpoint(context, 'eso');
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: buildHeaders(context),
+    cache: 'no-store',
+  });
+  return handleResponse<{ eso: ExpertSystemOverviewData; server_time: string }>(res);
 }

@@ -2005,6 +2005,64 @@ const EXECUTORS: Record<string, Executor> = {
   'hr.departments': (_args, context) =>
     readViaMcp(context, 'hr.departments', {}).then((output) => ({ output })),
 
+  // ---- Exam & Assessment ---------------------------------------------------
+
+  'exam_assessment.online_exam_summary': (args, context) =>
+    readViaMcp(
+      context,
+      'exam_assessment.online_exam_summary',
+      given({
+        standard_id: count(args.standard_id),
+        subject_id: count(args.subject_id),
+        student_id: count(args.student_id),
+        at_risk_percent: count(args.at_risk_percent),
+        limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  'exam_assessment.assignment_status': (args, context) =>
+    readViaMcp(
+      context,
+      'exam_assessment.assignment_status',
+      given({
+        standard_id: count(args.standard_id),
+        division_id: count(args.division_id),
+        subject_id: count(args.subject_id),
+        student_id: count(args.student_id),
+        work_type: text(args.work_type),
+        limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  'exam_assessment.draft_review_note': (args) => {
+    const student = text(args.student_name, 'the student');
+    const className = text(args.class_name);
+    const assessment = text(args.assessment_title, 'the assessment');
+    const rawScore = typeof args.score === 'number' ? args.score : Number(String(args.score ?? '').trim());
+    const rawTotal = typeof args.total_marks === 'number' ? args.total_marks : Number(String(args.total_marks ?? '').trim());
+    const score = Number.isFinite(rawScore) && rawScore >= 0 ? rawScore : undefined;
+    const total = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : undefined;
+    const workType = text(args.work_type, 'assessment');
+
+    const scoreLine =
+      score !== undefined && total !== undefined
+        ? `Score: ${score} / ${total}${total > 0 ? ` (${Math.round((score / total) * 100)}%)` : ''}.`
+        : score !== undefined
+          ? `Score: ${score}.`
+          : `An attempt was recorded for ${assessment}.`;
+
+    const body = `Assessment review note for ${student}${className ? ` (${className})` : ''} on ${workType} "${assessment}".\n\n${scoreLine}\n\nDrafted for review and follow-up.`;
+
+    return {
+      output: {
+        subject: `${assessment}${student !== 'the student' ? ` — ${student}` : ''}`,
+        body,
+        student,
+        assessment,
+      },
+    };
+  },
+
   'shared.compose_note': (args) => {
     const heading = text(args.heading, 'Note');
     const points = list(args.points);

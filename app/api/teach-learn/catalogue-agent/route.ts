@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
       const limit = request.nextUrl.searchParams.get('limit') || '50';
       const status = request.nextUrl.searchParams.get('status');
       endpoint = `/api/ai/teach-learn/catalogue-agent/content-tasks?limit=${encodeURIComponent(limit)}${status ? `&status=${encodeURIComponent(status)}` : ''}`;
+    } else if (action === 'eso') {
+      endpoint = '/api/ai/teach-learn/catalogue-agent/eso';
     }
 
     const upstream = await fetch(`${backendUrl}${endpoint}`, {
@@ -90,6 +92,8 @@ export async function POST(request: NextRequest) {
       endpoint = '/api/ai/teach-learn/catalogue-agent/auto-generate/toggle';
     } else if (action === 'auto-generate-batch') {
       endpoint = '/api/ai/teach-learn/catalogue-agent/auto-generate/batch';
+    } else if (action === 'pipeline') {
+      endpoint = '/api/ai/teach-learn/catalogue-agent/pipeline';
     }
 
     const upstream = await fetch(`${backendUrl}${endpoint}`, {
