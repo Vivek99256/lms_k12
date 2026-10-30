@@ -45,6 +45,8 @@ interface QueueItem {
   docType?: DocumentKind;
   /** Set for a question paper: extraction continues on the server, so there is nothing to wait for here. */
   jobId?: string;
+  scheduleExtraction?: boolean;
+  scheduledAt?: string;
   docId?: number;
   error?: string;
   failedStage?: FailedStage;
@@ -94,6 +96,15 @@ function formatDuration(ms: number): string {
 
 function formatClock(ms: number): string {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function formatLocalDateTime(date: Date): string {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function scheduledDateTimeText(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
 function formatSize(bytes: number): string {
@@ -248,10 +259,13 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
         try {
           if (item.docType === 'question_paper') {
             // Stored and queued on the server; this returns without waiting for extraction.
-            const job = await QuestionPapersApi.upload(item.file);
+            const scheduledAt =
+              item.scheduleExtraction && item.scheduledAt ? new Date(item.scheduledAt).toISOString() : undefined;
+            const job = await QuestionPapersApi.upload(item.file, scheduledAt ? { scheduled_at: scheduledAt } : {});
             patch(item.key, {
               status: 'published',
               jobId: job.id,
+              scheduledAt: job.scheduled_at ?? item.scheduledAt,
               docId: job.document_id,
               uploadedAt: Date.now(),
               publishedAt: Date.now(),
@@ -410,7 +424,13 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
   const isPdf = (file: File) => /\.pdf$/i.test(file.name);
   const untyped = items.filter((it) => !it.docType).length;
   const notPdf = items.filter((it) => it.docType === 'question_paper' && !isPdf(it.file));
-  const canStart = items.length > 0 && !reading && untyped === 0 && notPdf.length === 0;
+  const invalidSchedules = items.filter((it) => {
+    if (it.docType !== 'question_paper' || !it.scheduleExtraction) return false;
+    if (!it.scheduledAt) return true;
+    const scheduled = new Date(it.scheduledAt);
+    return Number.isNaN(scheduled.getTime()) || scheduled.getTime() <= now;
+  });
+  const canStart = items.length > 0 && !reading && untyped === 0 && notPdf.length === 0 && invalidSchedules.length === 0;
 
   const startUpload = () => {
     if (!canStart) return;
@@ -468,6 +488,7 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
   };
 
   const backgroundJobs = items.filter((it) => it.jobId).length;
+  const scheduledBackgroundJobs = items.filter((it) => it.jobId && it.scheduledAt).length;
 
   const header = !started
     ? null
@@ -506,7 +527,7 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
           <div>
             <h2 className="text-xl font-bold text-slate-900">Upload Once, Organize Automatically</h2>
             <p className="mt-1 text-sm text-slate-500">
-              The AI engine will read, classify, tag, extract metadata, and file your documents instantly.
+              Documents are organized automatically. Question papers can be extracted now or scheduled for later.
             </p>
 
             <div
@@ -604,39 +625,81 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
             )}
 
             {items.length > 0 && (
-              <ul className="mt-4 max-h-48 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+              <ul className="mt-4 max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
                 {items.map((it) => (
-                  <li key={it.key} className="flex items-center gap-2 px-3 py-2 text-sm">
-                    <FileText className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span className="min-w-0 flex-1 truncate text-slate-800" title={it.path}>{it.path}</span>
-                    <span className="shrink-0 text-xs text-slate-400">{formatSize(it.file.size)}</span>
-                    <select
-                      value={it.docType ?? ''}
-                      onChange={(e) => e.target.value && chooseForOne(it.key, e.target.value as DocumentKind)}
-                      aria-label={`Document type for ${it.path}`}
-                      className={`shrink-0 rounded-md border px-1.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
-                        !it.docType || (it.docType === 'question_paper' && !isPdf(it.file))
-                          ? 'border-red-300 text-red-700'
-                          : 'border-slate-200 text-slate-700'
-                      }`}
-                    >
-                      <option value="" disabled>
-                        Choose type
-                      </option>
-                      {DOCUMENT_KINDS.map((kind) => (
-                        <option key={kind.value} value={kind.value}>
-                          {kind.label}
+                  <li key={it.key} className="px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+                      <span className="min-w-0 flex-1 truncate text-slate-800" title={it.path}>{it.path}</span>
+                      <span className="shrink-0 text-xs text-slate-400">{formatSize(it.file.size)}</span>
+                      <select
+                        value={it.docType ?? ''}
+                        onChange={(e) => e.target.value && chooseForOne(it.key, e.target.value as DocumentKind)}
+                        aria-label={`Document type for ${it.path}`}
+                        className={`shrink-0 rounded-md border px-1.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
+                          !it.docType || (it.docType === 'question_paper' && !isPdf(it.file))
+                            ? 'border-red-300 text-red-700'
+                            : 'border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <option value="" disabled>
+                          Choose type
                         </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => removeQueued(it.key)}
-                      className="shrink-0 text-slate-400 hover:text-red-600"
-                      aria-label={`Remove ${it.path}`}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                        {DOCUMENT_KINDS.map((kind) => (
+                          <option key={kind.value} value={kind.value}>
+                            {kind.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeQueued(it.key)}
+                        className="shrink-0 text-slate-400 hover:text-red-600"
+                        aria-label={`Remove ${it.path}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {it.docType === 'question_paper' && (
+                      <div className="mt-2 space-y-2 pl-6">
+                        <label className="flex items-center gap-2 text-xs text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={it.scheduleExtraction ?? false}
+                            onChange={(e) =>
+                              setItems((prev) =>
+                                prev.map((item) =>
+                                  item.key === it.key
+                                    ? { ...item, scheduleExtraction: e.target.checked, scheduledAt: e.target.checked ? item.scheduledAt : undefined }
+                                    : item,
+                                ),
+                              )
+                            }
+                            className="rounded border-slate-300 text-indigo-600 focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+                          />
+                          Schedule extraction
+                        </label>
+                        {it.scheduleExtraction && (
+                          <label className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                            <span>Scheduled date and time</span>
+                            <input
+                              type="datetime-local"
+                              required
+                              min={formatLocalDateTime(new Date(now))}
+                              value={it.scheduledAt ?? ''}
+                              onChange={(e) =>
+                                setItems((prev) =>
+                                  prev.map((item) => item.key === it.key ? { ...item, scheduledAt: e.target.value } : item),
+                                )
+                              }
+                              aria-label={`Scheduled date and time for ${it.path}`}
+                              className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+                            />
+                            <span>Your local time; extraction starts automatically.</span>
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -650,6 +713,11 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
             {notPdf.length > 0 && (
               <p className="mt-3 text-xs text-red-700" role="alert">
                 Question papers must be PDF files. Change the type or remove: {notPdf.map((it) => it.path).join(', ')}.
+              </p>
+            )}
+            {invalidSchedules.length > 0 && (
+              <p className="mt-3 text-xs text-red-700" role="alert">
+                Choose a future date and time for each scheduled question paper.
               </p>
             )}
 
@@ -709,11 +777,18 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
 
             {backgroundJobs > 0 && (
               <div className="rounded-lg bg-indigo-50 p-3 text-sm text-indigo-900" role="status">
-                <p>
-                  {backgroundJobs === 1 ? 'The question paper is' : `${backgroundJobs} question papers are`} being
-                  processed on the server. You can close this window or leave the page; processing continues and you will
-                  get a notification when it finishes.
-                </p>
+                {scheduledBackgroundJobs > 0 && (
+                  <p>
+                    {scheduledBackgroundJobs === 1 ? 'The question paper is' : `${scheduledBackgroundJobs} question papers are`} scheduled.
+                    Extraction will start automatically at the selected time; you do not need to keep the application open.
+                  </p>
+                )}
+                {backgroundJobs > scheduledBackgroundJobs && (
+                  <p>
+                    {backgroundJobs - scheduledBackgroundJobs === 1 ? 'The question paper is' : `${backgroundJobs - scheduledBackgroundJobs} question papers are`} being
+                    processed on the server. You can close this window; processing continues in the background and you will get a notification when it finishes.
+                  </p>
+                )}
                 {onOpenQuestionPapers && (
                   <Button
                     size="sm"
@@ -821,7 +896,11 @@ function QueueRow({ item, now, onRetry }: { item: QueueItem; now: number; onRetr
         <span className="min-w-0 flex-1 truncate font-medium text-slate-800" title={item.path}>{item.path}</span>
         <span className="shrink-0 text-xs text-slate-400">{formatSize(item.file.size)}</span>
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}>
-          {item.jobId && status === 'published' ? 'Processing in background' : STATUS_LABEL[status]}
+          {item.jobId && status === 'published'
+            ? item.scheduledAt && new Date(item.scheduledAt).getTime() > now
+              ? 'Scheduled'
+              : 'Processing in background'
+            : STATUS_LABEL[status]}
         </span>
       </div>
 
@@ -852,6 +931,11 @@ function QueueRow({ item, now, onRetry }: { item: QueueItem; now: number; onRetr
       {status === 'published' && item.publishedAt !== undefined && item.uploadStartedAt !== undefined && (
         <p className="mt-1 pl-6 text-xs text-slate-500">
           {item.jobId ? 'Uploaded' : 'Published'} at {formatClock(item.publishedAt)} · took {formatDuration(item.publishedAt - item.uploadStartedAt)}
+        </p>
+      )}
+      {item.jobId && item.scheduledAt && (
+        <p className="mt-1 pl-6 text-xs text-slate-600">
+          Scheduled for {scheduledDateTimeText(item.scheduledAt)}
         </p>
       )}
 
