@@ -40,7 +40,7 @@ export interface Agent {
 
 export type AgentRunStatus = 'success' | 'failure' | 'denied';
 
-export type AgentRunTrigger = 'manual' | 'scheduled' | 'api';
+export type AgentRunTrigger = 'manual' | 'scheduled' | 'api' | 'pipeline';
 
 export interface AgentRun {
   /** `run_` + 12 hex chars. */

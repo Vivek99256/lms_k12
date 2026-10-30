@@ -48,10 +48,332 @@ import {
   type ContentStats,
   type UnifiedTeachLearnReport,
   type ExpertSystemOverviewData,
+  type AgentEsoStructuredObject,
 } from '@/lib/teach-learn/catalogue-agent-client';
 
 interface CatalogueAgentControlCardProps {
   onValidated?: (report: HierarchyValidationReport) => void;
+}
+
+const TEACH_LEARN_ESO_FALLBACKS: Record<string, AgentEsoStructuredObject> = {
+  agent_1: {
+    knowledge: {
+      summary: 'Master academic hierarchy standards, standard-subject active mappings with content publishing enablement (allow_content = "Yes"), chapter sequences, topic definitions, and concept linkage records.',
+      items: [
+        'Standards curriculum definitions and board bindings from standard',
+        'Subject mappings with active content publishing enabled (allow_content = "Yes") from sub_std_map and subject',
+        'Chapter hierarchy sequences, titles, and academic years from chapter_master',
+        'Topic definitions and sub-topic linkages from topic_master',
+        'Concept nodes and published content relationships from lms_concept and content_master',
+      ],
+      tables_and_sources: ['standard', 'sub_std_map', 'subject', 'chapter_master', 'topic_master', 'content_master', 'lms_concept'],
+    },
+    activities: {
+      summary: 'Traverses the complete 5-tier content hierarchy sequentially, calculates estate content metrics, detects structural curriculum gaps, and enforces Gate 1 validation.',
+      items: [
+        'Standard ID resolution from user string inputs or institute roster queries',
+        '5-tier hierarchical traversal across Standard -> Subject -> Chapter -> Topic -> Intelligence',
+        'Gap classification across 5 defect classes: missing subjects, missing chapters, missing topics, missing intelligence/concepts, and broken mappings',
+        'Estate metric aggregation (live counts of standards, courses with content, chapters, and topics)',
+        'Generation and hashing of curriculum inventory for caching and downstream pipeline handoff',
+      ],
+    },
+    abilities: {
+      summary: 'Deterministic read-only recursive tree traversal, zero-fabrication gap scoring, standard ID resolution, and strict Gate 1 pipeline halting.',
+      skills: [
+        'Multi-tier relational graph traversal without data mutations (risk: read)',
+        'Standard and board resolution logic',
+        'Zero-fabrication reporting (preserves genuine database nulls instead of synthetic data)',
+        'Curriculum hash calculation to avoid redundant database roundtrips',
+      ],
+      constraints_and_safeguards: [
+        'Read-only enforcement (modifies zero database records)',
+        'Tenant boundary isolation via sub_institute_id',
+        'Mandatory Gate 1 halting if zero courses or invalid standard is returned',
+      ],
+    },
+    usage: {
+      summary: 'Serves as the foundation (Step 1) of the Teach / Learn pipeline, resolving class curriculum targets, validating structural integrity, and handing off clean standard and chapter scopes to downstream agents.',
+      step_by_step_flow: [
+        'Step 1: Receives institute ID and standard parameter (e.g. Standard 7 or "all")',
+        'Step 2: Queries sub_std_map joined with standard and subject to filter active courses where allow_content = "Yes"',
+        'Step 3: Traverses chapter_master and topic_master to measure catalog depth and checks content_master for concept links',
+        'Step 4: Evaluates Gate 1 rules (must resolve valid standard_id, must find >= 1 active course, must extract chapter list)',
+        'Step 5: Passes the validated standard_id to Agent 2 (Timeline Reader) and standard chapters scope to Agent 3 (Content Model Coverage)',
+      ],
+      upstream_dependencies: 'None (initiates the pipeline with user or scheduled trigger).',
+      downstream_handoff: 'Passes resolved standard_id to Agent 2 and verified chapters_scope to Agent 3 via Gate 1.',
+    },
+  },
+  agent_2: {
+    knowledge: {
+      summary: 'Classroom instructional timeline data, scheduled virtual and offline periods, assigned student homework, and chronological date prioritization policies.',
+      items: [
+        'Homework assignments, descriptions, submission deadlines, and subject allocations from homework',
+        'Scheduled virtual classroom sessions and daily timetable slots from timetable_schedule and daily_attendance',
+        'Chronological date prioritization policy (prioritizes actual calendar timestamps over syear tags to support seamless multi-year/archival retrieval)',
+        'Division and section roster mappings for the selected standard',
+      ],
+      tables_and_sources: ['homework', 'daily_attendance', 'timetable_schedule', 'academic_year'],
+    },
+    activities: {
+      summary: 'Aggregates homework and scheduled class sessions across a sliding temporal window around today, categorizes timeline status, and sanitizes sensitive meeting links.',
+      items: [
+        'Sliding window temporal scoping (default +/-7 days, configurable up to 90 days)',
+        'Timeline orientation classification tagging each activity as past, today, or upcoming',
+        'Class roster and division scope validation against the target standard',
+        'Automatic redaction of virtual classroom join links to protect classroom meeting privacy',
+        'Gate 2 validation ensuring activity records match standard scope',
+      ],
+    },
+    abilities: {
+      summary: 'Sliding-window temporal normalization, break and vacation period tolerance (non-blocking validation), and meeting URL redaction.',
+      skills: [
+        'Chronological multi-source timeline indexing and sorting',
+        'Date normalization across changing academic years',
+        'Non-blocking vacation tolerance (allows 0 activities during school breaks if class scope is valid)',
+        'Privacy-preserving link sanitization',
+      ],
+      constraints_and_safeguards: [
+        'Read-only enforcement (modifies zero homework or timetable records)',
+        'Meeting join URLs are never returned in agent payloads',
+        'Tenant and standard boundary enforcement',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2 of the Teach / Learn pipeline, consuming the validated standard from Agent 1 to verify instructional pacing and recent/upcoming class activity.',
+      step_by_step_flow: [
+        'Step 1: Receives the validated standard_id directly from Agent 1\'s Gate 1 output',
+        'Step 2: Computes the sliding window boundary [today - days_back, today + days_ahead]',
+        'Step 3: Queries homework and timetable_schedule for the standard within the window',
+        'Step 4: Categorizes each record into past, today, or upcoming, and strips join URLs',
+        'Step 5: Evaluates Gate 2 rules (standard ownership verified) and outputs the unified activity timeline to Gate 2',
+      ],
+      upstream_dependencies: 'Requires resolved standard_id from Agent 1 (Gate 1).',
+      downstream_handoff: 'Provides verified instructional activity context alongside curriculum data to Agent 3 and the final Unified Teach / Learn Report.',
+    },
+  },
+  agent_3: {
+    knowledge: {
+      summary: 'The 4-Type Pedagogical Content Model (Concept Learning, Practice Ladder, Misconception Library, Assessment Bank) and chapter semantic intelligence extractions.',
+      items: [
+        'Type 1: Concept Learning models (4 variants: definition, knowledge anchor, real-world application, evidence)',
+        'Type 2: Practice Ladder (5-level Bloom\'s taxonomy cognitive ladder from assessment blueprints)',
+        'Type 3: Misconception Library (common student traps, flawed heuristics, diagnostic feedback)',
+        'Type 4: Assessment Bank (calibrated rubrics, marking schemes, question items)',
+        'Semantic intelligence extraction records and section slice counts from semantic_intelligence and content_master',
+      ],
+      tables_and_sources: ['semantic_intelligence', 'content_master', 'chapter_master', 'lms_concept'],
+    },
+    activities: {
+      summary: 'Evaluates pedagogical depth across all standard chapters, measures 4-type model coverage percentages, detects authoring gaps, and generates coordinator insights.',
+      items: [
+        'Granular SQL slice analysis across chapter semantic extraction columns',
+        'Evaluation of 4-type content coverage percentages for each chapter and across the institute estate',
+        'Diagnosis of curriculum bottlenecks (e.g. chapters with Type 1-3 complete but lacking Type 4 assessment rubrics)',
+        'Synthesis of actionable curriculum insights and pedagogical authoring priorities for educators',
+        'Gate 3 content readiness validation and generation of the Unified Teach / Learn Report',
+      ],
+    },
+    abilities: {
+      summary: 'High-performance memory-safe SQL slicing, strict zero-fabrication metric scoring, and multi-agent evidence fusion.',
+      skills: [
+        'Targeted SQL column aggregations without heavy JSON blob hydration',
+        'Multi-type pedagogical taxonomy evaluation against Bloom\'s cognitive tiers',
+        'Zero-fabrication scoring (reports true 0% rather than synthesized default values when assets are unauthored)',
+        'Multi-agent output consolidation into a unified executive report',
+      ],
+      constraints_and_safeguards: [
+        'Read-only execution with zero database writes',
+        'Institute-level tenant isolation',
+        'Memory leak prevention on high-volume extraction tables',
+      ],
+    },
+    usage: {
+      summary: 'Acts as the analytical culmination (Step 3) of the Teach / Learn pipeline, fusing curriculum structure from Agent 1 and instructional timeline from Agent 2 with semantic intelligence to deliver the final Content Readiness Report.',
+      step_by_step_flow: [
+        'Step 1: Ingests the verified standard_id and chapter roster from Gate 1 and Gate 2',
+        'Step 2: Executes SQL slice queries on semantic_intelligence and content_master matching chapter IDs',
+        'Step 3: Measures coverage percentages across Type 1, Type 2, Type 3, and Type 4 models',
+        'Step 4: Compiles learning gaps summary highlighting missing assessment rubrics and unextracted concepts',
+        'Step 5: Enforces Gate 3 validation and outputs the consolidated Unified Teach / Learn Report',
+      ],
+      upstream_dependencies: 'Requires standard_id from Gate 1 and chapter inventory verified by Agents 1 & 2.',
+      downstream_handoff: 'Synthesizes the final output of the Teach / Learn system (Unified Teach / Learn Report), surfaced on the dashboard and executive audit cards.',
+    },
+  },
+};
+
+function AgentEsoCard({ eso }: { eso: AgentEsoStructuredObject }) {
+  return (
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+          <Sparkles className="size-3.5 text-indigo-600" />
+          Executive Skill Object (ESO) 4-Pillar Specification
+        </h4>
+        <span className="rounded-full bg-indigo-100 text-indigo-800 px-2 py-0.5 text-[10px] font-extrabold uppercase">
+          Knowledge · Activities · Abilities · Usage
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        {/* 1. KNOWLEDGE */}
+        <div className="rounded-xl border border-blue-200 bg-white p-3.5 space-y-2 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+            <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+              <BookOpen className="size-3.5 text-blue-600" />
+              1. Knowledge
+            </span>
+            <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+              Data & Information
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+            {eso.knowledge.summary}
+          </p>
+          <ul className="space-y-1 text-[11px] text-slate-700 pt-1">
+            {eso.knowledge.items.map((item, idx) => (
+              <li key={idx} className="flex items-start gap-1.5">
+                <span className="text-blue-500 font-bold">•</span>
+                <span className="leading-snug">{item}</span>
+              </li>
+            ))}
+          </ul>
+          {eso.knowledge.tables_and_sources && eso.knowledge.tables_and_sources.length > 0 && (
+            <div className="pt-2 border-t border-slate-100">
+              <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                Data Tables & Sources:
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {eso.knowledge.tables_and_sources.map((tbl) => (
+                  <span key={tbl} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-700">
+                    {tbl}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 2. ACTIVITIES */}
+        <div className="rounded-xl border border-purple-200 bg-white p-3.5 space-y-2 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+            <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+              <Activity className="size-3.5 text-purple-600" />
+              2. Activities
+            </span>
+            <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md">
+              Operations & Audits
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+            {eso.activities.summary}
+          </p>
+          <ul className="space-y-1 text-[11px] text-slate-700 pt-1">
+            {eso.activities.items.map((item, idx) => (
+              <li key={idx} className="flex items-start gap-1.5">
+                <span className="text-purple-500 font-bold">➔</span>
+                <span className="leading-snug">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* 3. ABILITIES */}
+        <div className="rounded-xl border border-emerald-200 bg-white p-3.5 space-y-2 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+            <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+              <ShieldCheck className="size-3.5 text-emerald-600" />
+              3. Abilities
+            </span>
+            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+              Skills & Safeguards
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+            {eso.abilities.summary}
+          </p>
+          <div className="space-y-2 pt-1">
+            <div>
+              <span className="text-[10px] font-bold uppercase text-emerald-800 block mb-1">
+                Core Capabilities & Skills:
+              </span>
+              <ul className="space-y-1 text-[11px] text-slate-700">
+                {eso.abilities.skills.map((skill, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-emerald-500 font-bold">✓</span>
+                    <span className="leading-snug">{skill}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {eso.abilities.constraints_and_safeguards && eso.abilities.constraints_and_safeguards.length > 0 && (
+              <div className="pt-2 border-t border-slate-100">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                  Safety & Guardrail Constraints:
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {eso.abilities.constraints_and_safeguards.map((c, idx) => (
+                    <span key={idx} className="rounded bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-800">
+                      🛡️ {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 4. USAGE */}
+        <div className="rounded-xl border border-amber-200 bg-white p-3.5 space-y-2 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+            <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+              <Workflow className="size-3.5 text-amber-600" />
+              4. Usage
+            </span>
+            <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
+              End-to-End Execution Flow
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+            {eso.usage.summary}
+          </p>
+          <div className="space-y-1.5 pt-1">
+            <span className="text-[10px] font-bold uppercase text-amber-800 block mb-1">
+              Step-by-Step Practical Application:
+            </span>
+            <ol className="space-y-1 text-[11px] text-slate-700">
+              {eso.usage.step_by_step_flow.map((step, idx) => (
+                <li key={idx} className="flex items-start gap-1.5">
+                  <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-900 font-bold text-[9px] mt-0.5">
+                    {idx + 1}
+                  </span>
+                  <span className="leading-snug">{step}</span>
+                </li>
+              ))}
+            </ol>
+            {(eso.usage.upstream_dependencies || eso.usage.downstream_handoff) && (
+              <div className="pt-2 border-t border-slate-100 grid grid-cols-1 gap-1 text-[10px]">
+                {eso.usage.upstream_dependencies && (
+                  <div>
+                    <span className="font-bold text-slate-500">Upstream Inputs: </span>
+                    <span className="text-slate-700">{eso.usage.upstream_dependencies}</span>
+                  </div>
+                )}
+                {eso.usage.downstream_handoff && (
+                  <div>
+                    <span className="font-bold text-slate-500">Downstream Handoff: </span>
+                    <span className="text-slate-700">{eso.usage.downstream_handoff}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const INTERVAL_OPTIONS = [
@@ -103,6 +425,9 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
       });
       if (res.report) {
         setPipelineResult(res.report);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agents:runs-updated', { detail: { module: 'teach_learn' } }));
+        }
       }
     } catch (err) {
       setPipelineError(err instanceof Error ? err.message : 'Pipeline execution failed.');
@@ -111,7 +436,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
     }
   };
 
-  // ESO (Expert System Overview) State
+  // ESO (Executive Skill Object (ESO)) State
   const [esoOpen, setEsoOpen] = useState(false);
   const [esoLoading, setEsoLoading] = useState(false);
   const [esoData, setEsoData] = useState<ExpertSystemOverviewData | null>(null);
@@ -128,7 +453,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
           setEsoData(res.eso);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load Expert System Overview.');
+        setError(err instanceof Error ? err.message : 'Failed to load Executive Skill Object (ESO).');
       } finally {
         setEsoLoading(false);
       }
@@ -144,7 +469,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
         setEsoData(res.eso);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to refresh Expert System Overview.');
+      setError(err instanceof Error ? err.message : 'Failed to refresh Executive Skill Object (ESO).');
     } finally {
       setEsoLoading(false);
     }
@@ -297,6 +622,9 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
       setSuccessNote(`Full 5-tier hierarchy audit completed in ${res.report.duration_ms}ms.`);
       if (onValidated) {
         onValidated(res.report);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('agents:runs-updated', { detail: { module: 'teach_learn' } }));
       }
       void loadTasksLedger();
     } catch (err) {
@@ -549,11 +877,11 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
             type="button"
             onClick={() => void handleOpenEso()}
             disabled={esoLoading}
-            title="Open Expert System Overview (ESO) for all three agents"
+            title="Open Executive Skill Object (ESO) for all three agents"
             className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 text-xs font-semibold text-blue-800 shadow-sm hover:bg-blue-100 transition disabled:opacity-60"
           >
             <BookOpen className={`size-3.5 text-blue-600 ${esoLoading ? 'animate-spin' : ''}`} />
-            {esoLoading ? 'Loading ESO…' : 'Expert System Overview (ESO)'}
+            {esoLoading ? 'Loading ESO…' : 'Executive Skill Object (ESO)'}
           </button>
 
           <button
@@ -613,13 +941,41 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                 <span className="text-xs font-bold text-slate-900">
                   Agent Collaboration Pipeline:
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-md bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEsoActiveTab('agent_1');
+                    void handleOpenEso();
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md bg-indigo-100 hover:bg-indigo-200 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 transition cursor-pointer"
+                  title="View Course Catalogue Reader Executive Skill Object (ESO)"
+                >
                   <Bot className="size-3" /> Agent 1: Catalogue Reader
-                </span>
+                </button>
                 <ArrowRight className="size-3.5 text-indigo-400" />
-                <span className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800">
-                  <Sparkles className="size-3" /> Agent 2: Content Agent
-                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEsoActiveTab('agent_2');
+                    void handleOpenEso();
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md bg-blue-100 hover:bg-blue-200 px-2 py-0.5 text-[11px] font-semibold text-blue-800 transition cursor-pointer"
+                  title="View Activity Timeline Reader Executive Skill Object (ESO)"
+                >
+                  <Clock className="size-3" /> Agent 2: Activity Timeline
+                </button>
+                <ArrowRight className="size-3.5 text-indigo-400" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEsoActiveTab('agent_3');
+                    void handleOpenEso();
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md bg-emerald-100 hover:bg-emerald-200 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 transition cursor-pointer"
+                  title="View Content Model Coverage Executive Skill Object (ESO)"
+                >
+                  <Layers className="size-3" /> Agent 3: Content Coverage
+                </button>
               </div>
               <p className="mt-1 text-[11px] text-slate-600 leading-normal">
                 Loop runs autonomously: Standard ➔ Subject ➔ Chapter ➔ Topic ➔ Intelligence. When intelligence is found, Content Agent verifies existing content (preventing duplicates) or generates pedagogical HTML and stores its ID, clearing pending status.
@@ -1353,8 +1709,20 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                 <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
                   Extracts verified Standard, Subject & Chapter hierarchy for this institute.
                 </p>
-                <div className="mt-2.5 rounded-lg bg-indigo-50/70 px-2 py-1 text-[10px] font-bold text-indigo-700 flex items-center gap-1">
-                  <ShieldCheck className="size-3 text-indigo-600" /> Gate 1: Resolves Standard ID
+                <div className="mt-2.5 flex items-center justify-between gap-1">
+                  <div className="rounded-lg bg-indigo-50/70 px-2 py-1 text-[10px] font-bold text-indigo-700 flex items-center gap-1">
+                    <ShieldCheck className="size-3 text-indigo-600" /> Gate 1: Resolves Standard ID
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEsoActiveTab('agent_1');
+                      void handleOpenEso();
+                    }}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                  >
+                    View Agent 1 ESO →
+                  </button>
                 </div>
               </div>
 
@@ -1367,8 +1735,20 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                 <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
                   Uses Gate 1 Standard ID to query active class sessions and homework tasks.
                 </p>
-                <div className="mt-2.5 rounded-lg bg-blue-50/70 px-2 py-1 text-[10px] font-bold text-blue-700 flex items-center gap-1">
-                  <ShieldCheck className="size-3 text-blue-600" /> Gate 2: Verifies Class Scope
+                <div className="mt-2.5 flex items-center justify-between gap-1">
+                  <div className="rounded-lg bg-blue-50/70 px-2 py-1 text-[10px] font-bold text-blue-700 flex items-center gap-1">
+                    <ShieldCheck className="size-3 text-blue-600" /> Gate 2: Verifies Class Scope
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEsoActiveTab('agent_2');
+                      void handleOpenEso();
+                    }}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                  >
+                    View Agent 2 ESO →
+                  </button>
                 </div>
               </div>
 
@@ -1381,8 +1761,20 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                 <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
                   Analyzes 4-type model, Bloom ladder, misconceptions & assessment gaps.
                 </p>
-                <div className="mt-2.5 rounded-lg bg-emerald-50/70 px-2 py-1 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                  <ShieldCheck className="size-3 text-emerald-600" /> Gate 3: Flags Learning Gaps
+                <div className="mt-2.5 flex items-center justify-between gap-1">
+                  <div className="rounded-lg bg-emerald-50/70 px-2 py-1 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                    <ShieldCheck className="size-3 text-emerald-600" /> Gate 3: Flags Learning Gaps
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEsoActiveTab('agent_3');
+                      void handleOpenEso();
+                    }}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-800 underline cursor-pointer"
+                  >
+                    View Agent 3 ESO →
+                  </button>
                 </div>
               </div>
             </div>
@@ -1515,16 +1907,20 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
 
                     <div className="pt-2 border-t border-slate-100">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Sample Chapters</p>
-                      <ul className="space-y-1 text-xs text-slate-700">
-                        {pipelineResult.curriculum?.chapters_sample?.slice(0, 5).map((ch) => (
-                          <li key={ch.chapter_id} className="flex items-center gap-2 truncate">
-                            <span className="size-1.5 rounded-full bg-indigo-500 shrink-0" />
-                            <span className="font-mono text-[10px] text-slate-400">#{ch.chapter_id}</span>
-                            <span className="truncate">{ch.chapter_name}</span>
-                            <span className="text-[10px] text-slate-400">({ch.subject_name})</span>
-                          </li>
-                        ))}
-                      </ul>
+                      {pipelineResult.curriculum?.chapters_sample && pipelineResult.curriculum.chapters_sample.length > 0 ? (
+                        <ul className="space-y-1 text-xs text-slate-700">
+                          {pipelineResult.curriculum.chapters_sample.slice(0, 5).map((ch) => (
+                            <li key={ch.chapter_id} className="flex items-center gap-2 truncate">
+                              <span className="size-1.5 rounded-full bg-indigo-500 shrink-0" />
+                              <span className="font-mono text-[10px] text-slate-400">#{ch.chapter_id}</span>
+                              <span className="truncate">{ch.chapter_name}</span>
+                              <span className="text-[10px] text-slate-400">({ch.subject_name})</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic py-1">No chapters mapped to this standard.</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1729,7 +2125,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
         </div>
       )}
 
-      {/* Expert System Overview (ESO) Modal */}
+      {/* Executive Skill Object (ESO) Modal */}
       {esoOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] flex flex-col overflow-hidden">
@@ -1741,14 +2137,14 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                     ESO Specification
                   </span>
                   <span className="text-xs font-semibold text-blue-900">
-                    Live Grounded Expert System Overview
+                    Live Grounded Executive Skill Object (ESO)
                   </span>
                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
                     All 3 Agents Verified
                   </span>
                 </div>
                 <h2 className="text-base font-bold text-slate-950 mt-1">
-                  Expert System Overview: Teach/Learn 3-Agent Collaborative Pipeline
+                  Executive Skill Object (ESO): Teach/Learn 3-Agent Collaborative Pipeline
                 </h2>
                 <p className="text-xs text-slate-600 mt-0.5">
                   Knowledge requirements, parameter contracts, live database resources, validation gates & execution flow for each agent.
@@ -1878,6 +2274,9 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                         <strong>Role & Scope:</strong> {esoData.agents.agent_1.role_description}
                       </p>
 
+                      {/* ESO 4-Pillar Specification: Knowledge, Activities, Abilities, Usage */}
+                      <AgentEsoCard eso={esoData.agents.agent_1.eso || TEACH_LEARN_ESO_FALLBACKS.agent_1} />
+
                       {/* Knowledge Requirements & Database Resources */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="rounded-lg border border-slate-200 p-3 bg-white space-y-2">
@@ -1989,6 +2388,9 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                         <strong>Role & Scope:</strong> {esoData.agents.agent_2.role_description}
                       </p>
 
+                      {/* ESO 4-Pillar Specification: Knowledge, Activities, Abilities, Usage */}
+                      <AgentEsoCard eso={esoData.agents.agent_2.eso || TEACH_LEARN_ESO_FALLBACKS.agent_2} />
+
                       {/* Knowledge Requirements & Database Resources */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="rounded-lg border border-slate-200 p-3 bg-white space-y-2">
@@ -2090,6 +2492,9 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                       <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
                         <strong>Role & Scope:</strong> {esoData.agents.agent_3.role_description}
                       </p>
+
+                      {/* ESO 4-Pillar Specification: Knowledge, Activities, Abilities, Usage */}
+                      <AgentEsoCard eso={esoData.agents.agent_3.eso || TEACH_LEARN_ESO_FALLBACKS.agent_3} />
 
                       {/* Knowledge Requirements & 4-Type Model */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2234,7 +2639,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
             {/* Modal Footer */}
             <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-3 shrink-0">
               <span className="text-[11px] text-slate-500">
-                Teach/Learn Expert System Overview · Dynamic Live Reflection
+                Teach/Learn Executive Skill Object (ESO) · Dynamic Live Reflection
               </span>
               <button
                 type="button"

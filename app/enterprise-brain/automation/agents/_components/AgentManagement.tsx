@@ -39,16 +39,34 @@ export function AgentManagement({
   moduleFilter,
   embedded = false,
   initialTab = 'library',
+  hideCreate = false,
 }: {
   /** Restrict every tab to one module (and lock Create agent to it). */
   moduleFilter?: string;
   /** Skip the hero header when rendered inside another module's page. */
   embedded?: boolean;
   initialTab?: TabKey;
+  /** Hide the Create Agent tab and option. */
+  hideCreate?: boolean;
 }) {
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [running, setRunning] = useState<Agent | null>(null);
   const [note, setNote] = useState<string | null>(null);
+
+  const isCreateDisabled = hideCreate || moduleFilter === 'teach_learn' || moduleFilter === 'exam_assessment';
+
+  const visibleTabs = useMemo(() => {
+    if (isCreateDisabled) {
+      return TABS.filter((t) => t.key !== 'create');
+    }
+    return TABS;
+  }, [isCreateDisabled]);
+
+  React.useEffect(() => {
+    if (isCreateDisabled && tab === 'create') {
+      setTab('library');
+    }
+  }, [isCreateDisabled, tab]);
 
   const agents = useBrainResource(() => fetchAgents({ module: moduleFilter }), [moduleFilter]);
   const runs = useBrainResource(() => fetchRuns({ module: moduleFilter, limit: 200 }), [moduleFilter]);
@@ -82,7 +100,7 @@ export function AgentManagement({
 
     switch (tab) {
       case 'library':
-        return <LibraryTab agents={agentRows} runs={runRows} onRun={setRunning} onStatus={changeStatus} onCreate={() => setTab('create')} />;
+        return <LibraryTab agents={agentRows} runs={runRows} onRun={setRunning} onStatus={changeStatus} onCreate={isCreateDisabled ? undefined : () => setTab('create')} />;
       case 'dashboard':
         return <DashboardTab agents={agentRows} runs={runRows} moduleLabel={moduleLabel} />;
       case 'create':
@@ -125,7 +143,7 @@ export function AgentManagement({
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <nav className="flex flex-wrap gap-1 rounded-xl border border-gray-200 bg-white p-1" aria-label="Agent management sections">
-          {TABS.map(({ key, label, icon: Icon }) => (
+          {visibleTabs.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               type="button"
@@ -198,7 +216,7 @@ function LibraryTab({
   runs: AgentRun[];
   onRun: (agent: Agent) => void;
   onStatus: (agent: Agent, status: AgentStatus) => void;
-  onCreate: () => void;
+  onCreate?: () => void;
 }) {
   const lastRunByAgent = useMemo(() => {
     const map = new Map<string, AgentRun>();
