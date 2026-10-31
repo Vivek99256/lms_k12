@@ -283,6 +283,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   // The tool strip is closed until the header arrow is pressed.
   const [toolStripOpen, setToolStripOpen] = useState(false);
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const chatbotCloseHandlerRef = useRef<(() => Promise<void>) | null>(null);
   const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
   // Below the md breakpoint the sidebar is an overlay drawer opened from the header.
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -612,10 +613,18 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   }, [displayedMenuItems, selectedBranch, pathname, router, isKnownMenuPath]);
 
-  const toggleChatbot = () => {
+  const registerChatbotCloseHandler = useCallback((handler: (() => Promise<void>) | null) => {
+    chatbotCloseHandlerRef.current = handler;
+  }, []);
+
+  const toggleChatbot = async () => {
+    if (isChatbotOpen) {
+      await chatbotCloseHandlerRef.current?.();
+    }
+
     // Opening the assistant by hand answers the nudge, so don't leave it pending.
     setShowStuckNudge(false);
-    setIsChatbotOpen((prev) => !prev);
+    setIsChatbotOpen(!isChatbotOpen);
   };
 
   // Set by the idle watcher the moment it fires, and consumed exactly once by
@@ -1016,6 +1025,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               >
                 <ChatbotPanel
                   onToggleChatbot={toggleChatbot}
+                  onRegisterBeforeClose={registerChatbotCloseHandler}
                   stuckPrompt={pendingStuckPrompt}
                   onStuckPromptHandled={() => setPendingStuckPrompt(null)}
                   assistantPrompt={assistantPrompt}
@@ -1041,7 +1051,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     </PageAiContextProvider>
   );
 }
-
 
 
 

@@ -449,7 +449,7 @@ export function assignAdmin(
 export function addMessage(req: SendMessageRequest): LiveChatMessage | null {
   const store = loadPersistedData();
   const session = store.sessions[req.sessionId];
-  if (!session) return null;
+  if (!session || session.status === 'closed') return null;
 
   const now = new Date().toISOString();
   const message: LiveChatMessage = {
@@ -550,6 +550,8 @@ export function listSessions(filters?: {
 
   if (filters?.status) {
     list = list.filter((s) => s.status === filters.status);
+  } else {
+    list = list.filter((s) => s.status === 'waiting' || s.status === 'active');
   }
 
   return list.sort(
@@ -947,10 +949,7 @@ export function attachGoogleMeet(
   return { session, message: meetMessage };
 }
 
-export function closeSession(
-  sessionId: string,
-  closedBy: { id: string; name: string; role: string }
-): LiveChatSession | null {
+export function closeSession(sessionId: string): LiveChatSession | null {
   const store = loadPersistedData();
   const session = store.sessions[sessionId];
   if (!session) return null;
@@ -958,20 +957,12 @@ export function closeSession(
   const now = new Date().toISOString();
   session.status = 'closed';
   session.updatedAt = now;
-
-  const closedMsg: LiveChatMessage = {
-    id: uuidv4(),
-    sessionId,
-    senderId: 'system',
-    senderName: 'System',
-    senderRole: 'system',
-    type: 'system',
-    text: `This live support session was resolved and closed by ${closedBy.name}.`,
-    createdAt: now,
-  };
-
-  if (!store.messages[sessionId]) store.messages[sessionId] = [];
-  store.messages[sessionId].push(closedMsg);
+  session.lastMessageText = undefined;
+  session.lastMessageTime = undefined;
+  session.unreadCountForAdmin = 0;
+  session.unreadCountForUser = 0;
+  session.messagesExchangedCount = 0;
+  delete store.messages[sessionId];
 
   persistData();
   return session;

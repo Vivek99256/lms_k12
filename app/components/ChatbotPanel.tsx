@@ -190,12 +190,14 @@ const FALLBACK_PROMPTS = [
 
 export default function ChatbotPanel({
   onToggleChatbot,
+  onRegisterBeforeClose,
   stuckPrompt,
   onStuckPromptHandled,
   assistantPrompt,
   onAssistantPromptHandled,
 }: {
   onToggleChatbot: () => void;
+  onRegisterBeforeClose: (handler: (() => Promise<void>) | null) => void;
   /** A question put to the assistant from elsewhere on the page (e.g. "Ask AI" on an exam question).
    *  Sent once, as if the person had typed it. */
   assistantPrompt?: AskAssistantDetail | null;
@@ -264,9 +266,7 @@ export default function ChatbotPanel({
   // decide Enterprise Brain access — one rule, not a second opinion about who is staff.
   const canSeeTrace = useMemo(() => canSeeInternalView(), []);
   const isAdminUser = useMemo(() => canSeeInternalView(), []);
-  const [panelMode, setPanelMode] = useState<'ai' | 'live_admin' | 'admin_queue'>(() => {
-    return canSeeInternalView() ? 'live_admin' : 'ai';
-  });
+  const [panelMode, setPanelMode] = useState<'ai' | 'live_admin' | 'admin_queue'>('ai');
 
   // What the page says it is showing — filters, search, KPI tiles, visible rows, the
   // record it is about. Empty for a page that registers nothing, which is every page
@@ -298,6 +298,23 @@ export default function ChatbotPanel({
     isAdmin: isAdminUser,
     enabled: true,
   });
+
+  const { session: liveChatSession, closeCurrentSession } = liveChat;
+  const closeLiveChatSessionBeforePanelClose = useCallback(async () => {
+    if (
+      liveChatSession &&
+      liveChatSession.status !== 'closed' &&
+      (!isAdminUser || panelMode !== 'ai')
+    ) {
+      await closeCurrentSession();
+    }
+  }, [closeCurrentSession, isAdminUser, liveChatSession, panelMode]);
+
+  useEffect(() => {
+    onRegisterBeforeClose(closeLiveChatSessionBeforePanelClose);
+    return () => onRegisterBeforeClose(null);
+  }, [closeLiveChatSessionBeforePanelClose, onRegisterBeforeClose]);
+
   const [activeTab, setActiveTab] = useState<Capability>('conversational');
 
   // Set when the user jumps to Create from a finding, so that tab runs the right
@@ -922,6 +939,7 @@ export default function ChatbotPanel({
 
             <button
               onClick={onToggleChatbot}
+              aria-label="Collapse chatbot"
               className="rounded-xl p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
               title="Collapse Chatbot"
             >
