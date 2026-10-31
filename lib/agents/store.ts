@@ -139,6 +139,57 @@ export const BASELINE_AGENTS: Agent[] = [
     updated_at: '2026-10-28T10:10:00.000Z',
   },
   {
+    id: 'agt_engagement_attention_reader',
+    name: 'At-risk engagement detector',
+    description:
+      'Reads attendance, homework, and coursework records, isolating students below the participation threshold. Changes nothing.',
+    module: 'engagement',
+    tenant_id: '1',
+    tools_allowed: ['engagement.students_needing_attention'],
+    instructions:
+      'Report students whose computed engagement falls below the configured threshold across attendance, homework, and coursework. Never characterise students beyond the figures given.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:00:00.000Z',
+    updated_at: '2026-10-31T10:00:00.000Z',
+  },
+  {
+    id: 'agt_engagement_activity_profiler',
+    name: 'Student activity profiler',
+    description:
+      'Profiles detailed activity logs, content views, practice sessions, and social discussion engagement for flagged learners. Changes nothing.',
+    module: 'engagement',
+    tenant_id: '1',
+    tools_allowed: ['engagement.student_summary'],
+    instructions:
+      'Diagnose participation trends, digital platform touchpoints, and discussion questions for flagged learners without making character judgements.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:05:00.000Z',
+    updated_at: '2026-10-31T10:05:00.000Z',
+  },
+  {
+    id: 'agt_engagement_intervention_drafter',
+    name: 'Re-engagement intervention drafter',
+    description:
+      'Drafts factual, non-judgmental intervention recommendations for educators to review. Sends nothing externally.',
+    module: 'engagement',
+    tenant_id: '1',
+    tools_allowed: ['engagement.draft_intervention_note'],
+    instructions:
+      'Draft objective, evidence-based re-engagement action plans for educator sign-off. Ensure strict draft-only governance.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:10:00.000Z',
+    updated_at: '2026-10-31T10:10:00.000Z',
+  },
+  {
     id: 'agt_8294009535e7',
     name: 'Fee defaulter analyst',
     description: 'Reads the live fee records and reports who owes anything, and how much. Changes nothing.',
@@ -313,6 +364,22 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
         mod = 'exam_assessment';
         agtId = 'agt_review_note_drafter';
         agtName = 'Assessment review drafter';
+      } else if (key === 'engagement.student_attendance_summary' || key === 'engagement.students_needing_attention' || key === 'agt_engagement_attention_reader') {
+        mod = 'engagement';
+        agtId = 'agt_engagement_attention_reader';
+        agtName = 'At-risk engagement detector';
+      } else if (key === 'engagement.profile_engagement' || key === 'engagement.student_summary' || key === 'agt_engagement_activity_profiler') {
+        mod = 'engagement';
+        agtId = 'agt_engagement_activity_profiler';
+        agtName = 'Student activity profiler';
+      } else if (key === 'engagement.draft_intervention_note' || key === 'agt_engagement_intervention_drafter') {
+        mod = 'engagement';
+        agtId = 'agt_engagement_intervention_drafter';
+        agtName = 'Re-engagement intervention drafter';
+      } else if (key === 'k12_engagement') {
+        mod = 'engagement';
+        agtId = 'agt_engagement_attention_reader';
+        agtName = 'Engagement Master Agent';
       } else if (key.startsWith('fees.')) {
         mod = 'fees';
         agtId = 'agt_8294009535e7';

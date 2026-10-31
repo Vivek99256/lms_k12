@@ -78,6 +78,7 @@ import { AiStackCard, AiStackCardHeading, AiStackPill, formatWhen } from './ai-s
 import { aiStackRbacKey, type AiStackBoundAgent, type AiStackModule } from './ai-stack-module';
 import { CatalogueAgentControlCard } from './catalogue-agent-control-card';
 import { ExamAssessmentAgentControlCard } from './exam-assessment-agent-control-card';
+import { EngagementAgentControlCard } from './engagement-agent-control-card';
 
 interface ToolAgentEsoInfo {
   name: string;
@@ -830,6 +831,8 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
         <CatalogueAgentControlCard onValidated={refreshAll} />
       ) : module.boundAgent?.agentKey === 'k12_exam_assessment' ? (
         <ExamAssessmentAgentControlCard onValidated={refreshAll} />
+      ) : module.boundAgent?.agentKey === 'k12_engagement' ? (
+        <EngagementAgentControlCard onValidated={refreshAll} />
       ) : module.boundAgent ? (
         <BoundAgentPanel module={module} agent={module.boundAgent} />
       ) : (
@@ -902,7 +905,7 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
         <h3 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">
           {module.label} agent management
         </h3>
-        <AgentManagement key={consoleKey} moduleFilter={module.key} embedded hideCreate={module.key === 'teach_learn' || module.key === 'exam_assessment'} />
+        <AgentManagement key={consoleKey} moduleFilter={module.key} embedded hideCreate={module.key === 'teach_learn' || module.key === 'exam_assessment' || module.key === 'engagement'} />
       </div>
 
       {running && (
