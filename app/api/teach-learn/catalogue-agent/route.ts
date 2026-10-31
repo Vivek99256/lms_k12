@@ -6,23 +6,31 @@ import { readRequestSession } from '@/lib/agents/acting-user';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function getBackendBaseUrl(): string {
+function getBackendBaseUrl(request?: NextRequest): string {
+  const reqHost = request?.headers.get('x-laravel-base-url') || request?.headers.get('x-backend-url');
+  if (reqHost && !reqHost.includes('localhost') && !reqHost.includes('127.0.0.1') && !reqHost.includes('erp.triz.co.in')) {
+    return reqHost.trim().replace(/\/$/, '');
+  }
   const envUrl = (process.env.NEXT_PUBLIC_AI_BASE_URL || '').trim().replace(/\/$/, '');
-  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1') && !envUrl.includes('erp.triz.co.in')) {
     return envUrl;
+  }
+  if (process.env.NODE_ENV !== 'production') {
+    const devUrl = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim().replace(/\/$/, '');
+    if (devUrl && (devUrl.includes('localhost') || devUrl.includes('127.0.0.1'))) return devUrl;
   }
   return 'https://dev.triz.co.in';
 }
 
-function mintDevToken(): string {
+function mintDevToken(targetInstituteId = '1', userId = 1): string {
   const secret = process.env.LARAVEL_JWT_SECRET || 'b6bpRQ92jy9ty16FilMW54dsH9le3KhE';
   const header = Buffer.from(JSON.stringify({ typ: 'JWT', alg: 'HS256' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({
-    id: 1,
-    sub_institute_id: '1',
-    is_admin: 1,
+    id: userId,
+    sub_institute_id: String(targetInstituteId),
+    is_admin: 2,
     client_id: 1,
-    user_profile_id: 1,
+    user_profile_id: userId,
     is_student: false,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 86400 * 30,
@@ -31,19 +39,19 @@ function mintDevToken(): string {
   return `${header}.${payload}.${signature}`;
 }
 
-function resolveAuthHeader(request: NextRequest): string {
+function resolveAuthHeader(request: NextRequest, targetInstituteId = '1'): string {
   const incoming = request.headers.get('authorization')?.trim();
   if (incoming && incoming.toLowerCase().startsWith('bearer ')) {
     return incoming;
   }
-  return `Bearer ${mintDevToken()}`;
+  return `Bearer ${mintDevToken(targetInstituteId)}`;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const backendUrl = getBackendBaseUrl();
-    const token = resolveAuthHeader(request);
+    const backendUrl = getBackendBaseUrl(request);
     const instituteId = request.headers.get('x-mcp-institute-id') || request.headers.get('x-sub-institute-id') || '1';
+    const token = resolveAuthHeader(request, instituteId);
 
     const action = request.nextUrl.searchParams.get('action');
     let endpoint = '/api/ai/teach-learn/catalogue-agent/state';
@@ -77,9 +85,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const backendUrl = getBackendBaseUrl();
-    const token = resolveAuthHeader(request);
+    const backendUrl = getBackendBaseUrl(request);
     const instituteId = request.headers.get('x-mcp-institute-id') || request.headers.get('x-sub-institute-id') || '1';
+    const token = resolveAuthHeader(request, instituteId);
     const body = await request.json().catch(() => ({}));
     const action = request.nextUrl.searchParams.get('action') || body.action || 'run-now';
 

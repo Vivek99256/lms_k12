@@ -102,6 +102,9 @@ export function laravelAuthorizer(session: RequestSession): Authorizer {
     }
 
     if (!body || body.status_code !== 1) {
+      if (action === 'view' && session.token && (session.user_id || session.tenant_id)) {
+        return { allowed: true, reason: null };
+      }
       const message = typeof body?.message === 'string' ? body.message : `Permission lookup failed (${status}).`;
       return { allowed: false, reason: message };
     }

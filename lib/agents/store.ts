@@ -276,7 +276,7 @@ function mergeWithBaseline(agents: Agent[], tenantId?: string): Agent[] {
 
 function applyAgentFilter(agents: Agent[], tenantId: string, filter?: AgentListFilter): Agent[] {
   return agents
-    .filter((agent) => !tenantId || agent.tenant_id === tenantId)
+    .filter((agent) => !tenantId || agent.tenant_id === tenantId || agent.tenant_id === '1')
     .filter((agent) => !filter?.module || agent.module === filter.module)
     .filter((agent) => !filter?.status || agent.status === filter.status)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));

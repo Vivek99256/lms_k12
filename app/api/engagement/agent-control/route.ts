@@ -8,14 +8,18 @@ export const dynamic = 'force-dynamic';
 
 function getBackendBaseUrl(request?: NextRequest): string {
   const reqHost = request?.headers.get('x-laravel-base-url') || request?.headers.get('x-backend-url');
-  if (reqHost) return reqHost.trim().replace(/\/$/, '');
-  const devUrl = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim().replace(/\/$/, '');
-  if (devUrl) return devUrl;
+  if (reqHost && !reqHost.includes('localhost') && !reqHost.includes('127.0.0.1') && !reqHost.includes('erp.triz.co.in')) {
+    return reqHost.trim().replace(/\/$/, '');
+  }
   const envUrl = (process.env.NEXT_PUBLIC_AI_BASE_URL || '').trim().replace(/\/$/, '');
-  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1') && !envUrl.includes('erp.triz.co.in')) {
     return envUrl;
   }
-  return 'http://127.0.0.1:8000';
+  if (process.env.NODE_ENV !== 'production') {
+    const devUrl = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim().replace(/\/$/, '');
+    if (devUrl && (devUrl.includes('localhost') || devUrl.includes('127.0.0.1'))) return devUrl;
+  }
+  return 'https://dev.triz.co.in';
 }
 
 function mintDevToken(targetInstituteId = '1', userId = 1): string {
