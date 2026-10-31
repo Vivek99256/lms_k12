@@ -51,15 +51,10 @@ export default function OnlineExamAttemptPage() {
   const {
     sessionId: proctoringSessionId,
     error: proctoringError,
-    warning: proctoringWarningMessage,
-    warningHistory,
     fullscreenActive,
     restrictionsActive,
     serverRemainingSeconds,
     settings,
-    tabSwitchCount,
-    violationCount,
-    criticalViolationCount,
     restoredAnswers,
     autoSubmitReason,
     existingOnlineExamId,
@@ -181,7 +176,6 @@ export default function OnlineExamAttemptPage() {
       submittedRef.current = true;
       setSubmitting(true);
       setSubmitError(null);
-      const proctoringWarning = Boolean(proctoringError);
       try {
         let onlineExamId: string;
         if (proctoringEnabled) {
@@ -203,9 +197,8 @@ export default function OnlineExamAttemptPage() {
           });
           onlineExamId = result.onlineExamId;
         }
-        const warningQuery = proctoringWarning ? '&proctoring_warning=1' : '';
         router.push(
-          `/exam/online/${paperId}/result?online_exam_id=${onlineExamId}${warningQuery}`
+          `/exam/online/${paperId}/result?online_exam_id=${onlineExamId}`
         );
       } catch (reason) {
         submittedRef.current = false;
@@ -221,7 +214,6 @@ export default function OnlineExamAttemptPage() {
       isAnswered,
       router,
       proctoringEnabled,
-      proctoringError,
       ensureProctoringSession,
       saveProctoringDraft,
       markProctoringSubmitted,
@@ -344,13 +336,13 @@ export default function OnlineExamAttemptPage() {
                 </p>
                 <p className="mt-0.5 text-xs text-indigo-800">
                   Copy, cut and paste are blocked across the exam, including answer fields. Tab and window changes are monitored.
-                  {settings ? ` The exam submits after ${settings.tabSwitchLimit} tab switches; recorded: ${tabSwitchCount}.` : ''}
+                  {settings ? ` The exam submits after ${settings.tabSwitchLimit} tab switches.` : ''}
                 </p>
                 <p className="mt-1 text-xs text-indigo-800">
                   Screenshot shortcuts are recorded when detectable, but browser controls cannot prevent operating-system screenshots or external capture.
                 </p>
                 <p className="mt-1 text-xs text-indigo-800">
-                  {violationCount} violation{violationCount === 1 ? '' : 's'} recorded ({criticalViolationCount} critical). The exam timer is synchronized with the server.
+                  The exam timer is synchronized with the server.
                 </p>
               </div>
             </div>
@@ -364,24 +356,6 @@ export default function OnlineExamAttemptPage() {
                 {fullscreenActive ? <Minimize className="size-4" /> : <Maximize className="size-4" />}
                 {fullscreenActive ? 'Exit fullscreen' : 'Enter fullscreen'}
               </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {proctoringWarningMessage ? (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-          >
-            <p className="font-semibold">Proctoring warning</p>
-            <p className="mt-1">{proctoringWarningMessage}</p>
-            {warningHistory.length > 1 ? (
-              <ul className="mt-2 list-inside list-disc text-xs">
-                {warningHistory.slice(0, 5).map((warning, index) => (
-                  <li key={`${index}-${warning}`}>{warning}</li>
-                ))}
-              </ul>
             ) : null}
           </div>
         ) : null}
@@ -521,7 +495,7 @@ export default function OnlineExamAttemptPage() {
 }
 
 function TimerPill({ seconds }: { seconds: number }) {
-  const safe = Math.max(0, seconds);
+  const safe = Math.floor(Math.max(0, seconds));
   const mm = String(Math.floor(safe / 60)).padStart(2, '0');
   const ss = String(safe % 60).padStart(2, '0');
   const urgent = safe <= 60;

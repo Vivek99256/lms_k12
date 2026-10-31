@@ -61,7 +61,6 @@ function OnlineExamResultContent() {
   const paperId = params?.paperId;
   const searchParams = useSearchParams();
   const onlineExamId = searchParams?.get('online_exam_id') ?? '';
-  const proctoringWarning = searchParams?.get('proctoring_warning') === '1';
 
   const [result, setResult] = useState<ExamResult | null>(null);
   const [breakdowns, setBreakdowns] = useState<AttemptBreakdown[]>([]);
@@ -220,15 +219,6 @@ function OnlineExamResultContent() {
             </Button>
           </div>
         </div>
-
-        {proctoringWarning ? (
-          <div role="alert" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-800">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <span>
-              Your exam was submitted, but some proctoring records could not be saved or finalized. Please notify your teacher.
-            </span>
-          </div>
-        ) : null}
 
         {/* Result-load failure */}
         {resultError ? (
