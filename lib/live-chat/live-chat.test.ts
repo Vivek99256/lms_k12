@@ -8,6 +8,7 @@ import {
   bookMeetingSlot,
   cancelBooking,
   checkAndExpireMissedBookings,
+  closeSession,
   configureAdminSlots,
   generateGoogleMeetUrl,
   getAdminPresence,
@@ -387,6 +388,47 @@ test('11. Admin Queue filters out admin self-sessions so only genuine student ch
       );
     }
   }
+});
+
+test('Closed student sessions are excluded from the admin queue', () => {
+  const { session } = getOrCreateUserSession({
+    userId: 'student-closed-session',
+    userName: 'Closed Session Student',
+    userRole: 'Student',
+    subInstituteId: 1,
+  });
+
+  addMessage({
+    sessionId: session.id,
+    senderId: 'student-closed-session',
+    senderName: 'Closed Session Student',
+    senderRole: 'user',
+    text: 'This transcript should be deleted when the chat closes.',
+  });
+  closeSession(session.id);
+
+  assert.deepEqual(getMessages(session.id), [], 'Closing a session must remove its entire transcript');
+  assert.equal(
+    addMessage({
+      sessionId: session.id,
+      senderId: 'student-closed-session',
+      senderName: 'Closed Session Student',
+      senderRole: 'user',
+      text: 'Messages cannot be added after a session closes.',
+    }),
+    null,
+    'A closed session must reject new messages'
+  );
+  assert.equal(
+    listSessions({ subInstituteId: 1, excludeAdminRole: true }).some((queued) => queued.id === session.id),
+    false,
+    'Closed student sessions must not appear in the admin queue'
+  );
+  assert.equal(
+    listSessions({ status: 'closed' }).some((closed) => closed.id === session.id),
+    true,
+    'Closed sessions remain available when explicitly requested'
+  );
 });
 
 test('12. Authentic Google Meet room link configuration, slot assignment, and instant call', () => {
