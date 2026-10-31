@@ -502,6 +502,154 @@ const TOOL_AGENT_ESO_MAP: Record<string, ToolAgentEsoInfo> = {
       ],
     },
   },
+  'engagement.students_needing_attention': {
+    name: 'Engagement attention reader',
+    module: 'Engagement',
+    tool: 'engagement.students_needing_attention',
+    knowledge: {
+      summary: 'Live student attendance records, assigned homework, and LMS coursework submissions across the institute estate, participation benchmark thresholds (default 60%), and academic temporal windows.',
+      items: [
+        'Student directory and roster profiles from tblstudent',
+        'Daily student attendance marks and attendance rates from tblstudent_attendance',
+        'Assigned homework and submission rates from tblhomework and tblhomework_submission',
+        'LMS assignment completion records from lms_assignment and lms_assignment_submission',
+        'Configurable participation threshold (default 60%, evaluated across attendance and submissions)',
+      ],
+      tables: ['tblstudent', 'tblstudent_attendance', 'tblhomework', 'tblhomework_submission', 'lms_assignment'],
+    },
+    activities: {
+      summary: 'Scans cohort attendance, homework, and assignment participation, identifies learners falling below the participation threshold, and isolates specific deficit vectors.',
+      items: [
+        'Auditing attendance percentage over the configured temporal window (default: 30 days)',
+        'Evaluating homework submission and coursework completion rates against class benchmarks',
+        'Detecting specific deficiencies: low attendance, missing homework, unsubmitted assignments',
+        'Isolating at-risk learners without altering any marks or attendance records',
+        'Gate 1 validation pass packaging flagged students for downstream activity profiling',
+      ],
+    },
+    abilities: {
+      summary: 'High-performance cross-table deficit calculation, tenant boundary isolation, zero synthetic scoring, and read-only extraction.',
+      skills: [
+        'Multi-source participation aggregation without fabricating default scores',
+        'Temporal sliding window normalization',
+        'Deficiency vector tagging and cohort packaging',
+        'Strict tenant isolation via sub_institute_id',
+      ],
+      safeguards: [
+        'Read-only enforcement (zero modifications to student records, marks, or attendance)',
+        'Strict tenant isolation via sub_institute_id',
+        'Gate 1 validation requires verified flagged students before pipeline progression',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 1 of the Engagement pipeline, detecting which students need academic attention and passing validated candidates to Agent 2.',
+      step_by_step_flow: [
+        'Step 1: Ingests target standard, threshold percentage (default 60%), and days back (default 30 days)',
+        'Step 2: Scans tblstudent_attendance, tblhomework, and lms_assignment for candidate records',
+        'Step 3: Calculates individual participation rates and flags students falling below threshold',
+        'Step 4: Tag specific deficit causes (low attendance, homework gaps, coursework delinquency)',
+        'Step 5: Enforces Gate 1 validation and hands off validated flagged students to Agent 2 (Activity Profiler)',
+      ],
+    },
+  },
+  'engagement.student_summary': {
+    name: 'Engagement activity profiler',
+    module: 'Engagement',
+    tool: 'engagement.student_summary',
+    knowledge: {
+      summary: 'Granular platform telemetry from lms_student_engagement, learning content views, interactive practice sessions, and student doubt discussions in lms_doubt.',
+      items: [
+        'Per-event digital platform interactions from lms_student_engagement (content views, practice attempts)',
+        'Discussion forums and academic queries from lms_doubt and lms_doubt_conversation',
+        'Unanswered doubt detection and student query timestamps',
+        'Diagnostic disengagement vector classification taxonomy',
+      ],
+      tables: ['lms_student_engagement', 'lms_doubt', 'lms_doubt_conversation', 'tblstudent'],
+    },
+    activities: {
+      summary: 'Consumes flagged students from Agent 1, profiles their learning platform usage, audits discussion engagement, and isolates root causes of participation decline.',
+      items: [
+        'Consuming validated candidate cohort from Gate 1 without re-scanning the estate independently',
+        'Inspecting digital learning touchpoints (video lectures viewed, chapter practice sessions)',
+        'Auditing social discussion activity and identifying unresolved student doubts',
+        'Diagnosing participation gaps (platform inactivity, unanswered questions, delayed practice)',
+        'Gate 2 validation ensuring activity timestamps and diagnostic accuracy',
+      ],
+    },
+    abilities: {
+      summary: 'Multi-channel digital telemetry correlation, objective diagnostic classification, and downstream evidence enrichment.',
+      skills: [
+        'Event stream aggregation from lms_student_engagement',
+        'Social discussion and question resolution state analysis',
+        'Non-judgmental diagnostic classification',
+        'Evidence-enriched diagnostic profile packaging',
+      ],
+      safeguards: [
+        'Read-only operations with zero modifications to doubt or platform engagement records',
+        'Strict tenant isolation via sub_institute_id',
+        'Gate 2 validation ensures diagnostic evidence matches verified platform data',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2 of the Engagement pipeline, explaining why learners are disengaged and feeding diagnostic evidence to Agent 3.',
+      step_by_step_flow: [
+        'Step 1: Receives validated flagged student cohort from Gate 1',
+        'Step 2: Inspects digital event telemetry in lms_student_engagement for each learner',
+        'Step 3: Checks doubt topics and unanswered questions in lms_doubt',
+        'Step 4: Formulates enriched diagnostic profiles with specific disengagement causes',
+        'Step 5: Enforces Gate 2 validation and passes diagnostic profiles to Agent 3 (Intervention Drafter)',
+      ],
+    },
+  },
+  'engagement.draft_intervention_note': {
+    name: 'Re-engagement intervention drafter',
+    module: 'Engagement',
+    tool: 'engagement.draft_intervention_note',
+    knowledge: {
+      summary: 'Pedagogical intervention blueprints, non-judgmental educator communication standards, human approval workflows, and governance safety rules.',
+      items: [
+        'Actionable intervention strategies (1-on-1 check-ins, doubt clearance, remedial practice, submission extensions)',
+        'Safety policies strictly forbidding negative labeling or character assumptions from raw metrics',
+        'Human-in-the-loop approval workflows (engagement_intervention_review)',
+        'Pending approval queue integration (ai_agent_approvals, ai_audit_logs)',
+      ],
+      tables: ['ai_agent_approvals', 'ai_audit_logs', 'tblstudent', 'lms_student_engagement'],
+    },
+    activities: {
+      summary: 'Synthesizes diagnostic evidence into objective, constructive draft intervention proposals for teacher review and deposits them in the approval queue.',
+      items: [
+        'Ingesting enriched diagnostic profiles from Gate 2',
+        'Drafting personalized student follow-up plans citing specific attendance or coursework evidence',
+        'Composing cohort-level engagement briefs for academic coordinators',
+        'Enforcing strict draft-only governance without automatic message dispatching',
+        'Gate 3 validation depositing intervention proposals into the educator approval queue',
+      ],
+    },
+    abilities: {
+      summary: 'Non-judgmental natural language synthesis, policy compliance, and approval queue management.',
+      skills: [
+        'Generating objective, evidence-cited follow-up notes',
+        'Recommending targeted pedagogical remedies without changing records',
+        'Strict draft-only confinement (max_verb=recommend, may_execute=0)',
+        'Dual-level execution history synchronization',
+      ],
+      safeguards: [
+        'Zero automated external communication (no SMS, WhatsApp, or emails dispatched)',
+        'Zero modifications to student marks, attendance, or enrollment records',
+        'Human educator review and approval required before execution',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 3 of the Engagement pipeline, producing the final educator-facing intervention drafts and completing the pipeline run.',
+      step_by_step_flow: [
+        'Step 1: Receives enriched diagnostic profiles from Gate 2',
+        'Step 2: Composes factual evidence statements citing platform data',
+        'Step 3: Formulates recommended educator actions tailored to observed deficits',
+        'Step 4: Marks all proposals as draft_pending_human_approval',
+        'Step 5: Enforces Gate 3 validation and records run results in ai_agent_runs and agent state',
+      ],
+    },
+  },
 };
 
 function ToolAgentEsoModal({

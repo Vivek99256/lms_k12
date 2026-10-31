@@ -31,6 +31,7 @@ export interface EngagementAgentState {
     status_label?: string;
   };
   recent_findings?: unknown[];
+  latest_report?: EngagementPipelineReport | null;
 }
 
 export interface PipelineStepExecution {
