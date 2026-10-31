@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -198,7 +199,7 @@ export function setDefaultMeetUrl(url?: string): void {
 export function generateGoogleMeetUrl(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz';
   const segment = (len: number) =>
-    Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    Array.from({ length: len }, () => chars[randomInt(chars.length)]).join('');
   return `https://meet.google.com/${segment(3)}-${segment(4)}-${segment(3)}`;
 }
 

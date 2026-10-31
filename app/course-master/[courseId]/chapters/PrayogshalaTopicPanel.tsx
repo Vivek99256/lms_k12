@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlaskConical, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { TopicSimulations } from './simulations/SimulationsSection';
 import {
   fetchPrayogshalaForChapter,
   generatePrayogshalaActivity,
@@ -173,6 +174,7 @@ export function PrayogshalaTopicPanel({ chapterId, canManage, reloadKey, onOpenL
                 {canManage && entry.state === 'not_generated' && !entry.has_description && entry.concept_count === 0 ? (
                   <p className="mt-1 text-xs text-orange-700">This topic has little source content; generation may report that it needs more.</p>
                 ) : null}
+                <TopicSimulations topicId={entry.topic_id} />{/* simulations linked to a concept of this topic; nothing when there are none */}
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${providerBlocked(entry) ? 'bg-orange-100 text-orange-800' : STATE_STYLE[entry.state]}`}>

@@ -103,6 +103,10 @@ import {
   PrayogshalaEditorDialog,
 } from './PrayogshalaDialogs';
 import { filterCardAssets } from '@/lib/prayogshala/cardEligibility';
+import { RunWatcher } from '@/components/coursePresentation/RunWatcher';
+import type { CpRun } from '@/lib/coursePresentation/api';
+import type { CpWatch } from '@/lib/coursePresentation/poller';
+import { draftAddress } from '@/lib/coursePresentation/previewAddress';
 import { CoursePresentationFlow } from '@/components/coursePresentation/CoursePresentationFlow';
 import { COURSE_PRESENTATION_CARD_ID, routeCardOpen, shouldShowCoursePresentationCard } from '@/lib/coursePresentation/card';
 import { showsInLane } from '@/lib/classroomResources';
@@ -111,6 +115,8 @@ import { CREATE_CARD_TITLE, resourceTitle, viewTarget, type StoredDeckMetadata }
 import { readCpState, startState, withCpState, withoutCpState, type CpState } from '@/lib/coursePresentation/urlState';
 import { PrayogshalaLab } from './PrayogshalaLab';
 import { PrayogshalaTopicPanel } from './PrayogshalaTopicPanel';
+import { SimulationsProvider } from './simulations/SimulationsProvider';
+import { SimulationsSection } from './simulations/SimulationsSection';
 import { deletePrayogshalaActivity, type PrayogshalaActivity } from '../../data/prayogshala';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
@@ -1296,6 +1302,9 @@ export default function ChapterListPage() {
   const [presentationTheme, setPresentationTheme] = useState<string>(GAMMA_THEME_OPTIONS[0]);
   const [presentationAudienceNotes, setPresentationAudienceNotes] = useState('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  // A Classroom Presentation generation that was still being made when its window closed, and what to tell the teacher when it ends.
+  const [cpWatch, setCpWatch] = useState<CpWatch | null>(null);
+  const [cpNotice, setCpNotice] = useState<{ tone: 'success' | 'error'; text: string; href?: string; action?: string } | null>(null);
   const [uploadContentType, setUploadContentType] = useState<(typeof UPLOAD_CONTENT_TYPES)[number]>(
     UPLOAD_CONTENT_TYPES[0]
   );
@@ -3079,9 +3088,28 @@ export default function ChapterListPage() {
     router.replace(`/course-master/${courseId}/chapters?${params.toString()}`);
   };
 
-  const closeCoursePresentation = () => {
+  // A generation keeps running after its window is closed: the page keeps watching it and says when it ends.
+  const closeCoursePresentation = (watching?: CpWatch | null) => {
+    setCpWatch(watching ?? null);
     const params = withoutCpState(new URLSearchParams(window.location.search));
     router.replace(`/course-master/${courseId}/chapters?${params.toString()}`);
+  };
+
+  // A draft became ready, a presentation was stored, or a run failed: refresh the resource list and tell the teacher, once.
+  const handleCpRunFinished = (run: CpRun, outcome: 'completed' | 'failed', chapterId: number) => {
+    setCpWatch(null);
+    if (outcome === 'failed') {
+      setCpNotice({ tone: 'error', text: `The classroom presentation could not be created. ${run.error ?? ''}`.trim() });
+      return;
+    }
+    reloadChapterContent();
+    const seconds = run.progress_info?.duration_seconds;
+    const took = seconds ? ` It took ${seconds < 60 ? `${seconds} s` : `${Math.round(seconds / 60)} min`}.` : '';
+    if (run.state === 'stored' && run.stored?.deep_link) {
+      setCpNotice({ tone: 'success', text: `Presentation created successfully.${took}`, href: run.stored.deep_link, action: 'View presentation' });
+    } else {
+      setCpNotice({ tone: 'success', text: `A presentation draft was created and is ready for your review.${took}`, href: draftAddress(chapterId, run.run), action: 'Open the draft' });
+    }
   };
 
   const handleOpenContent = (item: ChapterContentItem) => {
@@ -6469,14 +6497,22 @@ export default function ChapterListPage() {
           ) : null}
 
           {activeContentLibraryTab === 'Prayogshala' && activeLibraryChapter && /^\d+$/.test(activeLibraryChapter.id) ? (
-            <PrayogshalaTopicPanel
+            <SimulationsProvider
               key={activeLibraryChapter.id}
               chapterId={Number(activeLibraryChapter.id)}
               canManage={canCreateContent !== false}
-              reloadKey={contentReloadKey}
-              onOpenLab={openPrayogshalaLab}
-              onChanged={reloadChapterContent}
-            />
+              canCreate={canCreateContent === true}
+            >
+              <PrayogshalaTopicPanel
+                key={activeLibraryChapter.id}
+                chapterId={Number(activeLibraryChapter.id)}
+                canManage={canCreateContent !== false}
+                reloadKey={contentReloadKey}
+                onOpenLab={openPrayogshalaLab}
+                onChanged={reloadChapterContent}
+              />
+              <SimulationsSection />
+            </SimulationsProvider>
           ) : null}
 
           {contentError ? (
@@ -6600,6 +6636,7 @@ export default function ChapterListPage() {
               initial={cpState}
               onMirror={setCpState}
               onClose={closeCoursePresentation}
+              onRunFinished={(run, outcome) => handleCpRunFinished(run, outcome, Number(cpChapterId))}
               onOpenPresentation={(deepLink) => {
                 if (typeof window !== 'undefined') {
                   const params = withoutCpState(new URLSearchParams(window.location.search));
@@ -6837,6 +6874,26 @@ export default function ChapterListPage() {
   return (
     <div className="min-h-screen rounded-t-3xl">
       <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8 ">
+        {/* While the window is closed the page follows the generation; reopening it hands the run back to the window. */}
+        <RunWatcher watch={cpOpen ? null : cpWatch} onFinished={(run, outcome, w) => handleCpRunFinished(run, outcome, w.chapterId)} />
+        {cpNotice && (
+          <div
+            role={cpNotice.tone === 'error' ? 'alert' : 'status'}
+            data-testid="cp-notice"
+            className={`mb-4 flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium ring-1 ${cpNotice.tone === 'error' ? 'bg-amber-50 text-amber-900 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200'}`}
+          >
+            {cpNotice.tone === 'success' ? <CheckCircle2 size={16} className="shrink-0" /> : null}
+            <span>{cpNotice.text}</span>
+            {cpNotice.href ? (
+              <button type="button" onClick={() => router.push(cpNotice.href as string)} className="rounded-md bg-indigo-600 px-3 py-1 text-white hover:bg-indigo-700">
+                {cpNotice.action}
+              </button>
+            ) : null}
+            <button type="button" onClick={() => setCpNotice(null)} className="ml-auto text-xs underline">
+              Dismiss
+            </button>
+          </div>
+        )}
         {successMessage && (
           <div className="mb-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
             <CheckCircle2 size={16} className="shrink-0" />

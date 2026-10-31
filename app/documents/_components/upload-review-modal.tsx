@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IdmsApi, ApiError, type DocumentItem, type DocumentWarning } from '../_lib/idms-api';
+import { QuestionPapersApi, type DocumentKind } from '../_lib/question-papers-api';
+import { DOCUMENT_KINDS, DocumentTypePicker } from './document-type-picker';
 import {
   collectFromDrop,
   collectFromInput,
@@ -25,6 +27,8 @@ interface UploadModalProps {
   onClose: () => void;
   /** Called once when every file in the batch has either been published or has failed. */
   onFinished: (result: { published: number; failed: number }) => void;
+  /** Opens the Question papers tab, where background extraction can be followed. */
+  onOpenQuestionPapers?: () => void;
 }
 
 type ItemStatus = 'queued' | 'uploading' | 'processing' | 'publishing' | 'published' | 'failed';
@@ -37,6 +41,12 @@ interface QueueItem {
   /** Folder or zip path the file came from; shown instead of the bare name. */
   path: string;
   status: ItemStatus;
+  /** What the uploader said this file is; required before upload starts. */
+  docType?: DocumentKind;
+  /** Set for a question paper: extraction continues on the server, so there is nothing to wait for here. */
+  jobId?: string;
+  scheduleExtraction?: boolean;
+  scheduledAt?: string;
   docId?: number;
   error?: string;
   failedStage?: FailedStage;
@@ -88,6 +98,15 @@ function formatClock(ms: number): string {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+function formatLocalDateTime(date: Date): string {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function scheduledDateTimeText(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -109,8 +128,11 @@ function warningText(w: DocumentWarning): string {
   return typeof w === 'string' ? w : w.message || w.type || '';
 }
 
-export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalProps) {
+export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionPapers }: UploadModalProps) {
   const [items, setItems] = useState<QueueItem[]>([]);
+  // The choice made for "all files"; files added afterwards start with it.
+  const [defaultKind, setDefaultKind] = useState<DocumentKind | null>(null);
+  const defaultKindRef = useRef<DocumentKind | null>(null);
   const [started, setStarted] = useState(false);
   const [reading, setReading] = useState(false);
   const [skipped, setSkipped] = useState<string[]>([]);
@@ -235,7 +257,27 @@ export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalPr
 
       for (let attempt = 0; ; attempt++) {
         try {
-          const res = await IdmsApi.uploadDocument(item.file);
+          if (item.docType === 'question_paper') {
+            // Stored and queued on the server; this returns without waiting for extraction.
+            const scheduledAt =
+              item.scheduleExtraction && item.scheduledAt ? new Date(item.scheduledAt).toISOString() : undefined;
+            const job = await QuestionPapersApi.upload(item.file, scheduledAt ? { scheduled_at: scheduledAt } : {});
+            patch(item.key, {
+              status: 'published',
+              jobId: job.id,
+              scheduledAt: job.scheduled_at ?? item.scheduledAt,
+              docId: job.document_id,
+              uploadedAt: Date.now(),
+              publishedAt: Date.now(),
+              note: undefined,
+            });
+            return;
+          }
+          const res = await IdmsApi.uploadDocument(
+            item.file,
+            'organization',
+            item.docType === 'general' ? undefined : item.docType,
+          );
           const docId = res.data?.id as number | undefined;
           if (!docId) throw new Error('the server did not return a document id');
           patch(item.key, { status: 'processing', docId, uploadedAt: Date.now(), note: undefined });
@@ -303,6 +345,8 @@ export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalPr
     setSkipped([]);
     setReading(false);
     setStarted(false);
+    defaultKindRef.current = null;
+    setDefaultKind(null);
   }, []);
 
   // Tell the library once per settle (and again after a retry settles) so it can reload and show the result.
@@ -316,15 +360,17 @@ export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalPr
     onFinishedRef.current({ published: publishedCount, failed: failedCount });
   }, [settled, publishedCount, failedCount]);
 
-  // Google-Drive style: close by itself when everything went through.
+  // Google-Drive style: close by itself when everything went through. Not when a question paper is
+  // processing in the background: the person needs to read where to follow it.
+  const hasBackgroundJobs = items.some((it) => it.jobId);
   useEffect(() => {
-    if (!settled || failedCount > 0) return;
+    if (!settled || failedCount > 0 || hasBackgroundJobs) return;
     const t = setTimeout(() => {
       resetAll();
       onCloseRef.current();
     }, AUTO_CLOSE_MS);
     return () => clearTimeout(t);
-  }, [settled, failedCount, resetAll]);
+  }, [settled, failedCount, hasBackgroundJobs, resetAll]);
 
   if (!isOpen) return null;
 
@@ -353,6 +399,7 @@ export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalPr
             file: f.file,
             path: f.path,
             status: 'queued' as ItemStatus,
+            docType: defaultKindRef.current ?? undefined,
           }));
         return [...prev, ...fresh];
       });
@@ -363,8 +410,30 @@ export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalPr
 
   const removeQueued = (key: string) => setItems((prev) => prev.filter((it) => it.key !== key));
 
+  /** One choice for every file in the list; a file can still be changed on its own afterwards. */
+  const chooseForAll = (kind: DocumentKind) => {
+    defaultKindRef.current = kind;
+    setDefaultKind(kind);
+    setItems((prev) => prev.map((it) => ({ ...it, docType: kind })));
+  };
+
+  const chooseForOne = (key: string, kind: DocumentKind) => {
+    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, docType: kind } : it)));
+  };
+
+  const isPdf = (file: File) => /\.pdf$/i.test(file.name);
+  const untyped = items.filter((it) => !it.docType).length;
+  const notPdf = items.filter((it) => it.docType === 'question_paper' && !isPdf(it.file));
+  const invalidSchedules = items.filter((it) => {
+    if (it.docType !== 'question_paper' || !it.scheduleExtraction) return false;
+    if (!it.scheduledAt) return true;
+    const scheduled = new Date(it.scheduledAt);
+    return Number.isNaN(scheduled.getTime()) || scheduled.getTime() <= now;
+  });
+  const canStart = items.length > 0 && !reading && untyped === 0 && notPdf.length === 0 && invalidSchedules.length === 0;
+
   const startUpload = () => {
-    if (items.length === 0) return;
+    if (!canStart) return;
     pending.current = items.map((it) => it.key);
     notified.current = false;
     setNow(Date.now());
@@ -418,11 +487,20 @@ export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalPr
     onClose();
   };
 
+  const backgroundJobs = items.filter((it) => it.jobId).length;
+  const scheduledBackgroundJobs = items.filter((it) => it.jobId && it.scheduledAt).length;
+
   const header = !started
     ? null
     : settled
     ? failedCount === 0
-      ? { tone: 'ok' as const, title: `All ${items.length} ${items.length === 1 ? 'file' : 'files'} uploaded and published` }
+      ? {
+          tone: 'ok' as const,
+          title:
+            backgroundJobs > 0
+              ? `${items.length} ${items.length === 1 ? 'file' : 'files'} uploaded`
+              : `All ${items.length} ${items.length === 1 ? 'file' : 'files'} uploaded and published`,
+        }
       : {
           tone: 'bad' as const,
           title:
@@ -449,7 +527,7 @@ export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalPr
           <div>
             <h2 className="text-xl font-bold text-slate-900">Upload Once, Organize Automatically</h2>
             <p className="mt-1 text-sm text-slate-500">
-              The AI engine will read, classify, tag, extract metadata, and file your documents instantly.
+              Documents are organized automatically. Question papers can be extracted now or scheduled for later.
             </p>
 
             <div
@@ -533,29 +611,120 @@ export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalPr
             )}
 
             {items.length > 0 && (
-              <ul className="mt-4 max-h-48 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+              <div className="mt-4">
+                <DocumentTypePicker
+                  value={defaultKind}
+                  onChange={chooseForAll}
+                  heading={
+                    items.length === 1
+                      ? 'What type of document is this?'
+                      : `What type of document are these ${items.length} files? You can change a single file below.`
+                  }
+                />
+              </div>
+            )}
+
+            {items.length > 0 && (
+              <ul className="mt-4 max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
                 {items.map((it) => (
-                  <li key={it.key} className="flex items-center gap-2 px-3 py-2 text-sm">
-                    <FileText className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span className="min-w-0 flex-1 truncate text-slate-800" title={it.path}>{it.path}</span>
-                    <span className="shrink-0 text-xs text-slate-400">{formatSize(it.file.size)}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeQueued(it.key)}
-                      className="shrink-0 text-slate-400 hover:text-red-600"
-                      aria-label={`Remove ${it.path}`}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                  <li key={it.key} className="px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+                      <span className="min-w-0 flex-1 truncate text-slate-800" title={it.path}>{it.path}</span>
+                      <span className="shrink-0 text-xs text-slate-400">{formatSize(it.file.size)}</span>
+                      <select
+                        value={it.docType ?? ''}
+                        onChange={(e) => e.target.value && chooseForOne(it.key, e.target.value as DocumentKind)}
+                        aria-label={`Document type for ${it.path}`}
+                        className={`shrink-0 rounded-md border px-1.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
+                          !it.docType || (it.docType === 'question_paper' && !isPdf(it.file))
+                            ? 'border-red-300 text-red-700'
+                            : 'border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <option value="" disabled>
+                          Choose type
+                        </option>
+                        {DOCUMENT_KINDS.map((kind) => (
+                          <option key={kind.value} value={kind.value}>
+                            {kind.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeQueued(it.key)}
+                        className="shrink-0 text-slate-400 hover:text-red-600"
+                        aria-label={`Remove ${it.path}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {it.docType === 'question_paper' && (
+                      <div className="mt-2 space-y-2 pl-6">
+                        <label className="flex items-center gap-2 text-xs text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={it.scheduleExtraction ?? false}
+                            onChange={(e) =>
+                              setItems((prev) =>
+                                prev.map((item) =>
+                                  item.key === it.key
+                                    ? { ...item, scheduleExtraction: e.target.checked, scheduledAt: e.target.checked ? item.scheduledAt : undefined }
+                                    : item,
+                                ),
+                              )
+                            }
+                            className="rounded border-slate-300 text-indigo-600 focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+                          />
+                          Schedule extraction
+                        </label>
+                        {it.scheduleExtraction && (
+                          <label className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                            <span>Scheduled date and time</span>
+                            <input
+                              type="datetime-local"
+                              required
+                              min={formatLocalDateTime(new Date(now))}
+                              value={it.scheduledAt ?? ''}
+                              onChange={(e) =>
+                                setItems((prev) =>
+                                  prev.map((item) => item.key === it.key ? { ...item, scheduledAt: e.target.value } : item),
+                                )
+                              }
+                              aria-label={`Scheduled date and time for ${it.path}`}
+                              className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+                            />
+                            <span>Your local time; extraction starts automatically.</span>
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
 
+            {items.length > 0 && untyped > 0 && (
+              <p className="mt-3 text-xs text-slate-600" role="status">
+                Choose a document type for {untyped === 1 ? 'the remaining file' : `${untyped} files`} to continue.
+              </p>
+            )}
+            {notPdf.length > 0 && (
+              <p className="mt-3 text-xs text-red-700" role="alert">
+                Question papers must be PDF files. Change the type or remove: {notPdf.map((it) => it.path).join(', ')}.
+              </p>
+            )}
+            {invalidSchedules.length > 0 && (
+              <p className="mt-3 text-xs text-red-700" role="alert">
+                Choose a future date and time for each scheduled question paper.
+              </p>
+            )}
+
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="ghost" onClick={handleClose}>Cancel</Button>
               <Button
-                disabled={items.length === 0 || reading}
+                disabled={!canStart}
                 onClick={startUpload}
                 className="bg-indigo-600 text-white hover:bg-indigo-700"
               >
@@ -600,10 +769,40 @@ export function UploadReviewModal({ isOpen, onClose, onFinished }: UploadModalPr
               </div>
             </div>
 
-            {settled && failedCount === 0 && (
+            {settled && failedCount === 0 && backgroundJobs === 0 && (
               <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
                 Everything was uploaded and published to the Document Library. This window will close now.
               </p>
+            )}
+
+            {backgroundJobs > 0 && (
+              <div className="rounded-lg bg-indigo-50 p-3 text-sm text-indigo-900" role="status">
+                {scheduledBackgroundJobs > 0 && (
+                  <p>
+                    {scheduledBackgroundJobs === 1 ? 'The question paper is' : `${scheduledBackgroundJobs} question papers are`} scheduled.
+                    Extraction will start automatically at the selected time; you do not need to keep the application open.
+                  </p>
+                )}
+                {backgroundJobs > scheduledBackgroundJobs && (
+                  <p>
+                    {backgroundJobs - scheduledBackgroundJobs === 1 ? 'The question paper is' : `${backgroundJobs - scheduledBackgroundJobs} question papers are`} being
+                    processed on the server. You can close this window; processing continues in the background and you will get a notification when it finishes.
+                  </p>
+                )}
+                {onOpenQuestionPapers && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2"
+                    onClick={() => {
+                      handleClose();
+                      onOpenQuestionPapers();
+                    }}
+                  >
+                    View question paper progress
+                  </Button>
+                )}
+              </div>
             )}
 
             <ul className="max-h-[46vh] space-y-2 overflow-y-auto pr-1">
@@ -696,7 +895,13 @@ function QueueRow({ item, now, onRetry }: { item: QueueItem; now: number; onRetr
         {status === 'queued' && <FileText className="h-4 w-4 shrink-0 text-slate-400" />}
         <span className="min-w-0 flex-1 truncate font-medium text-slate-800" title={item.path}>{item.path}</span>
         <span className="shrink-0 text-xs text-slate-400">{formatSize(item.file.size)}</span>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}>{STATUS_LABEL[status]}</span>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}>
+          {item.jobId && status === 'published'
+            ? item.scheduledAt && new Date(item.scheduledAt).getTime() > now
+              ? 'Scheduled'
+              : 'Processing in background'
+            : STATUS_LABEL[status]}
+        </span>
       </div>
 
       {item.note && <p className="mt-1.5 pl-6 text-xs text-amber-700">{item.note}</p>}
@@ -725,7 +930,12 @@ function QueueRow({ item, now, onRetry }: { item: QueueItem; now: number; onRetr
 
       {status === 'published' && item.publishedAt !== undefined && item.uploadStartedAt !== undefined && (
         <p className="mt-1 pl-6 text-xs text-slate-500">
-          Published at {formatClock(item.publishedAt)} · took {formatDuration(item.publishedAt - item.uploadStartedAt)}
+          {item.jobId ? 'Uploaded' : 'Published'} at {formatClock(item.publishedAt)} · took {formatDuration(item.publishedAt - item.uploadStartedAt)}
+        </p>
+      )}
+      {item.jobId && item.scheduledAt && (
+        <p className="mt-1 pl-6 text-xs text-slate-600">
+          Scheduled for {scheduledDateTimeText(item.scheduledAt)}
         </p>
       )}
 

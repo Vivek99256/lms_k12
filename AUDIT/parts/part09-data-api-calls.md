@@ -1519,7 +1519,7 @@ Summary: 114 routes with no route-level auth AND no token text in the controller
 | www.w3.org | app/students/health_medical/components/StudentHealthTable.tsx:61; components/document-template/editor/Toolbox.tsx:785; components/document-template/editor/Toolbox.tsx:799 (3) |  |
 | www.youtube-nocookie.com | lib/video-embed.ts:98 (1) |  |
 | player.vimeo.com | lib/video-embed.ts:110 (1) |  |
-| skill-ontology-neo4j.vercel.app | app/capability-intelligence/capability-explorer/components/taxonomy-ontology.tsx:38; app/capability-intelligence/capability-explorer/components/taxonomy-ontology.tsx:59 (2) | iframe origin for taxonomy explorer |
+| skill-ontology-neo4j.vercel.app | app/capability-intelligence/capability-explorer/components/taxonomy-ontology.tsx:38; app/capability-intelligence/capability-explorer/components/taxonomy-ontology.tsx:59 (2) | **STALE as of 2026-10-28** — iframe origin for taxonomy explorer; component was rewritten to call `/api/brain/{tenant}/graph` instead, no reference to this domain remains in the file at these or any lines. See `ERP_SQL_Neo4j_Complete_Synchronization_Audit.docx` §6/§8.2. |
 | view.officeapps.live.com | app/course-master/data/content-links.ts:56; components/domain/lms/delivery/learning-delivery-workspace.tsx:120 (2) |  |
 | apps.triz.co.in | app/general/implementation_management/ImplementationManagementPage.tsx:94; app/general/implementation_management/ImplementationManagementPage.tsx:103 (2) | plain http:// links to legacy excel export (ImplementationManagementPage.tsx:94,103) |
 | cdn.jsdelivr.net | app/layout.tsx:35; app/layout.tsx:41 (2) |  |

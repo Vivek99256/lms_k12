@@ -241,7 +241,9 @@ export function installErpAuthFetch() {
       const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       const target = new URL(rawUrl, window.location.origin);
       const sameOriginNextApi = target.origin === window.location.origin;
-      if (!sameOriginNextApi && erpOrigins().has(target.origin)) {
+      // The live-chat routes relay to Laravel, which needs the caller's token.
+      const liveChatRelay = sameOriginNextApi && target.pathname.startsWith('/api/live-chat/');
+      if (liveChatRelay || (!sameOriginNextApi && erpOrigins().has(target.origin))) {
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         const { token } = buildSessionContext();
         if (token && !headers.has('Authorization')) {

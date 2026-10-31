@@ -171,12 +171,14 @@ export const IdmsApi = {
     return requestApi<{ status: number; data: DocumentItem[]; pagination: DocumentPagination }>(`/documents?${q.toString()}`);
   },
 
-  async uploadDocument(file: File, visibility: string = 'organization') {
+  async uploadDocument(file: File, visibility: string = 'organization', declaredType?: 'curriculum' | 'general' | 'textbook') {
     const session = buildSessionContext();
     const base = session.baseUrl || '';
     const form = new FormData();
     form.append('file', file);
     form.append('visibility', visibility);
+    // Recorded as what the uploader said; the analysis pipeline behaves the same for every type.
+    if (declaredType) form.append('declared_type', declaredType);
     if (session.subInstituteId) form.append('sub_institute_id', session.subInstituteId);
     if (session.userId) form.append('user_id', session.userId);
 

@@ -174,6 +174,8 @@ export interface ScheduledTaskRow {
   fail_delay: number;
   last_run_at: string | null;
   last_run_status: 'ok' | 'failed' | null;
+  /** The summary line of the latest ok run (from the audit trail); null when none or the last run failed. */
+  last_run_message?: string | null;
   /** Computed on read, never stored — a stored one goes stale on the next edit. */
   next_run_at: string | null;
   /** The schedule differs from the shipped default. */

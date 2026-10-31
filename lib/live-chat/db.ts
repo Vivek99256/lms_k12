@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { createPool, type Pool } from 'mysql2/promise';
 import { v4 as uuidv4 } from 'uuid';
 import type {
@@ -24,11 +25,15 @@ export function getDbPool(): Pool {
     return globalThis.__liveChatDbPool;
   }
 
-  const host = process.env.LIVE_CHAT_DB_HOST || '202.47.117.220';
-  const user = process.env.LIVE_CHAT_DB_USER || process.env.LIVE_CHAT_DB_USERNAME || 'vivek_user';
-  const password = process.env.LIVE_CHAT_DB_PASSWORD || 'vivek@sql';
-  const database = process.env.LIVE_CHAT_DB_DATABASE || process.env.LIVE_CHAT_DB_NAME || 'vivek_erp';
+  const host = process.env.LIVE_CHAT_DB_HOST;
+  const user = process.env.LIVE_CHAT_DB_USER || process.env.LIVE_CHAT_DB_USERNAME;
+  const password = process.env.LIVE_CHAT_DB_PASSWORD;
+  const database = process.env.LIVE_CHAT_DB_DATABASE || process.env.LIVE_CHAT_DB_NAME;
   const port = Number(process.env.LIVE_CHAT_DB_PORT || 3306);
+
+  if (!host || !user || !password || !database) {
+    throw new Error('Live chat database is not configured');
+  }
 
   const pool = createPool({
     host,
@@ -49,7 +54,7 @@ export function getDbPool(): Pool {
 function generateMeetCode(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz';
   const seg = (len: number) =>
-    Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    Array.from({ length: len }, () => chars[randomInt(chars.length)]).join('');
   return `${seg(3)}-${seg(4)}-${seg(3)}`;
 }
 
