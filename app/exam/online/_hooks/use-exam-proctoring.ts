@@ -224,7 +224,7 @@ export function useExamProctoring(examId: string, enabled: boolean) {
     const actualMessage = autoSubmitReason === 'tab_switch'
       ? 'Switching tabs is not allowed. Your examination is being submitted.'
       : tabLimitExceeded
-        ? 'You have exceeded the allowed number of tab switches. Further violations may submit the exam.'
+        ? 'You have reached the tab-switch limit. Your examination is being submitted.'
         : message;
     if (actualMessage) {
       setWarning(actualMessage);

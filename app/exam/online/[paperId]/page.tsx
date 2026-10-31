@@ -343,8 +343,8 @@ export default function OnlineExamAttemptPage() {
                   {proctoringSessionId ? 'Proctoring is active' : 'Starting proctoring'}
                 </p>
                 <p className="mt-0.5 text-xs text-indigo-800">
-                  Copy, cut and paste are blocked across the exam, including answer fields. Tab and window changes are monitored; leaving the exam tab will trigger submission.
-                  {settings ? ` Recorded tab switches: ${tabSwitchCount}.` : ''}
+                  Copy, cut and paste are blocked across the exam, including answer fields. Tab and window changes are monitored.
+                  {settings ? ` The exam submits after ${settings.tabSwitchLimit} tab switches; recorded: ${tabSwitchCount}.` : ''}
                 </p>
                 <p className="mt-1 text-xs text-indigo-800">
                   Screenshot shortcuts are recorded when detectable, but browser controls cannot prevent operating-system screenshots or external capture.

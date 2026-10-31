@@ -245,7 +245,7 @@ export async function startProctoringSession(
     violationCount: readNumber(data.violation_count),
     criticalViolationCount: readNumber(data.critical_violation_count),
     settings: {
-      tabSwitchLimit: Math.max(1, readNumber(rawSettings.tab_switch_limit) || 3),
+      tabSwitchLimit: Math.max(1, readNumber(rawSettings.tab_switch_limit) || 5),
       autoSubmitOnTabSwitch: rawSettings.auto_submit_on_tab_switch !== false,
       criticalViolationLimit: Math.max(1, readNumber(rawSettings.critical_violation_limit) || 5),
       inactivitySeconds: Math.max(60, readNumber(rawSettings.inactivity_seconds) || 300),
