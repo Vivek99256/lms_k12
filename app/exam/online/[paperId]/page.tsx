@@ -2,7 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, Clock, Info, Loader2, Send, Sparkles } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Clock,
+  Info,
+  Loader2,
+  Maximize,
+  Minimize,
+  Send,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +24,8 @@ import {
   submitOnlineExam,
   type OnlineExamPaper,
 } from '@/app/exam/data/onlineExam';
+import { submitProctoringSession } from '@/app/exam/data/proctoring';
+import { useExamProctoring } from '@/app/exam/online/_hooks/use-exam-proctoring';
 import { askAssistant, setExamHelpFocus } from '@/lib/exam-help';
 
 export default function OnlineExamAttemptPage() {
@@ -29,15 +42,43 @@ export default function OnlineExamAttemptPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [notStudent, setNotStudent] = useState(false);
+  const [profileReady, setProfileReady] = useState(false);
 
   const startedAtRef = useRef<string>('');
   const submittedRef = useRef(false);
+  const restoredSessionRef = useRef('');
+  const proctoringEnabled = profileReady && !notStudent;
+  const {
+    sessionId: proctoringSessionId,
+    error: proctoringError,
+    warning: proctoringWarningMessage,
+    warningHistory,
+    fullscreenActive,
+    restrictionsActive,
+    serverRemainingSeconds,
+    settings,
+    tabSwitchCount,
+    violationCount,
+    criticalViolationCount,
+    restoredAnswers,
+    autoSubmitReason,
+    existingOnlineExamId,
+    ensureSession: ensureProctoringSession,
+    persistLocalDraft,
+    saveDraft: saveProctoringDraft,
+    markSubmitted: markProctoringSubmitted,
+    toggleFullscreen,
+    retry: retryProctoring,
+  } = useExamProctoring(paper?.id ?? '', proctoringEnabled);
 
   // --- profile note (deferred to avoid SSR/hydration mismatch) ------------
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
-      if (!cancelled) setNotStudent(!isStudentProfile());
+      if (!cancelled) {
+        setNotStudent(!isStudentProfile());
+        setProfileReady(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -70,6 +111,42 @@ export default function OnlineExamAttemptPage() {
       controller.abort();
     };
   }, [paperId]);
+
+  useEffect(() => {
+    if (!proctoringSessionId || restoredSessionRef.current === proctoringSessionId) return;
+    restoredSessionRef.current = proctoringSessionId;
+    setMcqAnswers(restoredAnswers.mcq);
+    setNarrativeAnswers(restoredAnswers.narrative);
+  }, [proctoringSessionId, restoredAnswers]);
+
+  useEffect(() => {
+    if (serverRemainingSeconds === null) return;
+    // The browser countdown is display-only; the server revalidates every submission.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTimeLeft(serverRemainingSeconds);
+  }, [serverRemainingSeconds]);
+
+  useEffect(() => {
+    if (!proctoringSessionId || !restrictionsActive) return;
+    persistLocalDraft({ mcq: mcqAnswers, narrative: narrativeAnswers });
+    const timer = window.setTimeout(() => {
+      void saveProctoringDraft({ mcq: mcqAnswers, narrative: narrativeAnswers }).catch(() => undefined);
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [
+    mcqAnswers,
+    narrativeAnswers,
+    proctoringSessionId,
+    restrictionsActive,
+    persistLocalDraft,
+    saveProctoringDraft,
+  ]);
+
+  useEffect(() => {
+    if (existingOnlineExamId) {
+      router.replace(`/exam/online/${paperId}/result?online_exam_id=${existingOnlineExamId}`);
+    }
+  }, [existingOnlineExamId, paperId, router]);
 
   const isAnswered = useCallback(
     (questionId: string, hasOptions: boolean) =>
@@ -104,22 +181,57 @@ export default function OnlineExamAttemptPage() {
       submittedRef.current = true;
       setSubmitting(true);
       setSubmitError(null);
+      const proctoringWarning = Boolean(proctoringError);
       try {
-        const result = await submitOnlineExam({
-          paperId,
-          mcqAnswers,
-          narrativeAnswers,
-          startedAt: startedAtRef.current || formatExamTimestamp(new Date()),
-        });
-        router.push(`/exam/online/${paperId}/result?online_exam_id=${result.onlineExamId}`);
+        let onlineExamId: string;
+        if (proctoringEnabled) {
+          const currentSessionId = await ensureProctoringSession();
+          if (!currentSessionId) throw new Error("Couldn't start a secure examination session. Retry before submitting.");
+          await saveProctoringDraft({ mcq: mcqAnswers, narrative: narrativeAnswers });
+          const result = await submitProctoringSession(currentSessionId, {
+            mcq: mcqAnswers,
+            narrative: narrativeAnswers,
+          });
+          onlineExamId = result.onlineExamId;
+          markProctoringSubmitted();
+        } else {
+          const result = await submitOnlineExam({
+            paperId,
+            mcqAnswers,
+            narrativeAnswers,
+            startedAt: startedAtRef.current || formatExamTimestamp(new Date()),
+          });
+          onlineExamId = result.onlineExamId;
+        }
+        const warningQuery = proctoringWarning ? '&proctoring_warning=1' : '';
+        router.push(
+          `/exam/online/${paperId}/result?online_exam_id=${onlineExamId}${warningQuery}`
+        );
       } catch (reason) {
         submittedRef.current = false;
         setSubmitError(reason instanceof Error ? reason.message : "Couldn't submit the exam. Try again.");
         setSubmitting(false);
       }
     },
-    [paper, paperId, mcqAnswers, narrativeAnswers, isAnswered, router]
+    [
+      paper,
+      paperId,
+      mcqAnswers,
+      narrativeAnswers,
+      isAnswered,
+      router,
+      proctoringEnabled,
+      proctoringError,
+      ensureProctoringSession,
+      saveProctoringDraft,
+      markProctoringSubmitted,
+    ]
   );
+
+  useEffect(() => {
+    if (!autoSubmitReason || submitting || submittedRef.current) return;
+    void handleSubmit(true);
+  }, [autoSubmitReason, submitting, handleSubmit]);
 
   // --- countdown timer (auto-submit on expiry) ----------------------------
   useEffect(() => {
@@ -192,7 +304,10 @@ export default function OnlineExamAttemptPage() {
   }
 
   return (
-    <div className="min-h-full px-4 py-5 sm:px-6">
+    <div
+      className={`min-h-full px-4 py-5 sm:px-6 ${restrictionsActive ? 'exam-proctoring-restricted' : ''}`}
+      data-exam-restrictions-active={restrictionsActive ? 'true' : 'false'}
+    >
       <div className="mx-auto w-full max-w-[1400px] space-y-5">
         {/* Sticky header with timer */}
         <div className="sticky top-0 z-10 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/95 px-5 py-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
@@ -218,6 +333,76 @@ export default function OnlineExamAttemptPage() {
             </Button>
           </div>
         </div>
+
+        {!notStudent && profileReady ? (
+          <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2 text-sm text-indigo-900">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0" />
+              <div>
+                <p className="font-semibold">
+                  {proctoringSessionId ? 'Proctoring is active' : 'Starting proctoring'}
+                </p>
+                <p className="mt-0.5 text-xs text-indigo-800">
+                  Copy, cut and paste are blocked across the exam, including answer fields. Tab and window changes are monitored; leaving the exam tab will trigger submission.
+                  {settings ? ` Recorded tab switches: ${tabSwitchCount}.` : ''}
+                </p>
+                <p className="mt-1 text-xs text-indigo-800">
+                  Screenshot shortcuts are recorded when detectable, but browser controls cannot prevent operating-system screenshots or external capture.
+                </p>
+                <p className="mt-1 text-xs text-indigo-800">
+                  {violationCount} violation{violationCount === 1 ? '' : 's'} recorded ({criticalViolationCount} critical). The exam timer is synchronized with the server.
+                </p>
+              </div>
+            </div>
+            {proctoringSessionId ? (
+              <button
+                type="button"
+                onClick={() => void toggleFullscreen()}
+                aria-label={fullscreenActive ? 'Exit fullscreen mode' : 'Enter fullscreen mode'}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-indigo-300 bg-white px-3 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              >
+                {fullscreenActive ? <Minimize className="size-4" /> : <Maximize className="size-4" />}
+                {fullscreenActive ? 'Exit fullscreen' : 'Enter fullscreen'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {proctoringWarningMessage ? (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            <p className="font-semibold">Proctoring warning</p>
+            <p className="mt-1">{proctoringWarningMessage}</p>
+            {warningHistory.length > 1 ? (
+              <ul className="mt-2 list-inside list-disc text-xs">
+                {warningHistory.slice(0, 5).map((warning, index) => (
+                  <li key={`${index}-${warning}`}>{warning}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        {proctoringError ? (
+          <div role="alert" className="flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-800">
+            <span className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <span>{proctoringError}</span>
+            </span>
+            {!proctoringSessionId && !notStudent ? (
+              <button
+                type="button"
+                onClick={retryProctoring}
+                className="shrink-0 font-semibold underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Retry
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {notStudent ? (
           <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-3 text-sm text-sky-700">
@@ -310,7 +495,7 @@ export default function OnlineExamAttemptPage() {
                         }
                         placeholder="Type your answer…"
                         rows={4}
-                        className="mt-3"
+                        className="mt-3 select-text"
                       />
                     )}
                   </div>

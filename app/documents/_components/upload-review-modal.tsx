@@ -12,6 +12,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/result/toast';
 import { IdmsApi, ApiError, type DocumentItem, type DocumentWarning } from '../_lib/idms-api';
 import { QuestionPapersApi, type DocumentKind } from '../_lib/question-papers-api';
 import { DOCUMENT_KINDS, DocumentTypePicker } from './document-type-picker';
@@ -31,7 +32,7 @@ interface UploadModalProps {
   onOpenQuestionPapers?: () => void;
 }
 
-type ItemStatus = 'queued' | 'uploading' | 'processing' | 'publishing' | 'published' | 'failed';
+type ItemStatus = 'queued' | 'uploading' | 'processing' | 'publishing' | 'published' | 'failed' | 'duplicate';
 /** Where a failed file stopped, which decides what "Retry" has to redo. */
 type FailedStage = 'upload' | 'analysis' | 'timeout' | 'publish';
 
@@ -75,6 +76,7 @@ const STAGE_WEIGHT: Record<ItemStatus, number> = {
   publishing: 0.85,
   published: 1,
   failed: 1,
+  duplicate: 1,
 };
 
 const STATUS_LABEL: Record<ItemStatus, string> = {
@@ -84,6 +86,7 @@ const STATUS_LABEL: Record<ItemStatus, string> = {
   publishing: 'Publishing',
   published: 'Published',
   failed: 'Failed',
+  duplicate: 'Duplicate blocked',
 };
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -284,6 +287,18 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
           void finish(item.key, docId);
           return;
         } catch (err) {
+          if (err instanceof ApiError && err.status === 409) {
+            patch(item.key, {
+              status: 'duplicate',
+              note: undefined,
+              error: undefined,
+            });
+            toast.info(
+              'Duplicate question paper not stored',
+              `${item.path} was already uploaded. No new document or extraction job was created.`,
+            );
+            return;
+          }
           if (isTransientUpload(err) && attempt < UPLOAD_RETRY_DELAYS_MS.length) {
             const retryAfterMs = err instanceof ApiError && err.retryAfter ? err.retryAfter * 1000 : 0;
             const wait = Math.max(UPLOAD_RETRY_DELAYS_MS[attempt], retryAfterMs);
@@ -324,11 +339,14 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
   const busy = items.some((it) => ['queued', 'uploading', 'processing', 'publishing'].includes(it.status));
   const publishedCount = items.filter((it) => it.status === 'published').length;
   const failedCount = items.filter((it) => it.status === 'failed').length;
+  const duplicateCount = items.filter((it) => it.status === 'duplicate').length;
+  const uploadableCount = items.length - duplicateCount;
+  const retryableFailedCount = failedCount;
   const settled = started && items.length > 0 && !busy;
   const percent =
-    items.length === 0
-      ? 0
-      : Math.round((items.reduce((sum, it) => sum + STAGE_WEIGHT[it.status], 0) / items.length) * 100);
+    uploadableCount === 0
+      ? 100
+      : Math.round((items.filter((it) => it.status !== 'duplicate').reduce((sum, it) => sum + STAGE_WEIGHT[it.status], 0) / uploadableCount) * 100);
 
   // Live clock so elapsed times tick while something is in flight.
   useEffect(() => {
@@ -498,8 +516,10 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
           tone: 'ok' as const,
           title:
             backgroundJobs > 0
-              ? `${items.length} ${items.length === 1 ? 'file' : 'files'} uploaded`
-              : `All ${items.length} ${items.length === 1 ? 'file' : 'files'} uploaded and published`,
+            ? `${uploadableCount} ${uploadableCount === 1 ? 'file' : 'files'} uploaded`
+            : uploadableCount === 0
+              ? 'No new files uploaded'
+              : `All ${uploadableCount} ${uploadableCount === 1 ? 'file' : 'files'} uploaded and published`,
         }
       : {
           tone: 'bad' as const,
@@ -761,7 +781,7 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
               </div>
               <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-slate-600">
                 <span className="min-w-0 truncate">
-                  {publishedCount} of {items.length} {items.length === 1 ? 'file' : 'files'} uploaded and published
+                  {publishedCount} of {uploadableCount} {uploadableCount === 1 ? 'file' : 'files'} uploaded and published
                   {failedCount > 0 ? ` · ${failedCount} failed` : ''}
                   {current && !settled ? ` · ${STATUS_LABEL[current.status]} ${current.path}` : ''}
                 </span>
@@ -771,7 +791,9 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
 
             {settled && failedCount === 0 && backgroundJobs === 0 && (
               <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
-                Everything was uploaded and published to the Document Library. This window will close now.
+                {uploadableCount === 0
+                  ? `${duplicateCount} duplicate ${duplicateCount === 1 ? 'question paper was' : 'question papers were'} not stored. No extraction job was started.`
+                  : 'Everything was uploaded and published to the Document Library. This window will close now.'}
               </p>
             )}
 
@@ -806,7 +828,7 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
             )}
 
             <ul className="max-h-[46vh] space-y-2 overflow-y-auto pr-1">
-              {items.map((it) => (
+              {items.filter((it) => it.status !== 'duplicate').map((it) => (
                 <QueueRow key={it.key} item={it} now={now} onRetry={() => retryItems([it.key])} />
               ))}
             </ul>
@@ -815,13 +837,13 @@ export function UploadReviewModal({ isOpen, onClose, onFinished, onOpenQuestionP
               {busy && items.some((it) => it.status === 'queued') && (
                 <Button variant="ghost" onClick={cancelRemaining}>Cancel remaining files</Button>
               )}
-              {settled && failedCount > 0 && (
+              {settled && retryableFailedCount > 0 && (
                 <Button
                   variant="outline"
                   onClick={() => retryItems(items.filter((it) => it.status === 'failed').map((it) => it.key))}
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />
-                  Retry {failedCount} failed
+                  Retry {retryableFailedCount} failed
                 </Button>
               )}
               {settled && (
@@ -875,8 +897,7 @@ function QueueRow({ item, now, onRetry }: { item: QueueItem; now: number; onRetr
     },
   ];
 
-  const badge =
-    status === 'failed'
+  const badge = status === 'failed'
       ? 'bg-red-50 text-red-700'
       : status === 'published'
       ? 'bg-emerald-50 text-emerald-700'

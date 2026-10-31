@@ -17,6 +17,7 @@ import {
 
 import { PageFrame, PageHeader, InlineMessage } from '@/app/fees/_components/fees-shared';
 import { Button } from '@/components/ui/button';
+import { Toaster } from '@/components/result/toast';
 import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { DocumentDetailPanel } from '@/app/documents/_components/document-detail-panel';
 import { UploadReviewModal } from '@/app/documents/_components/upload-review-modal';
@@ -354,6 +355,7 @@ export function IdmsLibrary() {
 
   return (
     <PageFrame>
+      <Toaster />
       <PageHeader
         title="Document Library"
         description="Upload once and the system reads, classifies, tags and files it. Search by name, tag, metadata or plain English."

@@ -60,6 +60,19 @@ body {
   font-family: var(--font-geist-sans);
 }
 
+.exam-proctoring-restricted,
+.exam-proctoring-restricted * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none;
+}
+
+.exam-proctoring-restricted textarea,
+.exam-proctoring-restricted textarea * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
 /* LMS Premium Styles */
 :root {
   --app-shell-background: #EAF0F8;

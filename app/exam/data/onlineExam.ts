@@ -123,9 +123,10 @@ export interface ResultQuestion {
   id: string;
   title: string;
   points: number;
-  rightWrong: string; // "right" | "wrong" | ""
+  rightWrong: string;
   actualAnswerIds: string[];
   givenAnswerIds: string[];
+  givenAnswer: string;
   options: { id: string; answer: string; correct: boolean }[];
   mapping: { typeName: string; valueName: string }[];
 }
@@ -135,6 +136,8 @@ export interface ExamResult {
   obtainMarks: number;
   totalRight: number;
   totalWrong: number;
+  totalUnanswered: number;
+  totalPendingReview: number;
   questions: ResultQuestion[];
   /** The student has not attempted this exam, so there is nothing to review. */
   noAttempt: boolean;
@@ -352,6 +355,7 @@ export async function fetchExamResult(
       rightWrong: readString(oa.RIGHT_WRONG),
       actualAnswerIds: csvIds(oa.ACTUAL_ANSWER),
       givenAnswerIds: csvIds(oa.GIVEN_ANSWER),
+      givenAnswer: readString(oa.GIVEN_ANSWER),
       options: toArray(answers[id]).map((opt) => {
         const o = toRecord(opt);
         return { id: readString(o.id), answer: readString(o.answer), correct: readString(o.correct_answer) === '1' };
@@ -370,6 +374,8 @@ export async function fetchExamResult(
     obtainMarks: readNumber(oe.obtain_marks),
     totalRight,
     totalWrong: readNumber(oe.total_wrong),
+    totalUnanswered: readNumber(oe.total_unanswered),
+    totalPendingReview: readNumber(oe.total_pending_review),
     questions,
     noAttempt: Boolean(raw.no_attempt),
     attemptsRemaining: readNumber(raw.attempts_remaining),
