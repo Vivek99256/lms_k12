@@ -201,8 +201,8 @@ export function OverviewTab({
                     {isLoading ? 'Loading...' : 'No upcoming lessons.'}
                   </div>
                 )}
-                {upcomingLessons.map((lesson) => (
-                  <div key={`${lesson.subject}-${lesson.title}`} className="flex min-h-14 items-start gap-3 rounded-lg bg-[#efeeec] px-3 py-3">
+                {upcomingLessons.map((lesson, idx) => (
+                  <div key={`${lesson.subject}-${lesson.title}-${idx}`} className="flex min-h-14 items-start gap-3 rounded-lg bg-[#efeeec] px-3 py-3">
                     <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: lesson.dotColor }} />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-[#2d2924]">{lesson.title}</div>

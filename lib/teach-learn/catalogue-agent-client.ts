@@ -139,27 +139,21 @@ function resolveBaseUrl(context: IntelligenceContext): string {
 }
 
 function resolveEndpoint(context: IntelligenceContext, action?: string): string {
-  const baseUrl = resolveBaseUrl(context);
-  const path = action === 'start' ? '/start'
-    : action === 'stop' ? '/stop'
-    : action === 'interval' ? '/interval'
-    : action === 'run-now' ? '/run-now'
-    : action === 'auto-generate-toggle' ? '/auto-generate/toggle'
-    : action === 'auto-generate-batch' ? '/auto-generate/batch'
-    : action === 'content-tasks' ? '/content-tasks'
-    : action === 'pipeline' ? '/pipeline'
-    : action === 'eso' ? '/eso'
-    : '/state';
-  return `${baseUrl}/api/ai/teach-learn/catalogue-agent${path}`;
+  const base = '/api/teach-learn/catalogue-agent';
+  if (!action || action === 'state') return base;
+  return `${base}?action=${encodeURIComponent(action)}`;
 }
 
 function buildHeaders(context: IntelligenceContext): HeadersInit {
-  return {
+  const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
-    ...(context.token ? { Authorization: `Bearer ${context.token}` } : {}),
-    'X-MCP-Institute-Id': String(context.instituteId || '1'),
   };
+  if (context.token) {
+    headers.Authorization = context.token.startsWith('Bearer ') ? context.token : `Bearer ${context.token}`;
+  }
+  headers['X-MCP-Institute-Id'] = String(context.instituteId || '1');
+  return headers;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
