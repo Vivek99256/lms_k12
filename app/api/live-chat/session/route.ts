@@ -1,4 +1,23 @@
-import { relayLiveChat } from '@/lib/live-chat/proxy';
+import { NextResponse } from 'next/server';
+import {
+  assignAdmin,
+  closeSession,
+  getAdminPresence,
+  getOrCreateUserSession,
+  getSession,
+  listSessions,
+  markAsRead,
+} from '@/lib/live-chat/store';
+import {
+  dbAssignAdmin,
+  dbCloseSession,
+  dbGetAdminPresence,
+  dbGetOrCreateUserSession,
+  dbGetSession,
+  dbListSessions,
+  dbMarkAsRead,
+} from '@/lib/live-chat/db';
+import type { LiveChatUser } from '@/lib/live-chat/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

@@ -1587,6 +1587,17 @@ export const AGENT_TOOLS: AgentTool[] = [
     available: true,
     exampleInput: { standard_id: null, threshold_percent: 60, days_back: 30, limit: 50 },
   },
+  {
+    key: 'engagement.draft_intervention_note',
+    label: 'Draft re-engagement intervention note',
+    description:
+      'Drafts a factual, objective, non-judgmental re-engagement intervention note for a student based on verified attendance, homework, and coursework activity. Changes nothing, sends nothing.',
+    module: 'engagement',
+    risk: 'draft',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { student_id: null, deficiency_reasons: [] },
+  },
 
   // ---- Interactions ------------------------------------------------------------
   //
