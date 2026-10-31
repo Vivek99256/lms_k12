@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { buildSessionContext } from '@/lib/erp-client';
+import type { ImageEditStates } from '@/lib/study-deck/imageEditing';
 
 /**
  * Course Presentation pilot client (next_lms_erp `lms/course-presentation/*`).
@@ -122,9 +123,56 @@ export interface CpRunCoverage {
   missing: string[];
 }
 
+/** Where a run is in its life. `completed` covers a draft ready for review (state `ready`) and a stored presentation (state `stored`). */
+export type CpLifecycle = 'queued' | 'processing' | 'saving' | 'completed' | 'failed' | 'cancelled';
+
+export interface CpStage {
+  key: string;
+  label: string;
+  description: string;
+  status: 'done' | 'current' | 'pending' | 'failed';
+  /** When the server first saw the stage; null for a stage not reached. */
+  at: string | null;
+}
+
+/**
+ * What the server knows about a run's progress: every field comes from the run's own record (the pipeline's stage lines, real
+ * timestamps, the durations of earlier finished runs). `percent` counts finished stages; it is not a clock.
+ */
+export interface CpProgressInfo {
+  lifecycle: CpLifecycle;
+  stage: string;
+  stages: CpStage[];
+  percent: number | null;
+  percent_basis: 'stages';
+  started_at: string | null;
+  finished_at: string | null;
+  elapsed_seconds: number | null;
+  duration_seconds: number | null;
+  estimate: { available: boolean; min_seconds?: number; max_seconds?: number; overdue?: boolean; samples?: number; basis?: string };
+  saving: boolean;
+  /** Only while queued: how long it has waited and whether a background worker has been seen. */
+  queue: { waiting_seconds: number | null; worker: 'inline' | 'active' | 'busy' | 'not_detected' } | null;
+  /** Where the run's time went (seconds), recorded by the server; null for a run made before timings were kept. */
+  timings?: CpTimings | null;
+  failure: { kind: 'quota' | 'overload' | 'budget' | 'queue' | 'images' | 'storage' | 'validation' | 'unknown'; retryable: boolean; hint: string } | null;
+}
+
+export interface CpTimings {
+  queue_wait_seconds: number | null;
+  stages: Record<string, { started_at: string; seconds: number | null }>;
+  total_seconds: number | null;
+  target_seconds: number | null;
+  within_target: boolean | null;
+  failed_stage: string | null;
+  failure: string | null;
+}
+
 /** One generation run as a teacher may see it: no folder, school, user or raw output. */
 export interface CpRun {
   run: string;
+  /** Absent on a server that predates progress reporting; the screen then shows only the state. */
+  progress_info?: CpProgressInfo;
   state: CpRunState;
   /** The teaching method and content format this run was made for: a run is only ever shown and acted on for exactly that choice. */
   method: string;
@@ -234,7 +282,7 @@ export class CoursePresentationApiError extends Error {
   }
 }
 
-async function request<T>(method: 'GET' | 'POST', path: string, params: Record<string, string | boolean>, signal?: AbortSignal): Promise<T> {
+export async function request<T>(method: 'GET' | 'POST', path: string, params: Record<string, string | boolean>, signal?: AbortSignal): Promise<T> {
   const { token } = buildSessionContext();
   if (!token) throw new CoursePresentationApiError('Your session has expired. Please sign in again.', 401);
 
@@ -256,6 +304,8 @@ async function request<T>(method: 'GET' | 'POST', path: string, params: Record<s
   if (res.status === 429) throw new CoursePresentationApiError('Too many requests. Please wait a minute and try again.', 429);
   // 422 is a missing/unknown choice, or a combination or draft the server refuses; its message says which.
   if (res.status === 422) throw new CoursePresentationApiError(typeof raw.message === 'string' && raw.message !== '' ? raw.message : 'Choose a teaching method and a delivery format first.', 422);
+  // Any other refusal that says why (a draft that is already approved, a picture the checks refused) is shown as the server worded it.
+  if (!res.ok && typeof raw.message === 'string' && raw.message !== '') throw new CoursePresentationApiError(raw.message, res.status);
   if (!res.ok || Number(raw.status_code) !== 1) throw new CoursePresentationApiError(`Request failed (${res.status}).`, res.status);
   return raw as unknown as T;
 }
@@ -277,7 +327,7 @@ export const fetchCpPreview = (chapterId: number, pedagogy: string, format: stri
 
 /** The deck of a draft waiting for review, to be played in the study-deck player before anything is stored. */
 export const fetchCpDraft = (chapterId: number, run: string, signal?: AbortSignal) =>
-  request<{ notice: string; deck: unknown }>('GET', 'draft', { chapter_id: String(chapterId), run }, signal);
+  request<{ notice: string; deck: unknown; slide_images?: ImageEditStates }>('GET', 'draft', { chapter_id: String(chapterId), run }, signal);
 
 export const fetchCpOptions = (chapterId: number, signal?: AbortSignal) => request<CpOptions>('GET', 'options', { chapter_id: String(chapterId) }, signal);
 

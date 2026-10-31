@@ -380,6 +380,15 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   // it into '/coherence.map', which is not a route — the real page is under
   // /pal/new/* with its siblings.
   'coherence.map': '/pal/new/coherence-map',
+  // Learning Intelligence — registered by 2026_10_26_120000_add_new_pal_
+  // learning_intelligence_submodule_menus (4 tblmenumaster rows exist).
+  // Knowledge Graph and Teacher Insights are mapped/reachable — Learning
+  // Journey and Context Inspector are still soft-disabled (see
+  // DashboardShell.tsx's NEW_PAL_LEVEL3_ITEMS for the matching nav-tab
+  // state, and each page's own "temporarily unavailable" state); their
+  // tblmenumaster rows and Next.js routes still exist, just not mapped here.
+  'new_pal.knowledge_graph': '/pal/learning-intelligence/knowledge-graph',
+  'new_pal.teacher_insights': '/pal/learning-intelligence/teacher-insights',
   'lmsassignment.index': '/lms/lmsAssignment',
   'lms/lmsassignment': '/lms/lmsAssignment',
   'lmsassignment_submission.index': '/lms/lmsAssignment_submission',

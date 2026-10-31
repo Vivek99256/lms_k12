@@ -72,7 +72,12 @@ export function checkSessionToken(token: string, now: number = Date.now()): Sess
   if (claims.exp !== undefined && claims.exp * 1000 <= now) return null;
 
   const secret = (process.env.LARAVEL_JWT_SECRET || '').trim();
-  if (!secret) return { claims, verified: false };
+  if (!secret) {
+    // Unsigned claims are only for local development. In production a missing secret
+    // must not turn every self-made token into a valid session: refuse it.
+    if (process.env.NODE_ENV === 'production') return null;
+    return { claims, verified: false };
+  }
 
   if (header.alg !== 'HS256') return null;
   const expected = createHmac('sha256', secret).update(`${parts[0]}.${parts[1]}`).digest();
@@ -84,8 +89,9 @@ export function checkSessionToken(token: string, now: number = Date.now()): Sess
 
 /**
  * The session behind a request, or null when there is none worth trusting.
- * In production with LARAVEL_JWT_SECRET unset this still returns unverified
- * sessions, so a missing setting degrades protection rather than breaking the app.
+ * In production with LARAVEL_JWT_SECRET unset there is no session at all (fail
+ * closed): set the variable in every deployed environment. Outside production an
+ * unset secret returns unverified claims so local development works.
  */
 export function requireSession(request: Request): SessionCheck | null {
   return checkSessionToken(readSessionToken(request));

@@ -5,6 +5,7 @@ import { getRequestContext } from '@/app/course-master/page';
 import { fetchWholeChapter } from '@/app/h5p/data/question-bank-library';
 import { readApiJson } from '@/app/h5p/data/h5p';
 import { fetchCpDraft, fetchCpPreview } from '@/lib/coursePresentation/api';
+import type { ImageEditStates } from '@/lib/study-deck/imageEditing';
 import { parseDeck } from '@/lib/study-deck/deck';
 import { imageUrlsRequest, resolveDeckImages } from '@/lib/study-deck/images';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
@@ -30,7 +31,7 @@ export interface LoadedDeck {
   assetBase: string | null;
   source: 'api' | 'pilot' | 'preview' | 'draft';
   /** A draft only: what it is (a review copy, nothing stored). */
-  draft?: { notice: string };
+  draft?: { notice: string; /** The run being reviewed, and per slide whether its picture can be replaced. */ run: string; slideImages: ImageEditStates };
   /** A preview only: what it is, and what the stored data could not supply. */
   preview?: { notice: string; missing: { what: string; where: string; why: string }[]; summary: { slides: number; pictures_placed: number; concepts_with_intelligence: number; concepts: number }; coverage: { total_concepts: number; renderable: number; from_intelligence: number; from_concept_record_only: number; unresolved: number } };
 }
@@ -75,7 +76,7 @@ export async function loadStudyDeck(chapterId: number, options: { pilot: boolean
     const res = await fetchCpDraft(chapterId, options.draft, options.signal);
     const deck = await resolveDeckImages(parseDeck(res.deck), (ids) => fetchImageUrls(ids, instituteId, options.signal));
 
-    return { deck, assetBase: null, source: 'draft', draft: { notice: res.notice } };
+    return { deck, assetBase: null, source: 'draft', draft: { notice: res.notice, run: options.draft, slideImages: res.slide_images ?? {} } };
   }
 
   // A Course Presentation PREVIEW: the chosen template filled from the chapter's stored data by the server (read only,

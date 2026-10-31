@@ -60,6 +60,7 @@ import {
 import { SelectedJourneyStepRail } from '@/app/pal/_components/SelectedJourneyStepRail';
 import { useUnlockAll } from '@/app/pal/_components/LockModeToggle';
 import { JourneyStepContent } from '@/app/pal/_components/JourneyStepContent';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 /**
  * Stage 1 - the chapter diagnostic.
@@ -1337,7 +1338,7 @@ function QuestionCard({
                 // Question bodies are authored HTML in lms_question_master and
                 // contain markup and figures; the rest of PAL renders them the
                 // same way.
-                dangerouslySetInnerHTML={{ __html: question.title }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
               />
               <div className="space-y-2">
                 {question.options.map((option) => {
@@ -1365,7 +1366,7 @@ function QuestionCard({
 
                       <span
                         className="min-w-0 flex-1 [&_img]:max-w-full"
-                        dangerouslySetInnerHTML={{ __html: option.answer }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }}
                       />
                     </label>
                   );

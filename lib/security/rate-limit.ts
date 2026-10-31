@@ -26,11 +26,21 @@ function sweep(now: number) {
   }
 }
 
-/** The client's address as the nearest proxy reports it. */
+/**
+ * The client's address as the platform's own proxy reports it. The FIRST `x-forwarded-for`
+ * entry is whatever the caller typed, so it is not used to key a limit (a script could send a
+ * new value every request and never be throttled). The platform headers come first; failing
+ * those, the LAST forwarded entry is the one the nearest proxy appended itself.
+ */
 export function clientIp(request: Request): string {
+  const platform = request.headers.get('x-vercel-forwarded-for') || request.headers.get('x-real-ip');
+  if (platform?.trim()) return platform.split(',')[0].trim();
   const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim() || 'unknown';
-  return request.headers.get('x-real-ip')?.trim() || 'unknown';
+  if (forwarded) {
+    const parts = forwarded.split(',').map((p) => p.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
+  }
+  return 'unknown';
 }
 
 export interface RateLimitResult {

@@ -24,6 +24,7 @@ import {
   type DiagnosticSubmitResult,
   type PalChapterContext,
 } from '@/app/pal/data/pal';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 /**
  * "Take chapter diagnostic" — the onboarding assessment step of the learning journey
@@ -308,7 +309,7 @@ function DiagnosticQuestionRow({
           </div>
           <div
             className="mt-1.5 text-sm font-medium text-slate-900 [&_img]:max-w-full"
-            dangerouslySetInnerHTML={{ __html: question.title }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
           />
           {playable ? (
             <div className="mt-2">
@@ -344,7 +345,7 @@ function DiagnosticQuestionRow({
                       onChange={() => onToggle(option.id)}
                       className="h-4 w-4 accent-violet-600"
                     />
-                    <span className="[&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: option.answer }} />
+                    <span className="[&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                   </label>
                 );
               })}

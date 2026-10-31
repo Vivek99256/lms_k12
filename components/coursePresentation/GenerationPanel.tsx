@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { GenerationProgress } from '@/components/coursePresentation/GenerationProgress';
 import {
   approveCpDraft,
   discardCpDraft,
@@ -10,7 +11,9 @@ import {
   type CpFit,
   type CpRun,
 } from '@/lib/coursePresentation/api';
+import { startRunPoller, type CpWatch } from '@/lib/coursePresentation/poller';
 import { draftAddress } from '@/lib/coursePresentation/previewAddress';
+import { announcement, canRetry, finishedOutcome, formatDuration, shouldPoll, type Outcome } from '@/lib/coursePresentation/progress';
 import { coverageSentence, runForChoice } from '@/lib/coursePresentation/runChoice';
 import { resolveViewer } from '@/lib/coursePresentation/viewer';
 import { cn } from '@/lib/utils';
@@ -25,6 +28,28 @@ import { cn } from '@/lib/utils';
  *
  * Mount it with a `key` for the pair of choices, so a different pair starts from its own run.
  */
+/** Where the time of a finished run went, as the server recorded it. */
+function TimingsDetails({ timings }: { timings: NonNullable<NonNullable<CpRun['progress_info']>['timings']> }) {
+  const rows = Object.entries(timings.stages).filter(([, s]) => s.seconds !== null);
+  const missed = timings.within_target === false && timings.target_seconds !== null;
+  return (
+    <details data-testid="cp-timings" className="mt-2 text-xs text-slate-600">
+      <summary className="cursor-pointer">
+        Where the time went
+        {timings.total_seconds !== null ? ` (${formatDuration(timings.total_seconds)} in total${missed ? `, target ${formatDuration(timings.target_seconds as number)} not met` : ''})` : ''}
+      </summary>
+      <ul className="mt-1 space-y-0.5">
+        {timings.queue_wait_seconds !== null && <li>Waiting for a worker: {formatDuration(timings.queue_wait_seconds)}</li>}
+        {rows.map(([key, s]) => (
+          <li key={key}>
+            {key}: {formatDuration(s.seconds as number)}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function GenerationPanel({
   chapterId,
   pedagogy,
@@ -32,6 +57,8 @@ export function GenerationPanel({
   fit,
   initialRun,
   onOpenPresentation,
+  onRunFinished,
+  onLiveChange,
 }: {
   chapterId: number;
   pedagogy: string;
@@ -39,9 +66,15 @@ export function GenerationPanel({
   fit: CpFit;
   initialRun: CpRun | null;
   onOpenPresentation: (deepLink: string) => void;
+  /** Told once when a run this screen was following finishes (draft ready, stored) or fails, so the page can refresh and say so. */
+  onRunFinished?: (run: CpRun, outcome: Exclude<Outcome, null>) => void;
+  /** Told which run is being made (null when none), so closing the window can hand it to the page to keep watching. */
+  onLiveChange?: (watch: CpWatch | null) => void;
 }) {
   // Only a run made for exactly THIS teaching method and format is ever shown or acted on; a run of another choice is no run here.
   const [run, setRun] = useState<CpRun | null>(() => runForChoice(initialRun, pedagogy, format));
+  const [receivedAt, setReceivedAt] = useState(() => Date.now());
+  const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [reviewed, setReviewed] = useState(false);
@@ -49,25 +82,59 @@ export function GenerationPanel({
   const story = format === 'branching_scenario';
   const noun = story ? 'story lesson' : 'presentation';
 
-  const runId = run?.run ?? '';
-  const live = run !== null && (run.state === 'queued' || run.state === 'running');
-
-  // While a draft is being made, ask the server how it is getting on.
+  // The newest run, readable from timers and handlers without waiting for a render.
+  const latest = useRef<CpRun | null>(run);
+  // A click is answered once even if a second one lands before the first render has disabled the button.
+  const working = useRef(false);
+  const onFinished = useRef(onRunFinished);
   useEffect(() => {
-    if (!live) return;
-    const timer = setInterval(async () => {
-      try {
-        const res = await fetchCpStatus(chapterId, { run: runId, pedagogy, format });
-        const mine = runForChoice(res.run, pedagogy, format);
-        if (mine) setRun(mine);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Something went wrong.');
-      }
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [live, runId, chapterId, pedagogy, format]);
+    onFinished.current = onRunFinished;
+  });
+
+  /** Every new reading of the run goes through here: it keeps the ref, the clock and the one-time completion notice in step. */
+  const commit = useCallback((next: CpRun | null) => {
+    const outcome = finishedOutcome(latest.current, next);
+    latest.current = next;
+    setRun(next);
+    setReceivedAt(Date.now());
+    if (outcome && next) onFinished.current?.(next, outcome);
+  }, []);
+
+  const runId = run?.run ?? '';
+  // Poll only for a run that is being made (or saved): never for a finished, failed or absent one.
+  const pollKey = shouldPoll(run) ? runId : '';
+
+  useEffect(() => {
+    onLiveChange?.(run && (run.state === 'queued' || run.state === 'running') ? { chapterId, run: run.run, pedagogy, format } : null);
+    // Reported when the live run changes, not on every reading of it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pollKey, run?.state]);
+
+  // While a draft is being made, ask the server how it is getting on; stop for good when it is done, or when the window closes.
+  useEffect(() => {
+    if (!pollKey) return;
+    const poller = startRunPoller({
+      initial: latest.current,
+      load: async (signal) => runForChoice((await fetchCpStatus(chapterId, { run: pollKey, pedagogy, format }, signal)).run, pedagogy, format),
+      onRun: commit,
+      onOffline: setOffline,
+      onFatal: (e) => setError(e instanceof Error ? e.message : 'Something went wrong.'),
+      isHidden: () => typeof document !== 'undefined' && document.hidden,
+    });
+    const onVisible = () => {
+      if (!document.hidden) poller.wake();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      poller.stop();
+      setOffline(false);
+    };
+  }, [pollKey, chapterId, pedagogy, format, commit]);
 
   const act = async (work: () => Promise<void>) => {
+    if (working.current) return;
+    working.current = true;
     setBusy(true);
     setError('');
     try {
@@ -75,19 +142,49 @@ export function GenerationPanel({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
     } finally {
+      working.current = false;
       setBusy(false);
     }
   };
 
-  const generate = () => act(async () => setRun((await generateCpPresentation(chapterId, pedagogy, format)).run));
+  const generate = () => act(async () => commit((await generateCpPresentation(chapterId, pedagogy, format)).run));
   // Approve and discard name the choice on screen; the server refuses a draft made for another one.
-  const approve = () => act(async () => setRun((await approveCpDraft(chapterId, runId, pedagogy, format)).run));
+  const approve = () => act(async () => commit((await approveCpDraft(chapterId, runId, pedagogy, format)).run));
+  /** The server refused to discard: the screen may be out of date (another window, or the run already ended), so it is refreshed from the server. */
+  const refreshAfterRefused = async () => {
+    try {
+      commit(runForChoice((await fetchCpStatus(chapterId, { run: runId, pedagogy, format })).run, pedagogy, format));
+    } catch {
+      /* the error already shown stands */
+    }
+  };
   const discard = () =>
     act(async () => {
-      await discardCpDraft(chapterId, runId, pedagogy, format);
-      setRun(null);
+      try {
+        await discardCpDraft(chapterId, runId, pedagogy, format);
+      } catch (e) {
+        await refreshAfterRefused();
+        throw e;
+      }
+      commit(null);
       setReviewed(false);
     });
+  // Try again is one deliberate click: drop the failed run, then start ONE new run for the same choice. Nothing retries by itself.
+  const retry = () =>
+    act(async () => {
+      try {
+        await discardCpDraft(chapterId, runId, pedagogy, format);
+      } catch (e) {
+        await refreshAfterRefused();
+        throw e;
+      }
+      setReviewed(false);
+      commit((await generateCpPresentation(chapterId, pedagogy, format)).run);
+    });
+
+  // Said once per change of stage, never per poll.
+  const spoken = run ? announcement(run, noun) : '';
+  const took = run?.progress_info?.duration_seconds;
 
   // The viewer is chosen by what the server says this format opens in AND what the stored item really is.
   const route = run?.state === 'stored' ? resolveViewer(fit.viewer_type, { deepLink: run.stored?.deep_link ?? null }) : null;
@@ -125,35 +222,41 @@ export function GenerationPanel({
         </>
       )}
 
-      {live && run && (
-        <div role="status" className="mt-2">
-          <p className="font-medium">{run.state === 'queued' ? 'Waiting to start…' : `Generating the ${noun}…`}</p>
-          {run.progress.length > 0 && (
-            <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-              {run.progress.map((p) => (
-                <li key={p}>{p}</li>
-              ))}
-            </ul>
-          )}
-          <p className="mt-1 text-xs text-slate-500">You can close this window. The draft waits here for your review.</p>
-        </div>
+      {/* One polite live region for the whole panel: it changes only when the stage or the outcome changes, so polling is silent. */}
+      <p className="sr-only" role="status" aria-live="polite" data-testid="cp-announce">
+        {spoken}
+      </p>
+
+      {run && (run.state === 'queued' || run.state === 'running' || (run.state === 'ready' && run.progress_info?.saving)) && (
+        <GenerationProgress run={run} noun={noun} receivedAt={receivedAt} offline={offline} />
       )}
 
       {run?.state === 'failed' && (
         <div className="mt-2">
-          <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
+          <p role="alert" data-testid="cp-failed" data-failure-kind={run.progress_info?.failure?.kind ?? 'unknown'} className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
+            <span className="font-medium">The {noun} could not be created.</span>{' '}
             {run.error || 'The draft could not be completed. The generation service did not provide a reason.'}
+            {run.progress_info?.failure?.hint && <span className="mt-1 block">{run.progress_info.failure.hint}</span>}
+            {took ? <span className="mt-1 block text-xs">It ran for {formatDuration(took)} before stopping. Nothing was stored.</span> : null}
           </p>
-          <button type="button" disabled={busy} onClick={discard} className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50">
-            Discard and start over
-          </button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {canRetry(run) && (
+              <button type="button" data-testid="cp-retry" disabled={busy || !fit.generation_supported} onClick={retry} className={cn('rounded-md px-3 py-1.5 font-medium', busy || !fit.generation_supported ? 'cursor-not-allowed bg-slate-200 text-slate-500' : 'bg-indigo-600 text-white hover:bg-indigo-700')}>
+                {busy ? 'Starting…' : 'Try again'}
+              </button>
+            )}
+            <button type="button" disabled={busy} onClick={discard} className="rounded-md border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50">
+              Discard and start over
+            </button>
+          </div>
         </div>
       )}
 
-      {run?.state === 'ready' && (
+      {run?.state === 'ready' && !run.progress_info?.saving && (
         <div className="mt-2">
-          <p className="rounded-md bg-emerald-50 px-3 py-2 text-emerald-900" role="status">
-            A draft is ready for your review. It passed validation, and it follows the teaching method you chose.
+          <p className="rounded-md bg-emerald-50 px-3 py-2 text-emerald-900" role="status" data-testid="cp-draft-ready">
+            <span className="font-medium">{story ? 'Story lesson draft created successfully.' : 'Draft created successfully.'}</span>{took ? ` Generated in ${formatDuration(took)}.` : ''}{' '}
+            It is ready for your review. It passed validation, and it follows the teaching method you chose.
             {run.report && (
               <>
                 {' '}
@@ -162,6 +265,7 @@ export function GenerationPanel({
               </>
             )}
           </p>
+          {run.progress_info?.timings && <TimingsDetails timings={run.progress_info.timings} />}
           {(() => {
             const cover = coverageSentence(run.coverage, run.report?.concepts ?? null);
             return (
@@ -222,7 +326,8 @@ export function GenerationPanel({
 
       {run?.state === 'stored' && (
         <div className="mt-2">
-          <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-emerald-900">
+          <p role="status" data-testid="cp-stored" className="rounded-md bg-emerald-50 px-3 py-2 text-emerald-900">
+            <span className="font-medium">{story ? 'Story lesson created successfully.' : 'Presentation created successfully.'}</span>{took ? ` Generated in ${formatDuration(took)}.` : ''}{' '}
             {story ? 'The story lesson is stored for this chapter, beside the Classroom Presentation.' : 'The presentation is stored for this chapter.'}
             {run.stored?.images && run.stored.images.linked === run.stored.images.referenced && ` All ${run.stored.images.referenced} pictures are linked to it.`}
           </p>
@@ -238,7 +343,7 @@ export function GenerationPanel({
               onClick={() => run.stored?.deep_link && onOpenPresentation(run.stored.deep_link)}
               className="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-700"
             >
-              {story ? 'Open story lesson' : 'Open presentation'}
+              {story ? 'View story lesson' : 'View presentation'}
             </button>
           ) : (
             <p role="alert" className="mt-2 text-amber-900">

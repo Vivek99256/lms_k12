@@ -15,6 +15,7 @@ import {
   Lightbulb,
   Loader2,
   Lock,
+  Mountain,
   Play,
   RefreshCw,
   Route,
@@ -636,15 +637,26 @@ function ChapterRow({
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-              {/* The primary route in. The plan page is the stage router: it reads
-                  the learner's stored evidence and opens on whatever they should
-                  do next — take the diagnostic, practise a weak concept, or go to
-                  Learn and Check. That keeps the decision server-side instead of
-                  asking every chapter row to work it out for itself. */}
+              {/* Open this chapter's existing 12-stage visual journey overview. */}
               {!isStaff && (
-                <Button size="sm" onClick={() => router.push(`/pal/plan/chapter/${context.chapterId}`)}>
+                <Button size="sm" onClick={() => router.push(`/pal/diagnostic/chapter/${context.chapterId}`)}>
                   <Route className="h-3.5 w-3.5" />
                   Learning journey
+                </Button>
+              )}
+
+              {/* The Mountain Adventure view: the same journey as one page,
+                  rather than the twelve separate screens above. Additive only
+                  — every other control on this row is unchanged. */}
+              {!isStaff && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => router.push(`/pal/journey?chapterId=${context.chapterId}`)}
+                  className="border-sky-200 text-sky-700 hover:bg-sky-50"
+                >
+                  <Mountain className="h-3.5 w-3.5" />
+                  Your Journey
                 </Button>
               )}
 
