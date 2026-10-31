@@ -324,7 +324,7 @@ function getDbPool(): mysql.Pool {
 async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<AgentRun[]> {
   try {
     const pool = getDbPool();
-    const limit = filter?.limit && filter.limit > 0 ? Math.min(200, filter.limit * 2) : 100;
+    const limit = Math.max(300, (filter?.limit && filter.limit > 0 ? filter.limit * 10 : 200));
     const [rows] = (await pool.query(
       'SELECT * FROM ai_agent_runs ORDER BY id DESC LIMIT ?',
       [limit]
