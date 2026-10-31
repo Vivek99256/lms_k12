@@ -344,21 +344,37 @@ export async function dbAssignAdmin(
   return dbGetSession(sessionId);
 }
 
-export async function dbCloseSession(
-  sessionId: string,
-  closedBy?: { id: string; name: string; role: string }
-): Promise<LiveChatSession | null> {
+export async function dbCloseSession(sessionId: string): Promise<LiveChatSession | null> {
   const pool = getDbPool();
-  await pool.query(`UPDATE ai_live_chat_sessions SET status = 'closed', updated_at = NOW() WHERE id = ?`, [sessionId]);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.query(
+      `UPDATE ai_live_chat_sessions
+       SET status = 'closed', last_message_text = NULL, last_message_time = NULL,
+           unread_count_for_admin = 0, unread_count_for_user = 0,
+           messages_exchanged_count = 0, updated_at = NOW()
+       WHERE id = ?`,
+      [sessionId]
+    );
+    const [rows] = (await connection.query(
+      `SELECT * FROM ai_live_chat_sessions WHERE id = ?`,
+      [sessionId]
+    )) as [Array<Record<string, unknown>>, unknown];
+    if (rows.length === 0) {
+      await connection.rollback();
+      return null;
+    }
 
-  const closerName = closedBy?.name || 'Administrator';
-  await pool.query(
-    `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
-     VALUES (?, ?, 'system', 'System', 'system', 'system', ?, NOW(), NOW())`,
-    [uuidv4(), sessionId, `Live chat ended by ${closerName}.`]
-  );
-
-  return dbGetSession(sessionId);
+    await connection.query(`DELETE FROM ai_live_chat_messages WHERE session_id = ?`, [sessionId]);
+    await connection.commit();
+    return formatSessionRow(rows[0]);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 export async function dbMarkAsRead(sessionId: string, role: 'user' | 'admin'): Promise<void> {
@@ -369,72 +385,89 @@ export async function dbMarkAsRead(sessionId: string, role: 'user' | 'admin'): P
 
 export async function dbAddMessage(req: SendMessageRequest): Promise<LiveChatMessage | null> {
   const pool = getDbPool();
+  const connection = await pool.getConnection();
   const messageId = uuidv4();
   const now = new Date();
   const bookingJson = req.bookingDetails ? JSON.stringify(req.bookingDetails) : null;
 
-  await pool.query(
-    `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, meet_url, booking_details, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-    [
-      messageId,
-      req.sessionId,
-      req.senderId,
-      req.senderName,
-      req.senderRole,
-      req.type || 'text',
-      req.text,
-      req.meetUrl || null,
-      bookingJson,
-    ]
-  );
-
-  // Update session
-  let updateSql = `UPDATE ai_live_chat_sessions SET updated_at = NOW(), last_message_text = ?, last_message_time = NOW()`;
-  const updateParams: unknown[] = [req.text];
-
-  if (req.senderRole === 'user') {
-    updateSql += `, unread_count_for_admin = unread_count_for_admin + 1, messages_exchanged_count = messages_exchanged_count + 1`;
-  } else if (req.senderRole === 'admin') {
-    updateSql += `, unread_count_for_user = unread_count_for_user + 1`;
-  }
-
-  updateSql += ` WHERE id = ?`;
-  updateParams.push(req.sessionId);
-  await pool.query(updateSql, updateParams);
-
-  // Trigger meet suggestion on 3 user messages
-  if (req.senderRole === 'user') {
-    const [sRows] = (await pool.query(`SELECT * FROM ai_live_chat_sessions WHERE id = ?`, [req.sessionId])) as [
-      Array<Record<string, unknown>>,
-      unknown
-    ];
-    if (sRows.length > 0 && Number(sRows[0].messages_exchanged_count) >= 3 && !sRows[0].meet_suggested) {
-      await pool.query(
-        `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
-         VALUES (?, ?, 'system', 'System', 'system', 'meet_suggestion', ?, NOW(), NOW())`,
-        [
-          uuidv4(),
-          req.sessionId,
-          'Would you like to schedule a 1:1 Google Meet session with the administrator to resolve this quickly?',
-        ]
-      );
-      await pool.query(`UPDATE ai_live_chat_sessions SET meet_suggested = 1 WHERE id = ?`, [req.sessionId]);
+  try {
+    await connection.beginTransaction();
+    const [sessionRows] = (await connection.query(
+      `SELECT status FROM ai_live_chat_sessions WHERE id = ? FOR UPDATE`,
+      [req.sessionId]
+    )) as [Array<Record<string, unknown>>, unknown];
+    if (sessionRows.length === 0 || sessionRows[0].status === 'closed') {
+      await connection.rollback();
+      return null;
     }
-  }
 
-  return {
-    id: messageId,
-    sessionId: req.sessionId,
-    senderId: req.senderId,
-    senderName: req.senderName,
-    senderRole: req.senderRole,
-    type: req.type || 'text',
-    text: req.text,
-    meetUrl: req.meetUrl,
-    bookingDetails: req.bookingDetails,
-    createdAt: now.toISOString(),
-  };
+    await connection.query(
+      `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, meet_url, booking_details, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        messageId,
+        req.sessionId,
+        req.senderId,
+        req.senderName,
+        req.senderRole,
+        req.type || 'text',
+        req.text,
+        req.meetUrl || null,
+        bookingJson,
+      ]
+    );
+
+    let updateSql = `UPDATE ai_live_chat_sessions SET updated_at = NOW(), last_message_text = ?, last_message_time = NOW()`;
+    const updateParams: unknown[] = [req.text];
+
+    if (req.senderRole === 'user') {
+      updateSql += `, unread_count_for_admin = unread_count_for_admin + 1, messages_exchanged_count = messages_exchanged_count + 1`;
+    } else if (req.senderRole === 'admin') {
+      updateSql += `, unread_count_for_user = unread_count_for_user + 1`;
+    }
+
+    updateSql += ` WHERE id = ?`;
+    updateParams.push(req.sessionId);
+    await connection.query(updateSql, updateParams);
+
+    if (req.senderRole === 'user') {
+      const [sRows] = (await connection.query(`SELECT * FROM ai_live_chat_sessions WHERE id = ?`, [req.sessionId])) as [
+        Array<Record<string, unknown>>,
+        unknown
+      ];
+      if (sRows.length > 0 && Number(sRows[0].messages_exchanged_count) >= 3 && !sRows[0].meet_suggested) {
+        await connection.query(
+          `INSERT INTO ai_live_chat_messages (id, session_id, sender_id, sender_name, sender_role, type, text, created_at, updated_at)
+           VALUES (?, ?, 'system', 'System', 'system', 'meet_suggestion', ?, NOW(), NOW())`,
+          [
+            uuidv4(),
+            req.sessionId,
+            'Would you like to schedule a 1:1 Google Meet session with the administrator to resolve this quickly?',
+          ]
+        );
+        await connection.query(`UPDATE ai_live_chat_sessions SET meet_suggested = 1 WHERE id = ?`, [req.sessionId]);
+      }
+    }
+
+    await connection.commit();
+    return {
+      id: messageId,
+      sessionId: req.sessionId,
+      senderId: req.senderId,
+      senderName: req.senderName,
+      senderRole: req.senderRole,
+      type: req.type || 'text',
+      text: req.text,
+      meetUrl: req.meetUrl,
+      bookingDetails: req.bookingDetails,
+      createdAt: now.toISOString(),
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 export async function dbGetMessages(sessionId: string, afterTimestamp?: string): Promise<LiveChatMessage[]> {
