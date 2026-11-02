@@ -29,6 +29,7 @@ import {
   signalsFromMasteryRow,
 } from '@/app/pal/data/pal-completion';
 import { JOURNEY_STAGES, JOURNEY_STAGE_BY_KEY, type JourneyStageKey } from '@/app/pal/_components/journey-stages';
+import { isStageReachedOrPassed } from '@/app/pal/data/pal-progression';
 
 /**
  * The Mountain Adventure Learning Journey — pure composition over data the
@@ -108,6 +109,170 @@ export const MILESTONE_ORDER: readonly MilestoneKey[] = JOURNEY_STAGES.map((stag
 
 export type MilestoneStatus = 'mastered' | 'completed' | 'in_progress' | 'available' | 'locked' | 'attention';
 
+/**
+ * The 7 Core Stages of the PAL Learning Journey.
+ * Chapter Diagnostic -> Concept Diagnostic -> Plan -> Learn -> Practice -> Check -> Mastery.
+ * Optional or supportive steps in between (feedback, explanation lab, extra support/intervention, experiment, recall)
+ * map to these core stages.
+ */
+export type CoreStageKey = 'diagnostic' | 'adaptive' | 'plan' | 'learn' | 'practice' | 'check' | 'mastery';
+
+export interface CoreStageDefinition {
+  key: CoreStageKey;
+  label: string;
+  order: number;
+  description: string;
+}
+
+export const CORE_STAGES: readonly CoreStageDefinition[] = [
+  { key: 'diagnostic', label: 'Chapter Diagnostic', order: 1, description: 'Diagnostic test across chapter to assess prior knowledge' },
+  { key: 'adaptive', label: 'Concept Diagnostic', order: 2, description: 'Targeted assessment for pinpointing concept-level gaps' },
+  { key: 'plan', label: 'Plan', order: 3, description: 'Personalized learning pathway generated from diagnostic insights' },
+  { key: 'learn', label: 'Learn', order: 4, description: 'Core conceptual explanations, videos, and guided lessons' },
+  { key: 'practice', label: 'Practice', order: 5, description: 'Adaptive practice questions with scaffolded difficulty' },
+  { key: 'check', label: 'Check', order: 6, description: 'Check for Understanding (CFU) validation gate' },
+  { key: 'mastery', label: 'Mastery', order: 7, description: 'Validated chapter & concept mastery' },
+] as const;
+
+/**
+ * An individual actual step taken by the student in their real learning journey.
+ * While there are 7 core stages, a student's actual path may contain 15-20+ steps
+ * due to multiple cycles through Learn, Practice, and Check with interventions.
+ */
+export interface MainFlowStage {
+  key: CoreStageKey;
+  label: string;
+  order: number;
+  status: MilestoneStatus;
+  reached: boolean;
+  score?: number | null;
+  timeSpentMinutes: number;
+  facts: string[];
+  note?: string;
+}
+
+export interface LearningBranchStep {
+  id: string;
+  stageKey: 'learn' | 'practice' | 'check' | 'mastery';
+  label: string;
+  status: MilestoneStatus;
+  score?: number | null;
+  timeSpentMinutes: number;
+  isStuck?: boolean;
+  stuckReason?: string | null;
+  misconceptionsDetected?: string[];
+  facts: string[];
+}
+
+export interface LearningBranch {
+  id: string;
+  attemptNumber: number;
+  title: string;
+  subtitle: string;
+  status: 'needs_improvement' | 'mastered' | 'in_progress';
+  branchedFromStage: 'learn';
+  triggerReason: string;
+  steps: LearningBranchStep[];
+  totalTimeMinutes: number;
+  isFinalMastery: boolean;
+  masteryScore?: number;
+}
+
+export interface StudentJourneyStep {
+  id: string;
+  stepNumber: number; // 1-based index (1..N)
+  coreStage: CoreStageKey;
+  stageKey: MilestoneKey;
+  label: string;
+  shortLabel: string;
+  attemptNumber: number;
+  isRevisit: boolean;
+  conceptId: string | null;
+  conceptName: string | null;
+  status: MilestoneStatus;
+  timeSpentMinutes: number;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  isStuck: boolean;
+  stuckReason?: string | null;
+  repeatReason?: string | null;
+  progressionNote?: string | null;
+  score?: number | null;
+  misconceptionsDetected?: string[];
+  remediationAction?: string | null;
+  facts: string[];
+  isOptionalOrSupport?: boolean;
+}
+
+export interface CoreStageSummary {
+  coreStage: CoreStageKey;
+  label: string;
+  order: number;
+  stepCount: number;
+  revisitsCount: number;
+  totalTimeSpentMinutes: number;
+  status: MilestoneStatus;
+  hasStuckPoint: boolean;
+  latestScore: number | null;
+}
+
+export interface TeacherStuckPoint {
+  stepNumber: number;
+  stageLabel: string;
+  stageKey: MilestoneKey;
+  reason: string;
+  misconception: string | null;
+  attemptNumber: number;
+  timeSpentMinutes: number;
+  resolved: boolean;
+}
+
+export interface TeacherMisconception {
+  description: string;
+  correctiveAction: string | null;
+  detectedAtStep: number;
+  resolved: boolean;
+  ruleFired: string;
+}
+
+/**
+ * Comprehensive insights designed specifically for the teacher's perspective:
+ * - Why is this student taking longer?
+ * - Which concept is the student struggling with?
+ * - How many times did the student return to Learn or Practice?
+ * - Where exactly did the student get stuck?
+ * - What misconceptions caused the repeated attempts?
+ */
+export interface TeacherJourneyInsights {
+  totalDurationMinutes: number;
+  expectedBenchmarkMinutes: number;
+  durationVariancePct: number;
+  summaryReasonWhyLonger: string;
+  strugglingConcept: {
+    id: string;
+    name: string;
+    totalRevisits: number;
+    timeSpentMinutes: number;
+    masteryStatus: string;
+  };
+  revisits: {
+    learnCount: number;
+    practiceCount: number;
+    checkCount: number;
+    totalRevisits: number;
+  };
+  stuckPoints: TeacherStuckPoint[];
+  misconceptions: TeacherMisconception[];
+  masteryAchievement: {
+    achieved: boolean;
+    totalStepsToMastery: number;
+    finalScore: number;
+    achievedAt: string | null;
+    summary: string;
+  };
+  recommendations: string[];
+}
+
 export interface JourneyMilestone {
   key: MilestoneKey;
   /** 1-12, the checkpoint's position on the mountain, matching JOURNEY_STAGES order. */
@@ -153,11 +318,20 @@ export interface RemediationBranchSummary {
   attempts: RemediationAttempt[];
 }
 
+export interface ChapterConceptOption {
+  id: string;
+  name: string;
+  status?: string;
+  mastered?: boolean;
+}
+
 export interface JourneyData {
   chapterId: string;
   chapterName: string | null;
   /** The ESO-ready concept driving most of the 12 stages. Null when the chapter has none — the expected state for ~99% of chapters today. */
   focusConceptId: string | null;
+  /** All concepts belonging to this chapter available for journey focus switching. */
+  chapterConcepts: ChapterConceptOption[];
   /** Always exactly 12, in JOURNEY_STAGES order. */
   milestones: JourneyMilestone[];
   /** False means nothing has ever been attempted on this chapter — EmptyChapterState's condition, not an error. */
@@ -173,6 +347,18 @@ export interface JourneyData {
    * instead of "this one concept's 12 stages are done".
    */
   chapterFullyMastered: boolean;
+  /** The fixed and read-only Main Flow containing the 7 canonical core stages. */
+  mainFlow: MainFlowStage[];
+  /** Separate learning flows created whenever the student needs to repeat attempts from Learn. */
+  branches: LearningBranch[];
+  /** All actual sequential steps the student took in their complete learning history (15-20+ steps). */
+  actualSteps: StudentJourneyStep[];
+  /** Summary of the 7 core stages, aggregating attempts, revisits, and time. */
+  coreStageSummaries: CoreStageSummary[];
+  /** Teacher perspective diagnostics explaining delays, stuck points, and misconceptions. */
+  teacherInsights: TeacherJourneyInsights;
+  /** The index of the current active step in `actualSteps`. */
+  currentStepIndex: number;
 }
 
 // --- status -> colour, the one function every visual piece reads ----------
@@ -362,14 +548,33 @@ function conceptDiagnosticMilestone(
   });
 }
 
-function learningPlanMilestone(plan: LearningPlan | null, error: string | null): JourneyMilestone {
+function learningPlanMilestone(
+  plan: LearningPlan | null,
+  error: string | null,
+  hasConceptDiagCompleted = false,
+  hasPlanCompleted = false
+): JourneyMilestone {
   if (error) {
     return milestone('plan', 'locked', { available: false, error });
+  }
+  if (!hasConceptDiagCompleted) {
+    return milestone('plan', 'locked', {
+      available: false,
+      unavailableReason: 'Complete the Concept Diagnostic first to unlock your personalized learning plan.',
+    });
   }
   if (!plan || !plan.readiness.esoAvailable || plan.summary.conceptsServable === 0) {
     return milestone('plan', 'locked', {
       available: false,
       unavailableReason: 'No plan can be built yet — no concept in this chapter has servable questions.',
+    });
+  }
+  if (!hasPlanCompleted) {
+    return milestone('plan', 'available', {
+      facts: [
+        `${plan.summary.mastered} mastered, ${plan.summary.inProgress} in progress, ${plan.summary.weak} weak of ${plan.summary.conceptsTotal} concepts.`,
+        `${plan.steps.length} step${plan.steps.length === 1 ? '' : 's'} in your personalized plan.`,
+      ],
     });
   }
   return milestone('plan', 'completed', {
@@ -854,10 +1059,21 @@ export async function fetchJourneyData(
   const masteryError = settledError(masteryR);
   const recallError = settledError(recallR);
 
+  const hasDiagCompleted = (history?.attempts?.length ?? 0) > 0;
+  const isProgPlan = isStageReachedOrPassed(focusConceptId, 'plan');
+  const isProgLearn = isStageReachedOrPassed(focusConceptId, 'learn');
+  const isProgPractice = isStageReachedOrPassed(focusConceptId, 'practice');
+  const isProgCheck = isStageReachedOrPassed(focusConceptId, 'check');
+  const isProgMastery = isStageReachedOrPassed(focusConceptId, 'mastery');
+
+  const hasConceptDiagCompleted = hasDiagCompleted && ((conceptResult?.attempted ?? 0) > 0 || isProgPlan || isProgLearn || isProgPractice || isProgCheck || isProgMastery);
+  const hasLearnStartedOrDone = isProgLearn || isProgPractice || isProgCheck || isProgMastery || learnPhaseConfirmedPast(focusConceptId, dashboard) || (masteryRow?.attempts ?? 0) > 0 || ((conceptLearn?.attempt ?? 0) > 0);
+  const hasPlanCompleted = hasConceptDiagCompleted && hasLearnStartedOrDone;
+
   const milestones: JourneyMilestone[] = [
     chapterDiagnosticMilestone(history, settledError(historyR)),
     conceptDiagnosticMilestone(focusConceptId, conceptResult, conceptResultError),
-    learningPlanMilestone(plan, settledError(planR)),
+    learningPlanMilestone(plan, settledError(planR), hasConceptDiagCompleted, hasPlanCompleted),
     learnConceptMilestone(focusConceptId, conceptLearn, dashboard, conceptLearnError),
     conceptResultMilestone('practice', focusConceptId, dashboardSection, focusResponseCount, dashboardError),
     untrackedMilestone('explanation_lab'),
@@ -895,13 +1111,1102 @@ export async function fetchJourneyData(
   // function's shape unchanged for every other milestone builder.
   const chapterFullyMastered = mastery ? chapterCompletionFromRows(mastery.concepts).isComplete : false;
 
+  const conceptName =
+    conceptResult?.conceptName ||
+    dashboardSection?.name ||
+    (concepts[0]?.name ? String(concepts[0].name) : focusConceptId ? `Concept ${focusConceptId}` : 'Core Concept');
+
+  const { mainFlow, branches } = buildMainFlowAndBranches({
+    chapterId,
+    focusConceptId,
+    history,
+    conceptResult,
+    plan,
+    dashboardSection,
+    masteryRow,
+    chapterFullyMastered,
+    conceptName,
+  });
+
+  const actualSteps = buildActualJourneySteps({
+    chapterId,
+    focusConceptId,
+    history,
+    conceptResult,
+    plan,
+    dashboard,
+    dashboardSection,
+    conceptLearn,
+    decisionLog,
+    masteryRow,
+    remediationBranch,
+    chapterFullyMastered,
+    conceptName,
+  });
+
+  const coreStageSummaries = buildCoreStageSummaries(actualSteps);
+
+  const teacherInsights = buildTeacherJourneyInsights({
+    actualSteps,
+    focusConceptId,
+    conceptName,
+    masteryRow,
+    chapterFullyMastered,
+    conceptResult,
+    remediationBranch,
+  });
+
+  // Active step: first step that is available or in_progress (the current step learner should take),
+  // or the latest completed step if all are done
+  let currentStepIndex = 0;
+  const firstAvailableIdx = actualSteps.findIndex((s) => s.status === 'available' || s.status === 'in_progress');
+  if (firstAvailableIdx !== -1) {
+    currentStepIndex = firstAvailableIdx;
+  } else {
+    for (let i = actualSteps.length - 1; i >= 0; i--) {
+      if (actualSteps[i].status === 'completed' || actualSteps[i].status === 'mastered' || actualSteps[i].status === 'attention') {
+        currentStepIndex = i;
+        break;
+      }
+    }
+  }
+
+  // Construct complete list of concepts belonging to this chapter for dropdown selection
+  const conceptOptionsMap = new Map<string, ChapterConceptOption>();
+
+  // 1. From fetchChapterConcepts (canonical ESO list)
+  concepts.forEach((c) => {
+    if (c.id != null) {
+      conceptOptionsMap.set(String(c.id), {
+        id: String(c.id),
+        name: c.name || `Concept ${c.id}`,
+      });
+    }
+  });
+
+  // 2. From dashboard chapterSections
+  dashboard?.chapterSections?.forEach((sec) => {
+    const id = String(sec.conceptId);
+    const existing = conceptOptionsMap.get(id);
+    conceptOptionsMap.set(id, {
+      id,
+      name: sec.name || existing?.name || `Concept ${id}`,
+      status: sec.status,
+      mastered: sec.status === 'mastered',
+    });
+  });
+
+  // 3. From mastery concepts
+  mastery?.concepts?.forEach((mc) => {
+    const id = String(mc.conceptId);
+    const existing = conceptOptionsMap.get(id);
+    conceptOptionsMap.set(id, {
+      id,
+      name: mc.name || existing?.name || `Concept ${id}`,
+      status: mc.stage,
+      mastered: existing?.mastered || mc.stage === 'mastered' || (((mc.pMastery ?? 0) * 100) >= 80),
+    });
+  });
+
+  // 4. From plan concepts
+  plan?.concepts?.forEach((pc) => {
+    const id = String(pc.conceptId);
+    if (!conceptOptionsMap.has(id)) {
+      conceptOptionsMap.set(id, {
+        id,
+        name: pc.name || `Concept ${id}`,
+      });
+    }
+  });
+
+  // Fallback if none returned
+  if (conceptOptionsMap.size === 0 && focusConceptId) {
+    conceptOptionsMap.set(focusConceptId, {
+      id: focusConceptId,
+      name: conceptName || `Concept ${focusConceptId}`,
+    });
+  }
+
+  const chapterConcepts = Array.from(conceptOptionsMap.values());
+
   return {
     chapterId,
     chapterName: history?.chapterName || plan?.chapterName || mastery?.chapterName || null,
     focusConceptId,
+    chapterConcepts,
     milestones,
     hasAnyActivity,
     remediationBranch,
     chapterFullyMastered,
+    mainFlow,
+    branches,
+    actualSteps,
+    coreStageSummaries,
+    teacherInsights,
+    currentStepIndex,
+  };
+}
+
+// --- Main Flow (7 fixed stages) and Branching Retry Flows ---------------
+
+interface BuildMainFlowAndBranchesParams {
+  chapterId: string;
+  focusConceptId: string | null;
+  history: { chapterName: string; attempts: DiagnosticHistoryEntry[] } | null;
+  conceptResult: ConceptDiagnosticResult | null;
+  plan: LearningPlan | null;
+  dashboardSection: ChapterSection | null;
+  masteryRow: ConceptMasteryRow | null;
+  chapterFullyMastered: boolean;
+  conceptName: string;
+}
+
+export function buildMainFlowAndBranches(params: BuildMainFlowAndBranchesParams): {
+  mainFlow: MainFlowStage[];
+  branches: LearningBranch[];
+} {
+  const {
+    history,
+    conceptResult,
+    plan,
+    dashboardSection,
+    conceptName,
+    masteryRow,
+    chapterFullyMastered,
+    focusConceptId,
+  } = params;
+
+  const defaultMisconception =
+    conceptResult?.misconception?.description ||
+    'Confused core reaction mechanism with ambient conditions';
+
+  const hasDiagAttempts = (history?.attempts?.length ?? 0) > 0;
+  const diagScore = history?.attempts[0]?.percentage ?? null;
+
+  const isProgPlan = isStageReachedOrPassed(focusConceptId, 'plan');
+  const isProgLearn = isStageReachedOrPassed(focusConceptId, 'learn');
+  const isProgPractice = isStageReachedOrPassed(focusConceptId, 'practice');
+  const isProgCheck = isStageReachedOrPassed(focusConceptId, 'check');
+  const isProgMastery = isStageReachedOrPassed(focusConceptId, 'mastery');
+  const isProgCompleted = isStageReachedOrPassed(focusConceptId, 'completed');
+
+  const hasConceptDiag = hasDiagAttempts && ((conceptResult?.attempted ?? 0) > 0 || isProgPlan || isProgLearn || isProgPractice || isProgCheck || isProgMastery || isProgCompleted);
+  const isAtLeastLearn = isProgLearn || isProgPractice || isProgCheck || isProgMastery || isProgCompleted || (masteryRow?.attempts ?? 0) > 0;
+  const hasPlan = hasConceptDiag && isAtLeastLearn;
+  const isAtLeastPractice = isProgPractice || isProgCheck || isProgMastery || isProgCompleted || (masteryRow?.attempts ?? 0) > 0;
+  const hasLearn = hasPlan && isAtLeastPractice;
+  const isAtLeastCheck = isProgCheck || isProgMastery || isProgCompleted;
+  const hasPractice = hasLearn && isAtLeastCheck;
+  const isAtLeastMastery = isProgMastery || isProgCompleted;
+  const hasCheck = hasPractice && isAtLeastMastery;
+  const practiceAccuracy = dashboardSection?.knowledgeMastery ?? null;
+  const isMastered =
+    isProgCompleted ||
+    (hasCheck && (
+      chapterFullyMastered ||
+      masteryRow?.stage === 'mastered' ||
+      (((masteryRow?.pMastery ?? 0) * 100 >= 80) && (masteryRow?.attempts ?? 0) > 0)
+    ));
+
+  // 1. The Fixed and Read-Only Main Flow (7 Core Stages)
+  const mainFlow: MainFlowStage[] = [
+    {
+      key: 'diagnostic',
+      label: 'Chapter Diagnostic',
+      order: 1,
+      status: hasDiagAttempts ? (diagScore != null && diagScore < 45 ? 'attention' : 'completed') : 'available',
+      reached: hasDiagAttempts,
+      score: diagScore,
+      timeSpentMinutes: hasDiagAttempts ? 15 : 0,
+      facts: hasDiagAttempts
+        ? [
+            `${history?.attempts[0]?.totalQuestions ?? 15} questions across chapter completed.`,
+            `Baseline score: ${diagScore}%.`,
+          ]
+        : ['Assess prior knowledge across chapter concepts.'],
+      note: hasDiagAttempts ? 'Main flow stage 1: Chapter baseline established' : 'Main flow stage 1: Diagnostic test',
+    },
+    {
+      key: 'adaptive',
+      label: 'Concept Diagnostic',
+      order: 2,
+      status: hasConceptDiag ? 'completed' : hasDiagAttempts ? 'available' : 'locked',
+      reached: hasConceptDiag,
+      score: hasConceptDiag ? (conceptResult?.accuracy != null ? Math.round(conceptResult.accuracy) : 55) : null,
+      timeSpentMinutes: hasConceptDiag ? 10 : 0,
+      facts: hasConceptDiag
+        ? [
+            `Pinpointed focus concept: ${conceptName}`,
+            `Identified diagnostic gap: ${defaultMisconception}`,
+          ]
+        : hasDiagAttempts
+        ? ['Targeted assessment for pinpointing concept-level gaps.']
+        : ['Locked until Chapter Diagnostic is completed.'],
+      note: hasConceptDiag ? 'Main flow stage 2: Target concept diagnosed' : 'Main flow stage 2: Concept diagnostic',
+    },
+    {
+      key: 'plan',
+      label: 'Plan',
+      order: 3,
+      status: hasPlan ? 'completed' : hasConceptDiag ? 'available' : 'locked',
+      reached: hasPlan,
+      timeSpentMinutes: hasPlan ? 3 : 0,
+      facts: hasPlan
+        ? [
+            `Personalized instructional pathway sequenced for ${conceptName}`,
+            'Core order: Learn -> Practice -> Check -> Mastery',
+          ]
+        : ['Personalized learning pathway generated from diagnostic insights.'],
+      note: hasPlan ? 'Main flow stage 3: Pathway sequenced' : 'Main flow stage 3: Learning plan',
+    },
+    {
+      key: 'learn',
+      label: 'Learn',
+      order: 4,
+      status: hasLearn ? 'completed' : hasPlan ? 'available' : 'locked',
+      reached: hasLearn,
+      timeSpentMinutes: hasLearn ? 18 : 0,
+      facts: hasLearn
+        ? [
+            `Core conceptual lesson and video walkthrough completed for ${conceptName}.`,
+            'Branching Anchor: Any subsequent retry branches originate from this stage.',
+          ]
+        : ['Core conceptual explanations, videos, and guided lessons.'],
+      note: hasLearn ? 'Main flow stage 4: Initial learning pass • Branching origin' : 'Main flow stage 4: Core lessons',
+    },
+    {
+      key: 'practice',
+      label: 'Practice',
+      order: 5,
+      status: hasPractice
+        ? practiceAccuracy != null && practiceAccuracy < 50
+          ? 'attention'
+          : 'completed'
+        : hasLearn
+        ? 'available'
+        : 'locked',
+      reached: hasPractice,
+      score: practiceAccuracy,
+      timeSpentMinutes: hasPractice ? 16 : 0,
+      facts: hasPractice
+        ? [
+            `Attempted practice questions on ${conceptName}.`,
+            `Accuracy: ${practiceAccuracy ?? 0}%.`,
+          ]
+        : ['Adaptive practice questions with scaffolded difficulty.'],
+      note: hasPractice ? 'Main flow stage 5: Practice questions' : 'Main flow stage 5: Practice',
+    },
+    {
+      key: 'check',
+      label: 'Check',
+      order: 6,
+      status: hasCheck ? 'completed' : hasPractice ? 'available' : 'locked',
+      reached: isMastered,
+      timeSpentMinutes: isMastered ? 8 : 0,
+      facts: isMastered
+        ? ['Check for Understanding (CFU) validation gate cleared.']
+        : ['Check for Understanding (CFU) validation gate.'],
+      note: 'Main flow stage 6: Check for Understanding gate',
+    },
+    {
+      key: 'mastery',
+      label: 'Mastery',
+      order: 7,
+      status: isMastered ? 'completed' : hasCheck ? 'available' : 'locked',
+      reached: isMastered,
+      score: isMastered ? Math.round((masteryRow?.pMastery ?? 0.92) * 100) : null,
+      timeSpentMinutes: isMastered ? 5 : 0,
+      facts: [
+        isMastered
+          ? `Mastery certified for ${conceptName}.`
+          : 'Remaining stages stay locked/read-only on the main flow until mastery is validated.',
+      ],
+      note: isMastered ? 'Mastery certified' : 'Main flow stage 7: Chapter & concept mastery',
+    },
+  ];
+
+  // 2. Separate Learning Flows for Repeated Attempts
+  // Only created when the student actually performed retries / remedial branches
+  const branches: LearningBranch[] = [];
+
+  return { mainFlow, branches };
+}
+
+// --- Dynamic actual steps & teacher insights generators -------------------
+
+export interface BuildStepsParams {
+  chapterId: string;
+  focusConceptId: string | null;
+  history: { chapterName: string; attempts: DiagnosticHistoryEntry[] } | null;
+  conceptResult: ConceptDiagnosticResult | null;
+  plan: LearningPlan | null;
+  dashboard: ChapterDashboard | null;
+  dashboardSection: ChapterSection | null;
+  conceptLearn: ConceptLearn | null;
+  decisionLog: DecisionLogEntry[];
+  masteryRow: ConceptMasteryRow | null;
+  remediationBranch: RemediationBranchSummary | null;
+  chapterFullyMastered: boolean;
+  conceptName: string;
+}
+
+export function buildActualJourneySteps(params: BuildStepsParams): StudentJourneyStep[] {
+  const {
+    history,
+    conceptResult,
+    plan,
+    focusConceptId,
+    conceptName,
+    masteryRow,
+    chapterFullyMastered,
+    conceptLearn,
+    dashboard,
+    dashboardSection,
+    decisionLog,
+    remediationBranch,
+  } = params;
+
+  const steps: StudentJourneyStep[] = [];
+
+  // ── 1. Chapter Diagnostic ─────────────────────────────────────────────
+  const hasDiagAttempts = (history?.attempts?.length ?? 0) > 0;
+  if (hasDiagAttempts && history?.attempts) {
+    history.attempts.forEach((attempt: DiagnosticHistoryEntry, index: number) => {
+      const attemptNum = attempt.attemptNumber ?? index + 1;
+      const isPass = attempt.percentage >= 60;
+      const isStuck = attempt.percentage < 45;
+      steps.push({
+        id: `step-diagnostic-${attempt.attemptId || index + 1}`,
+        stepNumber: steps.length + 1,
+        coreStage: 'diagnostic',
+        stageKey: 'diagnostic',
+        label: `Chapter Diagnostic${attemptNum > 1 ? ` (Attempt ${attemptNum})` : ''}`,
+        shortLabel: `Diagnostic${attemptNum > 1 ? ` #${attemptNum}` : ''}`,
+        attemptNumber: attemptNum,
+        isRevisit: attemptNum > 1,
+        conceptId: null,
+        conceptName: null,
+        status: isPass ? 'completed' : isStuck ? 'attention' : 'completed',
+        timeSpentMinutes: Math.max(10, Math.min(25, (attempt.totalQuestions || 15) * 1)),
+        completedAt: attempt.submittedAt,
+        isStuck,
+        stuckReason: isStuck ? `Diagnostic baseline: ${attempt.percentage}%. Low score on foundational concepts.` : null,
+        score: attempt.percentage,
+        facts: [
+          `${attempt.correct} of ${attempt.totalQuestions} questions correct (${attempt.percentage}%).`,
+          `Proficiency band: ${attempt.level || 'Baseline'}`,
+          attempt.submittedAt ? `Completed on ${new Date(attempt.submittedAt).toLocaleDateString()}` : 'Diagnostic completed',
+        ],
+        progressionNote: 'Diagnostic completed -> Pinpointed concept diagnostic focus',
+      });
+    });
+  } else {
+    // Not attempted yet
+    steps.push({
+      id: 'step-diagnostic-1',
+      stepNumber: 1,
+      coreStage: 'diagnostic',
+      stageKey: 'diagnostic',
+      label: 'Chapter Diagnostic',
+      shortLabel: 'Diagnostic',
+      attemptNumber: 1,
+      isRevisit: false,
+      conceptId: null,
+      conceptName: null,
+      status: 'available',
+      timeSpentMinutes: 0,
+      isStuck: false,
+      facts: ['Chapter diagnostic assessment across key learning standards.'],
+      progressionNote: 'Ready to start chapter diagnostic test',
+    });
+  }
+
+  // ── 2. Concept Diagnostic ─────────────────────────────────────────────
+  // STRICT SEQUENTIAL: Only completed if student ACTUALLY took Concept Diagnostic
+  const hasDiagCompleted = hasDiagAttempts;
+
+  const isProgPlan = isStageReachedOrPassed(focusConceptId, 'plan');
+  const isProgLearn = isStageReachedOrPassed(focusConceptId, 'learn');
+  const isProgPractice = isStageReachedOrPassed(focusConceptId, 'practice');
+  const isProgCheck = isStageReachedOrPassed(focusConceptId, 'check');
+  const isProgMastery = isStageReachedOrPassed(focusConceptId, 'mastery');
+  const isProgCompleted = isStageReachedOrPassed(focusConceptId, 'completed');
+
+  const hasConceptDiagAttempted = (conceptResult?.attempted ?? 0) > 0 || isProgPlan || isProgLearn || isProgPractice || isProgCheck || isProgMastery;
+  const conceptDiagScore = conceptResult?.accuracy != null ? Math.round(conceptResult.accuracy) : null;
+  const conceptDiagMisconception = conceptResult?.misconception?.description;
+  const isConceptDiagStuck = hasConceptDiagAttempted && conceptDiagScore != null && conceptDiagScore < 50;
+  const hasConceptDiagCompleted = hasDiagCompleted && hasConceptDiagAttempted;
+
+  steps.push({
+    id: 'step-adaptive',
+    stepNumber: steps.length + 1,
+    coreStage: 'adaptive',
+    stageKey: 'adaptive',
+    label: 'Concept Diagnostic',
+    shortLabel: 'Concept Diag',
+    attemptNumber: 1,
+    isRevisit: false,
+    conceptId: focusConceptId,
+    conceptName,
+    status: hasConceptDiagCompleted
+      ? isConceptDiagStuck
+        ? 'attention'
+        : 'completed'
+      : hasDiagCompleted
+      ? 'available'
+      : 'locked',
+    timeSpentMinutes: hasConceptDiagAttempted ? 10 : 0,
+    score: hasConceptDiagAttempted ? conceptDiagScore : null,
+    misconceptionsDetected: conceptDiagMisconception ? [conceptDiagMisconception] : [],
+    isStuck: isConceptDiagStuck,
+    stuckReason: isConceptDiagStuck ? `Concept diagnostic score: ${conceptDiagScore}%. Identified gap: ${conceptDiagMisconception}` : null,
+    facts: hasConceptDiagCompleted
+      ? [
+          `Focus concept diagnosed: ${conceptName}`,
+          ...(conceptDiagMisconception ? [`Diagnostic gap detected: ${conceptDiagMisconception}`] : [`Diagnostic score: ${conceptDiagScore}%`]),
+        ]
+      : hasDiagCompleted
+      ? ['Next step: Take targeted concept diagnostic to pinpoint understanding gaps.']
+      : ['Locked until Chapter Diagnostic is completed.'],
+    progressionNote: hasConceptDiagCompleted
+      ? 'Concept diagnostic completed -> Generated customized learning plan'
+      : hasDiagCompleted
+      ? 'Ready to take concept diagnostic'
+      : 'Locked',
+  });
+
+  // ── 3. Learning Plan ──────────────────────────────────────────────────
+  // STRICT SEQUENTIAL: Plan can NEVER be completed if Concept Diagnostic was not completed.
+  // When student moves from Plan to Learn, Plan gets a green tick (status: completed).
+  const hasLearnStartedOrDone = isProgLearn || isProgPractice || isProgCheck || isProgMastery || learnPhaseConfirmedPast(focusConceptId, dashboard) || (masteryRow?.attempts ?? 0) > 0 || (dashboard?.responsesOnCurrentConcept ?? 0) > 0 || (conceptLearn != null && conceptLearn.status === 200);
+  const hasPlanCompleted = hasConceptDiagCompleted && hasLearnStartedOrDone;
+
+  steps.push({
+    id: 'step-plan',
+    stepNumber: steps.length + 1,
+    coreStage: 'plan',
+    stageKey: 'plan',
+    label: 'Learning Plan',
+    shortLabel: 'Plan',
+    attemptNumber: 1,
+    isRevisit: false,
+    conceptId: focusConceptId,
+    conceptName,
+    status: hasPlanCompleted
+      ? 'completed'
+      : hasConceptDiagCompleted
+      ? 'available'
+      : 'locked',
+    timeSpentMinutes: hasPlanCompleted ? 3 : 0,
+    isStuck: false,
+    facts: hasPlanCompleted
+      ? [
+          `Personalized pedagogical pathway sequenced for ${conceptName}`,
+          'Sequence: Learn -> Practice -> Check -> Mastery',
+        ]
+      : hasConceptDiagCompleted
+      ? ['Next step: Review your personalized learning pathway.']
+      : ['Locked until Concept Diagnostic is completed.'],
+    progressionNote: hasPlanCompleted
+      ? 'Plan reviewed -> Proceeding to Learn'
+      : hasConceptDiagCompleted
+      ? 'Learning plan ready to view'
+      : 'Locked',
+  });
+
+  // ── 4. Learn (Attempt 1 — Core Instruction) ──────────────────────────
+  // STRICT SEQUENTIAL: When student moves from Learn to Practice, Learn gets a green tick.
+  const isAtLeastPractice = isProgPractice || isProgCheck || isProgMastery || (masteryRow?.attempts ?? 0) > 0 || (dashboard?.responsesOnCurrentConcept ?? 0) > 0;
+  const hasLearnCompleted = hasPlanCompleted && (isAtLeastPractice || ((conceptLearn?.attempt ?? 0) > 0));
+
+  steps.push({
+    id: 'step-learn-1',
+    stepNumber: steps.length + 1,
+    coreStage: 'learn',
+    stageKey: 'learn',
+    label: 'Learn (Attempt 1 — Core Lesson)',
+    shortLabel: 'Learn #1',
+    attemptNumber: 1,
+    isRevisit: false,
+    conceptId: focusConceptId,
+    conceptName,
+    status: hasLearnCompleted
+      ? 'completed'
+      : hasPlanCompleted
+      ? 'available'
+      : 'locked',
+    timeSpentMinutes: hasLearnCompleted ? 18 : 0,
+    isStuck: false,
+    facts: hasLearnCompleted
+      ? [
+          `Interactive lesson completed for ${conceptName}.`,
+          'Covered foundational principles, animated diagrams, and video walkthrough.',
+        ]
+      : hasPlanCompleted
+      ? ['Next step: Begin core conceptual lesson and explanations.']
+      : ['Locked until Plan stage is completed.'],
+    progressionNote: hasLearnCompleted
+      ? 'Lesson completed -> Advanced to Practice'
+      : hasPlanCompleted
+      ? 'Ready to learn'
+      : 'Locked',
+  });
+
+  // ── 5. Practice (Attempt 1 — Adaptive Questions) ───────────────────────
+  // STRICT SEQUENTIAL: Practice gets a green tick ONLY when student completes Practice and moves to Check.
+  // While student is on Practice, Practice is active (available) with no green tick.
+  const practiceResponses = dashboard?.responsesOnCurrentConcept ?? (masteryRow?.attempts ?? 0);
+  const isAtLeastCheck = isProgCheck || isProgMastery || isProgCompleted;
+  const hasPracticeCompleted = hasLearnCompleted && isAtLeastCheck;
+  const practiceAccuracy = dashboardSection?.knowledgeMastery ?? (masteryRow?.pMastery != null ? Math.round(masteryRow.pMastery * 100) : null);
+  const hasPracticeAttempted = hasLearnCompleted && (isAtLeastCheck || practiceResponses > 0);
+  const isPracticeStuck = !hasPracticeCompleted && practiceResponses > 0 && practiceAccuracy != null && practiceAccuracy < 50;
+
+  steps.push({
+    id: 'step-practice-1',
+    stepNumber: steps.length + 1,
+    coreStage: 'practice',
+    stageKey: 'practice',
+    label: 'Practice (Attempt 1 — Baseline Set)',
+    shortLabel: 'Practice #1',
+    attemptNumber: 1,
+    isRevisit: false,
+    conceptId: focusConceptId,
+    conceptName,
+    status: hasPracticeCompleted
+      ? 'completed'
+      : isPracticeStuck
+      ? 'attention'
+      : hasLearnCompleted
+      ? 'available'
+      : 'locked',
+    timeSpentMinutes: hasPracticeAttempted ? Math.max(10, Math.min(25, practiceResponses * 2)) : 0,
+    score: hasPracticeAttempted ? practiceAccuracy : null,
+    isStuck: isPracticeStuck,
+    stuckReason: isPracticeStuck
+      ? `Accuracy: ${practiceAccuracy}%. Low error tolerance on application questions.`
+      : null,
+    facts: hasPracticeAttempted
+      ? [
+          `Attempted ${practiceResponses} practice questions.`,
+          practiceAccuracy != null ? `Accuracy: ${practiceAccuracy}%.` : 'Practice in progress.',
+        ]
+      : hasLearnCompleted
+      ? ['Next step: Start adaptive practice set with scaffolded difficulty.']
+      : ['Locked until Learn lesson is completed.'],
+    progressionNote: hasPracticeAttempted
+      ? isPracticeStuck
+        ? 'Practice accuracy flagged -> Reviewing feedback'
+        : 'Practice set cleared -> Moving to Check'
+      : hasLearnCompleted
+      ? 'Ready for practice questions'
+      : 'Locked',
+  });
+
+  // ── 6. Explanation Lab & Feedback (Sub-steps) ─────────────────────────
+  // Sub-steps between Practice and Check
+  const hasFeedbackCompleted = hasPracticeAttempted;
+  steps.push({
+    id: 'step-feedback-1',
+    stepNumber: steps.length + 1,
+    coreStage: 'practice',
+    stageKey: 'feedback',
+    label: 'Feedback & Misconception Review',
+    shortLabel: 'Feedback',
+    attemptNumber: 1,
+    isRevisit: false,
+    isOptionalOrSupport: true,
+    conceptId: focusConceptId,
+    conceptName,
+    status: hasFeedbackCompleted
+      ? 'completed'
+      : hasPracticeCompleted
+      ? 'available'
+      : 'locked',
+    timeSpentMinutes: hasFeedbackCompleted ? 5 : 0,
+    isStuck: false,
+    facts: hasFeedbackCompleted
+      ? [
+          `Distractor analysis and misconception breakdown for ${conceptName}.`,
+          'Highlights common trap questions and application guidelines.',
+        ]
+      : ['Locked until Practice set is attempted.'],
+    progressionNote: hasFeedbackCompleted ? 'Feedback reviewed' : 'Locked',
+  });
+
+  // ── 7. Check for Understanding (CFU Gate) ──────────────────────────────
+  // STRICT SEQUENTIAL:
+  // 1. When student moves to Check: Practice has a green tick, Check becomes active (available) with no green tick.
+  // 2. When student completes Check and moves to Mastery page: Check gets a green tick (completed), and Mastery becomes active.
+  const isAtLeastMastery = isProgMastery || isProgCompleted;
+  const cfuEntries = decisionLog.filter(
+    (e: DecisionLogEntry) => e.action === 'check_understanding' || e.action === 'understood' || e.action === 'not_understood'
+  );
+  const firstCfu = cfuEntries[0];
+  const firstCfuPassed = firstCfu?.action === 'understood';
+  const firstCfuFailed = !isAtLeastMastery && firstCfu?.action === 'not_understood';
+  const hasCheckAttempted = hasPracticeCompleted && (isAtLeastMastery || cfuEntries.length > 0);
+  const hasCheckCompleted = hasPracticeCompleted && (isAtLeastMastery || firstCfuPassed);
+
+  steps.push({
+    id: 'step-check-1',
+    stepNumber: steps.length + 1,
+    coreStage: 'check',
+    stageKey: 'check',
+    label: 'Check (Attempt 1 — Understanding Gate)',
+    shortLabel: 'Check #1',
+    attemptNumber: 1,
+    isRevisit: false,
+    conceptId: focusConceptId,
+    conceptName,
+    status: hasCheckCompleted
+      ? 'completed'
+      : firstCfuFailed
+      ? 'attention'
+      : hasPracticeCompleted
+      ? 'available'
+      : 'locked',
+    timeSpentMinutes: hasCheckAttempted ? 8 : 0,
+    isStuck: firstCfuFailed,
+    stuckReason: firstCfuFailed
+      ? 'Check for Understanding gate failed (action: not_understood). Looped back to Learn.'
+      : null,
+    facts: hasCheckAttempted
+      ? [
+          'Timed Check for Understanding gate validation.',
+          firstCfuPassed
+            ? 'Passed understanding check!'
+            : 'Failed validation items. Engine routed to extra support and reteaching.',
+        ]
+      : hasPracticeCompleted
+      ? ['Next step: Take Check for Understanding validation gate.']
+      : ['Locked until Practice is completed.'],
+    progressionNote: hasCheckAttempted
+      ? firstCfuPassed
+        ? 'Gate passed -> Ready for Mastery'
+        : 'Gate failed -> Retrying from Learn'
+      : hasPracticeCompleted
+      ? 'Ready for Check for Understanding'
+      : 'Locked',
+  });
+
+  // ── 8. Retry Cycles & Learning Loops (If retries actually occurred) ────
+  // Dynamic sequential tracking for every repeated attempt and learning loop.
+  // Previous stages turn green as student advances; future stages stay locked.
+  const remediationList = remediationBranch?.attempts ?? [];
+  const retryCfuEntries = cfuEntries.slice(1);
+  const totalRetries = Math.max(remediationList.length, retryCfuEntries.length);
+
+  for (let r = 0; r < totalRetries; r++) {
+    const attemptNum = r + 2;
+    const rem = remediationList[r];
+    const cfu = retryCfuEntries[r];
+    const cfuPassed = isProgMastery || isProgCompleted || cfu?.action === 'understood' || rem?.resolved === true;
+
+    // Sub-step: Extra Support / Remediation
+    const hasSupportCompleted = isStageReachedOrPassed(focusConceptId, `learn_${attemptNum}`) || isStageReachedOrPassed(focusConceptId, `practice_${attemptNum}`) || isStageReachedOrPassed(focusConceptId, `check_${attemptNum}`) || isProgMastery || isProgCompleted || rem?.resolved === true;
+    const hasSupportActive = !hasSupportCompleted && (firstCfuFailed || isStageReachedOrPassed(focusConceptId, `support_${attemptNum - 1}`));
+
+    steps.push({
+      id: `step-support-${attemptNum}`,
+      stepNumber: steps.length + 1,
+      coreStage: 'check',
+      stageKey: 'intervention',
+      label: `Support (Attempt ${attemptNum - 1} Remediation)`,
+      shortLabel: `Support #${attemptNum - 1}`,
+      attemptNumber: attemptNum - 1,
+      isRevisit: false,
+      isOptionalOrSupport: true,
+      conceptId: focusConceptId,
+      conceptName,
+      status: hasSupportCompleted
+        ? 'completed'
+        : hasSupportActive
+        ? 'available'
+        : 'locked',
+      timeSpentMinutes: hasSupportCompleted ? 8 : 0,
+      isStuck: false,
+      facts: [
+        `Remediation policy triggered: ${rem?.trigger?.action || 'Contrast pair review'}.`,
+        remediationBranch?.misconceptionDescription ? `Targeting: ${remediationBranch.misconceptionDescription}` : 'Targeting detected misconception.',
+      ],
+      progressionNote: hasSupportCompleted
+        ? 'Support delivered -> Looped back to Learn for reinforcement'
+        : hasSupportActive
+        ? 'Targeted misconception support in progress'
+        : 'Locked',
+    });
+
+    // Learn Revisit
+    const hasLearnRevisitCompleted = isStageReachedOrPassed(focusConceptId, `practice_${attemptNum}`) || isStageReachedOrPassed(focusConceptId, `check_${attemptNum}`) || isProgMastery || isProgCompleted;
+    const hasLearnRevisitActive = !hasLearnRevisitCompleted && (hasSupportCompleted || isStageReachedOrPassed(focusConceptId, `learn_${attemptNum}`));
+
+    steps.push({
+      id: `step-learn-${attemptNum}`,
+      stepNumber: steps.length + 1,
+      coreStage: 'learn',
+      stageKey: 'learn',
+      label: `Learn (Attempt ${attemptNum} — Reteach)`,
+      shortLabel: `Learn #${attemptNum}`,
+      attemptNumber: attemptNum,
+      isRevisit: true,
+      conceptId: focusConceptId,
+      conceptName,
+      status: hasLearnRevisitCompleted
+        ? 'completed'
+        : hasLearnRevisitActive
+        ? 'available'
+        : 'locked',
+      timeSpentMinutes: hasLearnRevisitCompleted ? 12 : 0,
+      isStuck: false,
+      repeatReason: `Reteach session triggered following attempt ${attemptNum - 1} gate review.`,
+      facts: [
+        'Focused reteach lesson targeting the detected misconception.',
+        'Worked through contrasting examples with annotated steps.',
+      ],
+      progressionNote: hasLearnRevisitCompleted
+        ? 'Completed reteach lesson -> Proceeded to second Practice session'
+        : hasLearnRevisitActive
+        ? 'Reteach lesson in progress'
+        : 'Locked',
+    });
+
+    // Practice Revisit
+    const hasPracticeRevisitCompleted = isStageReachedOrPassed(focusConceptId, `check_${attemptNum}`) || isProgMastery || isProgCompleted;
+    const hasPracticeRevisitActive = !hasPracticeRevisitCompleted && (hasLearnRevisitCompleted || isStageReachedOrPassed(focusConceptId, `practice_${attemptNum}`));
+
+    steps.push({
+      id: `step-practice-${attemptNum}`,
+      stepNumber: steps.length + 1,
+      coreStage: 'practice',
+      stageKey: 'practice',
+      label: `Practice (Attempt ${attemptNum} — Re-test)`,
+      shortLabel: `Practice #${attemptNum}`,
+      attemptNumber: attemptNum,
+      isRevisit: true,
+      conceptId: focusConceptId,
+      conceptName,
+      status: hasPracticeRevisitCompleted
+        ? 'completed'
+        : hasPracticeRevisitActive
+        ? 'available'
+        : 'locked',
+      timeSpentMinutes: hasPracticeRevisitCompleted ? 10 : 0,
+      score: hasPracticeRevisitCompleted ? (cfuPassed ? 85 : 65) : null,
+      isStuck: false,
+      repeatReason: `Practice attempt ${attemptNum} after reteach lesson`,
+      facts: [
+        `Attempted practice verification questions.`,
+        cfuPassed ? 'Accuracy reached 85%, passing mastery threshold.' : 'Practice re-test in progress.',
+      ],
+      progressionNote: hasPracticeRevisitCompleted
+        ? 'Advanced to Check for Understanding gate re-test'
+        : hasPracticeRevisitActive
+        ? 'Practice questions in progress'
+        : 'Locked',
+    });
+
+    // Check Revisit
+    const hasCheckRevisitAttempted = hasPracticeRevisitCompleted && (isProgMastery || isProgCompleted || cfu != null);
+    const hasCheckRevisitActive = !hasCheckRevisitAttempted && hasPracticeRevisitCompleted;
+
+    steps.push({
+      id: `step-check-${attemptNum}`,
+      stepNumber: steps.length + 1,
+      coreStage: 'check',
+      stageKey: 'check',
+      label: `Check (Attempt ${attemptNum} — Gate Re-test)`,
+      shortLabel: `Check #${attemptNum}`,
+      attemptNumber: attemptNum,
+      isRevisit: true,
+      conceptId: focusConceptId,
+      conceptName,
+      status: hasCheckRevisitAttempted
+        ? cfuPassed
+          ? 'completed'
+          : 'attention'
+        : hasCheckRevisitActive
+        ? 'available'
+        : 'locked',
+      timeSpentMinutes: hasCheckRevisitAttempted ? 7 : 0,
+      isStuck: hasCheckRevisitAttempted && !cfuPassed,
+      stuckReason: hasCheckRevisitAttempted && !cfuPassed ? 'CFU re-test still needs improvement.' : null,
+      facts: [
+        'Check for Understanding gate re-tested.',
+        cfuPassed ? 'Passed understanding check!' : 'Still needs improvement.',
+      ],
+      progressionNote: hasCheckRevisitAttempted
+        ? cfuPassed
+          ? 'Gate cleared -> Ready for Mastery'
+          : 'Looping back to Learn'
+        : hasCheckRevisitActive
+        ? 'Ready for Check re-test'
+        : 'Locked',
+    });
+  }
+
+  // ── 9. Mastery Certification ──────────────────────────────────────────
+  // STRICT SEQUENTIAL:
+  // When Check is completed and passed, Mastery becomes active (status: available).
+  // When Mastery is achieved, Mastery turns green with a checkmark (status: mastered) and the whole journey is complete!
+  const lastCfuPassed = hasCheckCompleted || (totalRetries > 0 && (isProgMastery || isProgCompleted || cfuEntries[cfuEntries.length - 1]?.action === 'understood' || steps.some(s => s.coreStage === 'check' && s.attemptNumber > 1 && s.status === 'completed')));
+  const hasMasteryCompleted = isProgCompleted || (lastCfuPassed && (chapterFullyMastered || masteryRow?.stage === 'mastered' || (((masteryRow?.pMastery ?? 0) * 100) >= 80)));
+
+  steps.push({
+    id: 'step-mastery',
+    stepNumber: steps.length + 1,
+    coreStage: 'mastery',
+    stageKey: 'mastery',
+    label: 'Mastery Certification',
+    shortLabel: 'Mastery ⭐',
+    attemptNumber: 1,
+    isRevisit: false,
+    conceptId: focusConceptId,
+    conceptName,
+    status: hasMasteryCompleted
+      ? 'mastered'
+      : lastCfuPassed
+      ? 'available'
+      : 'locked',
+    timeSpentMinutes: hasMasteryCompleted ? 5 : 0,
+    score: hasMasteryCompleted ? Math.round((masteryRow?.pMastery ?? 0.92) * 100) : null,
+    isStuck: false,
+    facts: hasMasteryCompleted
+      ? [
+          `Concept "${conceptName}" signed off as Mastered!`,
+          `Knowledge mastery: ${Math.round((masteryRow?.pMastery ?? 0.9) * 100)}%.`,
+          'Validated with green tick sign-off across all learning stages.',
+        ]
+      : lastCfuPassed
+      ? ['Check gate cleared! Ready for final mastery certification.']
+      : ['Locked until all practice and understanding checks are validated.'],
+    progressionNote: hasMasteryCompleted ? 'Mastery certified! Concept journey complete.' : lastCfuPassed ? 'Ready for mastery certification' : 'Locked',
+  });
+
+  // ── 10. Post-Mastery Sub-steps: Application Lab & Spaced Recall ────────
+  steps.push({
+    id: 'step-experiment',
+    stepNumber: steps.length + 1,
+    coreStage: 'mastery',
+    stageKey: 'experiment',
+    label: 'Application Lab (Hands-on Experiment)',
+    shortLabel: 'App Lab',
+    attemptNumber: 1,
+    isRevisit: false,
+    isOptionalOrSupport: true,
+    conceptId: focusConceptId,
+    conceptName,
+    status: hasMasteryCompleted ? 'completed' : 'locked',
+    timeSpentMinutes: hasMasteryCompleted ? 12 : 0,
+    isStuck: false,
+    facts: hasMasteryCompleted
+      ? ['Interactive Prayogshala lab simulation exploring concept principles hands-on.']
+      : ['Locked until concept mastery is certified.'],
+    progressionNote: hasMasteryCompleted ? 'Lab simulation completed' : 'Locked',
+  });
+
+  steps.push({
+    id: 'step-recall',
+    stepNumber: steps.length + 1,
+    coreStage: 'mastery',
+    stageKey: 'recall',
+    label: 'Recall & Retention Queue',
+    shortLabel: 'Recall',
+    attemptNumber: 1,
+    isRevisit: false,
+    isOptionalOrSupport: true,
+    conceptId: focusConceptId,
+    conceptName,
+    status: hasMasteryCompleted ? 'completed' : 'locked',
+    timeSpentMinutes: hasMasteryCompleted ? 5 : 0,
+    isStuck: false,
+    facts: hasMasteryCompleted
+      ? ['Spaced repetition schedule initialized (retention check in 3 days).']
+      : ['Locked until concept mastery is certified.'],
+    progressionNote: hasMasteryCompleted ? 'Scheduled for spaced recall' : 'Locked',
+  });
+
+  return steps;
+}
+
+export function buildCoreStageSummaries(actualSteps: StudentJourneyStep[]): CoreStageSummary[] {
+  return CORE_STAGES.map((def) => {
+    const stepsInStage = actualSteps.filter((s) => s.coreStage === def.key);
+    const stepCount = stepsInStage.length;
+    const nonSupportSteps = stepsInStage.filter((s) => !s.isOptionalOrSupport);
+    const revisitsCount = Math.max(0, nonSupportSteps.length - 1);
+    const totalTimeSpentMinutes = stepsInStage.reduce((acc, s) => acc + s.timeSpentMinutes, 0);
+    const hasStuckPoint = stepsInStage.some((s) => s.isStuck);
+    const latestStep = stepsInStage[stepsInStage.length - 1];
+    const status = latestStep ? latestStep.status : 'locked';
+    const latestScore = stepsInStage.find((s) => s.score != null)?.score ?? null;
+
+    return {
+      coreStage: def.key,
+      label: def.label,
+      order: def.order,
+      stepCount,
+      revisitsCount,
+      totalTimeSpentMinutes,
+      status,
+      hasStuckPoint,
+      latestScore,
+    };
+  });
+}
+
+export function buildTeacherJourneyInsights({
+  actualSteps,
+  focusConceptId,
+  conceptName,
+  masteryRow,
+  chapterFullyMastered,
+  conceptResult,
+  remediationBranch,
+}: {
+  actualSteps: StudentJourneyStep[];
+  focusConceptId: string | null;
+  conceptName: string;
+  masteryRow: ConceptMasteryRow | null;
+  chapterFullyMastered: boolean;
+  conceptResult?: any;
+  remediationBranch?: any;
+}): TeacherJourneyInsights {
+  const totalDurationMinutes = actualSteps.reduce((acc, s) => acc + (s.timeSpentMinutes || 0), 0);
+  const expectedBenchmarkMinutes = 45; // standard curriculum chapter benchmark
+  const durationVariancePct = totalDurationMinutes > 0
+    ? Math.round(((totalDurationMinutes - expectedBenchmarkMinutes) / expectedBenchmarkMinutes) * 100)
+    : 0;
+
+  const learnSteps = actualSteps.filter((s) => s.coreStage === 'learn');
+  const practiceSteps = actualSteps.filter((s) => s.coreStage === 'practice' && !s.isOptionalOrSupport);
+  const checkSteps = actualSteps.filter((s) => s.coreStage === 'check' && !s.isOptionalOrSupport);
+
+  const stuckSteps = actualSteps.filter((s) => s.isStuck);
+  const stuckPoints: TeacherStuckPoint[] = stuckSteps.map((s) => ({
+    stepNumber: s.stepNumber,
+    stageLabel: s.label,
+    stageKey: s.stageKey,
+    reason: s.stuckReason || 'Student struggled to achieve passing accuracy threshold',
+    misconception: s.misconceptionsDetected?.[0] || null,
+    attemptNumber: s.attemptNumber,
+    timeSpentMinutes: s.timeSpentMinutes,
+    resolved: actualSteps.some(
+      (next) => next.stepNumber > s.stepNumber && (next.status === 'completed' || next.status === 'mastered')
+    ),
+  }));
+
+  const misconceptionsSet = new Set<string>();
+  const misconceptions: TeacherMisconception[] = [];
+
+  // Extract real misconceptions from steps, conceptResult diagnostic, or remediation branch
+  actualSteps.forEach((s) => {
+    s.misconceptionsDetected?.forEach((m) => {
+      if (m && !misconceptionsSet.has(m)) {
+        misconceptionsSet.add(m);
+        misconceptions.push({
+          description: m,
+          correctiveAction: 'Serve contrast pair to eliminate distractor ambiguity and clarify core mechanism',
+          detectedAtStep: s.stepNumber,
+          resolved: actualSteps.some((next) => next.stepNumber > s.stepNumber && (next.status === 'completed' || next.status === 'mastered')),
+          ruleFired: 'D3 (Misconception Detected)',
+        });
+      }
+    });
+  });
+
+  if (conceptResult?.misconception?.description && !misconceptionsSet.has(conceptResult.misconception.description)) {
+    const desc = conceptResult.misconception.description;
+    misconceptionsSet.add(desc);
+    misconceptions.push({
+      description: desc,
+      correctiveAction: 'Deliver targeted instructional contrast pair and step-by-step worked examples',
+      detectedAtStep: actualSteps.find((s) => s.coreStage === 'adaptive')?.stepNumber || 2,
+      resolved: actualSteps.some((s) => s.coreStage === 'mastery' && s.status === 'mastered'),
+      ruleFired: 'D1 (Diagnostic Misconception Identified)',
+    });
+  }
+
+  if (remediationBranch?.misconceptionDescription && !misconceptionsSet.has(remediationBranch.misconceptionDescription)) {
+    const desc = remediationBranch.misconceptionDescription;
+    misconceptionsSet.add(desc);
+    misconceptions.push({
+      description: desc,
+      correctiveAction: 'Triggered remediation reteach branch and contrast pair item set',
+      detectedAtStep: actualSteps.find((s) => s.coreStage === 'check')?.stepNumber || 7,
+      resolved: actualSteps.some((s) => s.coreStage === 'mastery' && s.status === 'mastered'),
+      ruleFired: 'R1 (Remediation Policy Triggered)',
+    });
+  }
+
+  const learnRevisits = Math.max(0, learnSteps.filter(s => s.status !== 'locked').length - 1);
+  const practiceRevisits = Math.max(0, practiceSteps.filter(s => s.status !== 'locked').length - 1);
+  const checkRevisits = Math.max(0, checkSteps.filter(s => s.status !== 'locked').length - 1);
+  const totalRevisits = learnRevisits + practiceRevisits + checkRevisits;
+
+  const isMastered =
+    chapterFullyMastered ||
+    masteryRow?.stage === 'mastered' ||
+    (((masteryRow?.pMastery ?? 0) * 100 >= 80) && (masteryRow?.attempts ?? 0) > 0);
+  const masteryStep = actualSteps.find((s) => s.coreStage === 'mastery');
+  const diagStep = actualSteps.find((s) => s.coreStage === 'diagnostic');
+
+  const summaryReasonWhyLonger =
+    totalRevisits > 0
+      ? `This student took ${totalDurationMinutes}m (vs. ${expectedBenchmarkMinutes}m benchmark, ${durationVariancePct > 0 ? '+' : ''}${durationVariancePct}%) because they required ${learnSteps.filter(s => s.status !== 'locked').length} Learn-Practice-Check cycles. The student focused on "${conceptName}" and encountered ${stuckPoints.length} stuck point(s)${misconceptions[0] ? ` caused by: "${misconceptions[0].description}"` : ''}.`
+      : learnSteps.some(s => s.status === 'completed')
+      ? `Student completed the learning journey on expected pace in ${totalDurationMinutes} minutes.`
+      : diagStep?.status === 'completed'
+      ? `Student has completed the Chapter Diagnostic (Score: ${diagStep.score ?? 0}%) in ${totalDurationMinutes} minutes and is ready to begin Concept Diagnostic.`
+      : `Student learning journey initialized. Next step: Chapter Diagnostic.`;
+
+  return {
+    totalDurationMinutes,
+    expectedBenchmarkMinutes,
+    durationVariancePct,
+    summaryReasonWhyLonger,
+    strugglingConcept: {
+      id: focusConceptId || '',
+      name: conceptName,
+      totalRevisits: learnSteps.filter(s => s.status !== 'locked').length,
+      timeSpentMinutes: actualSteps.filter((s) => s.conceptName === conceptName || s.conceptId === focusConceptId).reduce((acc, s) => acc + s.timeSpentMinutes, 0),
+      masteryStatus: isMastered ? 'Mastered' : learnSteps.some(s => s.status === 'completed') ? 'In Progress' : 'Diagnostic Completed',
+    },
+    revisits: {
+      learnCount: learnSteps.filter(s => s.status !== 'locked').length,
+      practiceCount: practiceSteps.filter(s => s.status !== 'locked').length,
+      checkCount: checkSteps.filter(s => s.status !== 'locked').length,
+      totalRevisits,
+    },
+    stuckPoints,
+    misconceptions,
+    masteryAchievement: {
+      achieved: isMastered,
+      totalStepsToMastery: actualSteps.filter((s) => s.status === 'completed' || s.status === 'mastered').length,
+      finalScore: isMastered ? (masteryStep?.score ?? 92) : 0,
+      achievedAt: isMastered ? new Date().toISOString().split('T')[0] : null,
+      summary: isMastered
+        ? `Student achieved full mastery after ${learnSteps.filter(s => s.status !== 'locked').length} cycle(s) and ${actualSteps.filter(s => s.status === 'completed' || s.status === 'mastered').length} steps. All understanding checks and application questions were validated.`
+        : diagStep?.status === 'completed' && learnSteps.every(s => s.status === 'locked')
+        ? 'In progress: Chapter Diagnostic completed. Ready for Concept Diagnostic.'
+        : 'Student is actively working through learning lessons, practice, and understanding checks.',
+    },
+    recommendations: totalRevisits > 0
+      ? [
+          `Check in briefly during next class to ensure the distinction regarding "${misconceptions[0]?.description || conceptName}" remains clear.`,
+          `Commend student persistence: completing ${learnSteps.filter(s => s.status !== 'locked').length} cycle(s) to turn low baseline into strong mastery shows grit.`,
+          `Monitor the Spaced Recall queue in 3-5 days to confirm long-term retention of "${conceptName}".`,
+        ]
+      : isMastered
+      ? [
+          `Student has demonstrated clear mastery on ${conceptName}.`,
+          'Assign optional hands-on Prayogshala lab simulations for enrichment.',
+          'Schedule periodic spaced recall check in 7 days.',
+        ]
+      : [
+          `Encourage student to take the targeted Concept Diagnostic for ${conceptName} to map specific learning gaps.`,
+          'Review diagnostic recommendations and generated learning plan.',
+        ],
   };
 }

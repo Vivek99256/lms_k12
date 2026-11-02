@@ -278,7 +278,7 @@ export function ConceptDeck({
                   ].join(' ')}
                 >
                   <Layers size={11} strokeWidth={2.2} />
-                  <span>1. All Units</span>
+                  <span> All Units</span>
                 </button>
 
                 {/* Step 2: Unit */}
@@ -299,7 +299,7 @@ export function ConceptDeck({
                       ].join(' ')}
                     >
                       <BookOpen size={11} strokeWidth={2.2} />
-                      <span>2. {openUnitTree.node.label}</span>
+                      <span> {openUnitTree.node.label}</span>
                     </button>
                   </>
                 )}
@@ -321,7 +321,7 @@ export function ConceptDeck({
                       ].join(' ')}
                     >
                       <ListTree size={11} strokeWidth={2.2} />
-                      <span>3. {openChapterTree.node.label}</span>
+                      <span> {openChapterTree.node.label}</span>
                     </button>
                   </>
                 )}
@@ -332,7 +332,7 @@ export function ConceptDeck({
                     <ChevronRight size={13} className="text-slate-400" />
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 font-bold text-white shadow-xs text-[11.5px]">
                       <Lightbulb size={11} strokeWidth={2.2} />
-                      <span>4. {openTopicTree.node.label}</span>
+                      <span> {openTopicTree.node.label}</span>
                     </span>
                   </>
                 )}

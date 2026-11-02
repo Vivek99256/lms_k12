@@ -35,6 +35,7 @@ import {
 } from '@/app/pal/_components/CompletionState';
 import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
+import { recordStageProgression } from '@/app/pal/data/pal-progression';
 
 /**
  * Stage 6 - Learn.
@@ -140,6 +141,11 @@ function ConceptLearnView() {
 
     try {
       const outcome = await acknowledgeConceptLearn(conceptId);
+      if (data?.attempt && data.attempt > 0) {
+        recordStageProgression(conceptId, `practice_${data.attempt + 1}`);
+      } else {
+        recordStageProgression(conceptId, 'practice');
+      }
 
       const planChapterId = data?.chapterId || chapterHint;
       router.push(

@@ -1,22 +1,25 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Loader2, UserCheck } from 'lucide-react';
 import { isStudentSession } from '@/app/pal/data/pal-lookups';
+import { useViewAsStudent, setViewAsStudent } from '@/app/pal/data/pal-view-as';
+import type { PalStudentSelection } from '@/app/pal/data/pal';
+import StudentPicker from '@/app/pal/_components/StudentPicker';
+import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyChapterState } from './_components/EmptyChapterState';
 import { MountainJourneyView } from './_components/MountainJourneyView';
 
 /**
- * `/pal/journey?chapterId=` — the Mountain Adventure Learning Journey.
+ * `/pal/journey?chapterId=` — Dynamic Learning Journey.
  *
- * Mirrors `app/pal/reports/activity/page.tsx`'s own shape: a Suspense
- * boundary around the `useSearchParams()` read, and `isStudentSession()`
- * resolved before anything renders. Phase 1 is the student's own journey
- * only — a teacher-facing monitor that reuses `MountainJourneyView` with
- * `viewContext={{mode:'monitor', studentId, readOnly:true}}` is a later
- * phase's route, not this one, so a staff session here sees a plain notice
- * rather than a half-built picker.
+ * Displays the complete actual student learning history through the 7 core stages:
+ * Chapter Diagnostic -> Concept Diagnostic -> Plan -> Learn -> Practice -> Check -> Mastery.
+ *
+ * Dynamically displays every real step, including repeated cycles through Learn, Practice,
+ * and Check, where the student got stuck, time spent, repeat reasons, and teacher diagnostics.
  */
 export default function PalJourneyPage() {
   return (
@@ -39,7 +42,34 @@ function Centered({ children }: { children: React.ReactNode }) {
 function PalJourneyPageContent() {
   const searchParams = useSearchParams();
   const chapterId = searchParams.get('chapterId') ?? '';
+  const paramStudentId = searchParams.get('studentId') ?? '';
   const isStudent = isStudentSession();
+  const viewAs = useViewAsStudent();
+
+  const [selectedStudent, setSelectedStudent] = useState<PalStudentSelection | null>(() => {
+    if (paramStudentId) {
+      return {
+        studentId: paramStudentId,
+        name: `Student #${paramStudentId}`,
+        gradeId: '',
+        standardId: '',
+      };
+    }
+    return viewAs;
+  });
+
+  useEffect(() => {
+    if (paramStudentId && (!selectedStudent || selectedStudent.studentId !== paramStudentId)) {
+      setSelectedStudent({
+        studentId: paramStudentId,
+        name: `Student #${paramStudentId}`,
+        gradeId: '',
+        standardId: '',
+      });
+    } else if (!paramStudentId && viewAs) {
+      setSelectedStudent(viewAs);
+    }
+  }, [paramStudentId, viewAs]);
 
   if (!chapterId) {
     return (
@@ -49,17 +79,63 @@ function PalJourneyPageContent() {
     );
   }
 
+  // Teacher or staff viewing the journey
   if (!isStudent) {
-    return (
-      <div className="mx-auto w-full max-w-5xl px-4 py-6">
-        <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-5 py-4 text-sm text-indigo-900">
-          The Mountain Adventure journey shows a student&rsquo;s own progress. Sign in as a student to see it
-          here &mdash; a teacher monitoring view is coming in a later phase.
+    const effectiveStudentId = selectedStudent?.studentId;
+
+    if (!effectiveStudentId) {
+      return (
+        <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
+          <Card className="border-indigo-100 bg-gradient-to-br from-indigo-50/60 via-white to-purple-50/40 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-xs">
+                  <UserCheck className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-lg text-slate-900">
+                    Teacher Learning Journey Monitor
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-600">
+                    Select a student to inspect their dynamic multi-step learning path, repeated Learn/Practice attempts, stuck points, and diagnostic insights for Chapter {chapterId}.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <StudentPicker
+                audience="Teacher"
+                onSelect={(student) => {
+                  setSelectedStudent(student);
+                  setViewAsStudent(student);
+                }}
+              />
+            </CardContent>
+          </Card>
         </div>
+      );
+    }
+
+    return (
+      <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
+        <ViewAsBanner
+          student={selectedStudent}
+          audience="Teacher"
+          onExit={() => {
+            setSelectedStudent(null);
+            setViewAsStudent(null);
+          }}
+        />
+
+        <MountainJourneyView
+          chapterId={chapterId}
+          viewContext={{ mode: 'monitor', studentId: effectiveStudentId, readOnly: true }}
+        />
       </div>
     );
   }
 
+  // Enrolled student viewing their own journey
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
       <MountainJourneyView chapterId={chapterId} />

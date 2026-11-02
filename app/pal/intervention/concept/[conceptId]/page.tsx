@@ -21,6 +21,7 @@ import {
 } from '@/app/pal/data/pal-intervention';
 import { defaultLearnerId } from '@/app/pal/data/pal-v4';
 import { BandRow } from '@/app/pal/_components/BandMeter';
+import { recordStageProgression } from '@/app/pal/data/pal-progression';
 import { JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
