@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { actingUserOf, laravelAuthorizer, readRequestSession } from '@/lib/agents/acting-user';
 import { AgentEngineDenied, AgentEngineError, type EngineContext } from '@/lib/agents/engine';
 import { getAgentStore } from '@/lib/agents/store';
-import { checkSessionToken } from '@/lib/security/session-token';
+import { checkSessionToken, ensureClockSafeMcpToken } from '@/lib/security/session-token';
 
 /**
  * Shared plumbing for the /api/agents routes.
@@ -40,7 +40,7 @@ export function engineContextFor(request: Request): EngineContext {
     // run log gets, and it deliberately has no token in it.
     toolSession: {
       baseUrl: session.baseUrl,
-      token: session.token,
+      token: session.token ? ensureClockSafeMcpToken(session.token, session.tenant_id) : '',
       instituteId: session.tenant_id,
       academicYear: header(request, 'x-academic-year'),
       termId: header(request, 'x-term-id'),
