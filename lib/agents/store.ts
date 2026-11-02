@@ -473,10 +473,11 @@ async function fetchHttpCapabilityRuns(tenantId: string, limit = 100): Promise<A
 }
 
 async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<AgentRun[]> {
+  const limit = Math.max(300, (filter?.limit && filter.limit > 0 ? filter.limit * 10 : 300));
+  let rows: Array<Record<string, unknown>> = [];
+
   try {
     const pool = getDbPool();
-    const limit = Math.max(300, (filter?.limit && filter.limit > 0 ? filter.limit * 10 : 300));
-    let rows: Array<Record<string, unknown>> = [];
     if (tenantId && tenantId !== '1') {
       const [scopedRows] = (await pool.query(
         'SELECT * FROM ai_agent_runs WHERE sub_institute_id = ? OR sub_institute_id = 1 OR sub_institute_id IS NULL ORDER BY id DESC LIMIT ?',
@@ -497,14 +498,19 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
       )) as [Array<Record<string, unknown>>, unknown];
       rows = allRows || [];
     }
+  } catch {
+    rows = [];
+  }
 
-    if (!Array.isArray(rows) || rows.length === 0) {
-      rows = await fetchHttpCapabilityRuns(tenantId, limit);
-    }
+  if (!Array.isArray(rows) || rows.length === 0) {
+    rows = await fetchHttpCapabilityRuns(tenantId, limit);
+  }
 
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return [];
-    }
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return [];
+  }
+
+  try {
 
     return rows.map((row, idx) => {
       const key = String(row.agent_key || '');
