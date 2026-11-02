@@ -288,7 +288,7 @@ export default function AdmissionReportWorkspace({ reportId }: { reportId: Repor
   );
 
   return (
-    <div className="min-h-screen bg-slate-50/40">
+    <div className="min-h-screen ">
       <div className="mx-auto max-w-[1600px] space-y-6 p-4 md:p-6 lg:p-8">
         <PageHeader
           icon={config.icon}
