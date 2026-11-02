@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import mysql from 'mysql2/promise';
+import { mintMcpToken } from '@/lib/security/session-token';
 
 import type { Agent, AgentModuleKey, AgentRun, AgentRunStatus, AgentRunTrigger } from './types';
 
@@ -454,6 +455,23 @@ function getDbPool(): mysql.Pool {
   return agentDbPool;
 }
 
+async function fetchHttpCapabilityRuns(tenantId: string, limit = 100): Promise<Array<Record<string, unknown>>> {
+  try {
+    const token = mintMcpToken({ id: 1, sub_institute_id: tenantId });
+    const aiBase = (process.env.NEXT_PUBLIC_AI_BASE_URL || 'https://dev.triz.co.in').trim().replace(/\/$/, '');
+    const url = `${aiBase}/api/ai/capabilities/agents?limit=${encodeURIComponent(limit)}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { data?: { table?: { rows?: Array<Record<string, unknown>> } } };
+    return json.data?.table?.rows || [];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<AgentRun[]> {
   try {
     const pool = getDbPool();
@@ -481,10 +499,14 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
     }
 
     if (!Array.isArray(rows) || rows.length === 0) {
+      rows = await fetchHttpCapabilityRuns(tenantId, limit);
+    }
+
+    if (!Array.isArray(rows) || rows.length === 0) {
       return [];
     }
 
-    return rows.map((row) => {
+    return rows.map((row, idx) => {
       const key = String(row.agent_key || '');
       let mod: AgentModuleKey = 'teach_learn';
       let agtId = 'agt_34dc52f6dc24';
@@ -619,11 +641,11 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
             : 'failure';
 
       return {
-        id: 'run_' + row.id,
+        id: 'run_' + (row.id || (row.started_at ? String(Date.parse(String(row.started_at))) : Date.now()) + '_' + idx),
         agent_id: agtId,
         agent_name: agtName,
         module: mod,
-        tenant_id: String(row.sub_institute_id || '1'),
+        tenant_id: String(row.sub_institute_id || tenantId || '1'),
         started_at: row.started_at ? new Date(row.started_at as string).toISOString() : new Date().toISOString(),
         finished_at: row.finished_at ? new Date(row.finished_at as string).toISOString() : new Date().toISOString(),
         duration_ms: Number(row.duration_ms || 100),
