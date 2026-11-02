@@ -91,8 +91,8 @@ export function breakdownParts(b: PaperBreakdown | null | undefined): string[] {
     [b.saved_active, 'active'],
     [b.saved_inactive, 'saved inactive'],
     [b.unresolved, 'waiting for standard or subject'],
-    [b.duplicate, 'already in the bank'],
-    [b.skipped, 'skipped'],
+    [b.duplicate, 'duplicates skipped'],
+    [b.skipped, 'failed'],
     [b.pending, 'not saved yet'],
   ];
   return parts.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);

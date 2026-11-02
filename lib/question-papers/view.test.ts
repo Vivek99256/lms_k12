@@ -49,10 +49,11 @@ describe('pagesText', () => {
 
 describe('breakdownParts', () => {
   it('lists only the non-zero outcomes', () => {
-    assert.deepEqual(breakdownParts({ saved_active: 3, saved_inactive: 0, unresolved: 2, duplicate: 1, skipped: 0, pending: 0 }), [
+    assert.deepEqual(breakdownParts({ saved_active: 3, saved_inactive: 0, unresolved: 2, duplicate: 1, skipped: 2, pending: 0 }), [
       '3 active',
       '2 waiting for standard or subject',
-      '1 already in the bank',
+      '1 duplicates skipped',
+      '2 failed',
     ]);
     assert.deepEqual(breakdownParts(null), []);
   });

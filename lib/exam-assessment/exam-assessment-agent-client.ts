@@ -45,18 +45,22 @@ export interface PipelineValidationGate {
 }
 
 export interface AtRiskStudentItem {
+  attempt_id?: number;
   exam_id?: number;
   paper_id?: number;
   paper_name?: string;
   subject_name?: string;
   student_id: number;
   student_name?: string;
-  obtained_marks: number;
+  obtain_marks?: number;
+  obtained_marks?: number;
   total_marks: number;
+  percent?: number;
   percentage?: number;
   score_percent?: number;
   sub_institute_id?: number;
   attempt_date?: string;
+  attempted_at?: string;
 }
 
 export interface UnsubmittedWorkItem {
@@ -69,7 +73,9 @@ export interface UnsubmittedWorkItem {
   standard_id?: number;
   division_id?: number;
   created_date?: string;
+  assigned_on?: string;
   submission_date?: string;
+  due_on?: string;
 }
 
 export interface DraftReviewNote {
@@ -152,6 +158,29 @@ export interface ExamAssessmentPipelineReport {
   error?: string;
 }
 
+export interface AgentEsoStructuredObject {
+  knowledge: {
+    summary: string;
+    items: string[];
+    tables_and_sources?: string[];
+  };
+  activities: {
+    summary: string;
+    items: string[];
+  };
+  abilities: {
+    summary: string;
+    skills: string[];
+    constraints_and_safeguards?: string[];
+  };
+  usage: {
+    summary: string;
+    step_by_step_flow: string[];
+    upstream_dependencies?: string;
+    downstream_handoff?: string;
+  };
+}
+
 export interface ExamAssessmentEso {
   overview: {
     system_name: string;
@@ -187,6 +216,7 @@ export interface ExamAssessmentEso {
         name: string;
         enforcement: string;
       };
+      eso?: AgentEsoStructuredObject;
       input_schema?: Record<string, unknown>;
       safety_guardrails?: Record<string, unknown>;
     }
@@ -322,7 +352,7 @@ export async function runExamAssessmentPipeline(
 }
 
 /**
- * Fetch Expert System Overview (ESO).
+ * Fetch Executive Skill Object (ESO).
  */
 export async function getExamAssessmentEso(
   context: IntelligenceContext

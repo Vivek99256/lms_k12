@@ -42,6 +42,8 @@ export interface QuestionPaperJob {
   questions_saved: number;
   questions_needing_review: number;
   questions_skipped: number;
+  questions_duplicates?: number | null;
+  questions_failed?: number | null;
   used_ocr: boolean;
   /** Real progress or null when it cannot be known; never an estimate. */
   progress_percent: number | null;
@@ -53,6 +55,7 @@ export interface QuestionPaperJob {
   last_error: string | null;
   can_retry: boolean;
   created_at: string;
+  scheduled_at: string | null;
   started_at: string | null;
   finished_at: string | null;
   /** Per-state counts of the stored questions; null when the endpoint did not load them. */
@@ -138,6 +141,10 @@ export interface AcademicChoice {
   chapter_id?: number;
 }
 
+export interface QuestionPaperUploadChoice extends AcademicChoice {
+  scheduled_at?: string;
+}
+
 export const ACTIVE_STATUSES: QuestionPaperStatus[] = ['queued', 'processing', 'retrying'];
 
 async function request<T>(path: string, init: { method?: string; body?: BodyInit; json?: unknown } = {}): Promise<T> {
@@ -171,7 +178,7 @@ async function request<T>(path: string, init: { method?: string; body?: BodyInit
 
 export const QuestionPapersApi = {
   /** Returns as soon as the file is stored and queued; extraction continues on the server. */
-  upload(file: File, choice: AcademicChoice = {}): Promise<QuestionPaperJob> {
+  upload(file: File, choice: QuestionPaperUploadChoice = {}): Promise<QuestionPaperJob> {
     const form = new FormData();
     form.append('file', file);
     for (const [key, value] of Object.entries(choice)) {

@@ -135,57 +135,25 @@ export interface CatalogueAgentStateResponse {
 const DEV_TRIZ_BACKEND = 'https://dev.triz.co.in';
 
 function resolveBaseUrl(context: IntelligenceContext): string {
-  if (process.env.NEXT_PUBLIC_AI_BASE_URL) {
-    return process.env.NEXT_PUBLIC_AI_BASE_URL.replace(/\/$/, '');
-  }
-
-  // When running in local development (npm run dev on localhost), use local Laravel backend
-  if (typeof window !== 'undefined') {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (isLocal) {
-      return (
-        context.baseUrl ||
-        process.env.NEXT_PUBLIC_API_BASE_URL_DEV ||
-        'http://127.0.0.1:8000'
-      ).replace(/\/$/, '');
-    }
-  }
-
-  const candidate = (context.baseUrl || '').trim().replace(/\/$/, '');
-  if (candidate && !candidate.includes('localhost') && !candidate.includes('127.0.0.1')) {
-    return candidate;
-  }
-
-  const resolved = resolveAiBaseUrl(context.baseUrl);
-  if (resolved && !resolved.includes('localhost') && !resolved.includes('127.0.0.1') && !resolved.includes('erp.triz.co.in')) {
-    return resolved;
-  }
-
-  return DEV_TRIZ_BACKEND;
+  return resolveAiBaseUrl(context.baseUrl);
 }
 
 function resolveEndpoint(context: IntelligenceContext, action?: string): string {
-  const baseUrl = resolveBaseUrl(context);
-  const path = action === 'start' ? '/start'
-    : action === 'stop' ? '/stop'
-    : action === 'interval' ? '/interval'
-    : action === 'run-now' ? '/run-now'
-    : action === 'auto-generate-toggle' ? '/auto-generate/toggle'
-    : action === 'auto-generate-batch' ? '/auto-generate/batch'
-    : action === 'content-tasks' ? '/content-tasks'
-    : action === 'pipeline' ? '/pipeline'
-    : action === 'eso' ? '/eso'
-    : '/state';
-  return `${baseUrl}/api/ai/teach-learn/catalogue-agent${path}`;
+  const base = '/api/teach-learn/catalogue-agent';
+  if (!action || action === 'state') return base;
+  return `${base}?action=${encodeURIComponent(action)}`;
 }
 
 function buildHeaders(context: IntelligenceContext): HeadersInit {
-  return {
+  const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
-    ...(context.token ? { Authorization: `Bearer ${context.token}` } : {}),
-    'X-MCP-Institute-Id': String(context.instituteId || '1'),
   };
+  if (context.token) {
+    headers.Authorization = context.token.startsWith('Bearer ') ? context.token : `Bearer ${context.token}`;
+  }
+  headers['X-MCP-Institute-Id'] = String(context.instituteId || '1');
+  return headers;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -438,6 +406,29 @@ export async function runTeachLearnPipeline(
   return handleResponse<{ report: UnifiedTeachLearnReport; server_time: string }>(res);
 }
 
+export interface AgentEsoStructuredObject {
+  knowledge: {
+    summary: string;
+    items: string[];
+    tables_and_sources?: string[];
+  };
+  activities: {
+    summary: string;
+    items: string[];
+  };
+  abilities: {
+    summary: string;
+    skills: string[];
+    constraints_and_safeguards?: string[];
+  };
+  usage: {
+    summary: string;
+    step_by_step_flow: string[];
+    upstream_dependencies?: string;
+    downstream_handoff?: string;
+  };
+}
+
 export interface AgentEsoDetail {
   order: number;
   name: string;
@@ -467,6 +458,7 @@ export interface AgentEsoDetail {
     enforcement: string;
     rules: string[];
   };
+  eso?: AgentEsoStructuredObject;
 }
 
 export interface ExpertSystemOverviewData {
@@ -493,7 +485,7 @@ export interface ExpertSystemOverviewData {
 }
 
 /**
- * Fetch the live Expert System Overview (ESO) for all three Teach/Learn agents.
+ * Fetch the live Executive Skill Object (ESO) for all three Teach/Learn agents.
  */
 export async function getExpertSystemOverview(
   context: IntelligenceContext

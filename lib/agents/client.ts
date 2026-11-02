@@ -1,6 +1,6 @@
 'use client';
 
-import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { API_BASE_URL, resolveAiBaseUrl } from '@/app/components/utils/api_url';
 
 import type { Agent, AgentRun, AgentStatus, CreateAgentInput, RunAgentInput } from './types';
 
@@ -71,7 +71,7 @@ export function readAgentBrowserSession(): AgentBrowserSession {
   }
 
   return {
-    baseUrl: (API_BASE_URL || firstString(sources, ['host_name', 'hostName'])).replace(/\/$/, ''),
+    baseUrl: resolveAiBaseUrl(firstString(sources, ['host_name', 'hostName']) || API_BASE_URL),
     token: firstString(sources, ['user_token', 'token']),
     subInstituteId: firstString(sources, ['sub_institute_id', 'subInstituteId']),
     userId: firstString(sources, ['user_id', 'userId', 'id']),

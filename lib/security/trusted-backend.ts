@@ -49,8 +49,8 @@ interface TrustedOrigins {
 }
 
 function readTrustedOrigins(): TrustedOrigins {
-  const exact = new Set<string>();
-  const wildcards: Array<[string, string]> = [];
+  const exact = new Set<string>(['https://dev.triz.co.in', 'https://erp.triz.co.in']);
+  const wildcards: Array<[string, string]> = [['https:', '.triz.co.in']];
 
   for (const name of BACKEND_ENV_VARS) {
     const origin = originOf(normalizeBase(process.env[name]));

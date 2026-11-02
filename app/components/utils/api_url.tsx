@@ -112,9 +112,33 @@ export const AI_API_BASE_URL_OVERRIDE: string = normalizeApiBaseUrl(
  * development included — behave exactly as they did before.
  */
 export function resolveAiBaseUrl(sessionBaseUrl?: string | null): string {
-  return (
-    AI_API_BASE_URL_OVERRIDE ||
-    normalizeApiBaseUrl(sessionBaseUrl ?? undefined) ||
-    API_BASE_URL
-  );
+  if (AI_API_BASE_URL_OVERRIDE) {
+    return AI_API_BASE_URL_OVERRIDE;
+  }
+
+  // When running in local development (npm run dev on localhost), use local Laravel backend
+  if (typeof window !== 'undefined') {
+    const isLocal =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+    if (isLocal) {
+      return (
+        normalizeApiBaseUrl(sessionBaseUrl ?? undefined) ||
+        normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL_DEV) ||
+        'http://127.0.0.1:8000'
+      );
+    }
+  }
+
+  const session = normalizeApiBaseUrl(sessionBaseUrl ?? undefined);
+  if (
+    session &&
+    !session.includes('erp.triz.co.in') &&
+    !session.includes('localhost') &&
+    !session.includes('127.0.0.1')
+  ) {
+    return session;
+  }
+
+  return 'https://dev.triz.co.in';
 }
