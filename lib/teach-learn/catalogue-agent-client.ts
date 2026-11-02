@@ -151,8 +151,15 @@ function buildHeaders(context: IntelligenceContext): HeadersInit {
   };
   if (context.token) {
     headers.Authorization = context.token.startsWith('Bearer ') ? context.token : `Bearer ${context.token}`;
+    headers['x-laravel-token'] = context.token.replace(/^Bearer\s+/i, '');
   }
-  headers['X-MCP-Institute-Id'] = String(context.instituteId || '1');
+  if (context.baseUrl) {
+    headers['x-laravel-base-url'] = context.baseUrl;
+    headers['x-backend-url'] = context.baseUrl;
+  }
+  const instId = String(context.instituteId || '1');
+  headers['X-MCP-Institute-Id'] = instId;
+  headers['x-sub-institute-id'] = instId;
   return headers;
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -52,7 +52,7 @@ import {
 } from '@/lib/teach-learn/catalogue-agent-client';
 
 interface CatalogueAgentControlCardProps {
-  onValidated?: (report: HierarchyValidationReport) => void;
+  onValidated?: (report?: HierarchyValidationReport | UnifiedTeachLearnReport | unknown) => void;
 }
 
 const TEACH_LEARN_ESO_FALLBACKS: Record<string, AgentEsoStructuredObject> = {
@@ -425,6 +425,9 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
       });
       if (res.report) {
         setPipelineResult(res.report);
+        if (onValidatedRef.current) {
+          onValidatedRef.current(res.report);
+        }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('agents:runs-updated', { detail: { module: 'teach_learn' } }));
         }
@@ -484,6 +487,11 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
   const [taskFilterStatus, setTaskFilterStatus] = useState<string>('all');
   const [selectedTaskPreview, setSelectedTaskPreview] = useState<ContentTaskRecord | null>(null);
 
+  const onValidatedRef = useRef(onValidated);
+  useEffect(() => {
+    onValidatedRef.current = onValidated;
+  }, [onValidated]);
+
   // Load Content Tasks Ledger
   const loadTasksLedger = useCallback(async (status?: string) => {
     setTasksLoading(true);
@@ -522,10 +530,6 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
       if (res.state?.content_stats) {
         setContentStats(res.state.content_stats);
       }
-
-      if (res.latest_run && onValidated) {
-        onValidated(res.latest_run);
-      }
     } catch (err) {
       if (!isPolling) {
         setError(err instanceof Error ? err.message : 'Failed to fetch Course Catalogue Reader Agent state.');
@@ -533,7 +537,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
     } finally {
       if (!isPolling) setLoading(false);
     }
-  }, [onValidated]);
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -541,7 +545,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
     void loadTasksLedger();
   }, [loadState, loadTasksLedger]);
 
-  // Auto-refresh interval (polling every 5 seconds)
+  // Auto-refresh interval (polling every 15 seconds)
   useEffect(() => {
     if (!autoRefresh) return;
     const timer = setInterval(() => {
@@ -549,7 +553,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
       if (mainTab === 'content_ledger') {
         void loadTasksLedger(taskFilterStatus);
       }
-    }, 5000);
+    }, 15000);
     return () => clearInterval(timer);
   }, [autoRefresh, loadState, loadTasksLedger, mainTab, taskFilterStatus]);
 
@@ -620,8 +624,8 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
       setLatestRun(res.report);
       setState(res.state);
       setSuccessNote(`Full 5-tier hierarchy audit completed in ${res.report.duration_ms}ms.`);
-      if (onValidated) {
-        onValidated(res.report);
+      if (onValidatedRef.current) {
+        onValidatedRef.current(res.report);
       }
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('agents:runs-updated', { detail: { module: 'teach_learn' } }));
@@ -668,8 +672,8 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
       setSuccessNote(
         'Content Agent batch processed! Newly generated and verified content has been saved with IDs, and the hierarchy has been updated.'
       );
-      if (onValidated && res.report) {
-        onValidated(res.report);
+      if (onValidatedRef.current && res.report) {
+        onValidatedRef.current(res.report);
       }
       void loadTasksLedger(taskFilterStatus);
     } catch (err) {

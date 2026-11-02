@@ -629,6 +629,28 @@ const EXECUTORS: Record<string, Executor> = {
       }),
     ).then((output) => ({ output })),
 
+  'curriculum_planning.lesson_pace': (args, context) =>
+    readViaMcp(
+      context,
+      'curriculum_planning.lesson_pace',
+      given({
+        standard_id: count(args.standard_id ?? args.class_id),
+        subject_id: count(args.subject_id),
+        syear: text(args.syear),
+      }),
+    ).then((output) => ({ output })),
+
+  'curriculum_planning.draft_alignment_note': (args, context) =>
+    readViaMcp(
+      context,
+      'curriculum_planning.draft_alignment_note',
+      given({
+        standard_name: text(args.standard_name, 'Class'),
+        curricula_gaps: args.curricula_gaps ?? [],
+        pacing_gaps: args.pacing_gaps ?? [],
+      }),
+    ).then((output) => ({ output })),
+
   'curriculum_planning.outcomes': (args, context) =>
     readViaMcp(
       context,
@@ -660,6 +682,17 @@ const EXECUTORS: Record<string, Executor> = {
         threshold_percent: count(args.threshold_percent),
         days_back: count(args.days_back),
         limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  'engagement.draft_intervention_note': (args, context) =>
+    readViaMcp(
+      context,
+      'engagement.draft_intervention_note',
+      given({
+        student_id: count(args.student_id),
+        student_name: text(args.student_name),
+        deficiency_reasons: list(args.deficiency_reasons),
       }),
     ).then((output) => ({ output })),
 
@@ -717,6 +750,16 @@ const EXECUTORS: Record<string, Executor> = {
         standard_id: count(args.standard_id ?? args.class_id),
         subject_id: count(args.subject_id),
         limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  'new_pal.draft_adaptive_intervention': (args, context) =>
+    readViaMcp(
+      context,
+      'new_pal.draft_adaptive_intervention',
+      given({
+        flagged_learners: args.flagged_learners ?? [],
+        coherence_summary: args.coherence_summary ?? {},
       }),
     ).then((output) => ({ output })),
 

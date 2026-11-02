@@ -79,6 +79,8 @@ import { aiStackRbacKey, type AiStackBoundAgent, type AiStackModule } from './ai
 import { CatalogueAgentControlCard } from './catalogue-agent-control-card';
 import { ExamAssessmentAgentControlCard } from './exam-assessment-agent-control-card';
 import { EngagementAgentControlCard } from './engagement-agent-control-card';
+import { CurriculumPlanningAgentControlCard } from './curriculum-planning-agent-control-card';
+import { PalAgentControlCard } from './pal-agent-control-card';
 
 interface ToolAgentEsoInfo {
   name: string;
@@ -650,6 +652,378 @@ const TOOL_AGENT_ESO_MAP: Record<string, ToolAgentEsoInfo> = {
       ],
     },
   },
+  'curriculum_planning.status': {
+    name: 'Curriculum coverage reader',
+    module: 'Curriculum Planning',
+    tool: 'curriculum_planning.status',
+    knowledge: {
+      summary: 'Curriculum authoring definitions, unit breakdowns, chapter masters, and completion states across standards and subjects.',
+      items: [
+        'Institute-scoped curriculum structures from lms_curriculum',
+        'Unit allocations and unit sequence numbers from lms_units',
+        'Chapter master records, sort orders, and completion flags from chapter_master',
+        'Topic and sub-topic breakdown records from topic_master',
+        'Standard and subject bindings from standard and subject',
+      ],
+      tables: ['lms_curriculum', 'lms_units', 'chapter_master', 'topic_master', 'standard', 'subject'],
+    },
+    activities: {
+      summary: 'Scans academic curriculum configurations, tallies unit and chapter counts, calculates completion percentages, and validates Gate 1.',
+      items: [
+        'Filtering active curricula by academic year and target standard/subject',
+        'Traversing unit-to-chapter hierarchy to detect unmapped or empty units',
+        'Calculating coverage percentage: (completed chapters / total chapters) * 100',
+        'Identifying subjects with zero configured chapters or missing units',
+        'Packaging validated syllabus hierarchy for Gate 1 delivery to downstream pacing auditor',
+      ],
+    },
+    abilities: {
+      summary: 'High-precision relational traversal, zero-fabrication gap calculation, and read-only extraction.',
+      skills: [
+        'Recursive curriculum tree validation without modifying database rows',
+        'Multi-subject coverage normalization',
+        'Deficit detection across missing units and orphaned chapters',
+        'Strict tenant isolation via sub_institute_id',
+      ],
+      safeguards: [
+        'Strictly read-only: does not alter chapter statuses or curriculum definitions',
+        'Tenant boundary isolation via sub_institute_id',
+        'Gate 1 requires valid curriculum structures before progressing to pacing audit',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 1 of the Curriculum Planning pipeline, establishing the syllabus baseline and passing validated curriculum targets to Agent 2.',
+      step_by_step_flow: [
+        'Step 1: Receives target standard, subject, and academic school year (default 2026)',
+        'Step 2: Queries lms_curriculum joined with subject and standard',
+        'Step 3: Gathers lms_units and chapter_master to compute coverage percentages',
+        'Step 4: Evaluates Gate 1 validation rules and packages findings',
+        'Step 5: Delivers validated curriculum objects to Agent 2 (Lesson Pace Auditor)',
+      ],
+    },
+  },
+  'curriculum_planning.lesson_pace': {
+    name: 'Lesson plan pace auditor',
+    module: 'Curriculum Planning',
+    tool: 'curriculum_planning.lesson_pace',
+    knowledge: {
+      summary: 'Macro and micro lesson schedules, scheduled period slots, teacher allocations, calendar milestones, and period completion statuses.',
+      items: [
+        'Term lesson plan schedules from lms_intelligence_lesson_plans',
+        'Individual scheduled periods, dates, and slots from lms_lesson_plan_periods',
+        'Faculty teacher allocations from tbluser',
+        'Period statuses: completed, in_progress, not_started',
+        'Temporal academic calendar boundaries (term_start_date, term_end_date)',
+      ],
+      tables: ['lms_intelligence_lesson_plans', 'lms_lesson_plan_periods', 'tbluser', 'standard', 'subject'],
+    },
+    activities: {
+      summary: 'Consumes curriculum targets from Gate 1, audits scheduled teaching periods against current calendar date, and isolates behind-schedule chapters.',
+      items: [
+        'Matching macro lesson plans to target standard and subject scope',
+        'Evaluating each scheduled period against current calendar date (scheduled_date < today AND status != completed)',
+        'Aggregating completed vs pending period totals and computing overall velocity rate',
+        'Identifying assigned teachers with overdue teaching periods',
+        'Packaging behind-schedule items and passing to Gate 2 for intervention drafting',
+      ],
+    },
+    abilities: {
+      summary: 'Temporal calendar reconciliation, faculty period auditing, velocity metric computation, and read-only extraction.',
+      skills: [
+        'Date-windowed pacing comparison against academic term schedules',
+        'Teacher allocation cross-referencing',
+        'Identification of delayed units risking exam milestone readiness',
+        'Strict tenant boundary enforcement',
+      ],
+      safeguards: [
+        'Read-only operations: zero modifications to period schedules or teacher assignments',
+        'Tenant boundary isolation via sub_institute_id',
+        'Gate 2 validation requires period records to match verified Gate 1 curricula',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2 of the Curriculum Planning pipeline, evaluating whether actual classroom delivery is keeping pace with planned syllabus schedules.',
+      step_by_step_flow: [
+        'Step 1: Consumes validated curriculum targets from Gate 1',
+        'Step 2: Queries lms_intelligence_lesson_plans and lms_lesson_plan_periods',
+        'Step 3: Identifies behind-schedule periods where scheduled_date has elapsed without completion',
+        'Step 4: Compiles upcoming 14-day delivery schedule and velocity rates',
+        'Step 5: Delivers behind-schedule period findings to Agent 3 via Gate 2',
+      ],
+    },
+  },
+  'curriculum_planning.outcomes': {
+    name: 'Learning outcomes reader',
+    module: 'Curriculum Planning',
+    tool: 'curriculum_planning.outcomes',
+    knowledge: {
+      summary: 'Competencies, curricular goals, and learning outcomes taxonomy defined across curriculum units.',
+      items: [
+        'Curricular goals (CG) and competencies (C) from lms_learning_outcomes',
+        'Unit associations and standard bindings from lms_units and standard',
+        'Outcome coding standards conforming to National Curriculum Framework (NCF)',
+      ],
+      tables: ['lms_learning_outcomes', 'lms_units', 'standard', 'subject'],
+    },
+    activities: {
+      summary: 'Reads declared learning outcomes and competencies linked to curriculum units and validates competency distribution.',
+      items: [
+        'Scans lms_learning_outcomes mapped to target curriculum and units',
+        'Validates outcome codes against national education guidelines',
+        'Delivers competency rosters to curriculum coordinators',
+      ],
+    },
+    abilities: {
+      summary: 'Deterministic taxonomy query, zero mutation, and tenant isolation.',
+      skills: ['Curriculum competency tree parsing', 'Standard code verification'],
+      safeguards: ['Read-only operations', 'Strict tenant boundary enforcement'],
+    },
+    usage: {
+      summary: 'Provides reference learning outcomes mapped to syllabus chapters for alignment verification.',
+      step_by_step_flow: [
+        'Step 1: Ingests curriculum or unit identifiers',
+        'Step 2: Queries lms_learning_outcomes for active competency declarations',
+        'Step 3: Returns structured competency hierarchy',
+      ],
+    },
+  },
+  'curriculum_planning.draft_alignment_note': {
+    name: 'Learning outcomes alignment drafter',
+    module: 'Curriculum Planning',
+    tool: 'curriculum_planning.draft_alignment_note',
+    knowledge: {
+      summary: 'National Curriculum Framework (NCF) competencies, learning outcome hierarchies, semantic intelligence concepts, and safety guardrails.',
+      items: [
+        'Curricular goals (CG) and competencies (C) from lms_learning_outcomes',
+        'Semantic intelligence concept linkages from semantic_intelligence',
+        'Pacing gap findings from Agent 2 (Gate 2)',
+        'Coverage deficit findings from Agent 1 (Gate 1)',
+        'Draft-only safety guardrails (max_verb=recommend, may_execute=0)',
+      ],
+      tables: ['lms_learning_outcomes', 'semantic_intelligence', 'lms_curriculum', 'lms_lesson_plan_periods'],
+    },
+    activities: {
+      summary: 'Synthesizes coverage and pacing deficits, aligns with learning outcome milestones, and drafts actionable recovery proposals for educator review.',
+      items: [
+        'Correlating behind-schedule lesson periods with uncompleted chapter competencies',
+        'Drafting personalized schedule recovery proposals for assigned educators citing specific period dates',
+        'Drafting cohort-level syllabus alignment notes for academic coordinators',
+        'Enforcing strict draft_pending_human_approval status with zero external dispatching',
+        'Gate 3 safety validation ensuring all recommendations are non-consequential drafts',
+      ],
+    },
+    abilities: {
+      summary: 'Pedagogical synthesis, grounded factual drafting, human-in-the-loop guardrail enforcement, and remediation proposal formulation.',
+      skills: [
+        'Cross-referencing syllabus delays with required learning competencies',
+        'Objective, constructive pedagogical drafting citing exact dates and chapters',
+        'Generating actionable timetable catch-up and zero-period recommendations',
+        'Multi-agent evidence fusion',
+      ],
+      safeguards: [
+        'Strict draft-only policy: zero automatic emails, SMS, or schedule changes are dispatched',
+        'Human-in-the-loop requirement: all drafts remain pending until approved by faculty/coordinator',
+        'Objective language with zero disciplinary judgements',
+        'Comprehensive logging in ai_agent_runs audit trail',
+      ],
+    },
+    usage: {
+      summary: 'Acts as the final synthesis step (Step 3) of the Curriculum Planning pipeline, converting raw coverage and pacing data into safe draft proposals ready for coordinator sign-off.',
+      step_by_step_flow: [
+        'Step 1: Ingests coverage gaps from Gate 1 and overdue periods from Gate 2',
+        'Step 2: Evaluates affected learning outcomes from lms_learning_outcomes',
+        'Step 3: Drafts individual teacher pacing recovery notes citing exact delayed periods',
+        'Step 4: Compiles coordinator executive summary with syllabus velocity recommendations',
+        'Step 5: Enforces Gate 3 safety validation and stores drafts in approval queue',
+      ],
+    },
+  },
+  'new_pal.gamification_summary': {
+    name: 'PAL gamification reader',
+    module: 'New PAL',
+    tool: 'new_pal.gamification_summary',
+    knowledge: {
+      summary: 'Real learner practice records, question paper attempts where exam_type="PAL", daily practice streaks, earned badges, and points.',
+      items: [
+        'PAL generated practice papers and attempts from question_paper and lms_online_exam',
+        'Per-question answer records and correctness from lms_online_exam_answer',
+        'Mastery points and consecutive practice days from LearnerActivitySource',
+        'Competency badges and career quest progression metrics',
+        'Student profiles from tblstudent and tblstudent_enrollment',
+      ],
+      tables: ['question_paper', 'lms_online_exam', 'lms_online_exam_answer', 'tblstudent', 'tblstudent_enrollment'],
+    },
+    activities: {
+      summary: 'Profiles learner practice telemetry, evaluates practice streaks and badge accumulation, and validates Gate 1.',
+      items: [
+        'Aggregating practice paper attempts under exam_type = "PAL"',
+        'Calculating consecutive daily practice streaks and accuracy trends',
+        'Auditing competency badges earned against class milestones',
+        'Extracting student practice velocity for downstream diagnostic correlation',
+        'Gate 1 validation pass ensuring telemetry integrity',
+      ],
+    },
+    abilities: {
+      summary: 'Longitudinal practice tracking, gamification metric calculation, zero-synthetic evaluation, and read-only extraction.',
+      skills: [
+        'Deterministic practice attempt tallying without altering student records',
+        'Dynamic streak calculation from real attempt timestamps',
+        'Multi-source learner profile normalization',
+        'Strict tenant isolation via sub_institute_id',
+      ],
+      safeguards: [
+        'Strictly read-only: does not modify attempts, points, or streaks',
+        'Tenant boundary isolation via sub_institute_id',
+        'Gate 1 requires genuine learner practice telemetry before progressing',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 1 of the PAL pipeline, capturing student practice velocity and passing verified learner telemetry to Agent 2.',
+      step_by_step_flow: [
+        'Step 1: Ingests student ID or resolves active candidate from the class roster',
+        'Step 2: Gathers attempt history from lms_online_exam for PAL papers',
+        'Step 3: Aggregates streaks, points, and badge credentials',
+        'Step 4: Evaluates Gate 1 validation criteria',
+        'Step 5: Delivers verified practice profile to Agent 2 (Mastery Diagnostic Agent)',
+      ],
+    },
+  },
+  'new_pal.content_model_status': {
+    name: 'PAL content mastery diagnostic agent',
+    module: 'New PAL',
+    tool: 'new_pal.content_model_status',
+    knowledge: {
+      summary: 'Chapter content models, 4-type Bloom cognitive nodes, mastery level thresholds, and Stream-tier stagnation rules.',
+      items: [
+        'Chapter content model configuration and cognitive mapping from ContentModelCoverageService',
+        'Learner mastery tier classifications from PalInterventionDetector',
+        'Threshold registry criteria (learners with >= 50% attempted concepts stuck at Stream)',
+        'Concept prerequisite relations from pal_concept_relations',
+        'Mastery attempt counts and session logs',
+      ],
+      tables: ['pal_concept_relations', 'pal_learning_events', 'chapter_master', 'lms_concept', 'tblstudent'],
+    },
+    activities: {
+      summary: 'Audits content model coverage across estate chapters, diagnoses learners stuck at the foundational Stream tier, and validates Gate 2.',
+      items: [
+        'Auditing chapter content model depth (concept learning, practice, assessment)',
+        'Evaluating attempted concepts against mastery progression tiers',
+        'Isolating students whose attempted concepts fail to advance beyond Stream',
+        'Detecting specific prerequisite concept bottlenecks and misconceptions',
+        'Packaging flagged candidate cohort for Gate 2 delivery to Agent 3',
+      ],
+    },
+    abilities: {
+      summary: 'Multi-tier cognitive model analysis, BKT mastery threshold classification, and deficit isolation.',
+      skills: [
+        'Cognitive taxonomy evaluation without fabricating test scores',
+        'Stalled mastery share calculation (stream_share = stuck_nodes / attempted_nodes)',
+        'Non-judgmental diagnostic deficit tagging',
+        'Strict tenant boundary enforcement',
+      ],
+      safeguards: [
+        'Zero character judgements: describes recorded mastery patterns only',
+        'Strict read-only execution: modifies no student records',
+        'Gate 2 validation requires verified mastery data',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2 of the PAL pipeline, diagnosing which concepts present mastery obstacles for candidate learners.',
+      step_by_step_flow: [
+        'Step 1: Consumes learner practice telemetry from Gate 1',
+        'Step 2: Inspects estate content models via ContentModelCoverageService',
+        'Step 3: Executes PalInterventionDetector to isolate students stuck at Stream',
+        'Step 4: Catalogs specific stuck concept nodes and misconception patterns',
+        'Step 5: Passes flagged learner records to Agent 3 via Gate 2',
+      ],
+    },
+  },
+  'new_pal.coherence_gaps': {
+    name: 'Adaptive coherence reader',
+    module: 'New PAL',
+    tool: 'new_pal.coherence_gaps',
+    knowledge: {
+      summary: 'Concept prerequisite trees, coherence mapping graphs, and mastery gap diagnostics across subjects.',
+      items: [
+        'Concept relations and dependency edges from pal_concept_relations',
+        'Topic-to-concept bindings from lms_concept',
+        'Missing prerequisite chains and cyclic dependency detection',
+      ],
+      tables: ['pal_concept_relations', 'lms_concept', 'topic_master', 'chapter_master'],
+    },
+    activities: {
+      summary: 'Traverses concept prerequisite graphs to identify broken dependencies and knowledge gaps preventing progression.',
+      items: [
+        'Tracing prerequisite paths for difficult concept nodes',
+        'Identifying missing prerequisite mastery records',
+        'Packaging graph coherence gaps for targeted remediation',
+      ],
+    },
+    abilities: {
+      summary: 'Graph traversal, circular link prevention, and read-only analysis.',
+      skills: ['DAG dependency verification', 'Prerequisite chain resolution'],
+      safeguards: ['Read-only execution', 'Strict tenant boundary isolation'],
+    },
+    usage: {
+      summary: 'Provides graph-level concept dependency insights to pinpoint foundational concepts requiring reteaching.',
+      step_by_step_flow: [
+        'Step 1: Identifies candidate struggling concept',
+        'Step 2: Traverses pal_concept_relations upstream to locate required antecedents',
+        'Step 3: Identifies unmastered prerequisites for scaffolding intervention',
+      ],
+    },
+  },
+  'new_pal.draft_adaptive_intervention': {
+    name: 'PAL adaptive coherence drafter',
+    module: 'New PAL',
+    tool: 'new_pal.draft_adaptive_intervention',
+    knowledge: {
+      summary: 'Coherence map knowledge graphs, concept prerequisite trees, remediation strategies, and draft safety rules.',
+      items: [
+        'Concept graph relationships and prerequisite links from CoherenceMapRepository',
+        'Flagged learner profiles and stuck concepts from Agent 2 (Gate 2)',
+        'Gamification streak and practice context from Agent 1 (Gate 1)',
+        'Remedial scaffolding strategies (worked examples, prerequisite reteach)',
+        'Safety guardrails (max_verb=recommend, may_execute=0, zero automated messaging)',
+      ],
+      tables: ['pal_concept_relations', 'ai_cases', 'ai_evidence', 'ai_recommendations', 'lms_concept'],
+    },
+    activities: {
+      summary: 'Synthesizes gamification metrics and stuck mastery concepts to draft personalized adaptive learning intervention plans for educator review.',
+      items: [
+        'Cross-referencing stalled concepts with graph prerequisite dependencies',
+        'Drafting individualized pedagogical action plans citing exact stuck concepts',
+        'Proposing worked-example reinforcement and scaffolding modules',
+        'Enforcing strict draft_pending_human_approval status tags',
+        'Gate 3 safety validation confirming zero external messages were dispatched',
+      ],
+    },
+    abilities: {
+      summary: 'Graph-grounded pedagogical synthesis, adaptive pathway generation, human-in-the-loop guardrail enforcement, and objective drafting.',
+      skills: [
+        'Prerequisite tree traversal to identify optimal remediation entry points',
+        'Grounded factual drafting citing exact concept titles and mastery percentages',
+        'Personalized adaptive recommendation drafting',
+        'Audit logging compliance',
+      ],
+      safeguards: [
+        'Strict draft-only policy: zero automatic emails, SMS, or test reassignments are dispatched',
+        'Human-in-the-loop requirement: plans remain pending until approved by the teacher',
+        'Objective, constructive pedagogical language',
+        'Comprehensive logging in ai_agent_runs audit trail',
+      ],
+    },
+    usage: {
+      summary: 'Acts as the final synthesis step (Step 3) of the PAL pipeline, converting raw practice and concept bottlenecks into safe draft interventions ready for teacher sign-off.',
+      step_by_step_flow: [
+        'Step 1: Consumes practice telemetry from Gate 1 and stuck concepts from Gate 2',
+        'Step 2: Traverses prerequisite trees in pal_concept_relations for foundational gap roots',
+        'Step 3: Drafts personalized intervention plans citing exact stuck concepts and recommended scaffolding',
+        'Step 4: Compiles coordinator executive summary with cohort mastery distributions',
+        'Step 5: Enforces Gate 3 safety validation and deposits proposals in the approval queue',
+      ],
+    },
+  },
 };
 
 function ToolAgentEsoModal({
@@ -907,8 +1281,7 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
   const refreshAll = useCallback(() => {
     agents.refresh();
     runs.refresh();
-    setConsoleKey((key) => key + 1);
-  }, [agents, runs]);
+  }, [agents.refresh, runs.refresh]);
 
   useEffect(() => {
     const handler = (evt: Event) => {
@@ -931,6 +1304,7 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
           `${agent.name} enabled as ${agent.id}. It runs only when someone presses Run, and only as that person.`,
         );
         refreshAll();
+        setConsoleKey((key) => key + 1);
       } catch (cause) {
         setNote(cause instanceof Error ? cause.message : 'The agent could not be enabled.');
       } finally {
@@ -981,6 +1355,10 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
         <ExamAssessmentAgentControlCard onValidated={refreshAll} />
       ) : module.boundAgent?.agentKey === 'k12_engagement' ? (
         <EngagementAgentControlCard onValidated={refreshAll} />
+      ) : module.boundAgent?.agentKey === 'k12_curriculum_planning' ? (
+        <CurriculumPlanningAgentControlCard onValidated={refreshAll} />
+      ) : module.boundAgent?.agentKey === 'k12_new_pal' ? (
+        <PalAgentControlCard onValidated={refreshAll} />
       ) : module.boundAgent ? (
         <BoundAgentPanel module={module} agent={module.boundAgent} />
       ) : (
@@ -1053,7 +1431,18 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
         <h3 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">
           {module.label} agent management
         </h3>
-        <AgentManagement key={consoleKey} moduleFilter={module.key} embedded hideCreate={module.key === 'teach_learn' || module.key === 'exam_assessment' || module.key === 'engagement'} />
+        <AgentManagement
+          key={consoleKey}
+          moduleFilter={module.key}
+          embedded
+          hideCreate={
+            module.key === 'teach_learn' ||
+            module.key === 'exam_assessment' ||
+            module.key === 'engagement' ||
+            module.key === 'curriculum_planning' ||
+            module.key === 'new_pal'
+          }
+        />
       </div>
 
       {running && (

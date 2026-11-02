@@ -1551,6 +1551,28 @@ export const AGENT_TOOLS: AgentTool[] = [
     exampleInput: { standard_id: null, subject_id: null, syear: null },
   },
   {
+    key: 'curriculum_planning.lesson_pace',
+    label: 'Audit lesson plan delivery pace',
+    description:
+      'Audits scheduled teaching periods against the academic calendar, isolating behind-schedule teaching slots and velocity deficits. Changes nothing.',
+    module: 'curriculum_planning',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { standard_id: null, subject_id: null, syear: 2026 },
+  },
+  {
+    key: 'curriculum_planning.draft_alignment_note',
+    label: 'Draft syllabus alignment & pacing proposal',
+    description:
+      'Synthesizes coverage gaps and delivery delays into actionable pacing recovery and competency alignment proposals for educator approval. Changes nothing.',
+    module: 'curriculum_planning',
+    risk: 'draft',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { standard_name: 'Class', curricula_gaps: [], pacing_gaps: [] },
+  },
+  {
     key: 'curriculum_planning.outcomes',
     label: 'Read learning outcomes',
     description:
@@ -1664,6 +1686,17 @@ export const AGENT_TOOLS: AgentTool[] = [
     kind: 'mcp',
     available: true,
     exampleInput: { standard_id: null, subject_id: null, limit: 50 },
+  },
+  {
+    key: 'new_pal.draft_adaptive_intervention',
+    label: 'Draft adaptive remediation proposal',
+    description:
+      'Synthesizes learner practice telemetry and stuck mastery concepts to draft personalized adaptive learning intervention plans for educator review. Changes nothing.',
+    module: 'new_pal',
+    risk: 'draft',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { flagged_learners: [], coherence_summary: {} },
   },
 
   // ---- Teach/Learn --------------------------------------------------------
