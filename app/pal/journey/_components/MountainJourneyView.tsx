@@ -1,29 +1,40 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, PartyPopper } from 'lucide-react';
+import {
+  AlertTriangle,
+  BookOpen,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Compass,
+  GitBranch,
+  Layers,
+  ListChecks,
+  Loader2,
+  PartyPopper,
+  RotateCcw,
+  Sparkles,
+  TrendingUp,
+  UserCheck,
+} from 'lucide-react';
 import {
   fetchJourneyData,
   currentMilestoneIndex,
   type JourneyData,
   type MilestoneKey,
 } from '@/app/pal/journey/data/pal-journey';
-import { PathJourneyView } from './path/PathJourneyView';
-import { MilestoneDetailPanel } from './MilestoneDetailPanel';
+import { PathJourneyView, type UnifiedJourneyNode } from './path/PathJourneyView';
+import { StepDetailPanel } from './StepDetailPanel';
+import { TeacherPerspectivePanel } from './TeacherPerspectivePanel';
 import { EmptyChapterState } from './EmptyChapterState';
 import { JourneyErrorState } from './JourneyErrorState';
 import { KnowledgeGraphPanel } from './KnowledgeGraphPanel';
 import { ChapterCompleteCelebration } from './ChapterCompleteCelebration';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
-/**
- * Who this render of the journey is for.
- *
- * `mode: 'self'` (the default) is a student looking at their own chapter.
- * `{mode:'monitor', studentId, readOnly:true}` is a teacher watching one
- * student's chapter — `studentId` is forwarded to `fetchJourneyData` as
- * `asStudentId`, which the backend already scopes to "student=self,
- * staff=teacher-of-student" (see `pal-journey.ts`'s file header).
- */
 export interface JourneyViewContext {
   mode: 'self' | 'monitor';
   studentId?: string;
@@ -37,41 +48,26 @@ export interface MountainJourneyViewProps {
 
 const DEFAULT_VIEW_CONTEXT: JourneyViewContext = { mode: 'self' };
 
-/**
- * The orchestrator: fetches the whole chapter's journey once, computes
- * nothing itself (every verdict already arrived decided from
- * `fetchJourneyData`), and renders the 12-step winding road plus whichever
- * milestone is selected.
- *
- * `only one chapter/concept system-wide has full data today` — Chapter 1014 /
- * Concept 114 — so Step 1 rendering live with most of the rest gray is the
- * expected result for almost every `chapterId` this page is opened with, not
- * a bug to chase.
- */
-export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONTEXT }: MountainJourneyViewProps) {
+export function MountainJourneyView({
+  chapterId,
+  viewContext = DEFAULT_VIEW_CONTEXT,
+}: MountainJourneyViewProps) {
   const [data, setData] = useState<JourneyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<MilestoneKey | null>(null);
+  const [selectedNode, setSelectedNode] = useState<UnifiedJourneyNode | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [showTeacherDiagnostics, setShowTeacherDiagnostics] = useState(
+    viewContext.mode === 'monitor'
+  );
   const [attempt, setAttempt] = useState(0);
   const [kgMilestone, setKgMilestone] = useState<JourneyData['milestones'][number] | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
-  // Which concept the map/detail panel are focused on — null keeps the
-  // backend's own default (the first ESO-ready concept). Set when a learner
-  // picks a different concept out of the Concept Diagnostic drawer
-  // (`ConceptDiagnosticPanel`, via `MilestoneDetailPanel`), so the 12-stage
-  // map re-renders around THAT concept's own real stages instead of staying
-  // stuck on whichever one the backend happened to pick first.
   const [focusConceptOverride, setFocusConceptOverride] = useState<string | null>(null);
+
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mountedRef = useRef(false);
 
-  // Scrolls the map back into view when a concept is picked from the drawer
-  // below it — otherwise "the map updates" is invisible if the drawer was
-  // opened from partway down the page, which is the normal case since the
-  // drawer lives inside the detail panel under the map. Skipped on mount
-  // (`mountedRef`): this only reacts to an actual concept switch, not the
-  // page's own first load.
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
@@ -80,23 +76,12 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
     mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [focusConceptOverride]);
 
-  // Fires the chapter-complete celebration once per chapter, not on every
-  // revisit — gated on localStorage rather than a backend flag, since
-  // "has this learner already seen the confetti" isn't evidence PAL needs
-  // to persist server-side. Lives alongside the other hooks (before the
-  // loading/error/empty early returns below) because hooks can't be called
-  // conditionally; it reads `data` defensively since this runs before those
-  // guards establish it's non-null.
   useEffect(() => {
     if (!data) return;
     const required = data.milestones.filter((entry) => !entry.untracked);
     const allRequiredDone =
-      required.length > 0 && required.every((entry) => entry.status === 'completed' || entry.status === 'mastered');
-    // Both conditions, not just the first: a learner can finish this one
-    // concept's own 12 stages while other concepts in the chapter are still
-    // untouched — `allRequiredDone` alone celebrated that too early. Gating
-    // on `chapterFullyMastered` too is what makes this "once ALL concepts
-    // are mastered", not "once this one concept's journey is done".
+      required.length > 0 &&
+      required.every((entry) => entry.status === 'completed' || entry.status === 'mastered');
     if (!allRequiredDone || !data.chapterFullyMastered) return;
 
     const storageKey = `pal_journey_celebrated_${data.chapterId}`;
@@ -104,9 +89,7 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
       if (localStorage.getItem(storageKey)) return;
       localStorage.setItem(storageKey, '1');
     } catch {
-      // Private browsing / storage disabled — worst case the celebration
-      // plays again on the next visit instead of staying silent. Not worth
-      // blocking the celebration over.
+      // Ignore storage errors in private mode
     }
     setShowCelebration(true);
   }, [data]);
@@ -114,8 +97,6 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
   useEffect(() => {
     const controller = new AbortController();
 
-    // Deferred - the convention across app/pal, and what
-    // react-hooks/set-state-in-effect enforces.
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
       setLoading(true);
@@ -124,7 +105,30 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
         .then((result) => {
           if (controller.signal.aborted) return;
           setData(result);
-          setSelected((current) => current ?? result.milestones[0]?.key ?? null);
+
+          // Default selected node: current active or latest reached step
+          const activeIndex = result.currentStepIndex ?? 0;
+          const activeStep = result.actualSteps[activeIndex] ?? result.actualSteps[0];
+          if (activeStep) {
+            setSelectedNodeId(activeStep.id);
+            setSelectedNode({
+              id: activeStep.id,
+              source: activeStep.attemptNumber > 1 ? 'attempt2' : 'main',
+              stageKey: activeStep.stageKey,
+              label: activeStep.label,
+              subLabel: activeStep.shortLabel,
+              timeSpentMinutes: activeStep.timeSpentMinutes,
+              score: activeStep.score,
+              status: activeStep.status as any,
+              isStuck: activeStep.isStuck,
+              stuckReason: activeStep.stuckReason,
+              repeatReason: activeStep.repeatReason,
+              facts: activeStep.facts,
+              note: activeStep.progressionNote ?? undefined,
+              x: 0,
+              y: 0,
+            });
+          }
         })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
@@ -142,7 +146,7 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
         <Loader2 aria-hidden className="mr-2 h-5 w-5 animate-spin" />
-        Loading your journey…
+        Loading complete learning journey…
       </div>
     );
   }
@@ -155,99 +159,117 @@ export function MountainJourneyView({ chapterId, viewContext = DEFAULT_VIEW_CONT
     return <EmptyChapterState chapterName={data?.chapterName} />;
   }
 
-  const activeMilestone = data.milestones.find((entry) => entry.key === selected) ?? data.milestones[0];
   const readOnly = viewContext.readOnly ?? viewContext.mode === 'monitor';
-
-  // The learner's actual furthest real progress — not whichever milestone
-  // happens to be selected for the detail panel. This is what the "Current"
-  // tag marks. See currentMilestoneIndex()'s own docblock for why this is a
-  // shared function, not a loop duplicated per view.
-  const currentIndex = currentMilestoneIndex(data);
-
-  // Required = every milestone except the two with no per-student tracking
-  // at all (explanation_lab/experiment — see pal-journey.ts's file header).
-  // "Completed vs required" would be meaningless if it counted steps the
-  // backend can never mark done.
-  const requiredMilestones = data.milestones.filter((entry) => !entry.untracked);
-  const completedCount = requiredMilestones.filter(
-    (entry) => entry.status === 'completed' || entry.status === 'mastered'
-  ).length;
-  const isChapterComplete = requiredMilestones.length > 0 && completedCount === requiredMilestones.length;
-  const masteryEntry = data.milestones.find((entry) => entry.key === 'mastery');
-  const masteryLabel =
-    masteryEntry?.status === 'mastered'
-      ? 'Mastered'
-      : masteryEntry?.status === 'in_progress'
-        ? 'In progress'
-        : masteryEntry?.status === 'attention'
-          ? 'Needs attention'
-          : 'Not yet';
-  const nextMilestone = data.milestones.find(
-    (entry) => entry.status === 'available' || entry.status === 'in_progress' || entry.status === 'attention'
-  );
+  const isTeacherMonitor = viewContext.mode === 'monitor';
 
   return (
     <div className="space-y-6">
-      <header className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Learning Path</p>
-              {isChapterComplete && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-100 via-orange-100 to-rose-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">
-                  <PartyPopper aria-hidden className="h-3 w-3" />
-                  Chapter complete
-                </span>
-              )}
-            </div>
-            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
-              {data.chapterName || `Chapter ${data.chapterId}`}
-            </h1>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-slate-500">Current stage</p>
-            <p className="text-sm font-semibold text-slate-800">{data.milestones[currentIndex].label}</p>
-          </div>
-        </div>
-
-        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className="rounded-xl bg-slate-50 p-3">
-            <dt className="text-xs text-slate-500">Steps completed</dt>
-            <dd className="text-base font-bold text-slate-900">
-              {completedCount} / {requiredMilestones.length}
-            </dd>
-          </div>
-          <div className="rounded-xl bg-slate-50 p-3">
-            <dt className="text-xs text-slate-500">Mastery status</dt>
-            <dd className="text-base font-bold text-slate-900">{masteryLabel}</dd>
-          </div>
-          <div className="col-span-2 rounded-xl bg-slate-50 p-3 sm:col-span-1">
-            <dt className="text-xs text-slate-500">Next recommended action</dt>
-            <dd className="text-base font-bold text-slate-900">{nextMilestone ? nextMilestone.label : 'All caught up'}</dd>
-          </div>
-        </dl>
-      </header>
-
-      <div ref={mapRef} className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl shadow-[0_8px_30px_rgba(99,102,241,0.25)]">
+      {/* ── 1. The Single Unified "Your Journey" Visualization ── */}
+      <div ref={mapRef} className="w-full">
         <PathJourneyView
           data={data}
-          currentIndex={currentIndex}
-          selected={activeMilestone.key}
-          onSelect={(key) => setSelected(key)}
+          selectedNodeId={selectedNodeId}
+          onSelectNode={(node) => {
+            setSelectedNode(node);
+            setSelectedNodeId(node.id);
+          }}
         />
       </div>
 
-      <MilestoneDetailPanel
-        milestone={activeMilestone}
-        chapterId={data.chapterId}
-        readOnly={readOnly}
-        onOpenKnowledgeGraph={setKgMilestone}
-        focusConceptId={data.focusConceptId}
-        onSelectConcept={setFocusConceptOverride}
+      {/* ── 2. Interactive Step Detail Panel ── */}
+      {selectedNode && (
+        <StepDetailPanel
+          selectedNode={selectedNode}
+          chapterId={data.chapterId}
+          readOnly={readOnly}
+          onOpenKnowledgeGraph={() =>
+            setKgMilestone(data.milestones.find((m) => m.key === 'mastery') ?? null)
+          }
+          onSelectConcept={setFocusConceptOverride}
+          concepts={data.chapterConcepts}
+          selectedConceptId={data.focusConceptId}
+        />
+      )}
+
+      {/* ── 3. Teacher Perspective & Diagnostics Accordion/Panel ── */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+              <UserCheck className="h-4 w-4" />
+            </span>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Teacher Perspective &amp; Diagnostic Audit
+              </h3>
+              <p className="text-xs text-slate-500">
+                Answers why student took longer, stuck points, and root misconception causes.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowTeacherDiagnostics((prev) => !prev)}
+            className="gap-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50"
+          >
+            {showTeacherDiagnostics ? (
+              <>
+                <ChevronUp className="h-4 w-4" />
+                Hide Teacher Diagnostics
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-4 w-4" />
+                Show Teacher Diagnostics (Q1–Q5)
+              </>
+            )}
+          </Button>
+        </div>
+
+        {showTeacherDiagnostics && (
+          <div className="mt-5 border-t border-slate-100 pt-5">
+            <TeacherPerspectivePanel
+              insights={data.teacherInsights}
+              actualSteps={data.actualSteps}
+              onSelectStep={(stepNum) => {
+                // Find matching node and select it
+                const found = data.actualSteps.find((s) => s.stepNumber === stepNum);
+                if (found) {
+                  setSelectedNodeId(found.id);
+                  setSelectedNode({
+                    id: found.id,
+                    source: found.attemptNumber > 1 ? 'attempt2' : 'main',
+                    stageKey: found.stageKey,
+                    label: found.label,
+                    subLabel: found.shortLabel,
+                    timeSpentMinutes: found.timeSpentMinutes,
+                    score: found.score,
+                    status: found.status as any,
+                    isStuck: found.isStuck,
+                    stuckReason: found.stuckReason,
+                    repeatReason: found.repeatReason,
+                    facts: found.facts,
+                    note: found.progressionNote ?? undefined,
+                    x: 0,
+                    y: 0,
+                  });
+                }
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Knowledge Graph Dialog Panel */}
+      <KnowledgeGraphPanel
+        milestone={kgMilestone}
+        viewContext={viewContext}
+        onClose={() => setKgMilestone(null)}
       />
 
-      <KnowledgeGraphPanel milestone={kgMilestone} viewContext={viewContext} onClose={() => setKgMilestone(null)} />
-
+      {/* Chapter Completion Confetti Celebration */}
       {showCelebration && (
         <ChapterCompleteCelebration
           chapterName={data.chapterName || `Chapter ${data.chapterId}`}
