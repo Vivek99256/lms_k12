@@ -53,7 +53,13 @@ export function AgentManagement({
   const [running, setRunning] = useState<Agent | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
-  const isCreateDisabled = hideCreate || moduleFilter === 'teach_learn' || moduleFilter === 'exam_assessment';
+  const isCreateDisabled =
+    hideCreate ||
+    moduleFilter === 'teach_learn' ||
+    moduleFilter === 'exam_assessment' ||
+    moduleFilter === 'engagement' ||
+    moduleFilter === 'curriculum_planning' ||
+    moduleFilter === 'new_pal';
 
   const visibleTabs = useMemo(() => {
     if (isCreateDisabled) {

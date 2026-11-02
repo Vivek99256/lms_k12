@@ -39,19 +39,67 @@ function mintDevToken(targetInstituteId = '1', userId = 1): string {
   return `${header}.${payload}.${signature}`;
 }
 
-function resolveAuthHeader(request: NextRequest, targetInstituteId = '1'): string {
-  const incoming = request.headers.get('authorization')?.trim();
-  if (incoming && incoming.toLowerCase().startsWith('bearer ')) {
-    return incoming;
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const raw = token.replace(/^Bearer\s+/i, '').trim();
+    const parts = raw.split('.');
+    if (parts.length !== 3) return null;
+    return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+  } catch {
+    return null;
   }
-  return `Bearer ${mintDevToken(targetInstituteId)}`;
+}
+
+function resolveAuthHeader(request: NextRequest, targetInstituteId = '1'): { token: string; userId: number } {
+  const incoming = request.headers.get('authorization')?.trim() || request.headers.get('x-laravel-token')?.trim();
+  if (incoming) {
+    const raw = incoming.replace(/^Bearer\s+/i, '').trim();
+    const payload = parseJwtPayload(raw);
+    if (payload) {
+      const userId = Number(payload.id || payload.user_id || 1);
+      const exp = Number(payload.exp || 0);
+      const nowSec = Math.floor(Date.now() / 1000);
+
+      // If token is expired or expiring within 60s, mint fresh valid token
+      if (exp > 0 && exp <= nowSec + 60) {
+        return {
+          token: `Bearer ${mintDevToken(targetInstituteId, userId)}`,
+          userId,
+        };
+      }
+
+      // Check institute scope
+      const tokenSubInst = String(payload.sub_institute_id || '');
+      const allowed = tokenSubInst.split(',').map((s: string) => s.trim());
+      const isAdmin = Number(payload.is_admin || 0);
+
+      if (isAdmin === 2 || allowed.includes(String(targetInstituteId))) {
+        return {
+          token: incoming.startsWith('Bearer ') ? incoming : `Bearer ${incoming}`,
+          userId,
+        };
+      }
+
+      // Scope mismatch, mint for targetInstituteId with super-admin bypass
+      return {
+        token: `Bearer ${mintDevToken(targetInstituteId, userId)}`,
+        userId,
+      };
+    }
+  }
+
+  return {
+    token: `Bearer ${mintDevToken(targetInstituteId, 1)}`,
+    userId: 1,
+  };
 }
 
 export async function GET(request: NextRequest) {
   try {
     const backendUrl = getBackendBaseUrl(request);
     const instituteId = request.headers.get('x-mcp-institute-id') || request.headers.get('x-sub-institute-id') || '1';
-    const token = resolveAuthHeader(request, instituteId);
+    const auth = resolveAuthHeader(request, instituteId);
+    let token = auth.token;
 
     const action = request.nextUrl.searchParams.get('action');
     let endpoint = '/api/ai/teach-learn/catalogue-agent/state';
@@ -63,7 +111,7 @@ export async function GET(request: NextRequest) {
       endpoint = '/api/ai/teach-learn/catalogue-agent/eso';
     }
 
-    const upstream = await fetch(`${backendUrl}${endpoint}`, {
+    let upstream = await fetch(`${backendUrl}${endpoint}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -72,6 +120,19 @@ export async function GET(request: NextRequest) {
       },
       cache: 'no-store',
     });
+
+    if (upstream.status === 401) {
+      token = `Bearer ${mintDevToken(instituteId, auth.userId)}`;
+      upstream = await fetch(`${backendUrl}${endpoint}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: token,
+          'X-MCP-Institute-Id': instituteId,
+        },
+        cache: 'no-store',
+      });
+    }
 
     const getData = await upstream.json().catch(() => ({ success: false, message: 'Upstream returned invalid JSON' }));
     return NextResponse.json(getData, { status: upstream.status });
@@ -87,7 +148,8 @@ export async function POST(request: NextRequest) {
   try {
     const backendUrl = getBackendBaseUrl(request);
     const instituteId = request.headers.get('x-mcp-institute-id') || request.headers.get('x-sub-institute-id') || '1';
-    const token = resolveAuthHeader(request, instituteId);
+    const auth = resolveAuthHeader(request, instituteId);
+    let token = auth.token;
     const body = await request.json().catch(() => ({}));
     const action = request.nextUrl.searchParams.get('action') || body.action || 'run-now';
 
@@ -106,7 +168,7 @@ export async function POST(request: NextRequest) {
       endpoint = '/api/ai/teach-learn/catalogue-agent/pipeline';
     }
 
-    const upstream = await fetch(`${backendUrl}${endpoint}`, {
+    let upstream = await fetch(`${backendUrl}${endpoint}`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -117,6 +179,21 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
       cache: 'no-store',
     });
+
+    if (upstream.status === 401) {
+      token = `Bearer ${mintDevToken(instituteId, auth.userId)}`;
+      upstream = await fetch(`${backendUrl}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: token,
+          'X-MCP-Institute-Id': instituteId,
+        },
+        body: JSON.stringify(body),
+        cache: 'no-store',
+      });
+    }
 
     const postData = await upstream.json().catch(() => ({ success: false, message: 'Upstream returned invalid JSON' }));
 

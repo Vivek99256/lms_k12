@@ -272,3 +272,24 @@ test('create and run an exam_assessment agent end to end', async () => {
     ['agents.exam_assessment', 'update'],
   ]);
 });
+
+
+test('curriculum_planning baseline agents are present and scoped', async () => {
+  const store = new MemoryAgentStore(undefined, true);
+  const agents = await listAgents(context(feesAdmin, allow, store), { module: 'curriculum_planning' });
+  assert.ok(agents.length >= 4);
+  assert.ok(agents.some((a) => a.tools_allowed.includes('curriculum_planning.status')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('curriculum_planning.lesson_pace')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('curriculum_planning.draft_alignment_note')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('curriculum_planning.outcomes')));
+});
+
+test('new_pal baseline agents are present and scoped', async () => {
+  const store = new MemoryAgentStore(undefined, true);
+  const agents = await listAgents(context(feesAdmin, allow, store), { module: 'new_pal' });
+  assert.ok(agents.length >= 4);
+  assert.ok(agents.some((a) => a.tools_allowed.includes('new_pal.gamification_summary')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('new_pal.content_model_status')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('new_pal.coherence_gaps')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('new_pal.draft_adaptive_intervention')));
+});
