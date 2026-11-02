@@ -3,7 +3,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 
-import { fetchMyNotifications, fetchNotificationInbox } from '@/lib/platform/client';
+import {
+  fetchMyNotifications,
+  fetchNotificationInbox,
+  markAllUserNotificationsRead,
+  markUserNotificationRead,
+} from '@/lib/platform/client';
+import { safeInternalPath } from '@/lib/question-papers/view';
 
 const SEEN_KEY = 'notification-bell-seen-at';
 const POLL_MS = 60_000;
@@ -15,7 +21,11 @@ interface BellItem {
   createdAt: number;
   /** true/false where the source tracks it; null means the bell's own last-seen time decides. */
   read: boolean | null;
+  /** Set for notices the server tracks per person (`user:<id>`), which can be marked read. */
+  userNoticeId?: number;
+  link?: string | null;
 }
+
 
 function toTime(value: string): number {
   const time = new Date(value.replace(' ', 'T')).getTime();
@@ -62,7 +72,16 @@ export default function NotificationBell() {
       }
       if (mine.status === 'fulfilled') {
         for (const row of mine.value) {
-          merged.push({ key: row.key, subject: row.subject, body: row.body, createdAt: toTime(row.created_at), read: row.read });
+          const userNoticeId = row.source === 'user' ? Number(row.key.split(':')[1]) || undefined : undefined;
+          merged.push({
+            key: row.key,
+            subject: row.subject,
+            body: row.body,
+            createdAt: toTime(row.created_at),
+            read: row.read,
+            userNoticeId,
+            link: row.link,
+          });
         }
       }
       merged.sort((a, b) => b.createdAt - a.createdAt);
@@ -99,8 +118,32 @@ export default function NotificationBell() {
 
   // The server cannot record a read yet, so what this browser has already opened (seen) decides
   // too: a notice stays unread only if its source has not marked it read AND it is newer than that.
-  const isUnread = (item: BellItem) => item.read !== true && item.createdAt > seen;
+  // Server-tracked notices are unread until the server says otherwise; merely opening the bell is not a read.
+  const isUnread = (item: BellItem) =>
+    item.userNoticeId !== undefined ? item.read !== true : item.read !== true && item.createdAt > seen;
   const unread = items.filter(isUnread).length;
+
+  const openNotice = (item: BellItem) => {
+    const target = safeInternalPath(item.link);
+    const done = () => {
+      if (target) window.location.assign(target);
+    };
+    if (item.userNoticeId !== undefined && item.read !== true) {
+      setItems((prev) => prev.map((x) => (x.key === item.key ? { ...x, read: true } : x)));
+      markUserNotificationRead(item.userNoticeId).then(done, () => {
+        // Not recorded: show it as unread again rather than pretend it was saved.
+        setItems((prev) => prev.map((x) => (x.key === item.key ? { ...x, read: false } : x)));
+        done();
+      });
+    } else {
+      done();
+    }
+  };
+
+  const readAll = () => {
+    setItems((prev) => prev.map((x) => (x.userNoticeId !== undefined ? { ...x, read: true } : x)));
+    markAllUserNotificationsRead().catch(load);
+  };
 
   const toggle = () => {
     const next = !open;
@@ -136,16 +179,37 @@ export default function NotificationBell() {
 
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" role="menu">
-          <p className="border-b border-slate-100 px-3 py-2 text-sm font-semibold text-slate-900">Notifications</p>
+          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+            <p className="text-sm font-semibold text-slate-900">Notifications</p>
+            {items.some((item) => item.userNoticeId !== undefined && item.read !== true) && (
+              <button type="button" onClick={readAll} className="text-xs font-medium text-indigo-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40">
+                Mark all read
+              </button>
+            )}
+          </div>
           {items.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-slate-500">Nothing new.</p>
           ) : (
             <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
               {items.map((item) => (
-                <li key={item.key} className={`px-3 py-2 ${isUnread(item) ? 'bg-indigo-50/50' : ''}`}>
-                  <p className="text-sm font-medium text-slate-900">{item.subject}</p>
-                  <p className="text-xs text-slate-600">{item.body}</p>
-                  <p className="mt-0.5 text-[11px] text-slate-400">{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</p>
+                <li key={item.key} className={isUnread(item) ? 'bg-indigo-50/50' : ''}>
+                  {safeInternalPath(item.link) || item.userNoticeId !== undefined ? (
+                    <button
+                      type="button"
+                      onClick={() => openNotice(item)}
+                      className="block w-full px-3 py-2 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/40"
+                    >
+                      <p className="text-sm font-medium text-slate-900">{item.subject}</p>
+                      <p className="text-xs text-slate-600">{item.body}</p>
+                      <p className="mt-0.5 text-[11px] text-slate-400">{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</p>
+                    </button>
+                  ) : (
+                    <div className="px-3 py-2">
+                      <p className="text-sm font-medium text-slate-900">{item.subject}</p>
+                      <p className="text-xs text-slate-600">{item.body}</p>
+                      <p className="mt-0.5 text-[11px] text-slate-400">{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</p>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

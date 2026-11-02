@@ -74,11 +74,38 @@ export const EXAM_ASSESSMENT_AI_STACK: AiStackModule = {
       'No online exam attempts matched those filters, so no report was created. A class this institute has not recorded attempts for returns nothing rather than the whole school.',
   },
 
-  // No tool-agent presets are declared here: the Automations tab's bound-agent panel
-  // (below) is this module's real case-opening path. A preset button would need its tool
-  // registered in lib/agents/registry.ts's own module catalogue, which nothing here does
-  // yet — an empty list is honest about that rather than offering a button that fails.
-  presets: [],
+  presets: [
+    {
+      name: 'Online exam summary reader',
+      description:
+        'Reads online exam attempts, average scores and students scoring below the passing bar. Changes nothing.',
+      module: EXAM_ASSESSMENT_MODULE_KEY,
+      tools_allowed: ['exam_assessment.online_exam_summary'],
+      instructions:
+        'Report recorded online exam attempt figures and scores accurately. PAL-generated papers are excluded.',
+      status: 'active',
+    },
+    {
+      name: 'Assignment status reader',
+      description:
+        'Reads submission and review counts for assignments, worksheets and projects, plus the not-submitted list. Changes nothing.',
+      module: EXAM_ASSESSMENT_MODULE_KEY,
+      tools_allowed: ['exam_assessment.assignment_status'],
+      instructions:
+        'Report submission counts and identify unsubmitted student work without making character judgements.',
+      status: 'active',
+    },
+    {
+      name: 'Assessment review drafter',
+      description:
+        'Drafts a factual review note for a student’s online exam or assignment performance. Sends nothing.',
+      module: EXAM_ASSESSMENT_MODULE_KEY,
+      tools_allowed: ['exam_assessment.draft_review_note'],
+      instructions:
+        'Draft a neutral, factual assessment note for follow-up using only the recorded scores and details.',
+      status: 'active',
+    },
+  ],
 
   // Registered by 2026_09_29_100300_register_exam_assessment_agent_signal_and_workflow.php.
   // Reads only lms_online_exam/question_paper through OnlineExamReportService — the same

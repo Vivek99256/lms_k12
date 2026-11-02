@@ -135,55 +135,32 @@ export interface CatalogueAgentStateResponse {
 const DEV_TRIZ_BACKEND = 'https://dev.triz.co.in';
 
 function resolveBaseUrl(context: IntelligenceContext): string {
-  if (process.env.NEXT_PUBLIC_AI_BASE_URL) {
-    return process.env.NEXT_PUBLIC_AI_BASE_URL.replace(/\/$/, '');
-  }
-
-  // When running in local development (npm run dev on localhost), use local Laravel backend
-  if (typeof window !== 'undefined') {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (isLocal) {
-      return (
-        context.baseUrl ||
-        process.env.NEXT_PUBLIC_API_BASE_URL_DEV ||
-        'http://127.0.0.1:8000'
-      ).replace(/\/$/, '');
-    }
-  }
-
-  const candidate = (context.baseUrl || '').trim().replace(/\/$/, '');
-  if (candidate && !candidate.includes('localhost') && !candidate.includes('127.0.0.1')) {
-    return candidate;
-  }
-
-  const resolved = resolveAiBaseUrl(context.baseUrl);
-  if (resolved && !resolved.includes('localhost') && !resolved.includes('127.0.0.1') && !resolved.includes('erp.triz.co.in')) {
-    return resolved;
-  }
-
-  return DEV_TRIZ_BACKEND;
+  return resolveAiBaseUrl(context.baseUrl);
 }
 
 function resolveEndpoint(context: IntelligenceContext, action?: string): string {
-  const baseUrl = resolveBaseUrl(context);
-  const path = action === 'start' ? '/start'
-    : action === 'stop' ? '/stop'
-    : action === 'interval' ? '/interval'
-    : action === 'run-now' ? '/run-now'
-    : action === 'auto-generate-toggle' ? '/auto-generate/toggle'
-    : action === 'auto-generate-batch' ? '/auto-generate/batch'
-    : action === 'content-tasks' ? '/content-tasks'
-    : '/state';
-  return `${baseUrl}/api/ai/teach-learn/catalogue-agent${path}`;
+  const base = '/api/teach-learn/catalogue-agent';
+  if (!action || action === 'state') return base;
+  return `${base}?action=${encodeURIComponent(action)}`;
 }
 
 function buildHeaders(context: IntelligenceContext): HeadersInit {
-  return {
+  const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
-    ...(context.token ? { Authorization: `Bearer ${context.token}` } : {}),
-    'X-MCP-Institute-Id': String(context.instituteId || '1'),
   };
+  if (context.token) {
+    headers.Authorization = context.token.startsWith('Bearer ') ? context.token : `Bearer ${context.token}`;
+    headers['x-laravel-token'] = context.token.replace(/^Bearer\s+/i, '');
+  }
+  if (context.baseUrl) {
+    headers['x-laravel-base-url'] = context.baseUrl;
+    headers['x-backend-url'] = context.baseUrl;
+  }
+  const instId = String(context.instituteId || '1');
+  headers['X-MCP-Institute-Id'] = instId;
+  headers['x-sub-institute-id'] = instId;
+  return headers;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -332,4 +309,199 @@ export async function getContentTasksLedger(
     cache: 'no-store',
   });
   return handleResponse<{ tasks: ContentTaskRecord[]; stats: ContentStats; server_time: string }>(res);
+}
+
+export interface PipelineStep {
+  step: number;
+  agent_name: string;
+  agent_id: string;
+  tool: string;
+  status: 'success' | 'failed';
+  duration_ms: number;
+  input: Record<string, unknown>;
+  output_summary: string;
+}
+
+export interface PipelineGate {
+  gate: number;
+  name: string;
+  status: 'passed' | 'failed';
+  [key: string]: unknown;
+}
+
+export interface UnifiedTeachLearnReport {
+  success: boolean;
+  pipeline_status: 'completed' | 'failed';
+  sub_institute_id: number;
+  generated_at: string;
+  total_duration_ms: number;
+  standard: {
+    id: number;
+    name: string;
+    total_subjects: number;
+    total_chapters: number;
+  };
+  curriculum: {
+    subjects: Array<{ subject_id: number; subject_name: string; category: string; chapter_count: number }>;
+    chapters_sample: Array<{ chapter_id: number; chapter_name: string; subject_id: number; subject_name: string }>;
+    total_chapters: number;
+  };
+  activity_timeline: {
+    total_activities: number;
+    window: string;
+    activities: Array<{
+      id: number | null;
+      kind: string;
+      title: string;
+      subject: string;
+      date: string | null;
+      status: string;
+      when: string;
+    }>;
+  };
+  content_readiness: {
+    total_chapters_analyzed: number;
+    fully_covered: number;
+    partially_covered: number;
+    missing_components_summary: Record<string, number>;
+    four_type_model: Record<string, unknown>;
+    chapter_details: Array<{
+      id: number;
+      name: string;
+      standard: string;
+      subject: string;
+      concepts_count: number;
+      status: string;
+      coverage_pct: number;
+      missing: string[];
+      covered: string[];
+    }>;
+  };
+  pipeline_execution: {
+    steps: PipelineStep[];
+    gates: PipelineGate[];
+  };
+}
+
+export interface RunPipelineOptions {
+  standard_name?: string;
+  standard_id?: number;
+  subject_id?: number;
+  days_back?: number;
+  days_ahead?: number;
+  limit?: number;
+  content_limit?: number;
+}
+
+/**
+ * Execute the complete 3-agent synchronized Teach/Learn pipeline:
+ *   1. Course Catalogue Agent -> Gate 1
+ *   2. Activity Timeline Agent -> Gate 2
+ *   3. Content Model Coverage Agent -> Gate 3 -> Unified Teach/Learn Report
+ */
+export async function runTeachLearnPipeline(
+  context: IntelligenceContext,
+  options: RunPipelineOptions = {}
+): Promise<{ report: UnifiedTeachLearnReport; server_time: string }> {
+  const url = resolveEndpoint(context, 'pipeline');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: buildHeaders(context),
+    body: JSON.stringify(options),
+    cache: 'no-store',
+  });
+  return handleResponse<{ report: UnifiedTeachLearnReport; server_time: string }>(res);
+}
+
+export interface AgentEsoStructuredObject {
+  knowledge: {
+    summary: string;
+    items: string[];
+    tables_and_sources?: string[];
+  };
+  activities: {
+    summary: string;
+    items: string[];
+  };
+  abilities: {
+    summary: string;
+    skills: string[];
+    constraints_and_safeguards?: string[];
+  };
+  usage: {
+    summary: string;
+    step_by_step_flow: string[];
+    upstream_dependencies?: string;
+    downstream_handoff?: string;
+  };
+}
+
+export interface AgentEsoDetail {
+  order: number;
+  name: string;
+  agent_id: string;
+  backend_key: string;
+  module: string;
+  status: string;
+  trigger: string;
+  tool_key: string;
+  tool_alias: string;
+  role_description: string;
+  knowledge_requirements: Record<string, unknown>;
+  database_resources: {
+    primary_tables: string[];
+    live_metrics: Record<string, number>;
+  };
+  input_schema: {
+    type?: string;
+    properties?: Record<string, unknown>;
+    required?: string[];
+  };
+  inputs_received_from_upstream?: Record<string, string>;
+  outputs: Record<string, string>;
+  validation_rules: {
+    gate: number;
+    name: string;
+    enforcement: string;
+    rules: string[];
+  };
+  eso?: AgentEsoStructuredObject;
+}
+
+export interface ExpertSystemOverviewData {
+  overview: {
+    system_name: string;
+    module: string;
+    sub_institute_id: number;
+    architecture: string;
+    generated_at: string;
+    total_agents: number;
+    status: string;
+  };
+  agents: {
+    agent_1: AgentEsoDetail;
+    agent_2: AgentEsoDetail;
+    agent_3: AgentEsoDetail;
+  };
+  execution_workflow: {
+    pattern: string;
+    execution_order: string[];
+    data_flow: Record<string, string>;
+    isolation_and_safety: Record<string, boolean>;
+  };
+}
+
+/**
+ * Fetch the live Executive Skill Object (ESO) for all three Teach/Learn agents.
+ */
+export async function getExpertSystemOverview(
+  context: IntelligenceContext
+): Promise<{ eso: ExpertSystemOverviewData; server_time: string }> {
+  const url = resolveEndpoint(context, 'eso');
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: buildHeaders(context),
+    cache: 'no-store',
+  });
+  return handleResponse<{ eso: ExpertSystemOverviewData; server_time: string }>(res);
 }

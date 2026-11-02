@@ -59,4 +59,16 @@ test('every available tool has an executor and every module has a distinct key',
 
 test('the RBAC key follows agents.<module>', () => {
   assert.equal(rbacModuleKey('fees'), 'agents.fees');
+  assert.equal(rbacModuleKey('exam_assessment'), 'agents.exam_assessment');
+});
+
+test('exam_assessment is registered with tools, executors and correct RBAC scoping', () => {
+  const offered = toolsForModule('exam_assessment');
+  assert.ok(offered.some((tool) => tool.key === 'exam_assessment.online_exam_summary'));
+  assert.ok(offered.some((tool) => tool.key === 'exam_assessment.assignment_status'));
+  assert.ok(offered.some((tool) => tool.key === 'exam_assessment.draft_review_note'));
+  assert.ok(offered.some((tool) => tool.key === 'shared.compose_note'));
+  assert.ok(!offered.some((tool) => tool.key === 'exam.results'));
+  assert.match(validateToolsForModule('exam_assessment', ['exam.results']) ?? '', /belongs to exam/);
+  assert.equal(validateToolsForModule('exam_assessment', ['exam_assessment.online_exam_summary', 'exam_assessment.draft_review_note']), null);
 });

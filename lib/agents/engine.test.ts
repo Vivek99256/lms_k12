@@ -218,3 +218,78 @@ test('listing agents needs view rights on a named module', async () => {
     error instanceof AgentEngineError && error.status === 403);
   assert.equal((await listAgents(context(feesAdmin, allow, store), { module: reminderAgent.module })).length, 1);
 });
+
+test('listing agents for exam_assessment succeeds and asks for agents.exam_assessment view rights', async () => {
+  const store = new MemoryAgentStore();
+  const asked: Array<[string, string]> = [];
+  const spy: Authorizer = async (moduleKey, action) => {
+    asked.push([moduleKey, action]);
+    return { allowed: true, reason: null };
+  };
+  const list = await listAgents(context(feesAdmin, spy, store), { module: 'exam_assessment' });
+  assert.deepEqual(list, []);
+  assert.deepEqual(asked, [['agents.exam_assessment', 'view']]);
+});
+
+
+test('create and run an exam_assessment agent end to end', async () => {
+  const store = new MemoryAgentStore();
+  const asked: Array<[string, string]> = [];
+  const spy: Authorizer = async (moduleKey, action) => {
+    asked.push([moduleKey, action]);
+    return { allowed: true, reason: null };
+  };
+
+  const agent = await createAgent(context(feesAdmin, spy, store), {
+    name: 'Assessment review drafter',
+    module: 'exam_assessment',
+    tools_allowed: ['exam_assessment.draft_review_note'],
+    instructions: 'Draft factual review notes.',
+    status: 'active',
+  });
+
+  assert.equal(agent.module, 'exam_assessment');
+  assert.equal(agent.tools_allowed[0], 'exam_assessment.draft_review_note');
+  assert.deepEqual(asked, [['agents.exam_assessment', 'create']]);
+
+  const { run } = await runAgent(context(feesAdmin, spy, store), agent.id, {
+    tool: 'exam_assessment.draft_review_note',
+    arguments: {
+      student_name: 'Aarav Shah',
+      class_name: 'Grade 8-A',
+      assessment_title: 'Math Unit Test',
+      score: 42,
+      total_marks: 50,
+      work_type: 'online exam',
+    },
+  });
+
+  assert.equal(run.status, 'success');
+  assert.equal(run.module, 'exam_assessment');
+  assert.match(String(run.output?.body), /Score: 42 \/ 50 \(84%\)/);
+  assert.deepEqual(asked, [
+    ['agents.exam_assessment', 'create'],
+    ['agents.exam_assessment', 'update'],
+  ]);
+});
+
+
+test('curriculum_planning baseline agents are present and scoped', async () => {
+  const store = new MemoryAgentStore(undefined, true);
+  const agents = await listAgents(context(feesAdmin, allow, store), { module: 'curriculum_planning' });
+  assert.ok(agents.length >= 4);
+  assert.ok(agents.some((a) => a.tools_allowed.includes('curriculum_planning.status')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('curriculum_planning.lesson_pace')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('curriculum_planning.draft_alignment_note')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('curriculum_planning.outcomes')));
+});
+
+test('new_pal baseline agents are present and scoped', async () => {
+  const store = new MemoryAgentStore(undefined, true);
+  const agents = await listAgents(context(feesAdmin, allow, store), { module: 'new_pal' });
+  assert.ok(agents.length >= 4);
+  assert.ok(agents.some((a) => a.tools_allowed.includes('new_pal.gamification_summary')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('new_pal.content_model_status')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('new_pal.coherence_gaps')));
+  assert.ok(agents.some((a) => a.tools_allowed.includes('new_pal.draft_adaptive_intervention')));
+});

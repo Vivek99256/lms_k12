@@ -81,7 +81,9 @@ export function moduleCategoryItems(response: ModuleCategoriesResponse): ModuleC
 
   if (!moduleName) return [];
 
-  return (response.categories ?? []).map((category) => ({
+  const mod = (moduleName || '').toLowerCase();
+  const cats = (response.categories ?? []).filter((c) => !((mod === 'mobile-apps' || mod === 'mobile_apps') && c.key.toLowerCase() === 'reports'));
+  return cats.map((category) => ({
     key: category.key,
     label: category.label,
     description: category.description,

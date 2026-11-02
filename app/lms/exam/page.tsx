@@ -23,6 +23,7 @@ import {
   Printer,
   ScanLine,
   Send,
+  ShieldCheck,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -40,6 +41,7 @@ import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import ExamResultDashboard from '@/app/lms/exam/_result-dashboard/ExamResultDashboard';
 import AssessmentBlueprints from '@/app/lms/exam/_assessment-blueprint/AssessmentBlueprints';
 import ExamEvaluation from '@/app/lms/exam/_exam-evaluation/ExamEvaluation';
+import ExamProctoringMonitoring from '@/app/lms/exam/_components/exam-proctoring-monitoring';
 import QuestionPaperTemplates from '@/app/lms/exam/_question-paper-templates/QuestionPaperTemplates';
 import {
   QuestionPaperTemplateSelect,
@@ -335,7 +337,8 @@ type ExamInnerTab =
   | 'Exams'
   | 'Question paper templates'
   | 'Exam evaluation'
-  | 'Results dashboard';
+  | 'Results dashboard'
+  | 'Proctoring';
 
 /**
  * The tabs run in the order the work actually happens in, so the bar reads
@@ -352,6 +355,7 @@ const innerTabs: Array<{ label: ExamInnerTab; icon: LucideIcon }> = [
   { label: 'Question paper templates', icon: Layers },
   { label: 'Exam evaluation', icon: ScanLine },
   { label: 'Results dashboard', icon: GraduationCap },
+  { label: 'Proctoring', icon: ShieldCheck },
 ];
 
 const studentViewTabs: Array<{ label: StudentLearningTab; icon: LucideIcon; hidden?: boolean }> = [
@@ -917,9 +921,13 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
   const [examInnerTab, setExamInnerTab] = useState<ExamInnerTab>('Exams');
   // Coming back from reviewing an answer sheet: land on the evaluation tab, not the default one.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('examTab') === 'evaluation') {
+    const initialTab = new URLSearchParams(window.location.search).get('examTab');
+    if (initialTab === 'evaluation') {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setExamInnerTab('Exam evaluation');
+    } else if (initialTab === 'proctoring') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setExamInnerTab('Proctoring');
     }
   }, []);
   // Drives the template dropdown in the toolbar and the PDF action on each row.
@@ -2359,6 +2367,8 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                   <ExamEvaluation />
                 ) : examInnerTab === 'Results dashboard' ? (
                   <ExamResultDashboard />
+                ) : examInnerTab === 'Proctoring' ? (
+                  <ExamProctoringMonitoring />
                 ) : (
                   <>
                   <QuestionPaperGrid

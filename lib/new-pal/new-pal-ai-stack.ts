@@ -85,6 +85,15 @@ export const NEW_PAL_AI_STACK: AiStackModule = {
         'Report gaps exactly as recorded. If the coherence map is unavailable, say so rather than estimating a figure.',
       status: 'active',
     },
+    {
+      name: 'Adaptive remediation drafter',
+      description: 'Drafts personalized adaptive learning intervention plans for educator review. Changes nothing.',
+      module: NEW_PAL_MODULE_KEY,
+      tools_allowed: ['new_pal.draft_adaptive_intervention'],
+      instructions:
+        'Synthesize practice telemetry and stuck mastery concepts to draft actionable remediation proposals. Mark all proposals as draft_pending_human_approval.',
+      status: 'active',
+    },
   ],
 
   // Registered by 2026_09_29_100100_register_new_pal_agent_signal_and_workflow.php. Reads

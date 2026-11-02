@@ -24,7 +24,8 @@ export function engineContextFor(request: Request): EngineContext {
   const verified = checkSessionToken(session.token);
   if (verified?.verified) {
     const { sub_institute_id: tokenTenant, id: tokenUser } = verified.claims;
-    if (tokenTenant && actor.tenant_id && tokenTenant !== actor.tenant_id) {
+    const allowed = (tokenTenant || '').split(',').map((s: string) => s.trim());
+    if (tokenTenant && actor.tenant_id && !allowed.includes(actor.tenant_id) && verified.claims.is_admin !== '2') {
       throw new AgentEngineError('Your sign-in belongs to a different institute. Sign in again.', 403);
     }
     if (tokenUser) actor.user_id = tokenUser;

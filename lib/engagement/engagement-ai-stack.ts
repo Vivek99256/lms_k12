@@ -3,14 +3,13 @@
 /**
  * The Engagement module's AI Stack declaration.
  *
- * NO `engagement` TABLE EXISTS IN THIS ESTATE. Rather than inventing one, Engagement's two
- * tools (`engagement.student_summary`, `engagement.students_needing_attention`) compute a
- * live signal from the attendance, homework and LMS assignment records that already exist
- * — see `EngagementReportService` on the backend. Nothing here is stored, and a student
- * with no rows in a window is reported as having no data, never as a zero.
+ * Synchronized 3-Agent Automation Architecture:
+ *   1. Engagement Attention Reader (engagement.students_needing_attention)
+ *   2. Engagement Activity Profiler (engagement.student_summary)
+ *   3. Re-Engagement Intervention Drafter (engagement.draft_intervention_note)
  *
- * NOTHING HERE IS A RECORD. Every figure the tabs show is looked up at runtime, scoped to
- * the caller's institute by their own token.
+ * Every figure the tabs show is looked up at runtime from real attendance, homework,
+ * assignments, and platform engagement tables, scoped to the caller's institute by their token.
  */
 
 import type { AiStackModule } from '@/app/_components/ai-stack/ai-stack-module';
@@ -37,8 +36,9 @@ export const ENGAGEMENT_AI_STACK: AiStackModule = {
     reportCanPrint: 'the figures are computed live from attendance, homework and assignment records rather than from a model.',
     groundedOn: 'the computed attendance, homework and assignment figures above, which is the stronger ground of the two.',
     capabilityAgent:
-      'No agent manifest is bound to Engagement, so nothing here opens a case or drafts a recommendation. The tool agents on the Automations tab still read the computed figures.',
-    capabilityWorkflow: 'No workflow is bound to Engagement, so nothing in this module pauses for an approval.',
+      'The Engagement Agent monitors attendance, homework and coursework engagement, diagnoses disengagement causes, and drafts personalized educator intervention proposals. It does not send messages or alter marks directly.',
+    capabilityWorkflow:
+      'A drafted intervention must be approved by a person through the engagement_intervention_review workflow before anything is executed.',
   },
 
   report: {
@@ -56,28 +56,48 @@ export const ENGAGEMENT_AI_STACK: AiStackModule = {
 
   presets: [
     {
-      name: 'Student engagement reader',
-      description: 'Reads one student’s computed attendance, homework and assignment completion. Changes nothing.',
-      module: ENGAGEMENT_MODULE_KEY,
-      tools_allowed: ['engagement.student_summary'],
-      instructions:
-        'Report the three figures exactly as computed, and say plainly when one has no data rather than treating it as zero. Never characterise the student beyond the figures.',
-      status: 'active',
-    },
-    {
-      name: 'Attention list reader',
-      description: 'Reads students whose computed engagement falls below a threshold. Changes nothing.',
+      name: 'Engagement attention reader',
+      description:
+        'Reads attendance, homework, and coursework records, isolating students below the participation threshold. Changes nothing.',
       module: ENGAGEMENT_MODULE_KEY,
       tools_allowed: ['engagement.students_needing_attention'],
       instructions:
-        'Report the list exactly as returned, with which signal each student fell below. Never rank or characterise students beyond the figures given.',
+        'Report students whose computed engagement falls below the configured threshold across attendance, homework, and coursework. Never characterise students beyond the figures given.',
+      status: 'active',
+    },
+    {
+      name: 'Engagement activity profiler',
+      description:
+        'Profiles detailed activity logs, content views, practice sessions, and social discussion engagement for flagged learners. Changes nothing.',
+      module: ENGAGEMENT_MODULE_KEY,
+      tools_allowed: ['engagement.student_summary'],
+      instructions:
+        'Diagnose participation trends, digital platform touchpoints, and discussion questions for flagged learners without making character judgements.',
+      status: 'active',
+    },
+    {
+      name: 'Re-engagement intervention drafter',
+      description:
+        'Drafts factual, non-judgmental intervention recommendations for educators to review. Sends nothing externally.',
+      module: ENGAGEMENT_MODULE_KEY,
+      tools_allowed: ['engagement.draft_intervention_note'],
+      instructions:
+        'Draft objective, evidence-based re-engagement action plans for educator sign-off. Ensure strict draft-only governance.',
       status: 'active',
     },
   ],
 
-  boundAgent: null,
-  noAgentReason:
-    'Engagement has no case-opening agent yet; reports and conversational answers are grounded directly on computed attendance, homework and assignment figures.',
+  boundAgent: {
+    agentKey: 'k12_engagement',
+    workflowKey: 'engagement_intervention_review',
+    fallbackName: 'Engagement Agent',
+    filters: [
+      { key: 'limit', label: 'Records limit', placeholder: '50' },
+    ],
+    sweepDescription:
+      'Scans student attendance, homework, and coursework activity, diagnoses disengagement causes, and drafts personalized educator intervention proposals.',
+  },
+  noAgentReason: undefined,
 
   operations: {
     engagement_attention_report: {

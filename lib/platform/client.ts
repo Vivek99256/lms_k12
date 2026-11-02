@@ -389,12 +389,23 @@ export function fetchNotificationInbox(): Promise<NotificationInboxRow[]> {
 /** One notice addressed to the signed-in person, merged server-side from the per-person notification tables. */
 export interface MyNotificationRow {
   key: string;
-  source: 'app' | 'pal' | 'brain' | 'platform';
+  source: 'app' | 'pal' | 'brain' | 'platform' | 'user';
   subject: string;
   body: string;
   created_at: string;
   /** true/false where the source table tracks it, null where it does not. */
   read: boolean | null;
+  /** In-app path to open when the notice is clicked; only `user` notices carry one. */
+  link?: string | null;
+}
+
+/** Persist a read for one `user` notice (key `user:<id>`). The server only lets its owner do this. */
+export async function markUserNotificationRead(id: number): Promise<void> {
+  await call<{ unread: number }>(`/notifications/user/${id}/read`, { method: 'POST', body: {} });
+}
+
+export async function markAllUserNotificationsRead(): Promise<void> {
+  await call<{ unread: number }>('/notifications/user/read-all', { method: 'POST', body: {} });
 }
 
 export function fetchMyNotifications(): Promise<MyNotificationRow[]> {

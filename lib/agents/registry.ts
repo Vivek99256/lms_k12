@@ -82,6 +82,7 @@ export const AGENT_MODULES: AgentModule[] = [
   | that exact string. The level-2 menu slug is `communication` and is used only in a route.
   */
   { key: 'mobile_apps', label: 'Users Mobile Apps', description: 'The parent, student and teacher apps.' },
+  { key: 'mobile-apps', label: 'Users Mobile Apps', description: 'The parent, student and teacher apps.' },
   {
     key: 'student_icard',
     label: 'Student I-Card',
@@ -89,6 +90,7 @@ export const AGENT_MODULES: AgentModule[] = [
   },
   { key: 'certificate', label: 'Certificate', description: 'Certificates issued and the layouts behind them.' },
   { key: 'easy_com', label: 'Communication', description: 'SMS, WhatsApp and app notifications sent.' },
+  { key: 'communication', label: 'Communication', description: 'School announcements, circulars, SMS, WhatsApp and parent communication.' },
   { key: 'timetable', label: 'Time Table', description: 'The published class timetable and its clashes.' },
   {
     key: 'student_medical',
@@ -185,7 +187,7 @@ export const AGENT_MODULES: AgentModule[] = [
   // duplicate key in `config/ai.php` silently kept the wrong block.
   { key: 'institute', label: 'Institute', description: 'The academic structure of the school.' },
   /*
-  | The six modules under the LMS + PAL menu group, whose AI Stacks were added together.
+  | The modules under the LMS + PAL menu group.
   |
   | `teach_learn` reads the SAME course/chapter/activity records as `lms` above — it is a
   | teacher-facing presentation layer over the existing LMS catalogue, not a second copy of
@@ -193,9 +195,10 @@ export const AGENT_MODULES: AgentModule[] = [
   | tools `lms` already uses. That is deliberate reuse, not a leak: the two modules' pages
   | are different, the records behind them are not.
   |
-  | `exam_assessment` is NOT a key here. The existing `exam` module above already covers
-  | Exam & Assessment; adding a second key for the same records is exactly the duplication
-  | this registry's own comments warn against.
+  | `exam_assessment` is the LMS online-delivery domain (online exams, homework,
+  | assignments, worksheets, projects; tblmenumaster id 276). It is a distinct module
+  | from `exam` (Mark Entry / Results; tblmenumaster id 67), with its own registered
+  | `agents.exam_assessment` RBAC key and distinct MCP tools.
   |
   | `curriculum_planning` promotes what was a tab inside `lms` (`/lms/curriculum-planning`)
   | to its own module key, at the school's request — its pages stay at the same URL.
@@ -206,6 +209,11 @@ export const AGENT_MODULES: AgentModule[] = [
   | genuinely empty-until-used touchpoint log (`interaction_logs`), because nothing like it
   | existed to reuse.
   */
+  {
+    key: 'exam_assessment',
+    label: 'Exam & Assessment',
+    description: 'Online exam attempts, homework, assignments, worksheets and projects.',
+  },
   {
     key: 'teach_learn',
     label: 'Teach/Learn',
@@ -1543,6 +1551,28 @@ export const AGENT_TOOLS: AgentTool[] = [
     exampleInput: { standard_id: null, subject_id: null, syear: null },
   },
   {
+    key: 'curriculum_planning.lesson_pace',
+    label: 'Audit lesson plan delivery pace',
+    description:
+      'Audits scheduled teaching periods against the academic calendar, isolating behind-schedule teaching slots and velocity deficits. Changes nothing.',
+    module: 'curriculum_planning',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { standard_id: null, subject_id: null, syear: 2026 },
+  },
+  {
+    key: 'curriculum_planning.draft_alignment_note',
+    label: 'Draft syllabus alignment & pacing proposal',
+    description:
+      'Synthesizes coverage gaps and delivery delays into actionable pacing recovery and competency alignment proposals for educator approval. Changes nothing.',
+    module: 'curriculum_planning',
+    risk: 'draft',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { standard_name: 'Class', curricula_gaps: [], pacing_gaps: [] },
+  },
+  {
     key: 'curriculum_planning.outcomes',
     label: 'Read learning outcomes',
     description:
@@ -1580,6 +1610,17 @@ export const AGENT_TOOLS: AgentTool[] = [
     kind: 'mcp',
     available: true,
     exampleInput: { standard_id: null, threshold_percent: 60, days_back: 30, limit: 50 },
+  },
+  {
+    key: 'engagement.draft_intervention_note',
+    label: 'Draft re-engagement intervention note',
+    description:
+      'Drafts a factual, objective, non-judgmental re-engagement intervention note for a student based on verified attendance, homework, and coursework activity. Changes nothing, sends nothing.',
+    module: 'engagement',
+    risk: 'draft',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { student_id: null, deficiency_reasons: [] },
   },
 
   // ---- Interactions ------------------------------------------------------------
@@ -1646,6 +1687,17 @@ export const AGENT_TOOLS: AgentTool[] = [
     available: true,
     exampleInput: { standard_id: null, subject_id: null, limit: 50 },
   },
+  {
+    key: 'new_pal.draft_adaptive_intervention',
+    label: 'Draft adaptive remediation proposal',
+    description:
+      'Synthesizes learner practice telemetry and stuck mastery concepts to draft personalized adaptive learning intervention plans for educator review. Changes nothing.',
+    module: 'new_pal',
+    risk: 'draft',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { flagged_learners: [], coherence_summary: {} },
+  },
 
   // ---- Teach/Learn --------------------------------------------------------
   {
@@ -1658,6 +1710,48 @@ export const AGENT_TOOLS: AgentTool[] = [
     kind: 'mcp',
     available: true,
     exampleInput: { standard_id: null, subject_id: null, validate_hierarchy: true, limit: 50 },
+  },
+
+  // ---- Exam & Assessment ----------------------------------------------------
+  {
+    key: 'exam_assessment.online_exam_summary',
+    label: 'Read online exam performance',
+    description:
+      'Reads online exam performance: attempts recorded, average score and attempts below the passing bar. Excludes PAL-generated papers. Changes nothing.',
+    module: 'exam_assessment',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { standard_id: null, subject_id: null, student_id: null, at_risk_percent: 40, limit: 50 },
+  },
+  {
+    key: 'exam_assessment.assignment_status',
+    label: 'Read assignment, worksheet and project status',
+    description:
+      'Reads counts submitted, reviewed and not-submitted for assignments, worksheets and projects, plus the not-submitted list. Changes nothing.',
+    module: 'exam_assessment',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { standard_id: null, division_id: null, subject_id: null, student_id: null, work_type: 'assignment', limit: 50 },
+  },
+  {
+    key: 'exam_assessment.draft_review_note',
+    label: 'Draft an assessment review note',
+    description:
+      'Turns an online exam or assignment performance into a factual review note for teacher follow-up. Changes nothing and sends nothing.',
+    module: 'exam_assessment',
+    risk: 'draft',
+    kind: 'local',
+    available: true,
+    exampleInput: {
+      student_name: 'Aarav Shah',
+      class_name: 'Grade 8-A',
+      assessment_title: 'Unit Test 1',
+      score: 35,
+      total_marks: 100,
+      work_type: 'online exam',
+    },
   },
 
   // ---- Shared -------------------------------------------------------------

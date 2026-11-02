@@ -11,6 +11,7 @@ import {
   type CpImages,
   type CpOptions,
   type CpPreflight,
+  type CpRun,
   type CpSourceStatus,
   type CpSuitability,
 } from '@/lib/coursePresentation/api';
@@ -19,6 +20,7 @@ import { CHAPTER_DATA_PREVIEW_TITLE as PREVIEW_TITLE, previewAddress } from '@/l
 import { storedHeading } from '@/lib/coursePresentation/runChoice';
 import { carriesEarlierChoice, startState, type CpState } from '@/lib/coursePresentation/urlState';
 import { resolveSelectedContent } from '@/lib/coursePresentation/contentRoute';
+import type { CpWatch } from '@/lib/coursePresentation/poller';
 import { GenerationPanel } from '@/components/coursePresentation/GenerationPanel';
 import { cn } from '@/lib/utils';
 
@@ -264,6 +266,7 @@ export function CoursePresentationFlow({
   initial,
   onMirror,
   onClose,
+  onRunFinished,
   onOpenPresentation,
   onOpenPreview,
 }: {
@@ -272,7 +275,10 @@ export function CoursePresentationFlow({
   initial: CpState;
   /** Told after every change, so the caller can keep the URL in step. The screen itself never waits for it. */
   onMirror: (next: CpState) => void;
-  onClose: () => void;
+  /** Told when the window closes; `watching` is the generation still being made, if any, so the page can say when it finishes. */
+  onClose: (watching?: CpWatch | null) => void;
+  /** Told once when a generation this window followed finishes or fails. */
+  onRunFinished?: (run: CpRun, outcome: 'completed' | 'failed') => void;
   /** Opens a stored presentation in the study-deck viewer (the page owns navigation). */
   onOpenPresentation: (deepLink: string) => void;
   /** Opens the existing study-deck viewer on a template filled from stored data (the page owns navigation). */
@@ -294,9 +300,10 @@ export function CoursePresentationFlow({
     if (mirrorTimer.current) clearTimeout(mirrorTimer.current);
     mirrorTimer.current = setTimeout(() => onMirror(next), 250);
   };
+  const liveWatch = useRef<CpWatch | null>(null);
   const close = () => {
     if (mirrorTimer.current) clearTimeout(mirrorTimer.current);
-    onClose();
+    onClose(liveWatch.current);
   };
   const [options, setOptions] = useState<CpOptions | null>(null);
   // The pre-flight answer is kept with the request it answers, so a stale answer is never shown for new choices.
@@ -385,7 +392,7 @@ export function CoursePresentationFlow({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (mirrorTimer.current) clearTimeout(mirrorTimer.current);
-      onClose();
+      onClose(liveWatch.current);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -577,6 +584,10 @@ export function CoursePresentationFlow({
                   fit={preflight.fit}
                   initialRun={preflight.run}
                   onOpenPresentation={onOpenPresentation}
+                  onRunFinished={onRunFinished}
+                  onLiveChange={(w) => {
+                    liveWatch.current = w;
+                  }}
                 />
                 <h3 className="mt-4 text-sm font-semibold">{storedHeading(preflight.selection.format.key)}</h3>
                 {preflight.existing_resources.length === 0 ? (
