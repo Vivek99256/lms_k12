@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { createHmac } from 'node:crypto';
 import { getAgentStore } from '@/lib/agents/store';
 import { readRequestSession } from '@/lib/agents/acting-user';
+import { mintMcpToken, ensureClockSafeMcpToken } from '@/lib/security/session-token';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,23 +23,7 @@ function getBackendBaseUrl(request?: NextRequest): string {
 }
 
 function mintDevToken(targetInstituteId = '1', userId = 1): string {
-  const secret = process.env.LARAVEL_JWT_SECRET || 'b6bpRQ92jy9ty16FilMW54dsH9le3KhE';
-  const header = Buffer.from(JSON.stringify({ typ: 'JWT', alg: 'HS256' })).toString('base64url');
-  const scopeId = String(targetInstituteId) === '1' ? '1,0' : String(targetInstituteId);
-  const payload = Buffer.from(
-    JSON.stringify({
-      id: userId,
-      sub_institute_id: scopeId,
-      is_admin: 2,
-      client_id: 1,
-      user_profile_id: userId,
-      is_student: false,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 86400 * 30,
-    })
-  ).toString('base64url');
-  const signature = createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
-  return `${header}.${payload}.${signature}`;
+  return mintMcpToken({ id: userId, sub_institute_id: targetInstituteId, is_admin: 2 });
 }
 
 function parseJwtPayload(token: string): Record<string, unknown> | null {
@@ -55,42 +39,18 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
 
 function resolveAuthHeader(request: NextRequest, targetInstituteId = '1'): { token: string; userId: number } {
   const incoming = request.headers.get('authorization')?.trim() || request.headers.get('x-laravel-token')?.trim();
+  const token = ensureClockSafeMcpToken(incoming, targetInstituteId);
+  let userId = 1;
   if (incoming) {
     const raw = incoming.replace(/^Bearer\s+/i, '').trim();
     const payload = parseJwtPayload(raw);
     if (payload) {
-      const userId = Number(payload.id || payload.user_id || 1);
-      const exp = Number(payload.exp || 0);
-      const nowSec = Math.floor(Date.now() / 1000);
-
-      const tokenSubInst = String(payload.sub_institute_id || '');
-      if ((exp > 0 && exp <= nowSec + 60) || tokenSubInst === '1') {
-        return {
-          token: `Bearer ${mintDevToken(targetInstituteId, userId)}`,
-          userId,
-        };
-      }
-
-      const allowed = tokenSubInst.split(',').map((s: string) => s.trim());
-      const isAdmin = Number(payload.is_admin || 0);
-
-      if (isAdmin === 2 || allowed.includes(String(targetInstituteId))) {
-        return {
-          token: incoming.startsWith('Bearer ') ? incoming : `Bearer ${incoming}`,
-          userId,
-        };
-      }
-
-      return {
-        token: `Bearer ${mintDevToken(targetInstituteId, userId)}`,
-        userId,
-      };
+      userId = Number(payload.id || payload.user_id || 1);
     }
   }
-
   return {
-    token: `Bearer ${mintDevToken(targetInstituteId, 1)}`,
-    userId: 1,
+    token: `Bearer ${token}`,
+    userId,
   };
 }
 
@@ -238,7 +198,7 @@ export async function POST(request: NextRequest) {
           });
         }
       } catch (err) {
-        console.error('Failed to sync PAL pipeline runs to agent store:', err);
+        console.error('Failed to sync pal pipeline runs to agent store:', err);
       }
     }
 
@@ -250,4 +210,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

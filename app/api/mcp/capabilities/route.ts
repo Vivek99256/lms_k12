@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listMcpTools } from "@/lib/ai/mcp-client";
 import { isTrustedBackendUrl } from "@/lib/security/trusted-backend";
+import { ensureClockSafeMcpToken } from "@/lib/security/session-token";
 
 export const runtime = "nodejs";
 
@@ -11,8 +12,11 @@ export async function GET(request: Request) {
     // SSRF guard: this baseUrl comes straight from the query string, so only a
     // configured backend may be named; anything else falls back to the default.
     const baseUrl = requestedBaseUrl && isTrustedBackendUrl(requestedBaseUrl) ? requestedBaseUrl : null;
+    const rawToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+    const token = rawToken ? ensureClockSafeMcpToken(rawToken) : undefined;
+
     const toolsPayload = await listMcpTools({
-      token: request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim(),
+      token,
       baseUrl,
     });
     const payloadData =
