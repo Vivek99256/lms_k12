@@ -24,6 +24,8 @@ export interface ImageEditState {
   can_restore: boolean;
   /** Why the picture cannot be changed (pins or hotspots placed on it, a story slide), or null. */
   reason: string | null;
+  /** What is on the slide now: a real photograph, a drawn diagram, or nothing. Sent for a stored presentation. */
+  kind?: 'photo' | 'diagram' | 'none';
   /** A scene's name. */
   title?: string;
   /** For a story slide: the same, per scene. */
@@ -52,6 +54,11 @@ export interface ImageCandidate {
   licence: string;
   provider: string;
   source_url: string;
+  /** Size in pixels, when the source said. */
+  width?: number;
+  height?: number;
+  /** The search words this picture's own title, tags or categories share: why it was listed. */
+  matches?: string[];
 }
 
 export interface ImageSearch {
@@ -59,6 +66,8 @@ export interface ImageSearch {
   candidates: ImageCandidate[];
   /** Why there is nothing to choose from (search down, nothing openly licensed), or null. */
   note: string | null;
+  /** One-click alternatives to the default words: the slide's planned picture, its title, its concept. */
+  suggestions?: { label: string; query: string }[];
 }
 
 export interface UploadOptions {
@@ -97,17 +106,19 @@ export function openLabel(state: ImageEditState | null, scene = false): string {
   return state.has_image ? `Change ${noun}` : `Add ${noun}`;
 }
 
-export function actionSentence(result: Pick<ImageEditResult, 'action' | 'slide' | 'node'>): string {
+/** What to tell the teacher after a change. A stored presentation is saved at once; a draft is saved when it is approved. */
+export function actionSentence(result: Pick<ImageEditResult, 'action' | 'slide' | 'node'>, stored = false): string {
   const where = result.node ? `Slide ${result.slide}, scene ${result.node}` : `Slide ${result.slide}`;
+  const kept = stored ? 'The change is saved with this presentation.' : 'It is part of this draft and is saved when you approve it.';
   switch (result.action) {
     case 'add':
-      return `${where}: picture added. It is part of this draft and is saved when you approve it.`;
+      return `${where}: picture added. ${kept}`;
     case 'replace':
-      return `${where}: picture replaced. It is part of this draft and is saved when you approve it.`;
+      return `${where}: picture replaced. ${kept}`;
     case 'remove':
       return `${where}: picture removed. You can restore the original.`;
     case 'restore':
-      return `${where}: the original is back.`;
+      return `${where}: the original is back.${stored ? ' The change is saved with this presentation.' : ''}`;
   }
 }
 
@@ -137,7 +148,7 @@ export function withEditedState(states: ImageEditStates, result: Pick<ImageEditR
   const key = String(result.slide);
   const slide = states[key];
   if (!slide) return states;
-  const next = { has_image: result.state.has_image, can_add: result.state.can_add, can_replace: result.state.can_replace, can_remove: result.state.can_remove, reason: result.state.reason, can_restore: result.can_restore };
+  const next = { has_image: result.state.has_image, can_add: result.state.can_add, can_replace: result.state.can_replace, can_remove: result.state.can_remove, reason: result.state.reason, can_restore: result.can_restore, ...(result.state.kind ? { kind: result.state.kind } : {}) };
   if (result.node == null) return { ...states, [key]: { ...slide, ...next } };
   const node = slide.nodes?.[result.node];
   if (!node) return states;

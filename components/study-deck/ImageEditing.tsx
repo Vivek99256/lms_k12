@@ -26,7 +26,7 @@ export function useImageEditing(): ImageEditing | null {
 }
 
 /**
- * The control that opens the editor for one picture. It says what it will do ("Add image", "Change image"), is disabled with the reason when
+ * The control that opens the editor for one picture. It says what it will do ("Add image", "Change image"), is marked unavailable (aria-disabled, so it stays focusable and still opens the window, which prints the reason) when
  * the picture cannot be changed safely, and draws nothing at all when the lesson is not being edited. It never takes part in the lesson's own
  * navigation: it is a plain button outside the slide's controls.
  */
@@ -43,10 +43,10 @@ export function ImageEditButton({ target, scene = false, className = '' }: { tar
       type="button"
       data-testid={target.node === undefined ? 'change-image' : 'change-scene-image'}
       onClick={() => editing.edit(target)}
-      disabled={!enabled}
+      aria-disabled={!enabled || undefined}
       title={!enabled ? state.reason ?? undefined : undefined}
       aria-label={openLabel(state, scene)}
-      className={`inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${className}`}
     >
       <ImageIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="hidden sm:inline">{openLabel(state, scene)}</span>

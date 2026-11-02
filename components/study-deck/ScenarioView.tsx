@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
-import { AlertTriangle, ArrowRight, CheckCircle2, Compass, RotateCcw, Undo2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Compass, RotateCcw } from 'lucide-react';
 
 import {
   advance,
@@ -109,10 +109,15 @@ export function ScenarioView({ interaction, done, onDone, lead, memoryKey, image
             <p className="text-[0.95em] leading-snug text-slate-900">{interaction.situation}</p>
           </div>
         </div>
-        <SideFigure image={image} assetBase={assetBase} />
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-col justify-center-safe gap-[0.8em]">
+        {/* The picture sits above the choices, where the column is otherwise empty, so it is large enough to read. Once a choice is made the consequence needs the room. */}
+        {!state.ended && !picked && image && !portrait ? (
+          <div className="flex h-[46%] min-h-0 flex-col">
+            <SideFigure image={image} assetBase={assetBase} />
+          </div>
+        ) : null}
         {state.ended ? (
           <div className="space-y-[0.8em]">
             <h3 ref={heading} tabIndex={-1} className="text-[1.3em] font-semibold text-slate-900 outline-none">
@@ -141,11 +146,26 @@ export function ScenarioView({ interaction, done, onDone, lead, memoryKey, image
             <h3 ref={heading} tabIndex={-1} className="text-[1.15em] font-semibold text-slate-900 outline-none">
               {node.prompt}
             </h3>
-            <p className="rounded-[0.7em] border border-slate-200 bg-slate-50 px-[0.9em] py-[0.5em] text-[0.95em] text-slate-800">
-              <span className="text-[0.7em] font-semibold uppercase tracking-wider text-slate-500">You chose </span>
-              <br />
-              {picked.text}
-            </p>
+            {/* The choices stay in view after one is made, so another can be picked at once to compare what each leads to. */}
+            <ul className="space-y-[0.35em]" aria-label="Your choices">
+              {node.choices.map((choice, choiceIndex) => (
+                <li key={choice.id}>
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: 'choose', id: choice.id })}
+                    aria-pressed={state.chosen === choice.id}
+                    className={`flex w-full items-center gap-[0.7em] rounded-[0.8em] border-2 px-[0.8em] py-[0.35em] text-left text-[0.9em] leading-snug text-slate-900 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sd-accent ${
+                      state.chosen === choice.id ? 'border-sd-accent bg-sd-soft font-semibold shadow-sm' : 'border-sd-line bg-white hover:border-sd-accent hover:bg-sd-softer'
+                    }`}
+                  >
+                    <span aria-hidden="true" className={`flex h-[1.7em] w-[1.7em] shrink-0 items-center justify-center rounded-[0.6em] text-[0.85em] font-extrabold text-white ${TONES[choiceIndex % TONES.length].dot}`}>
+                      {String.fromCharCode(65 + choiceIndex)}
+                    </span>
+                    {choice.text}
+                  </button>
+                </li>
+              ))}
+            </ul>
             <div className={`space-y-[0.5em] rounded-[1em] border-2 border-l-[0.4em] p-[1em] shadow-[0_0.2em_0.9em_rgba(15,23,42,0.1)] ${picked.sound ? 'border-emerald-300 bg-emerald-50' : 'border-amber-300 bg-amber-50'}`}>
               <p className={`flex items-center gap-[0.5em] text-[0.8em] font-bold uppercase tracking-wider ${picked.sound ? 'text-emerald-900' : 'text-amber-900'}`}>
                 {picked.sound ? <CheckCircle2 className="h-[1.3em] w-[1.3em]" aria-hidden="true" /> : <AlertTriangle className="h-[1.3em] w-[1.3em]" aria-hidden="true" />}
@@ -161,10 +181,6 @@ export function ScenarioView({ interaction, done, onDone, lead, memoryKey, image
               </p>
             </div>
             <div className="flex flex-wrap gap-[0.6em]">
-              <button type="button" onClick={() => dispatch({ type: 'again' })} className={`${button} border border-slate-300 bg-white text-slate-800 hover:bg-slate-50`}>
-                <Undo2 className="h-[1.1em] w-[1.1em]" aria-hidden="true" />
-                Try a different choice
-              </button>
               <button type="button" onClick={() => dispatch({ type: 'next' })} className={`${button} bg-sd-accent text-white hover:bg-sd-strong`}>
                 {picked.next ? 'Next decision' : 'See what to take from this'}
                 <ArrowRight className="h-[1.1em] w-[1.1em]" aria-hidden="true" />

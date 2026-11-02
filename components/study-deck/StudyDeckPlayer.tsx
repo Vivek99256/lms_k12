@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Dumbbell, List, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Dumbbell, List, Maximize, Minimize, X } from 'lucide-react';
 
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import { activityKey, resolveActivity } from '@/lib/study-deck/deck';
@@ -73,6 +73,19 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
   // Which way the learner is travelling, so the next screen arrives from that side.
   const [direction, setDirection] = useState<'next' | 'back'>('next');
   const stageRef = useRef<HTMLDivElement>(null);
+  // Browser full screen (the lesson already fills the window; this also hides the browser's own bars). The browser can leave it
+  // by itself (Esc), so the button follows the document rather than its own click.
+  const [fullScreen, setFullScreen] = useState(false);
+  useEffect(() => {
+    const sync = () => setFullScreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', sync);
+
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, []);
+  const toggleFullScreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  };
   // What the learner has opened on each screen, kept while the lesson is open.
   const [memory] = useState(() => new Map<string, unknown>());
 
@@ -128,7 +141,8 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
   const hint = finished ? null : pendingHint(slide, stepKind, exploredDone);
   const totals = deckTotals(deck, progress, playable);
   // The lesson wears the colours of the topic on screen: the chrome around the slide follows it.
-  const theme = finished ? THEMES.brand : themeOf(deck, slide);
+  const brand = deck.theme === 'professional' ? THEMES.navy : THEMES.brand;
+  const theme = finished ? brand : themeOf(deck, slide);
 
   const forward = useCallback(() => {
     if (finished) return;
@@ -192,7 +206,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
           <X className="h-4 w-4" aria-hidden="true" />
           Exit
         </button>
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-sd-strong">{deck.chapter.name}</p>
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-sd-strong">{deck.title ?? deck.chapter.name}</p>
         <p className="shrink-0 text-xs font-medium text-slate-700">{finished ? 'Finished' : `Slide ${slide.n} of ${deck.slides.length}`}</p>
         {!finished ? <ImageEditButton target={{ slide: slide.n }} /> : null}
         {!finished && (slide.activities.length > 0 || slidePlays(deck.concepts, slide).length > 0) ? (
@@ -206,6 +220,15 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
             <span className="hidden sm:inline">Practice</span>
           </button>
         ) : null}
+        <button
+          type="button"
+          onClick={toggleFullScreen}
+          aria-label={fullScreen ? 'Exit full screen' : 'Full screen'}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
+        >
+          {fullScreen ? <Minimize className="h-4 w-4" aria-hidden="true" /> : <Maximize className="h-4 w-4" aria-hidden="true" />}
+          <span className="hidden sm:inline">{fullScreen ? 'Exit full screen' : 'Full screen'}</span>
+        </button>
         <button
           type="button"
           onClick={() => setOutlineOpen(true)}
@@ -232,7 +255,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
           <MemoryContext.Provider value={memory}>
           <div key={`${slide.n}:${stepIndex}:${finished}`} className={`h-full ${direction === 'back' ? motion.enterPrev : motion.enterNext}`}>
           {finished ? (
-            <SlideStage theme={THEMES.brand}>
+            <SlideStage theme={brand}>
             <SummaryScreen
               deck={deck}
               progress={progress}

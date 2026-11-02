@@ -238,7 +238,8 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
           </ul>
           {doneBanner}
         </div>
-        {marked ? (
+        {/* The explanation is always a panel under the picture, never a small box over its lower edge, so it can be read at once. */}
+        {(
           <div className="flex min-h-0 min-w-0 flex-col gap-[0.6em]">
             <div className="relative min-h-0 flex-1">
               <VisualFigure image={image} assetBase={assetBase}>
@@ -250,29 +251,19 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
                 <div key={open.id} className={`flex items-start gap-[1em] ${motion.fadeUp}`}>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-[1em]">
-                      <h3 className="text-[1.05em] font-semibold text-slate-900">{open.label}</h3>
+                      <h3 className="text-[1.25em] font-semibold text-slate-900">{open.label}</h3>
                       {openMarks.length > 0 ? <MarkLegend marks={openMarks} label={open.label} /> : null}
                     </div>
-                    <p className="mt-[0.2em] text-[0.95em] leading-snug text-slate-800">{open.text}</p>
+                    <p className="mt-[0.2em] text-[1.15em] leading-snug text-slate-800">{open.text}</p>
                     {noMark(open) ? <p className="mt-[0.3em] text-[0.8em] italic text-slate-600">{NO_MARK_NOTE}</p> : null}
                   </div>
                   {open.inset ? <div className="max-w-[45%] shrink-0"><MarkInsetView inset={open.inset} /></div> : null}
                 </div>
               ) : (
-                <p className="text-[0.85em] text-slate-600">Select a card to see where it is on the picture.</p>
+                <p className="text-[0.85em] text-slate-600">Select a card to read about it.</p>
               )}
             </div>
           </div>
-        ) : (
-        <div className="relative min-h-0 min-w-0">
-          <VisualFigure image={image} assetBase={assetBase} />
-          {open ? (
-            <div role="dialog" aria-label={open.label} className={`absolute bottom-[3%] left-[8%] right-[8%] z-20 rounded-[0.9em] border border-sd-line bg-white p-[0.9em] shadow-xl ${motion.fadeUp}`}>
-              <h3 className="text-[1.05em] font-semibold text-slate-900">{open.label}</h3>
-              <p className="mt-[0.25em] text-[0.95em] leading-snug text-slate-800">{open.text}</p>
-            </div>
-          ) : null}
-        </div>
         )}
       </section>
     );

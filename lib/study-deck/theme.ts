@@ -14,11 +14,11 @@
 
 import type { DeckImage, DeckSlide, StudyDeck } from './types';
 
-export type BackdropKind = 'cells' | 'lens' | 'membrane' | 'organelles' | 'division' | 'tissue';
+export type BackdropKind = 'cells' | 'lens' | 'membrane' | 'organelles' | 'division' | 'tissue' | 'plain';
 
 export interface StageTheme {
   /** A stable name, for tests and for `data-sd-theme`. */
-  key: 'brand' | 'blue' | 'teal' | 'purple' | 'cyan' | 'amber';
+  key: 'brand' | 'blue' | 'teal' | 'purple' | 'cyan' | 'amber' | 'navy';
   accent: string;
   strong: string;
   soft: string;
@@ -37,6 +37,8 @@ export const THEMES: Record<StageTheme['key'], StageTheme> = {
   purple: { key: 'purple', accent: '#7c3aed', strong: '#4c1d95', soft: '#ede9fe', softer: '#f5f3ff', line: '#c4b5fd', backdrop: 'organelles', wash: ['#ede9fe', '#cffafe'] },
   cyan: { key: 'cyan', accent: '#0e7490', strong: '#164e63', soft: '#cffafe', softer: '#ecfeff', line: '#67e8f9', backdrop: 'division', wash: ['#cffafe', '#ede9fe'] },
   amber: { key: 'amber', accent: '#b45309', strong: '#78350f', soft: '#fef3c7', softer: '#fffbeb', line: '#fcd34d', backdrop: 'tissue', wash: ['#fef3c7', '#fce7f3'] },
+  // The professional theme (`deck.theme = 'professional'`): one navy family for every slide, with no corner artwork.
+  navy: { key: 'navy', accent: '#1f4e9c', strong: '#0b1f4b', soft: '#dce7f7', softer: '#f2f6fc', line: '#9db6e0', backdrop: 'plain', wash: ['#f2f6fc', '#ffffff'] },
 };
 
 /** The family for the nth topic (0 based). A deck with more topics than families starts over. */
@@ -61,7 +63,8 @@ export function topicIndexOf(deck: Pick<StudyDeck, 'outline'>, slide: Pick<DeckS
  * The theme of a slide. A slide that teaches a concept takes its topic's family; the framing slides (cover, hook,
  * objectives, the closing summary) and anything that teaches nothing use the brand family.
  */
-export function themeOf(deck: Pick<StudyDeck, 'outline'>, slide: Pick<DeckSlide, 'taught_concept_ids' | 'slide_type'>): StageTheme {
+export function themeOf(deck: Pick<StudyDeck, 'outline'> & { theme?: StudyDeck['theme'] }, slide: Pick<DeckSlide, 'taught_concept_ids' | 'slide_type'>): StageTheme {
+  if (deck.theme === 'professional') return THEMES.navy;
   if (slide.slide_type === 'cover') return THEMES.brand;
   const topic = topicIndexOf(deck, slide);
   if (topic === null) return THEMES.brand;
@@ -107,6 +110,8 @@ export interface BackdropShape {
  */
 export function backdropShapes(kind: BackdropKind): BackdropShape[] {
   switch (kind) {
+    case 'plain':
+      return [];
     case 'cells':
       return [
         { kind: 'circle', cx: 1190, cy: 70, r: 120, o: 0.16, nucleus: true },

@@ -3,7 +3,7 @@
 import { useCallback, type CSSProperties, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, ChevronRight, Link2 } from 'lucide-react';
 
-import { assetUrl, outlineOf, relatedConcepts, stageLabel, topicOfSlide } from '@/lib/study-deck/deck';
+import { assetUrl, outlineOf, relatedConcepts, stageLabel, topicOfSlide, workflowOutcomeRefs, workflowStageLabel } from '@/lib/study-deck/deck';
 import { dockTabs, explanationInline } from '@/lib/study-deck/explain';
 import { exampleKey, interactionKey } from '@/lib/study-deck/interactions';
 import { conceptStatus, type DeckProgress, type ResultInput } from '@/lib/study-deck/progress';
@@ -221,6 +221,12 @@ function Lead({ deck, slide, large = false, inline = false, wide = false }: { de
   return (
     <div className="space-y-[0.5em]">
       <Eyebrow>{stageLabel(slide.slide_type)}</Eyebrow>
+      {workflowStageLabel(deck, slide) && (
+        <p className="text-[0.7em] font-semibold text-sd-strong" data-testid="workflow-stage">
+          {workflowStageLabel(deck, slide)}
+          {workflowOutcomeRefs(deck, slide).length > 0 && <span className="ml-[0.8em] font-normal">Addresses {workflowOutcomeRefs(deck, slide).join(', ')}</span>}
+        </p>
+      )}
       <div className="flex items-center gap-[0.65em]">
         <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-[0.9em] bg-sd-accent text-white shadow-[0_0.2em_0.7em_rgba(15,23,42,0.25)] ${portrait ? 'h-[2.3em] w-[2.3em]' : wide ? 'h-[2.7em] w-[2.7em]' : 'h-[2.4em] w-[2.4em]'}`}>
           <GlyphIcon text={`${slide.title} ${names.join(' ')}`} className="h-[55%] w-[55%]" />
@@ -477,6 +483,8 @@ function CoverScreen({ deck, slide, assetBase, onStart }: { deck: StudyDeck; sli
   const image = slide.image;
   const number = deck.chapter.number;
 
+  const professional = deck.theme === 'professional';
+
   return (
     <div className="relative h-full overflow-hidden bg-[#172554] text-white">
       {image ? (
@@ -487,24 +495,32 @@ function CoverScreen({ deck, slide, assetBase, onStart }: { deck: StudyDeck; sli
         aria-hidden="true"
         className="absolute inset-0"
         style={{
-          background: portrait
-            ? 'linear-gradient(180deg, rgba(23,37,84,0.94) 0%, rgba(30,58,138,0.84) 60%, rgba(15,118,110,0.7) 100%)'
-            : 'linear-gradient(100deg, rgba(23,37,84,0.96) 0%, rgba(30,58,138,0.88) 42%, rgba(30,58,138,0.35) 74%, rgba(15,118,110,0.18) 100%)',
+          // The professional theme stays in navy: no teal wash, no corner artwork, no rainbow bar.
+          background: professional
+            ? portrait
+              ? 'linear-gradient(180deg, rgba(11,31,75,0.95) 0%, rgba(11,31,75,0.85) 100%)'
+              : 'linear-gradient(100deg, rgba(11,31,75,0.97) 0%, rgba(11,31,75,0.9) 42%, rgba(11,31,75,0.4) 74%, rgba(11,31,75,0.1) 100%)'
+            : portrait
+              ? 'linear-gradient(180deg, rgba(23,37,84,0.94) 0%, rgba(30,58,138,0.84) 60%, rgba(15,118,110,0.7) 100%)'
+              : 'linear-gradient(100deg, rgba(23,37,84,0.96) 0%, rgba(30,58,138,0.88) 42%, rgba(30,58,138,0.35) 74%, rgba(15,118,110,0.18) 100%)',
         }}
       />
-      <div aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: backdropUrl('cells', '#ffffff'), backgroundSize: portrait ? 'auto 100%' : '100% 100%', backgroundRepeat: 'no-repeat', backgroundPosition: 'right top' }} />
-      <div aria-hidden="true" className="absolute inset-x-0 top-0 z-10 h-[0.32em]" style={{ background: `linear-gradient(90deg, ${THEMES.blue.accent}, ${THEMES.teal.accent}, ${THEMES.purple.accent}, ${THEMES.cyan.accent}, ${THEMES.amber.accent})` }} />
+      {professional ? null : <div aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: backdropUrl('cells', '#ffffff'), backgroundSize: portrait ? 'auto 100%' : '100% 100%', backgroundRepeat: 'no-repeat', backgroundPosition: 'right top' }} />}
+      {professional ? null : <div aria-hidden="true" className="absolute inset-x-0 top-0 z-10 h-[0.32em]" style={{ background: `linear-gradient(90deg, ${THEMES.blue.accent}, ${THEMES.teal.accent}, ${THEMES.purple.accent}, ${THEMES.cyan.accent}, ${THEMES.amber.accent})` }} />}
 
       <div className={`relative z-10 flex h-full min-h-0 flex-col justify-center-safe gap-[0.9em] ${portrait ? 'p-[1.6em]' : 'w-[58%] p-[3em]'}`}>
-        <p className="inline-flex w-fit items-center gap-[0.7em] text-[0.85em] font-semibold text-sky-100">
-          <span>Standard {deck.chapter.standard_name}</span>
-          <span aria-hidden="true" className="h-[1.1em] w-px bg-sky-200/60" />
-          <span>{deck.chapter.subject_name}</span>
-        </p>
+        {/* A deck with its own title (shown outside its chapter's topic) leads with that, not the chapter it is filed under. */}
+        {deck.title ? null : (
+          <p className="inline-flex w-fit items-center gap-[0.7em] text-[0.85em] font-semibold text-sky-100">
+            <span>Standard {deck.chapter.standard_name}</span>
+            <span aria-hidden="true" className="h-[1.1em] w-px bg-sky-200/60" />
+            <span>{deck.chapter.subject_name}</span>
+          </p>
+        )}
         <div>
-          {number ? <p className={`font-extrabold tracking-tight text-cyan-300 ${portrait ? 'text-[1.5em]' : 'text-[2.2em]'}`}>Chapter {number}</p> : null}
+          {number && !deck.title ? <p className={`font-extrabold tracking-tight text-cyan-300 ${portrait ? 'text-[1.5em]' : 'text-[2.2em]'}`}>Chapter {number}</p> : null}
           <h2 id={`slide-${slide.n}-title`} tabIndex={-1} className={`font-extrabold leading-[1.05] tracking-tight text-white outline-none ${portrait ? 'text-[2em]' : 'text-[3.2em]'}`}>
-            {deck.chapter.name}
+            {deck.title ? slide.title : deck.chapter.name}
           </h2>
         </div>
         {slide.content.body ? <p className={`leading-snug text-sky-50 ${portrait ? 'text-[1em]' : 'text-[1.25em]'}`}>{slide.content.body}</p> : null}
@@ -513,7 +529,7 @@ function CoverScreen({ deck, slide, assetBase, onStart }: { deck: StudyDeck; sli
           onClick={onStart}
           className="mt-[0.4em] inline-flex w-fit items-center gap-[0.6em] rounded-full bg-sky-100 px-[1.6em] py-[0.7em] text-[1em] font-bold text-[#172554] shadow-[0_0.3em_1em_rgba(2,6,23,0.35)] transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
-          Start lesson <ArrowRight className="h-[1.1em] w-[1.1em]" aria-hidden="true" />
+          {deck.title ? 'Start presentation' : 'Start lesson'} <ArrowRight className="h-[1.1em] w-[1.1em]" aria-hidden="true" />
         </button>
       </div>
       {image ? <CoverCredit image={image} /> : null}

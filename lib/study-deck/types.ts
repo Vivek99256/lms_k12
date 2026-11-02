@@ -334,6 +334,28 @@ export interface DeckSlide {
   h5p_pattern: { type: string; reason: string } | null;
   image: DeckImage | null;
   image_missing: string | null;
+  /** The pedagogical-workflow stage this slide belongs to (1-based) and its name. Present only on decks made with a staged workflow. */
+  workflow_stage?: number | null;
+  workflow_stage_name?: string | null;
+  /** Codes of the stored learning outcomes and competencies this slide addresses. */
+  outcome_refs?: string[];
+}
+
+/** What a deck says about the staged workflow it was made with; `validation.validated` is true only when the stage and outcome rules passed on its slides. */
+export interface DeckWorkflow {
+  method: { key: string; name: string; source?: string };
+  format: { key: string; name: string };
+  stages: Array<{ number: number; name: string; minutes: number; objective: string; outcome: string }>;
+  outcomes: Array<{ ref: string; type: 'learning_outcome' | 'competency'; description: string }>;
+  outcomes_note?: string | null;
+  validation: {
+    validated: boolean;
+    errors: string[];
+    outcomes_checked: boolean;
+    missing_outcomes?: string[];
+    stage_count?: number;
+    reason?: string;
+  };
 }
 
 export interface DeckConcept {
@@ -347,6 +369,10 @@ export interface DeckConcept {
 
 export interface StudyDeck {
   version: number;
+  /** Optional: a title for the player's header instead of the chapter's name (a deck shown outside its chapter's topic). */
+  title?: string;
+  /** Optional: `professional` draws every slide in one navy colour family with no corner artwork, instead of the topic colours. */
+  theme?: 'professional';
   /** Every stored picture the deck uses, by sha1. Present once the deck has been stored. */
   assets?: Record<string, DeckAsset>;
   chapter: { id: number; name: string; /** The chapter's place in its subject ("Chapter 2"), when the school's list numbers it. */ number?: number; standard_id: number; subject_id: number; standard_name: string; subject_name: string };
@@ -358,4 +384,6 @@ export interface StudyDeck {
   concept_slides: Record<string, number[]>;
   taught_by: Record<string, number[]>;
   concept_questions: Record<string, number[]>;
+  /** Present only on a deck made with the staged pedagogical workflow. */
+  workflow?: DeckWorkflow;
 }

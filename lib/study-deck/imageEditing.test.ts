@@ -127,10 +127,11 @@ test('a slide with a picture offers Change image, and one without offers Add ima
   assert.match(inEditor(createElement(ImageEditButton, { target: { slide: 1 } })), /aria-label="Add image"/);
 });
 
-test('a picture that cannot be changed safely is shown disabled with its reason; a story slide has no slide-level control', () => {
+test('a picture that cannot be changed safely is shown unavailable (still focusable) with its reason; a story slide has no slide-level control', () => {
   const locked: ImageEditStates = { ...states(), '4': state({ can_replace: false, can_remove: false, reason: 'This slide\'s hotspots are placed on its picture.' }) };
   const html = renderToStaticMarkup(createElement(ImageEditingProvider, { value: { states: locked, slide: 4, edit: () => {} } }, createElement(ImageEditButton, { target: { slide: 4 } })));
-  assert.match(html, /disabled/);
+  assert.match(html, /aria-disabled="true"/);
+  assert.doesNotMatch(html, / disabled(=|>| )/, 'not natively disabled: it stays focusable and still opens the window that prints the reason');
   assert.match(html, /title="This slide&#x27;s hotspots are placed on its picture\."/);
   assert.equal(inEditor(createElement(ImageEditButton, { target: { slide: 3 } }), 3), '', 'a story slide\'s pictures are edited scene by scene');
 });
