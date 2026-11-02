@@ -19,6 +19,7 @@ import type { MenuItem } from '@/app/data/menuItems';
 import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { AI_CAPABILITIES, capabilityHref } from '@shared/ai-intelligence-core';
 import { canAccessDocuments } from '@/app/documents/_lib/document-access';
+import { canManageRoleAccess } from '@/app/general/role_access/access';
 
 const platformServicesItems = [
   'RBAC',
@@ -112,6 +113,7 @@ const menuDisplayLabels: Record<string, string> = {
   'Add Process': 'Add process',
   'Fields Configuration': 'Field settings',
   'Mobile App Rights': 'Mobile app rights',
+  'Role Access': 'Roles & access',
   'Platform Administration': 'Platform administration',
   "What's Coming": "What's coming",
 };
@@ -175,6 +177,7 @@ const platformSetupIcons: Record<string, LucideIcon> = {
   'Fields Configuration': SlidersHorizontal,
   'Group-wise Rights': ShieldCheck,
   'Individual Rights': UserPlus,
+  'Role Access': ShieldCheck,
   'Mobile App Rights': Smartphone,
   'Platform Administration': LayoutDashboard,
   "What's Coming": MapIcon,
@@ -247,13 +250,14 @@ export default function Header({
     'Fields Configuration': '/general/fields_configuration',
     'Group-wise Rights': '/general/groupwise_rights',
     'Individual Rights': '/general/individual_rights',
+    'Role Access': '/general/role_access',
     'Mobile App Rights': '/general/mobile_app_rights',
     'Platform Administration': '/platform-administration',
     "What's Coming": '/platform-roadmap',
   };
 
   const platformServicesRoutes: Record<string, string> = {
-    'RBAC': '/organization-management/role-and-permissions',
+    'RBAC': '/general/role_access',
     // The three centralised engines every module configures against rather than
     // rebuilding. Each reads the same module/component catalogue, served by
     // Laravel at /api/platform/registry — see config/platform_services.php.
@@ -734,6 +738,8 @@ const logoUrl = (() => {
                               // refuses the endpoints independently (see
                               // document-access.ts).
                               if (subItem === 'Document' && !documentsVisible) return null;
+                              // Hiding the door, not locking it: Laravel refuses everyone but an Admin.
+                              if (subItem === 'Role Access' && !canManageRoleAccess()) return null;
 
                               const ItemIcon = group.icons[subItem];
                               const route = group.routes[subItem] || '/';
