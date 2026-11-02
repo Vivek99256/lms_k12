@@ -323,9 +323,17 @@ export function useModuleLevel3Nav({
       };
     }
 
+    const visibleCategories = categories.filter((category) => {
+      const mod = (activeModule.moduleName || '').toLowerCase();
+      if ((mod === 'mobile-apps' || mod === 'mobile_apps') && category.key.toLowerCase() === 'reports') {
+        return false;
+      }
+      return true;
+    });
+
     return {
       parentLabel,
-      items: categories.map<Level3Item>((category) => {
+      items: visibleCategories.map<Level3Item>((category) => {
         const href = category.route || `/modules/${activeModule.moduleName}/${category.key}`;
 
         return {

@@ -82,6 +82,7 @@ export const AGENT_MODULES: AgentModule[] = [
   | that exact string. The level-2 menu slug is `communication` and is used only in a route.
   */
   { key: 'mobile_apps', label: 'Users Mobile Apps', description: 'The parent, student and teacher apps.' },
+  { key: 'mobile-apps', label: 'Users Mobile Apps', description: 'The parent, student and teacher apps.' },
   {
     key: 'student_icard',
     label: 'Student I-Card',
@@ -89,6 +90,7 @@ export const AGENT_MODULES: AgentModule[] = [
   },
   { key: 'certificate', label: 'Certificate', description: 'Certificates issued and the layouts behind them.' },
   { key: 'easy_com', label: 'Communication', description: 'SMS, WhatsApp and app notifications sent.' },
+  { key: 'communication', label: 'Communication', description: 'School announcements, circulars, SMS, WhatsApp and parent communication.' },
   { key: 'timetable', label: 'Time Table', description: 'The published class timetable and its clashes.' },
   {
     key: 'student_medical',

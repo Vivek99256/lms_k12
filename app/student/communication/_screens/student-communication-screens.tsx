@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  History,
   Inbox,
   Loader2,
   Mail,
@@ -627,7 +628,22 @@ function SentMessagesFeed() {
   );
 }
 
+import { StudentBroadcastNotice } from '@/app/student/communication/_components/StudentBroadcastNotice';
+import { StudentDeliveryLog } from '@/app/student/communication/_components/StudentDeliveryLog';
+
 export const STUDENT_COMMUNICATION_SCREENS: ModuleStaticScreen[] = [
+  {
+    id: 'broadcast-notice',
+    label: 'Send notice',
+    icon: Send,
+    render: () => <StudentBroadcastNotice />,
+  },
+  {
+    id: 'delivery-log',
+    label: 'Delivery log',
+    icon: History,
+    render: () => <StudentDeliveryLog />,
+  },
   {
     id: 'sent-messages',
     label: 'Sent messages',

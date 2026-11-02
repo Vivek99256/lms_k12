@@ -7,7 +7,7 @@ import { reportConfigs } from './config';
 
 export default function AdmissionReportsIndexPage() {
   return (
-    <div className="min-h-screen bg-slate-50/40">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6 lg:p-8">
         <PageHeader
           icon={reportConfigs[0].icon}

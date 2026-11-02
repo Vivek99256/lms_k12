@@ -1015,6 +1015,24 @@ export const INTELLIGENCE_MODULES: RegisteredIntelligenceModule[] = [
       link === 'consent' ||
       hrefs.some((h) => h.toLowerCase().includes('/consent/')),
   },
+  {
+    key: 'alumni',
+    label: 'Alumni Intelligence',
+    route: '/modules/alumni-management',
+    status: 'live',
+    ladder: 'L3',
+    moduleSlug: 'alumni-management',
+    moduleSlugs: ['alumni'],
+    loadContract: async () => (await import('./contracts/alumni')).alumniIntelligenceContract,
+    note:
+      'Built on alumni (sub_institute_id, no syear — alumni are grouped by passing_year, so every figure is ' +
+      'all-time per institute) with alumni_mentor_profiles, alumni_mentorship_requests, alumni_events and ' +
+      'alumni_donations. "Reachable" needs an address AND consent on a channel; verified means status verified or active.',
+    nav: (label, link, hrefs) =>
+      label === 'alumni management' ||
+      link === 'alumni' ||
+      hrefs.some((h) => h.toLowerCase().includes('/alumni/')),
+  },
 ];
 
 export function findIntelligenceModule(key: string): RegisteredIntelligenceModule | undefined {
