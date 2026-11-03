@@ -120,7 +120,7 @@ export interface DeckImage {
    * Where the picture came from: a web search (`web`), the chapter's own textbook (`textbook`: credited to the book and its page, with no web
    * source), a diagram drawn from the chapter's content (`diagram`), or `none` (no suitable picture). Absent on a deck made before it was recorded.
    */
-  source_kind?: 'web' | 'textbook' | 'diagram' | 'none';
+  source_kind?: 'web' | 'textbook' | 'diagram' | 'none' | 'teacher_upload';
   /**
    * True for a stored picture (a photograph or a real labelled diagram) whose parts a person has marked: it may carry hotspots
    * like a drawn diagram does. The marks sit where the person put them, so the picture is reviewed before it is stored.

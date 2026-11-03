@@ -21,6 +21,8 @@ export function isTextbookPicture(image: DeckImage): boolean {
 export function creditText(image: DeckImage): string {
   if (isTextbookPicture(image) && image.attribution.trim() !== '') return image.attribution.trim().replace(/\.$/, '');
   if (image.type === 'photo' && image.source_url) return `${image.creator ?? 'Openverse'}, ${image.licence}`;
+  // A picture a teacher added has no web source and was not drawn by the lesson: name the teacher's credit when they gave one.
+  if (image.source_kind === 'teacher_upload') return image.creator?.trim() ? image.creator.trim() : 'Added by the teacher';
 
   return 'Drawn for this lesson';
 }

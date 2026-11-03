@@ -8,11 +8,13 @@ import { readCpState, withCpState, withoutCpState } from './urlState';
 const courseCard = { id: COURSE_PRESENTATION_CARD_ID, type: 'Classroom presentation', chapterId: '8592', coursePresentationPilot: true, prayogshala: null };
 const lab = { id: '68', type: 'Prayogshala', chapterId: '8592', prayogshala: { id: 68, status: 'review' } };
 
-test('chapter 8592 (Std 9 Science chapter 1) and the four Std 4 EVS Water chapters are enabled, and nothing else', () => {
+test('chapter 1 of Std 9 Science, Mathematics, English and Social Science and the four Std 4 EVS Water chapters are enabled, and nothing else', () => {
   assert.equal(coursePresentationEnabledFor(8592), true);
   assert.equal(coursePresentationEnabledFor('8592'), true);
+  for (const id of [8594, 8622, 8608]) assert.equal(coursePresentationEnabledFor(id), true, String(id)); // Maths, English, Social Science
   for (const id of [41675, 41676, 41677, 41678]) assert.equal(coursePresentationEnabledFor(id), true, String(id));
   for (const id of [41674, 41679]) assert.equal(coursePresentationEnabledFor(id), false, String(id)); // the chapters next to them
+  for (const id of [8595, 8623, 8609]) assert.equal(coursePresentationEnabledFor(id), false, String(id)); // chapter 2 of the same three subjects
   for (const id of [8614, 8593, 8613, 8615, 0, '', null, undefined, 'abc', '8592.5']) assert.equal(coursePresentationEnabledFor(id as never), false, String(id));
 });
 
