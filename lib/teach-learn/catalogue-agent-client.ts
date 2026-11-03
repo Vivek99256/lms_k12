@@ -157,9 +157,11 @@ function buildHeaders(context: IntelligenceContext): HeadersInit {
     headers['x-laravel-base-url'] = context.baseUrl;
     headers['x-backend-url'] = context.baseUrl;
   }
-  const instId = String(context.instituteId || '1');
-  headers['X-MCP-Institute-Id'] = instId;
-  headers['x-sub-institute-id'] = instId;
+  if (context.instituteId && String(context.instituteId).trim() !== '' && String(context.instituteId) !== '0') {
+    const instId = String(context.instituteId).trim();
+    headers['X-MCP-Institute-Id'] = instId;
+    headers['x-sub-institute-id'] = instId;
+  }
   return headers;
 }
 
@@ -311,6 +313,60 @@ export async function getContentTasksLedger(
   return handleResponse<{ tasks: ContentTaskRecord[]; stats: ContentStats; server_time: string }>(res);
 }
 
+export interface CatalogueStandard {
+  id: number;
+  name: string;
+  grade_id?: number;
+}
+
+export interface CatalogueSubject {
+  subject_id: number;
+  subject_name: string;
+  standard_id: number;
+}
+
+export interface CatalogueChapter {
+  id: number;
+  chapter_name: string;
+  sort_order: number;
+  standard_id: number;
+  subject_id: number;
+}
+
+export interface ContentResourceStatus {
+  key: string;
+  name: string;
+  exists: boolean;
+  content_id: number | null;
+  title: string | null;
+  file_type: string | null;
+}
+
+export interface AvailableGenerator {
+  id: string;
+  label: string;
+  available: boolean;
+  generator: string | null;
+  note?: string;
+  description?: string;
+}
+
+export interface ContentCoverageCheck {
+  exists: boolean;
+  standard_id: number;
+  standard_name: string;
+  subject_id: number;
+  subject_name: string;
+  chapter_id: number;
+  chapter_name: string;
+  total_checked: number;
+  existing_count: number;
+  missing_count: number;
+  resources_status: ContentResourceStatus[];
+  available_generators: AvailableGenerator[];
+  teaching_approaches: string[];
+}
+
 export interface PipelineStep {
   step: number;
   agent_name: string;
@@ -331,10 +387,15 @@ export interface PipelineGate {
 
 export interface UnifiedTeachLearnReport {
   success: boolean;
-  pipeline_status: 'completed' | 'failed';
+  step?: 1 | 2 | 3 | 'all';
+  pipeline_status: 'completed' | 'failed' | 'step_1_completed' | 'step_2_completed' | string;
   sub_institute_id: number;
   generated_at: string;
   total_duration_ms: number;
+  step_result?: PipelineStep;
+  gate?: PipelineGate;
+  handover?: Record<string, any>;
+  error?: string;
   standard: {
     id: number;
     name: string;
@@ -381,16 +442,165 @@ export interface UnifiedTeachLearnReport {
     steps: PipelineStep[];
     gates: PipelineGate[];
   };
+  content_generation?: {
+    scope: {
+      standard_id?: number;
+      standard_name?: string;
+      standard_ids?: number[];
+      subject_ids?: number[];
+      chapter_ids?: number[];
+      chapter_id?: number;
+      chapter_name?: string;
+      chapters?: Array<{
+        id: number;
+        name: string;
+        standard_id?: number;
+        subject_id?: number;
+      }>;
+    };
+    teaching_approach?: string;
+    student_experiences?: string[];
+    selected_resources?: string[];
+    selected_template?: string;
+    existing_found?: Array<{
+      chapter_id: number;
+      chapter_name: string;
+      resource_type: string;
+      content_id: number;
+      title: string;
+      status: string;
+      is_new: boolean;
+    }>;
+    missing_identified?: Array<{
+      chapter_id: number;
+      chapter_name: string;
+      resource_type: string;
+      status: string;
+    }>;
+    generated_resources?: Array<{
+      success?: boolean;
+      content_id: number;
+      resource_type: string;
+      category?: string;
+      title: string;
+      status: string;
+      url?: string;
+      file_type?: string;
+      chapter_id?: number;
+      chapter_name?: string;
+      is_new?: boolean;
+    }>;
+    verified_resources?: Array<{
+      chapter_id?: number;
+      chapter_name?: string;
+      type: string;
+      status: string;
+      content_id: number;
+      title: string;
+      url?: string;
+      file_type?: string;
+      is_new?: boolean;
+      message?: string;
+    }>;
+    generated_count?: number;
+    verified_count?: number;
+    duplicates_prevented?: number;
+    assessment_created?: boolean;
+    summary_message?: string;
+    coverage_before?: ContentCoverageCheck;
+  };
 }
 
 export interface RunPipelineOptions {
+  step?: 1 | 2 | 3 | 'all';
+  handover?: Record<string, unknown>;
   standard_name?: string;
   standard_id?: number;
+  standard_ids?: number[];
   subject_id?: number;
+  subject_ids?: number[];
+  chapter_id?: number;
+  chapter_ids?: number[];
+  teaching_approach?: string;
+  student_experiences?: string[];
+  selected_resources?: string[];
+  selected_template?: 'modern_tech' | 'academic_classic' | 'vibrant_creative' | 'stem_blueprint' | 'warm_editorial' | 'minimalist_clean' | 'infographic_visual' | 'gamified_quest' | string;
+  generate_assessment?: boolean;
+  check_only?: boolean;
   days_back?: number;
   days_ahead?: number;
   limit?: number;
   content_limit?: number;
+}
+
+/**
+ * Fetch real database standards for the active institute.
+ */
+export async function fetchCatalogueStandards(
+  context: IntelligenceContext
+): Promise<{ standards: CatalogueStandard[]; count: number; server_time: string }> {
+  const url = resolveEndpoint(context, 'standards');
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: buildHeaders(context),
+    cache: 'no-store',
+  });
+  return handleResponse<{ standards: CatalogueStandard[]; count: number; server_time: string }>(res);
+}
+
+/**
+ * Fetch real database subjects mapped to the selected standard(s).
+ */
+export async function fetchCatalogueSubjects(
+  context: IntelligenceContext,
+  standardIds?: number[] | number
+): Promise<{ subjects: CatalogueSubject[]; count: number; server_time: string }> {
+  const url = resolveEndpoint(context, 'subjects');
+  const ids = Array.isArray(standardIds) ? standardIds.join(',') : standardIds != null ? String(standardIds) : '';
+  const finalUrl = ids ? `${url}&standard_ids=${encodeURIComponent(ids)}` : url;
+  const res = await fetch(finalUrl, {
+    method: 'GET',
+    headers: buildHeaders(context),
+    cache: 'no-store',
+  });
+  return handleResponse<{ subjects: CatalogueSubject[]; count: number; server_time: string }>(res);
+}
+
+/**
+ * Fetch real database chapters for the selected subject(s) and standard(s).
+ */
+export async function fetchCatalogueChapters(
+  context: IntelligenceContext,
+  standardIds?: number[] | number,
+  subjectIds?: number[] | number
+): Promise<{ chapters: CatalogueChapter[]; count: number; server_time: string }> {
+  const url = resolveEndpoint(context, 'chapters');
+  const stdParam = Array.isArray(standardIds) ? standardIds.join(',') : standardIds != null ? String(standardIds) : '';
+  const subParam = Array.isArray(subjectIds) ? subjectIds.join(',') : subjectIds != null ? String(subjectIds) : '';
+  const finalUrl = `${url}&standard_ids=${encodeURIComponent(stdParam)}&subject_ids=${encodeURIComponent(subParam)}`;
+  const res = await fetch(finalUrl, {
+    method: 'GET',
+    headers: buildHeaders(context),
+    cache: 'no-store',
+  });
+  return handleResponse<{ chapters: CatalogueChapter[]; count: number; server_time: string }>(res);
+}
+
+/**
+ * Check whether content already exists for a Chapter before generating content.
+ */
+export async function checkChapterContent(
+  context: IntelligenceContext,
+  params: { standard_id: number; subject_id?: number; chapter_id?: number }
+): Promise<{ coverage: ContentCoverageCheck; server_time: string }> {
+  const url = resolveEndpoint(context, 'check-content');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: buildHeaders(context),
+    body: JSON.stringify(params),
+    cache: 'no-store',
+  });
+  return handleResponse<{ coverage: ContentCoverageCheck; server_time: string }>(res);
 }
 
 /**

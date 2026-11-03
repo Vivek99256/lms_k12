@@ -8,16 +8,16 @@ export const dynamic = 'force-dynamic';
 
 function getBackendBaseUrl(request?: NextRequest): string {
   const reqHost = request?.headers.get('x-laravel-base-url') || request?.headers.get('x-backend-url');
-  if (reqHost && !reqHost.includes('localhost') && !reqHost.includes('127.0.0.1') && !reqHost.includes('erp.triz.co.in')) {
+  if (reqHost && !reqHost.includes('erp.triz.co.in')) {
     return reqHost.trim().replace(/\/$/, '');
+  }
+  if (process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_APP_ENV === 'development') {
+    const devUrl = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim().replace(/\/$/, '');
+    if (devUrl) return devUrl;
   }
   const envUrl = (process.env.NEXT_PUBLIC_AI_BASE_URL || '').trim().replace(/\/$/, '');
   if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1') && !envUrl.includes('erp.triz.co.in')) {
     return envUrl;
-  }
-  if (process.env.NODE_ENV !== 'production') {
-    const devUrl = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim().replace(/\/$/, '');
-    if (devUrl && (devUrl.includes('localhost') || devUrl.includes('127.0.0.1'))) return devUrl;
   }
   return 'https://dev.triz.co.in';
 }
@@ -69,6 +69,15 @@ export async function GET(request: NextRequest) {
       endpoint = `/api/ai/teach-learn/catalogue-agent/content-tasks?limit=${encodeURIComponent(limit)}${status ? `&status=${encodeURIComponent(status)}` : ''}`;
     } else if (action === 'eso') {
       endpoint = '/api/ai/teach-learn/catalogue-agent/eso';
+    } else if (action === 'standards') {
+      endpoint = '/api/ai/teach-learn/catalogue-agent/standards';
+    } else if (action === 'subjects') {
+      const standardIds = request.nextUrl.searchParams.get('standard_ids') || request.nextUrl.searchParams.get('standard_id') || '';
+      endpoint = `/api/ai/teach-learn/catalogue-agent/subjects${standardIds ? `?standard_ids=${encodeURIComponent(standardIds)}` : ''}`;
+    } else if (action === 'chapters') {
+      const standardIds = request.nextUrl.searchParams.get('standard_ids') || request.nextUrl.searchParams.get('standard_id') || '';
+      const subjectIds = request.nextUrl.searchParams.get('subject_ids') || request.nextUrl.searchParams.get('subject_id') || '';
+      endpoint = `/api/ai/teach-learn/catalogue-agent/chapters?standard_ids=${encodeURIComponent(standardIds)}&subject_ids=${encodeURIComponent(subjectIds)}`;
     }
 
     let upstream = await fetch(`${backendUrl}${endpoint}`, {
@@ -129,6 +138,12 @@ export async function POST(request: NextRequest) {
       endpoint = '/api/ai/teach-learn/catalogue-agent/auto-generate/batch';
     } else if (action === 'pipeline') {
       endpoint = '/api/ai/teach-learn/catalogue-agent/pipeline';
+    } else if (action === 'check-content') {
+      endpoint = '/api/ai/teach-learn/catalogue-agent/check-content';
+    } else if (action === 'subjects') {
+      endpoint = '/api/ai/teach-learn/catalogue-agent/subjects';
+    } else if (action === 'chapters') {
+      endpoint = '/api/ai/teach-learn/catalogue-agent/chapters';
     }
 
     let upstream = await fetch(`${backendUrl}${endpoint}`, {
