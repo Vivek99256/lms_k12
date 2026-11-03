@@ -9,6 +9,8 @@ import { USERS_AI_STACK_SCREENS } from '@/app/user/ai-stack/_screens/ai-stack-sc
 import { LIBRARY_AI_STACK_SCREENS } from '@/app/library/ai-stack/_screens/ai-stack-screens';
 import { LMS_AI_STACK_SCREENS } from '@/app/lms/ai-stack/_screens/ai-stack-screens';
 import { INSTITUTE_AI_STACK_SCREENS } from '@/app/organization-management/ai-stack/_screens/ai-stack-screens';
+import { ORG_COMMUNICATION_SCREENS } from '@/app/organization-management/communication/_screens/org-communication-screens';
+import { ORG_KNOWLEDGE_GRAPH_SCREENS } from '@/app/organization-management/knowledge-graph/_screens/org-knowledge-graph-screens';
 import { CONSENT_AI_STACK_SCREENS } from '@/app/admin-services/consent-ai-stack/_screens/ai-stack-screens';
 import { CURRICULUM_PLANNING_AI_STACK_SCREENS } from '@/app/lms/curriculum-planning/ai-stack/_screens/ai-stack-screens';
 import { ENGAGEMENT_AI_STACK_SCREENS } from '@/app/engagement/ai-stack/_screens/ai-stack-screens';
@@ -191,6 +193,10 @@ const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   'inward-outward-report:communication': INWARD_OUTWARD_COMMUNICATION_SCREENS,
   'inward_outward:communication': INWARD_OUTWARD_COMMUNICATION_SCREENS,
   'institute:ai-stack': INSTITUTE_AI_STACK_SCREENS,
+  'organization-management:communication': ORG_COMMUNICATION_SCREENS,
+  'organization-management:knowledge-graph': ORG_KNOWLEDGE_GRAPH_SCREENS,
+  'organization_managment:knowledge-graph': ORG_KNOWLEDGE_GRAPH_SCREENS,
+  'organization_managment:communication': ORG_COMMUNICATION_SCREENS,
   'interactions:ai-stack': INTERACTIONS_AI_STACK_SCREENS,
   'inventory:ai-stack': INVENTORY_AI_STACK_SCREENS,
   'inventory:communication': INVENTORY_COMMUNICATION_SCREENS,
