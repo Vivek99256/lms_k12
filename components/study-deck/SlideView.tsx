@@ -14,6 +14,8 @@ import type { DeckImage, DeckSlide, StudyDeck } from '@/lib/study-deck/types';
 import { ExplainDock } from './ExplainDock';
 import { ExploreView } from './ExploreView';
 import { HotspotsView } from './HotspotsView';
+import { DecisionView, OutcomeView } from './ProDecision';
+import { BarsView, FlowView, HubView } from './ProViews';
 import { MatchView } from './MatchView';
 import { OrderView } from './OrderView';
 import { ScenarioView } from './ScenarioView';
@@ -32,6 +34,8 @@ export interface SlideViewProps {
   onGoto: (n: number) => void;
   /** Moves on to the next screen: the cover's Start button. */
   onNext: () => void;
+  /** Back to where the learner came from (the question a consequence answers). */
+  onBack?: () => void;
 }
 
 const EXPLORED: ResultInput = { correct: null, score: null, maxScore: null };
@@ -60,7 +64,9 @@ export function SlideView(props: SlideViewProps) {
   // No photograph is drawn behind a slide.
   const behind = null as DeckImage | null;
   const photo = layout === 'cover' || !behind ? null : { src: assetUrl(behind.url, props.assetBase), led: bleed };
-  const stage = { theme, number: slide.n, count: deck.slides.length, bare: layout === 'cover', photo };
+  // The professional look lets a picture take the whole slide: no wash, no stripe, no page number over it.
+  const fullBleed = deck.theme === 'professional' && (layout === 'visual-hotspots' || layout === 'scenario' || layout === 'image-text' || layout === 'decision' || layout === 'outcome');
+  const stage = { theme, number: slide.n, count: deck.slides.length, bare: layout === 'cover' || fullBleed, photo };
 
   // No panel when the slide has nothing beyond its main picture (the cover; a slide with no explanation at all). The
   // number badge takes the bottom-right corner, so the slide keeps a little room under it.
@@ -70,7 +76,7 @@ export function SlideView(props: SlideViewProps) {
   if (tabs.length === 0) {
     return (
       <SlideStage {...stage}>
-        <div data-fit={layout === 'cover' ? undefined : true} className={`h-full ${layout === 'cover' ? '' : 'overflow-hidden pb-[1.8em]'}`}>
+        <div data-fit={layout === 'cover' ? undefined : true} className={`h-full ${layout === 'cover' || fullBleed ? '' : 'overflow-hidden pb-[1.8em]'}`}>
           <SlideLayout {...props} layout={layout} bleed={bleed} />
         </div>
         <NoPictureBadge notice={noPicture} />
@@ -91,7 +97,7 @@ export function SlideView(props: SlideViewProps) {
   );
 }
 
-function SlideLayout({ deck, slide, progress, assetBase, onResult, onGoto, onNext, layout, bleed = false }: SlideViewProps & { layout: LayoutKind; bleed?: boolean }) {
+function SlideLayout({ deck, slide, progress, assetBase, onResult, onGoto, onNext, onBack, layout, bleed = false }: SlideViewProps & { layout: LayoutKind; bleed?: boolean }) {
   const exploredKey = interactionKey(slide);
   const memoryKey = exploredKey;
   const exploredDone = Boolean(progress.activities[exploredKey]?.done);
@@ -108,8 +114,26 @@ function SlideLayout({ deck, slide, progress, assetBase, onResult, onGoto, onNex
       return <CoverScreen deck={deck} slide={slide} assetBase={assetBase} onStart={onNext} />;
     case 'visual-hotspots':
       return interaction?.kind === 'hotspots' && slide.image ? (
-        <HotspotsView interaction={interaction} image={slide.image} assetBase={assetBase} done={exploredDone} onDone={explored} lead={lead} memoryKey={memoryKey} />
+        <HotspotsView interaction={interaction} image={slide.image} assetBase={assetBase} done={exploredDone} onDone={explored} lead={lead} memoryKey={memoryKey} heading={{ kicker: slide.section ?? '', title: slide.title }} />
       ) : null;
+    case 'hub':
+      return interaction?.kind === 'hub' ? (
+        <HubView interaction={interaction} heading={{ kicker: slide.section ?? '', title: slide.title }} images={Object.fromEntries(deck.slides.map((s) => [s.n, s.image]))} visited={progress.visited} assetBase={assetBase} onChoose={onGoto} onDone={explored} />
+      ) : null;
+    case 'flow':
+      return interaction?.kind === 'flow' ? (
+        <FlowView interaction={interaction} heading={{ kicker: slide.section ?? '', title: slide.title }} image={slide.image} assetBase={assetBase} onDone={explored} />
+      ) : null;
+    case 'decision':
+      return interaction?.kind === 'decision' ? (
+        <DecisionView interaction={interaction} image={slide.image} assetBase={assetBase} heading={{ kicker: slide.section ?? '', title: slide.title }} onGoto={onGoto} onBack={onBack ?? (() => undefined)} onDone={explored} />
+      ) : null;
+    case 'outcome':
+      return interaction?.kind === 'outcome' ? (
+        <OutcomeView interaction={interaction} image={slide.image} assetBase={assetBase} heading={{ kicker: slide.section ?? '', title: slide.title }} onGoto={onGoto} onBack={onBack ?? (() => undefined)} onDone={explored} />
+      ) : null;
+    case 'bars':
+      return interaction?.kind === 'bars' ? <BarsView interaction={interaction} heading={{ kicker: slide.section ?? '', title: slide.title }} onDone={explored} /> : null;
     case 'scenario':
       if (interaction?.kind !== 'scenario') return null;
 
@@ -117,11 +141,11 @@ function SlideLayout({ deck, slide, progress, assetBase, onResult, onGoto, onNex
       return interaction.template === STORY_TEMPLATE ? (
         <StoryView interaction={interaction} done={exploredDone} onDone={explored} lead={lead} memoryKey={memoryKey} image={slide.image} assetBase={assetBase} />
       ) : (
-        <ScenarioView interaction={interaction} done={exploredDone} onDone={explored} lead={lead} memoryKey={memoryKey} image={slide.image} assetBase={assetBase} />
+        <ScenarioView interaction={interaction} done={exploredDone} onDone={explored} lead={lead} memoryKey={memoryKey} image={slide.image} assetBase={assetBase} heading={{ kicker: slide.section ?? '', title: slide.title, summary: slide.content.body }} />
       );
     case 'explore':
       return interaction && 'items' in interaction && interaction.kind !== 'order' ? (
-        <ExploreView interaction={interaction} done={exploredDone} onDone={explored} lead={lead} image={slide.image} assetBase={assetBase} memoryKey={memoryKey} bleed={bleed} />
+        <ExploreView interaction={interaction} done={exploredDone} onDone={explored} lead={lead} image={slide.image} assetBase={assetBase} memoryKey={memoryKey} bleed={bleed} heading={{ kicker: slide.section ?? '', title: slide.title }} />
       ) : null;
     case 'match':
       return interaction?.kind === 'match' ? (
@@ -132,6 +156,8 @@ function SlideLayout({ deck, slide, progress, assetBase, onResult, onGoto, onNex
         <OrderView interaction={interaction} done={exploredDone} onDone={explored} lead={lead} memoryKey={memoryKey} image={slide.image} assetBase={assetBase} />
       ) : null;
     case 'image-text':
+      if (deck.theme === 'professional' && slide.image) return <ProHero slide={slide} assetBase={assetBase} />;
+
       return (
         <Split>
           <div className="flex min-h-0 min-w-0 flex-col gap-[0.8em]">
@@ -176,6 +202,40 @@ function SlideLayout({ deck, slide, progress, assetBase, onResult, onGoto, onNex
         </Split>
       );
   }
+}
+
+/**
+ * The professional look of a slide with a photograph and a short text (the opening and the closing): the text on the left in plain
+ * type with thin rules, the photograph on the right filling its half from edge to edge, with its caption on a quiet bar.
+ */
+function ProHero({ slide, assetBase }: { slide: DeckSlide; assetBase: string | null }) {
+  const { portrait } = useStage();
+  const image = slide.image as DeckImage;
+
+  return (
+    <div className={`grid h-full min-h-0 ${portrait ? 'grid-rows-[auto_minmax(0,1fr)]' : 'grid-cols-[minmax(0,5fr)_minmax(0,7fr)]'}`}>
+      <div className="flex min-h-0 min-w-0 flex-col justify-center-safe gap-[0.9em] p-[2em]">
+        {slide.section ? <p className="text-[0.7em] font-semibold uppercase tracking-[0.14em] text-sd-accent">{slide.section}</p> : null}
+        <h2 id={`slide-${slide.n}-title`} tabIndex={-1} className="text-[1.9em] font-bold leading-[1.1] tracking-tight text-slate-900 outline-none">
+          {slide.title}
+        </h2>
+        {slide.content.body ? <p className="text-[1em] leading-snug text-slate-700">{slide.content.body}</p> : null}
+        {slide.content.bullets.length > 0 ? (
+          <ul className="divide-y divide-slate-200 border-y border-slate-200 text-[0.85em] text-slate-800">
+            {slide.content.bullets.map((b, i) => (
+              <li key={i} className="py-[0.45em]">
+                {b}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      <div className="relative min-h-0 min-w-0 bg-slate-200">
+        {/* eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies */}
+        <img src={assetUrl(image.url, assetBase)} alt={image.alt} className="absolute inset-0 h-full w-full object-cover" />
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------

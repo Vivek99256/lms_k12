@@ -13,7 +13,7 @@
 
 import { mapQuestionToPlayerPayload, type RuntimeScope } from '../h5p/question-bank-runtime';
 import { repairGenericLabels } from './cardTitle';
-import { interactionProblem } from './interactions';
+import { branchProblem, interactionProblem } from './interactions';
 import type { BankQuestion, H5pTargetKind } from '../h5p/question-bank-h5p-map';
 import {
   ACTIVITY_LABELS,
@@ -84,6 +84,9 @@ export function parseDeck(raw: unknown): StudyDeck {
       }
     });
   });
+
+  const stranded = branchProblem(deck.slides);
+  if (stranded) throw new DeckError(`${stranded}.`);
 
   return deck as StudyDeck;
 }

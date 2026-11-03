@@ -16,6 +16,10 @@ export interface PartCalloutProps {
   assetBase?: string | null;
   /** Which side of the picture it opens on: the side away from the part, so the part stays in view. */
   placement: 'left' | 'right';
+  /** Against the top or the bottom edge; the professional look picks the one that covers neither the part nor another marker. */
+  anchor?: 'top' | 'bottom';
+  /** A narrower card, for a picture that is small on the slide. */
+  narrow?: boolean;
   onClose: () => void;
 }
 
@@ -32,7 +36,7 @@ export const SENTENCE_GAP = 1100;
  * part, numbered like the part's pin, with the explanation arriving one sentence at a time (so the eye stays on the part while
  * the idea builds). "Replay" plays it again. With reduced motion, or for a screen reader, the whole text is there at once.
  */
-export function PartCallout({ number, title, text, image = null, assetBase = null, placement, onClose }: PartCalloutProps) {
+export function PartCallout({ number, title, text, image = null, assetBase = null, placement, anchor = 'top', narrow = false, onClose }: PartCalloutProps) {
   const still = useReducedMotion();
   const [round, setRound] = useState(0);
   const sentences = sentencesOf(text);
@@ -42,7 +46,7 @@ export function PartCallout({ number, title, text, image = null, assetBase = nul
       role="region"
       aria-label={`${title}: explanation`}
       data-testid="part-callout"
-      className={`absolute top-[5%] z-30 w-[62%] rounded-[0.9em] border-2 border-sd-accent bg-white/97 p-[0.7em] shadow-[0_0.4em_1.4em_rgba(15,23,42,0.28)] ${placement === 'left' ? 'left-[2.5%]' : 'right-[2.5%]'} ${motion.fadeUp}`}
+      className={`pointer-events-auto absolute z-30 rounded-[0.9em] border-2 border-sd-accent bg-white/97 p-[0.7em] shadow-[0_0.4em_1.4em_rgba(15,23,42,0.28)] ${anchor === 'bottom' ? 'bottom-[5%]' : 'top-[5%]'} ${narrow ? 'w-[50%]' : 'w-[62%]'} ${placement === 'left' ? 'left-[2.5%]' : 'right-[2.5%]'} ${motion.fadeUp}`}
     >
       <div className="flex items-center gap-[0.6em]">
         <span aria-hidden="true" className="flex h-[1.7em] w-[1.7em] shrink-0 items-center justify-center rounded-full bg-sd-accent text-[0.85em] font-bold tabular-nums text-white">

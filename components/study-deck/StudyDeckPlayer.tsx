@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Dumbbell, List, Maximize, Minimize, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Dumbbell, LayoutGrid, List, Maximize, Minimize, X } from 'lucide-react';
 
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import { activityKey, resolveActivity } from '@/lib/study-deck/deck';
@@ -73,6 +73,9 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
   // Which way the learner is travelling, so the next screen arrives from that side.
   const [direction, setDirection] = useState<'next' | 'back'>('next');
   const stageRef = useRef<HTMLDivElement>(null);
+  // Where the learner has been, in order, so Back returns to the question they came from rather than to the previous slide number.
+  const [trail, setTrail] = useState<number[]>([]);
+  const currentRef = useRef(1);
   // Browser full screen (the lesson already fills the window; this also hides the browser's own bars). The browser can leave it
   // by itself (Esc), so the button follows the document rather than its own click.
   const [fullScreen, setFullScreen] = useState(false);
@@ -82,6 +85,8 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
 
     return () => document.removeEventListener('fullscreenchange', sync);
   }, []);
+  // A deck that opens on a choice of products (the professional look) can always be returned to it.
+  const hubSlide = deck.slides.find((s) => s.interaction?.kind === 'hub')?.n ?? null;
   const toggleFullScreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
     else void document.documentElement.requestFullscreen?.().catch(() => undefined);
@@ -108,6 +113,10 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
   const steps = stepsOf(slide);
   const stepIndex = Math.min(step, steps.length - 1);
 
+  useEffect(() => {
+    currentRef.current = slide.n;
+  }, [slide.n]);
+
   // Opening a slide marks it visited. The reducer ignores a repeat.
   useEffect(() => {
     if (!finished && !progress.visited.includes(slide.n)) {
@@ -125,6 +134,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
   }, [slide.n, stepIndex, finished]);
 
   const goto = useCallback((n: number) => {
+    if (n !== currentRef.current) setTrail((previous) => [...previous, currentRef.current]);
     setDirection('next');
     setFinished(false);
     setOutlineOpen(false);
@@ -138,23 +148,32 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
 
   const stepKind = steps[stepIndex];
   const exploredDone = Boolean(progress.activities[(stepKind === 'example' ? exampleKey : interactionKey)(slide)]?.done);
-  const hint = finished ? null : pendingHint(slide, stepKind, exploredDone);
+  const waiting = !finished && slide.next === -1;
+  const hint = finished ? null : pendingHint(slide, stepKind, exploredDone) ?? (waiting ? 'Choose an answer to continue.' : null);
   const totals = deckTotals(deck, progress, playable);
   // The lesson wears the colours of the topic on screen: the chrome around the slide follows it.
   const brand = deck.theme === 'professional' ? THEMES.navy : THEMES.brand;
   const theme = finished ? brand : themeOf(deck, slide);
 
   const forward = useCallback(() => {
-    if (finished) return;
+    if (finished || slide.next === -1) return;
+    // A slide may name where Continue goes (the branches of a story); otherwise it is the next screen.
+    if (typeof slide.next === 'number' && slide.next > 0 && deck.slides.some((s) => s.n === slide.next)) {
+      goto(slide.next);
+      return;
+    }
     setDirection('next');
     const next = nextPosition(deck, { n: slide.n, step: stepIndex });
     if (!next) {
       setFinished(true);
       return;
     }
-    if (next.n !== slide.n) dispatch({ type: 'goto', n: next.n });
+    if (next.n !== slide.n) {
+      setTrail((previous) => [...previous, slide.n]);
+      dispatch({ type: 'goto', n: next.n });
+    }
     setStep(next.step);
-  }, [deck, finished, slide.n, stepIndex]);
+  }, [deck, finished, goto, slide.n, slide.next, stepIndex]);
 
   const back = useCallback(() => {
     setDirection('back');
@@ -163,11 +182,19 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
       setStep(stepsOf(deck.slides[lastIndex]).length - 1);
       return;
     }
+    if (trail.length > 0) {
+      const previous = trail[trail.length - 1];
+      setTrail(trail.slice(0, -1));
+      setOutlineOpen(false);
+      setStep(0);
+      dispatch({ type: 'goto', n: previous });
+      return;
+    }
     const before = previousPosition(deck, { n: slide.n, step: stepIndex });
     if (!before) return;
     if (before.n !== slide.n) dispatch({ type: 'goto', n: before.n });
     setStep(before.step);
-  }, [deck, finished, lastIndex, slide.n, stepIndex]);
+  }, [deck, finished, lastIndex, slide.n, stepIndex, trail]);
 
   const exit = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) router.back();
@@ -188,8 +215,10 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
     return () => window.removeEventListener('keydown', onKey);
   }, [forward, back, outlineOpen, practiceOpen]);
 
-  const atStart = !finished && index === 0 && stepIndex === 0;
-  const last = !finished && nextPosition(deck, { n: slide.n, step: stepIndex }) === null;
+  const atStart = !finished && index === 0 && stepIndex === 0 && trail.length === 0;
+  const last = !finished && slide.next === undefined && nextPosition(deck, { n: slide.n, step: stepIndex }) === null;
+  // The end of a path leads back to the choice of products, and says so.
+  const toProducts = typeof slide.next === 'number' && deck.slides.find((s) => s.n === slide.next)?.interaction?.kind === 'hub';
   const nav =
     'inline-flex items-center gap-1.5 rounded-xl px-5 py-2 text-sm font-semibold shadow-sm transition active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sd-accent';
 
@@ -218,6 +247,16 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
           >
             <Dumbbell className="h-4 w-4" aria-hidden="true" />
             <span className="hidden sm:inline">Practice</span>
+          </button>
+        ) : null}
+        {hubSlide !== null && !finished && slide.n !== hubSlide ? (
+          <button
+            type="button"
+            onClick={() => goto(hubSlide)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
+          >
+            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Products</span>
           </button>
         ) : null}
         <button
@@ -280,6 +319,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
               onResult={onResult}
               onGoto={goto}
               onNext={forward}
+              onBack={back}
             />
           )}
           </div>
@@ -321,9 +361,10 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
           <button
             type="button"
             onClick={forward}
-            className={`${nav} ${hint ? 'border border-sd-line bg-white text-sd-strong hover:bg-sd-softer' : 'bg-sd-accent text-white hover:bg-sd-strong'}`}
+            disabled={waiting}
+            className={`${nav} disabled:cursor-not-allowed disabled:opacity-40 ${hint ? 'border border-sd-line bg-white text-sd-strong hover:bg-sd-softer' : 'bg-sd-accent text-white hover:bg-sd-strong'}`}
           >
-            {last ? 'Finish' : 'Continue'}
+            {last ? 'Finish' : toProducts ? 'Back to products' : 'Continue'}
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>
         )}

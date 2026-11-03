@@ -15,7 +15,8 @@ import {
   type ScenarioState,
 } from '@/lib/study-deck/interactions';
 import type { DeckImage, ScenarioInteraction } from '@/lib/study-deck/types';
-import { SideFigure, Tag, TONES, useRememberedReducer, useStage } from './stage-ui';
+import { assetUrl } from '@/lib/study-deck/deck';
+import { SideFigure, Tag, TONES, useRememberedReducer, useStage, useTheme } from './stage-ui';
 
 export interface ScenarioViewProps {
   interaction: ScenarioInteraction;
@@ -29,6 +30,8 @@ export interface ScenarioViewProps {
   /** The slide's own picture, shown beside the text when it has one. */
   image?: DeckImage | null;
   assetBase?: string | null;
+  /** The professional look: the slide's own name and opening line, shown in place of the large lead. */
+  heading?: { kicker: string; title: string; summary: string };
 }
 
 type Action = { type: 'choose'; id: string } | { type: 'again' } | { type: 'next' } | { type: 'restart' };
@@ -40,8 +43,11 @@ type Action = { type: 'choose'; id: string } | { type: 'again' } | { type: 'next
  *
  * Nothing is scored. A choice is described as sound or not the best choice, because the point is to see why.
  */
-export function ScenarioView({ interaction, done, onDone, lead, memoryKey, image, assetBase }: ScenarioViewProps) {
+export function ScenarioView({ interaction, done, onDone, lead, memoryKey, image, assetBase, heading: slideHeading }: ScenarioViewProps) {
   const { portrait } = useStage();
+  // The professional theme: the photograph fills the left half and the decision sits beside it, with the long context folded away.
+  const pro = useTheme().key === 'navy' && !portrait && Boolean(image) && Boolean(slideHeading);
+  const headline = slideHeading ? slideHeading.summary.split(/(?<=\?)\s+/) : [];
   const [state, dispatch] = useRememberedReducer(memoryKey, (s: ScenarioState, a: Action) => {
     switch (a.type) {
       case 'choose':
@@ -84,8 +90,14 @@ export function ScenarioView({ interaction, done, onDone, lead, memoryKey, image
   return (
     <section
       aria-label="What would you do?"
-      className={`grid h-full min-h-0 gap-[1.2em] p-[1.4em] ${portrait ? 'grid-rows-[auto_minmax(0,1fr)]' : 'grid-cols-[minmax(0,4.6fr)_minmax(0,7.4fr)]'}`}
+      className={`grid h-full min-h-0 ${pro ? '' : 'p-[1.4em]'} ${portrait ? 'grid-rows-[auto_minmax(0,1fr)] gap-[1.2em]' : pro ? 'grid-cols-[minmax(0,6fr)_minmax(0,5fr)]' : 'grid-cols-[minmax(0,4.6fr)_minmax(0,7.4fr)] gap-[1.2em]'}`}
     >
+      {pro && image ? (
+        <div className="relative min-h-0 min-w-0 overflow-hidden bg-slate-200">
+          {/* eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies */}
+          <img src={assetUrl(image.url, assetBase ?? null)} alt={image.alt} className="absolute inset-0 h-full w-full object-cover" />
+        </div>
+      ) : (
       <div className="flex min-h-0 min-w-0 flex-col justify-center-safe gap-[0.9em]">
         {lead}
         <div className="space-y-[0.5em]">
@@ -110,10 +122,25 @@ export function ScenarioView({ interaction, done, onDone, lead, memoryKey, image
           </div>
         </div>
       </div>
+      )}
 
-      <div className="flex min-h-0 min-w-0 flex-col justify-center-safe gap-[0.8em]">
+      <div className={`flex min-h-0 min-w-0 flex-col justify-center-safe gap-[0.8em] ${pro ? 'p-[1.8em]' : ''}`}>
         {/* The picture sits above the choices, where the column is otherwise empty, so it is large enough to read. Once a choice is made the consequence needs the room. */}
-        {!state.ended && !picked && image && !portrait ? (
+        {pro && slideHeading ? (
+          <div className="space-y-[0.4em] border-b border-slate-300 pb-[0.7em]">
+            <p className="text-[0.7em] font-semibold uppercase tracking-[0.14em] text-sd-accent">{slideHeading.kicker}</p>
+            <h2 tabIndex={-1} className="text-[1.5em] font-bold leading-tight text-slate-900 outline-none">{slideHeading.title}</h2>
+            {headline[0] ? <p className="text-[0.95em] font-medium leading-snug text-slate-700">{headline[0]}</p> : null}
+            <details className="text-[0.78em] text-slate-700">
+              <summary className="cursor-pointer font-semibold text-sd-accent">Read the context</summary>
+              <div className="mt-[0.4em] space-y-[0.4em] leading-snug">
+                {headline.slice(1).length > 0 ? <p>{headline.slice(1).join(' ')}</p> : null}
+                <p>{interaction.situation}</p>
+              </div>
+            </details>
+          </div>
+        ) : null}
+        {!state.ended && !picked && image && !portrait && !pro ? (
           <div className="flex h-[46%] min-h-0 flex-col">
             <SideFigure image={image} assetBase={assetBase} />
           </div>

@@ -73,6 +73,11 @@ export type LayoutKind =
   | 'explore'
   | 'match'
   | 'order'
+  | 'hub'
+  | 'flow'
+  | 'bars'
+  | 'decision'
+  | 'outcome'
   | 'image-text'
   | 'summary'
   | 'intro'
@@ -96,6 +101,7 @@ export function layoutOf(slide: DeckSlide): LayoutKind {
   if (kind === 'reveal' || kind === 'steps' || kind === 'timeline' || kind === 'compare') return 'explore';
   if (kind === 'match') return 'match';
   if (kind === 'order') return 'order';
+  if (kind === 'hub' || kind === 'flow' || kind === 'bars' || kind === 'decision' || kind === 'outcome') return kind;
   if (slide.image) return 'image-text';
   if (slide.slide_type === 'summary' || slide.slide_type === 'concept_map') return 'summary';
   if (FRAMING.has(slide.slide_type) || slide.taught_concept_ids.length === 0) return 'intro';
@@ -141,6 +147,13 @@ export function pendingHint(slide: DeckSlide, step: StepKind, explored: boolean)
       return 'Match every pair to continue.';
     case 'order':
       return 'Put the steps in order to continue.';
+    case 'hub':
+    case 'flow':
+    case 'bars':
+    case 'decision':
+    case 'outcome':
+      // Nothing here has to be finished: the learner may go on at any time.
+      return null;
   }
 }
 
