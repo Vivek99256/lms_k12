@@ -8,16 +8,26 @@ import {
   ArrowRight,
   BookOpen,
   Bot,
+  Check,
   CheckCheck,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Database,
+  Download,
   Eye,
+  FileCheck,
   FileText,
   Layers,
+  Layout,
+  Maximize2,
+  Minimize2,
+  Monitor,
+  Palette,
   Pause,
   Play,
+  Printer,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -31,6 +41,7 @@ import {
 } from 'lucide-react';
 
 import { readModuleWorkspaceSession } from '@/lib/module-ai/module-ai-stack';
+import { resolveAiBaseUrl } from '@/app/components/utils/api_url';
 import {
   getCatalogueAgentState,
   startCatalogueAgentContinuous,
@@ -42,6 +53,10 @@ import {
   getContentTasksLedger,
   runTeachLearnPipeline,
   getExpertSystemOverview,
+  fetchCatalogueStandards,
+  fetchCatalogueSubjects,
+  fetchCatalogueChapters,
+  checkChapterContent,
   type CatalogueAgentState,
   type HierarchyValidationReport,
   type ContentTaskRecord,
@@ -49,7 +64,19 @@ import {
   type UnifiedTeachLearnReport,
   type ExpertSystemOverviewData,
   type AgentEsoStructuredObject,
+  type CatalogueStandard,
+  type CatalogueSubject,
+  type CatalogueChapter,
+  type ContentCoverageCheck,
+  type ContentResourceStatus,
+  type RunPipelineOptions,
 } from '@/lib/teach-learn/catalogue-agent-client';
+import {
+  CONTENT_TEMPLATES,
+  type ContentTemplateOption,
+  TemplateDesignCanvas,
+} from './template-design-canvas';
+export { CONTENT_TEMPLATES, type ContentTemplateOption, TemplateDesignCanvas };
 
 interface CatalogueAgentControlCardProps {
   onValidated?: (report?: HierarchyValidationReport | UnifiedTeachLearnReport | unknown) => void;
@@ -384,6 +411,38 @@ const INTERVAL_OPTIONS = [
   { label: '1 Hour', value: 3600 },
 ];
 
+const TEACHING_APPROACHES = [
+  'Explicit instruction / direct teaching',
+  'Inquiry-based learning',
+  'Problem-based learning',
+  'Project-based learning',
+  'Experiential / learning by doing',
+  'Collaborative / peer learning',
+  'Socratic questioning / guided discovery',
+  'Flipped classroom',
+  'Differentiated / mastery-based instruction',
+  'Gamified learning',
+];
+
+const STUDENT_EXPERIENCES = [
+  { id: 'ppt', label: 'PPT / interactive slides', available: true, description: 'Generates structured interactive presentation slides' },
+  { id: 'scenario_lesson', label: 'Scenario-based lesson', available: false, note: 'no generator yet' },
+  { id: 'branching_scenario', label: 'Interactive branching scenario', available: true, description: 'Generates branching scenario decision path' },
+  { id: 'video_lesson', label: 'Video lesson', available: false, note: 'no generator yet' },
+  { id: 'simulation', label: 'Simulation / practical activity', available: false, note: 'no generator yet' },
+  { id: 'student_worksheet', label: 'Student worksheet / learning guide', available: false, note: 'no generator yet' },
+  { id: 'socratic_dialogue', label: 'Interactive Socratic dialogue', available: false, note: 'no generator yet' },
+];
+
+const CLASSROOM_RESOURCE_TYPES = [
+  { id: 'Presentation', label: 'Presentation' },
+  { id: 'Revision Notes', label: 'Revision Notes' },
+  { id: 'Classroom Activity', label: 'Classroom Activity' },
+  { id: 'Remedial Class', label: 'Remedial Class' },
+];
+
+// Note: CONTENT_TEMPLATES, ContentTemplateOption, and TemplateDesignCanvas are imported from ./template-design-canvas
+
 export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControlCardProps) {
   const [loading, setLoading] = useState(true);
   const [operating, setOperating] = useState(false);
@@ -401,42 +460,465 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
   const [autoGenerate, setAutoGenerate] = useState<boolean>(true);
   const [countdown, setCountdown] = useState<number | null>(null);
 
-  // Main UI Navigation Tabs
-  const [mainTab, setMainTab] = useState<'hierarchy' | 'content_ledger' | 'cycle_diagram' | 'pipeline'>('hierarchy');
+  // Main UI Navigation Tabs - Defaults to User-Driven Multi-Agent Pipeline
+  const [mainTab, setMainTab] = useState<'hierarchy' | 'content_ledger' | 'cycle_diagram' | 'pipeline'>('pipeline');
 
-  // Synchronized 3-Agent Pipeline State
+  // Multi-Stage Selection State (Stage 1 to 5)
+  const [workflowStage, setWorkflowStage] = useState<1 | 2 | 3 | 4 | 5>(1);
+
+  // Stage 1: Cascading Academic Scope (Real Database Grounded)
+  const [catalogueStandards, setCatalogueStandards] = useState<CatalogueStandard[]>([]);
+  const [selectedStandardIds, setSelectedStandardIds] = useState<number[]>([]);
+  const [catalogueSubjects, setCatalogueSubjects] = useState<CatalogueSubject[]>([]);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<number[]>([]);
+  const [catalogueChapters, setCatalogueChapters] = useState<CatalogueChapter[]>([]);
+  const [selectedChapterIds, setSelectedChapterIds] = useState<number[]>([]);
+  const [loadingHierarchy, setLoadingHierarchy] = useState(false);
+
+  // Stage 2: Teaching Method
+  const [selectedTeachingApproach, setSelectedTeachingApproach] = useState<string>('Inquiry-based learning');
+
+  // Stage 3: Student Learning Experience & Template Layout
+  const [selectedStudentExperience, setSelectedStudentExperience] = useState<string>('ppt');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('modern_tech');
+
+  // Interactive Design View (Preview Before Generation) State
+  const [previewMode, setPreviewMode] = useState<'ppt' | 'pdf'>('ppt');
+  const [previewSlideIdx, setPreviewSlideIdx] = useState<number>(0);
+  const [previewFullscreenOpen, setPreviewFullscreenOpen] = useState<boolean>(false);
+
+  const currentTmpl = useMemo(() => {
+    return CONTENT_TEMPLATES.find((t) => t.id === selectedTemplate) || CONTENT_TEMPLATES[0];
+  }, [selectedTemplate]);
+
+  const activePreviewChapter = useMemo(() => {
+    if (selectedChapterIds.length > 0) {
+      const found = catalogueChapters.find((c) => selectedChapterIds.includes(c.id));
+      if (found) return found.chapter_name;
+    }
+    return 'Market Equilibrium & Price Determination';
+  }, [selectedChapterIds, catalogueChapters]);
+
+  const activePreviewSubject = useMemo(() => {
+    if (selectedSubjectIds.length > 0) {
+      const found = catalogueSubjects.find((s) => selectedSubjectIds.includes(s.subject_id));
+      if (found) return found.subject_name;
+    }
+    return 'Economics';
+  }, [selectedSubjectIds, catalogueSubjects]);
+
+  const activePreviewStandard = useMemo(() => {
+    if (selectedStandardIds.length > 0) {
+      const found = catalogueStandards.find((s) => selectedStandardIds.includes(s.id));
+      if (found) return `Standard ${found.name}`;
+    }
+    return 'Standard 10';
+  }, [selectedStandardIds, catalogueStandards]);
+
+  // Helper to resolve real viewer URLs for generated & audited content
+  const resolveContentViewUrl = useCallback((contentId?: number | null, rawUrl?: string | null) => {
+    if (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
+      return rawUrl;
+    }
+    const base = resolveAiBaseUrl();
+    return `${base.replace(/\/+$/, '')}/api/lms-content-view/${contentId || ''}`;
+  }, []);
+
+  // Stage 4: Classroom Resources & Assessment
+  const [selectedResourceTypes, setSelectedResourceTypes] = useState<string[]>([
+    'Presentation',
+    'Revision Notes',
+  ]);
+  const [includeAssessment, setIncludeAssessment] = useState<boolean>(true);
+
+  // Synchronized 3-Agent Pipeline Execution State
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [pipelineResult, setPipelineResult] = useState<UnifiedTeachLearnReport | null>(null);
-  const [pipelineStandard, setPipelineStandard] = useState('7');
   const [pipelineDays, setPipelineDays] = useState(15);
+
+  // Dedicated 3-Agent Sequential Execution States (Agent 1 -> Agent 2 -> Agent 3)
+  const [executingStep, setExecutingStep] = useState<0 | 1 | 2 | 3>(0);
+  const [step1State, setStep1State] = useState<{
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    summary?: string;
+    duration_ms?: number;
+    scopeText?: string;
+  }>({ status: 'pending' });
+  const [step2State, setStep2State] = useState<{
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    existingFound?: number;
+    missingIdentified?: number;
+    summary?: string;
+    duration_ms?: number;
+  }>({ status: 'pending' });
+  const [step3State, setStep3State] = useState<{
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    approach?: string;
+    generatedCount?: number;
+    summary?: string;
+    duration_ms?: number;
+  }>({ status: 'pending' });
   const [pipelineError, setPipelineError] = useState<string | null>(null);
 
-  const handleRunPipeline = async () => {
+  // 1. Load real standards from database on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadStandards() {
+      try {
+        const context = readModuleWorkspaceSession();
+        const res = await fetchCatalogueStandards(context);
+        if (isMounted && res.standards && res.standards.length > 0) {
+          setCatalogueStandards(res.standards);
+          // Default select Standard 7 if available, otherwise first available standard
+          const std7 = res.standards.find(
+            (s) => String(s.name).trim() === '7' || s.id === 7 || String(s.name).toLowerCase().includes('7')
+          );
+          const defaultStd = std7 || res.standards[0];
+          if (defaultStd) {
+            setSelectedStandardIds([defaultStd.id]);
+          }
+        }
+      } catch {
+        // Fallback gracefully
+      }
+    }
+    void loadStandards();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // 2. When selected standards change, dynamically load mapped subjects from database
+  useEffect(() => {
+    let isMounted = true;
+    if (selectedStandardIds.length === 0) {
+      setCatalogueSubjects([]);
+      setSelectedSubjectIds([]);
+      setCatalogueChapters([]);
+      setSelectedChapterIds([]);
+      return;
+    }
+
+    async function loadSubjects() {
+      setLoadingHierarchy(true);
+      try {
+        const context = readModuleWorkspaceSession();
+        const res = await fetchCatalogueSubjects(context, selectedStandardIds);
+        if (isMounted) {
+          const subs = res.subjects || [];
+          setCatalogueSubjects(subs);
+          // Auto-select valid previously selected subjects, or default to first subject
+          setSelectedSubjectIds((prev) => {
+            const valid = prev.filter((id) => subs.some((s) => s.subject_id === id));
+            if (valid.length > 0) return valid;
+            // Prefer Science or first available subject
+            const scienceSub = subs.find((s) => s.subject_name.toLowerCase().includes('science'));
+            return scienceSub ? [scienceSub.subject_id] : subs.length > 0 ? [subs[0].subject_id] : [];
+          });
+        }
+      } catch {
+        if (isMounted) setCatalogueSubjects([]);
+      } finally {
+        if (isMounted) setLoadingHierarchy(false);
+      }
+    }
+    void loadSubjects();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedStandardIds]);
+
+  // 3. When selected subjects or standards change, dynamically load corresponding chapters
+  useEffect(() => {
+    let isMounted = true;
+    if (selectedStandardIds.length === 0 || selectedSubjectIds.length === 0) {
+      setCatalogueChapters([]);
+      setSelectedChapterIds([]);
+      return;
+    }
+
+    async function loadChapters() {
+      setLoadingHierarchy(true);
+      try {
+        const context = readModuleWorkspaceSession();
+        const res = await fetchCatalogueChapters(context, selectedStandardIds, selectedSubjectIds);
+        if (isMounted) {
+          const chaps = res.chapters || [];
+          setCatalogueChapters(chaps);
+          // Auto-select valid previously selected chapters, or default to Chapter 3 or first
+          setSelectedChapterIds((prev) => {
+            const valid = prev.filter((id) => chaps.some((c) => c.id === id));
+            if (valid.length > 0) return valid;
+            const ch3 = chaps.find((c) => c.chapter_name.toLowerCase().includes('chapter 3') || c.sort_order === 3);
+            return ch3 ? [ch3.id] : chaps.length > 0 ? [chaps[0].id] : [];
+          });
+        }
+      } catch {
+        if (isMounted) setCatalogueChapters([]);
+      } finally {
+        if (isMounted) setLoadingHierarchy(false);
+      }
+    }
+    void loadChapters();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedStandardIds, selectedSubjectIds]);
+
+  // Toggle Standard selection
+  const toggleStandardSelection = (stdId: number) => {
+    setSelectedStandardIds((prev) =>
+      prev.includes(stdId) ? prev.filter((id) => id !== stdId) : [...prev, stdId]
+    );
+  };
+
+  const toggleAllStandardsSelection = () => {
+    if (selectedStandardIds.length === catalogueStandards.length) {
+      setSelectedStandardIds([]);
+    } else {
+      setSelectedStandardIds(catalogueStandards.map((s) => s.id));
+    }
+  };
+
+  // Toggle Subject selection
+  const toggleSubjectSelection = (subId: number) => {
+    setSelectedSubjectIds((prev) =>
+      prev.includes(subId) ? prev.filter((id) => id !== subId) : [...prev, subId]
+    );
+  };
+
+  const toggleAllSubjectsSelection = () => {
+    if (selectedSubjectIds.length === catalogueSubjects.length) {
+      setSelectedSubjectIds([]);
+    } else {
+      setSelectedSubjectIds(catalogueSubjects.map((s) => s.subject_id));
+    }
+  };
+
+  // Toggle Chapter selection
+  const toggleChapterSelection = (chId: number) => {
+    setSelectedChapterIds((prev) =>
+      prev.includes(chId) ? prev.filter((id) => id !== chId) : [...prev, chId]
+    );
+  };
+
+  const toggleAllChaptersSelection = () => {
+    if (selectedChapterIds.length === catalogueChapters.length) {
+      setSelectedChapterIds([]);
+    } else {
+      setSelectedChapterIds(catalogueChapters.map((c) => c.id));
+    }
+  };
+
+  // Toggle Classroom Resource Type selection
+  const toggleResourceType = (rType: string) => {
+    setSelectedResourceTypes((prev) =>
+      prev.includes(rType) ? prev.filter((t) => t !== rType) : [...prev, rType]
+    );
+  };
+
+  const toggleAllResourceTypes = () => {
+    if (selectedResourceTypes.length === CLASSROOM_RESOURCE_TYPES.length) {
+      setSelectedResourceTypes([]);
+    } else {
+      setSelectedResourceTypes(CLASSROOM_RESOURCE_TYPES.map((r) => r.id));
+    }
+  };
+
+  // Execute the 3-Agent Sequential Pipeline based strictly on confirmed user selections
+  // Execute the 3-Agent Sequential Pipeline strictly one by one (Agent 1 -> Agent 2 -> Agent 3)
+  const executePipeline = async (options: RunPipelineOptions) => {
     setPipelineRunning(true);
     setPipelineError(null);
+    setPipelineResult(null);
+
+    const stdNames = selectedStandardIds
+      .map((id) => catalogueStandards.find((s) => s.id === id)?.name || `Std ${id}`)
+      .join(', ');
+    const subNames = selectedSubjectIds
+      .map((id) => catalogueSubjects.find((s) => s.subject_id === id)?.subject_name || `Sub ${id}`)
+      .join(', ');
+    const chNames = selectedChapterIds
+      .map((id) => catalogueChapters.find((c) => c.id === id)?.chapter_name || `Ch ${id}`)
+      .join(', ');
+    const scopeSummaryText = `Standard: ${stdNames || 'All'} | Subject: ${subNames || 'All'} | Chapter: ${chNames || 'All'}`;
+
+    // Reset and initialize step execution states
+    setExecutingStep(1);
+    setStep1State({
+      status: 'running',
+      summary: 'Validating confirmed academic scope, subject bindings, and 5-tier hierarchy...',
+      scopeText: scopeSummaryText,
+    });
+    setStep2State({
+      status: 'pending',
+      summary: 'Waiting for Agent 1 to pass Gate 1 validation...',
+    });
+    setStep3State({
+      status: 'pending',
+      summary: 'Waiting for Agent 2 to pass Gate 2 content audit...',
+    });
+
     try {
       const context = readModuleWorkspaceSession();
-      const res = await runTeachLearnPipeline(context, {
-        standard_name: pipelineStandard,
+
+      // =========================================================================
+      // STEP 1: Agent 1 – Course Catalogue Reader (Gate 1 Validation)
+      // =========================================================================
+      const step1Res = await runTeachLearnPipeline(context, {
+        ...options,
+        step: 1,
         days_back: pipelineDays,
         days_ahead: pipelineDays,
         limit: 10,
         content_limit: 50,
       });
-      if (res.report) {
-        setPipelineResult(res.report);
-        if (onValidatedRef.current) {
-          onValidatedRef.current(res.report);
-        }
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('agents:runs-updated', { detail: { module: 'teach_learn' } }));
-        }
+
+      if (!step1Res.report?.success) {
+        const errMsg = step1Res.report?.error || 'Scope validation failed at Gate 1.';
+        setStep1State((prev) => ({ ...prev, status: 'failed', summary: errMsg }));
+        throw new Error(errMsg);
       }
+
+      setStep1State({
+        status: 'completed',
+        summary: step1Res.report?.step_result?.output_summary || 'Scope and curriculum hierarchy validated successfully.',
+        duration_ms: step1Res.report?.step_result?.duration_ms,
+        scopeText: scopeSummaryText,
+      });
+
+      const handover1 = (step1Res.report?.handover as Record<string, unknown>) || {};
+
+      // =========================================================================
+      // STEP 2: Agent 2 – Activity Timeline Reader (Gate 2 Content Audit)
+      // =========================================================================
+      setExecutingStep(2);
+      setStep2State({
+        status: 'running',
+        summary: 'Auditing database for existing classroom resources and activity records...',
+      });
+
+      const step2Res = await runTeachLearnPipeline(context, {
+        ...options,
+        step: 2,
+        handover: handover1,
+        days_back: pipelineDays,
+        days_ahead: pipelineDays,
+        limit: 10,
+        content_limit: 50,
+      });
+
+      if (!step2Res.report?.success) {
+        const errMsg = step2Res.report?.error || 'Content audit failed at Gate 2.';
+        setStep2State((prev) => ({ ...prev, status: 'failed', summary: errMsg }));
+        throw new Error(errMsg);
+      }
+
+      const existingCount = Number(step2Res.report?.handover?.existing_content_count ?? 0);
+      const missingCount = Number(step2Res.report?.handover?.missing_content_count ?? 0);
+
+      setStep2State({
+        status: 'completed',
+        existingFound: existingCount,
+        missingIdentified: missingCount,
+        summary: step2Res.report?.step_result?.output_summary || `Found ${existingCount} existing resources; identified ${missingCount} missing resources.`,
+        duration_ms: step2Res.report?.step_result?.duration_ms,
+      });
+
+      const handover2 = (step2Res.report?.handover as Record<string, unknown>) || {};
+
+      // =========================================================================
+      // STEP 3: Agent 3 – Content Generation Agent (Gate 3 Generation & Assessment)
+      // =========================================================================
+      setExecutingStep(3);
+      setStep3State({
+        status: 'running',
+        approach: selectedTeachingApproach,
+        summary: `Generating missing resources using '${selectedTeachingApproach}' approach...`,
+      });
+
+      const step3Res = await runTeachLearnPipeline(context, {
+        ...options,
+        step: 3,
+        handover: { ...handover1, ...handover2 },
+        days_back: pipelineDays,
+        days_ahead: pipelineDays,
+        limit: 10,
+        content_limit: 50,
+      });
+
+      if (!step3Res.report?.success) {
+        const errMsg = step3Res.report?.error || 'Content generation failed at Gate 3.';
+        setStep3State((prev) => ({ ...prev, status: 'failed', summary: errMsg }));
+        throw new Error(errMsg);
+      }
+
+      const finalReport = step3Res.report;
+      const genCount = Number(finalReport.content_generation?.generated_count ?? 0);
+
+      setStep3State({
+        status: 'completed',
+        approach: selectedTeachingApproach,
+        generatedCount: genCount,
+        summary: finalReport.content_generation?.summary_message || `Generated ${genCount} new pedagogical resources. Zero duplicate records created.`,
+        duration_ms: finalReport.pipeline_execution?.steps?.[2]?.duration_ms,
+      });
+
+      setPipelineResult(finalReport);
+      setExecutingStep(0);
+
+      if (onValidatedRef.current) {
+        onValidatedRef.current(finalReport);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('agents:runs-updated', { detail: { module: 'teach_learn' } }));
+      }
+      // Immediately sync upper-section KPI counters and tasks ledger with new results
+      void loadState(true);
+      void loadTasksLedger();
     } catch (err) {
       setPipelineError(err instanceof Error ? err.message : 'Pipeline execution failed.');
     } finally {
       setPipelineRunning(false);
+      setExecutingStep(0);
     }
+  };
+
+  // User clicks "Start Agents" after reviewing all selections
+  const handleStartAgents = async () => {
+    if (selectedStandardIds.length === 0) {
+      setPipelineError('Please select at least one Standard in Stage 1 before starting.');
+      setWorkflowStage(1);
+      return;
+    }
+    if (selectedSubjectIds.length === 0) {
+      setPipelineError('Please select at least one Subject in Stage 1 before starting.');
+      setWorkflowStage(1);
+      return;
+    }
+    if (selectedChapterIds.length === 0) {
+      setPipelineError('Please select at least one Chapter in Stage 1 before starting.');
+      setWorkflowStage(1);
+      return;
+    }
+    if (selectedResourceTypes.length === 0 && !includeAssessment) {
+      setPipelineError('Please select at least one Classroom Resource or Assessment in Stage 4.');
+      setWorkflowStage(4);
+      return;
+    }
+
+    setPipelineError(null);
+    await executePipeline({
+      standard_ids: selectedStandardIds,
+      subject_ids: selectedSubjectIds,
+      chapter_ids: selectedChapterIds,
+      teaching_approach: selectedTeachingApproach,
+      student_experiences: [selectedStudentExperience],
+      selected_resources: selectedResourceTypes,
+      selected_template: selectedTemplate,
+      generate_assessment: includeAssessment,
+      check_only: false,
+    });
   };
 
   // ESO (Executive Skill Object (ESO)) State
@@ -1106,11 +1588,29 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
       </div>
 
       {/* Main Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setMainTab('pipeline')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shrink-0 ${
+            mainTab === 'pipeline'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <Sparkles className="size-3.5" />
+          User-Driven Content Generation Workflow
+          <span className={`rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+            mainTab === 'pipeline' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+          }`}>
+            Sequential 3-Agent
+          </span>
+        </button>
+
         <button
           type="button"
           onClick={() => setMainTab('hierarchy')}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shrink-0 ${
             mainTab === 'hierarchy'
               ? 'bg-indigo-600 text-white shadow-xs'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1133,7 +1633,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
             setMainTab('content_ledger');
             void loadTasksLedger(taskFilterStatus);
           }}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shrink-0 ${
             mainTab === 'content_ledger'
               ? 'bg-violet-600 text-white shadow-xs'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1151,7 +1651,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
         <button
           type="button"
           onClick={() => setMainTab('cycle_diagram')}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shrink-0 ${
             mainTab === 'cycle_diagram'
               ? 'bg-slate-900 text-white shadow-xs'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1159,19 +1659,6 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
         >
           <Workflow className="size-3.5" />
           Automated Loop Workflow (Steps 1–6)
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMainTab('pipeline')}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-            mainTab === 'pipeline'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Sparkles className="size-3.5" />
-          Synchronized 3-Agent Pipeline
         </button>
       </div>
 
@@ -1502,9 +1989,15 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                         </td>
                         <td className="px-3 py-3">
                           {task.content_id ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 font-mono text-[11px] font-bold text-indigo-700">
+                            <a
+                              href={resolveContentViewUrl(task.content_id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 font-mono text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition cursor-pointer"
+                              title="Open content in responsive viewer"
+                            >
                               <Database className="size-3" /> #{task.content_id}
-                            </span>
+                            </a>
                           ) : (
                             <span className="text-slate-400 text-[11px]">—</span>
                           )}
@@ -1631,157 +2124,1014 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
         </div>
       )}
 
-      {/* TAB 4: Synchronized 3-Agent Sequential Pipeline */}
+      {/* TAB: User-Driven Multi-Agent Content Generation Workflow */}
       {mainTab === 'pipeline' && (
         <div className="space-y-6">
-          <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/50 via-white to-teal-50/40 p-5 space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+          {/* Main Workflow Card */}
+          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/40 via-white to-teal-50/30 p-6 space-y-6 shadow-xs">
+            {/* Header */}
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-emerald-100/80 pb-5">
               <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white tracking-wider">
+                    Sequential Workflow
+                  </span>
+                  <span className="text-xs text-slate-500 font-semibold">
+                    Agent 1 ➔ Agent 2 ➔ Agent 3
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mt-1 flex items-center gap-2">
                   <Sparkles className="size-5 text-emerald-600" />
-                  Teach/Learn Synchronized 3-Agent Sequential Pipeline
+                  Teach/Learn User-Driven Multi-Agent Content Generation
                 </h3>
-                <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                  Executes all three agents sequentially with strict validation gates: 
-                  <strong className="text-slate-800"> Agent 1 (Course Catalogue)</strong> validates curriculum hierarchy → 
-                  <strong className="text-slate-800"> Agent 2 (Activity Timeline)</strong> scopes sessions & homework → 
-                  <strong className="text-slate-800"> Agent 3 (Content Model Coverage)</strong> analyzes 4-type model readiness and learning gaps.
+                <p className="text-xs text-slate-600 mt-1 max-w-3xl leading-relaxed">
+                  Agents never generate unselected content. Complete your selections across Stages 1–4, review in Stage 5, and click <strong>Start Agents</strong>. 
+                  The three agents will execute sequentially, check existing database content first to prevent duplicates, and generate only what is missing.
                 </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-500">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-100 px-2 py-0.5 font-semibold text-emerald-800">
+                    <CheckCircle2 className="size-3 text-emerald-600" />
+                    Simultaneous Execution Supported
+                  </span>
+                  <span>The upper autonomous background loop and this lower targeted selection workflow run in parallel without conflicts or duplicate data creation.</span>
+                </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-2xs">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Standard:</span>
-                  <select
-                    value={pipelineStandard}
-                    onChange={(e) => setPipelineStandard(e.target.value)}
-                    className="text-xs font-bold text-slate-900 bg-transparent outline-none cursor-pointer"
-                    disabled={pipelineRunning}
-                  >
-                    <option value="7">Standard 7 (Grade 7)</option>
-                    <option value="6">Standard 6 (Grade 6)</option>
-                    <option value="8">Standard 8 (Grade 8)</option>
-                    <option value="9">Standard 9 (Grade 9)</option>
-                    <option value="10">Standard 10 (Grade 10)</option>
-                    <option value="all">All Standards (Sequential Sweep)</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-2xs">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Window:</span>
-                  <input
-                    type="number"
-                    value={pipelineDays}
-                    onChange={(e) => setPipelineDays(Number(e.target.value) || 15)}
-                    className="w-12 text-center text-xs font-bold text-slate-900 outline-none"
-                    min={1}
-                    max={60}
-                    disabled={pipelineRunning}
-                  />
-                  <span className="text-[11px] text-slate-400">days</span>
-                </div>
-
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleRunPipeline}
-                  disabled={pipelineRunning}
-                  className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition"
+                  onClick={() => {
+                    setEsoActiveTab('workflow');
+                    void handleOpenEso();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-2xs hover:bg-emerald-50 transition"
                 >
-                  {pipelineRunning ? (
-                    <>
-                      <RefreshCw className="size-4 animate-spin" />
-                      Running Pipeline…
-                    </>
-                  ) : (
-                    <>
-                      <Play className="size-4 fill-white" />
-                      Run Synchronized Pipeline
-                    </>
-                  )}
+                  <Workflow className="size-3.5 text-emerald-600" />
+                  View 3-Agent Architecture
                 </button>
               </div>
             </div>
 
-            {/* Visual Step-by-Step Architecture Flow */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-              <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 font-bold text-xs">1</span>
-                  <span className="text-[10px] font-mono text-slate-400">teach_learn.courses</span>
-                </div>
-                <h4 className="text-xs font-bold text-slate-900 mt-2">Course Catalogue Reader</h4>
-                <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
-                  Extracts verified Standard, Subject & Chapter hierarchy for this institute.
-                </p>
-                <div className="mt-2.5 flex items-center justify-between gap-1">
-                  <div className="rounded-lg bg-indigo-50/70 px-2 py-1 text-[10px] font-bold text-indigo-700 flex items-center gap-1">
-                    <ShieldCheck className="size-3 text-indigo-600" /> Gate 1: Resolves Standard ID
-                  </div>
+            {/* 5-Stage Stepper Navigation */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 border-b border-slate-100 pb-4">
+              {[
+                { stage: 1, label: 'Stage 1', title: 'Academic Scope', icon: Layers },
+                { stage: 2, label: 'Stage 2', title: 'Teaching Method', icon: BookOpen },
+                { stage: 3, label: 'Stage 3', title: 'Learning Experience', icon: Sparkles },
+                { stage: 4, label: 'Stage 4', title: 'Classroom Resources', icon: Database },
+                { stage: 5, label: 'Stage 5', title: 'Review & Start', icon: Play },
+              ].map((step) => {
+                const IconComponent = step.icon;
+                const isActive = workflowStage === step.stage;
+                const isComplete = workflowStage > step.stage;
+                return (
                   <button
+                    key={step.stage}
                     type="button"
-                    onClick={() => {
-                      setEsoActiveTab('agent_1');
-                      void handleOpenEso();
-                    }}
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                    onClick={() => setWorkflowStage(step.stage as 1 | 2 | 3 | 4 | 5)}
+                    className={`flex items-center gap-2.5 rounded-xl p-2.5 text-left transition border ${
+                      isActive
+                        ? 'border-emerald-600 bg-emerald-50/70 text-emerald-950 font-bold shadow-2xs'
+                        : isComplete
+                        ? 'border-emerald-200 bg-white text-slate-700 hover:bg-slate-50'
+                        : 'border-slate-200 bg-slate-50/50 text-slate-500 hover:bg-white'
+                    }`}
                   >
-                    View Agent 1 ESO →
+                    <span
+                      className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        isActive
+                          ? 'bg-emerald-600 text-white'
+                          : isComplete
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {isComplete ? <Check className="size-3.5" /> : step.stage}
+                    </span>
+                    <div className="min-w-0">
+                      <span className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                        {step.label}
+                      </span>
+                      <span className="block text-xs truncate font-semibold">
+                        {step.title}
+                      </span>
+                    </div>
                   </button>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-blue-50 text-blue-700 font-bold text-xs">2</span>
-                  <span className="text-[10px] font-mono text-slate-400">teach_learn.activities</span>
-                </div>
-                <h4 className="text-xs font-bold text-slate-900 mt-2">Activity Timeline Reader</h4>
-                <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
-                  Uses Gate 1 Standard ID to query active class sessions and homework tasks.
-                </p>
-                <div className="mt-2.5 flex items-center justify-between gap-1">
-                  <div className="rounded-lg bg-blue-50/70 px-2 py-1 text-[10px] font-bold text-blue-700 flex items-center gap-1">
-                    <ShieldCheck className="size-3 text-blue-600" /> Gate 2: Verifies Class Scope
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEsoActiveTab('agent_2');
-                      void handleOpenEso();
-                    }}
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
-                  >
-                    View Agent 2 ESO →
-                  </button>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs">3</span>
-                  <span className="text-[10px] font-mono text-slate-400">teach_learn.content_model_coverage</span>
-                </div>
-                <h4 className="text-xs font-bold text-slate-900 mt-2">Content Model Coverage</h4>
-                <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
-                  Analyzes 4-type model, Bloom ladder, misconceptions & assessment gaps.
-                </p>
-                <div className="mt-2.5 flex items-center justify-between gap-1">
-                  <div className="rounded-lg bg-emerald-50/70 px-2 py-1 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                    <ShieldCheck className="size-3 text-emerald-600" /> Gate 3: Flags Learning Gaps
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEsoActiveTab('agent_3');
-                      void handleOpenEso();
-                    }}
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-800 underline cursor-pointer"
-                  >
-                    View Agent 3 ESO →
-                  </button>
-                </div>
-              </div>
+                );
+              })}
             </div>
+
+            {/* STAGE 1: Select Academic Scope (Standard, Subject, Chapter) */}
+            {workflowStage === 1 && (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Layers className="size-4 text-emerald-600" />
+                      Stage 1 – Select Academic Scope
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Choose one, multiple, or all Standards, Subjects, and Chapters from your institute&apos;s real database records.
+                    </p>
+                  </div>
+                  {loadingHierarchy && (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-indigo-600 font-semibold">
+                      <RefreshCw className="size-3.5 animate-spin" />
+                      Loading Database Records…
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* 1. Standards */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <span className="text-xs font-bold text-slate-900">
+                        1. Standards ({selectedStandardIds.length}/{catalogueStandards.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={toggleAllStandardsSelection}
+                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 cursor-pointer"
+                      >
+                        {selectedStandardIds.length === catalogueStandards.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 max-h-56 overflow-y-auto pr-1">
+                      {catalogueStandards.map((std) => {
+                        const isSelected = selectedStandardIds.includes(std.id);
+                        return (
+                          <button
+                            key={std.id}
+                            type="button"
+                            onClick={() => toggleStandardSelection(std.id)}
+                            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer border ${
+                              isSelected
+                                ? 'border-emerald-600 bg-emerald-600 text-white shadow-2xs'
+                                : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white'
+                            }`}
+                          >
+                            {isSelected && <Check className="size-3" />}
+                            Standard {std.name}
+                          </button>
+                        );
+                      })}
+                      {catalogueStandards.length === 0 && (
+                        <p className="text-xs text-slate-400 italic">No standards found in database.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 2. Subjects */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <span className="text-xs font-bold text-slate-900">
+                        2. Subjects ({selectedSubjectIds.length}/{catalogueSubjects.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={toggleAllSubjectsSelection}
+                        disabled={catalogueSubjects.length === 0}
+                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 cursor-pointer disabled:opacity-40"
+                      >
+                        {selectedSubjectIds.length === catalogueSubjects.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 max-h-56 overflow-y-auto pr-1">
+                      {catalogueSubjects.map((sub) => {
+                        const isSelected = selectedSubjectIds.includes(sub.subject_id);
+                        return (
+                          <button
+                            key={sub.subject_id}
+                            type="button"
+                            onClick={() => toggleSubjectSelection(sub.subject_id)}
+                            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer border ${
+                              isSelected
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-2xs'
+                                : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white'
+                            }`}
+                          >
+                            {isSelected && <Check className="size-3" />}
+                            {sub.subject_name}
+                          </button>
+                        );
+                      })}
+                      {catalogueSubjects.length === 0 && (
+                        <p className="text-xs text-slate-400 italic">
+                          {selectedStandardIds.length === 0 ? 'Select a standard first.' : 'No content-enabled subjects found.'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3. Chapters */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <span className="text-xs font-bold text-slate-900">
+                        3. Chapters ({selectedChapterIds.length}/{catalogueChapters.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={toggleAllChaptersSelection}
+                        disabled={catalogueChapters.length === 0}
+                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 cursor-pointer disabled:opacity-40"
+                      >
+                        {selectedChapterIds.length === catalogueChapters.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                      {catalogueChapters.map((ch) => {
+                        const isSelected = selectedChapterIds.includes(ch.id);
+                        return (
+                          <button
+                            key={ch.id}
+                            type="button"
+                            onClick={() => toggleChapterSelection(ch.id)}
+                            className={`w-full flex items-center justify-between rounded-lg p-2 text-left text-xs font-medium transition cursor-pointer border ${
+                              isSelected
+                                ? 'border-emerald-600 bg-emerald-50/70 text-emerald-950 font-bold shadow-2xs'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                            }`}
+                          >
+                            <span className="truncate pr-2">{ch.chapter_name}</span>
+                            <span
+                              className={`flex size-4 shrink-0 items-center justify-center rounded-sm border ${
+                                isSelected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              {isSelected && <Check className="size-3" />}
+                            </span>
+                          </button>
+                        );
+                      })}
+                      {catalogueChapters.length === 0 && (
+                        <p className="text-xs text-slate-400 italic">
+                          {selectedSubjectIds.length === 0 ? 'Select a subject first.' : 'No chapters found.'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stage 1 Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <span className="text-xs text-slate-500">
+                    Selected: <strong>{selectedStandardIds.length}</strong> Standard(s), <strong>{selectedSubjectIds.length}</strong> Subject(s), <strong>{selectedChapterIds.length}</strong> Chapter(s)
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleStartAgents()}
+                      disabled={pipelineRunning || selectedChapterIds.length === 0}
+                      className="flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50 transition cursor-pointer shadow-2xs"
+                      title="Directly execute Agent 1 ➔ Agent 2 ➔ Agent 3 for the selected Standard, Subject, and Chapter right now"
+                    >
+                      {pipelineRunning ? (
+                        <>
+                          <RefreshCw className="size-3.5 animate-spin text-emerald-700" />
+                          Executing for Selected Scope…
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="size-3.5 text-emerald-600 fill-emerald-600" />
+                          Execute for Selected Scope
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWorkflowStage(2)}
+                      disabled={selectedChapterIds.length === 0}
+                      className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition cursor-pointer"
+                    >
+                      Customize Pedagogy (Stage 2) ➔
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 2: Choose Teaching Method */}
+            {workflowStage === 2 && (
+              <div className="space-y-5">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <BookOpen className="size-4 text-emerald-600" />
+                    Stage 2 – Choose Teaching Method
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Select the pedagogical approach. Agents will tailor presentation structures and classroom exercises to this instructional style.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {TEACHING_APPROACHES.map((approach) => {
+                    const isSelected = selectedTeachingApproach === approach;
+                    return (
+                      <label
+                        key={approach}
+                        onClick={() => setSelectedTeachingApproach(approach)}
+                        className={`flex items-center gap-3 rounded-xl border p-3.5 text-xs cursor-pointer transition ${
+                          isSelected
+                            ? 'border-emerald-600 bg-emerald-50/60 text-emerald-950 font-bold shadow-2xs'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50/50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="workflowTeachingApproach"
+                          checked={isSelected}
+                          onChange={() => setSelectedTeachingApproach(approach)}
+                          className="size-4 text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                        />
+                        <span className="leading-snug">{approach}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setWorkflowStage(1)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    ← Back to Academic Scope
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWorkflowStage(3)}
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition cursor-pointer"
+                  >
+                    Next: Choose Learning Experience ➔
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 3: Choose Learning Experience & Presentation Template */}
+            {workflowStage === 3 && (
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Sparkles className="size-4 text-emerald-600" />
+                    Stage 3 – Choose Learning Experience &amp; Design Template
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Select your target interactive format and choose a professionally designed visual template for Presentations (PPT), PDFs, Revision Notes, and Activities.
+                  </p>
+                </div>
+
+                {/* 3A: Student Learning Experience */}
+                <div className="space-y-2.5">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Layout className="size-3.5 text-emerald-600" />
+                    Interactive Student Experience Format
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {STUDENT_EXPERIENCES.map((exp) => {
+                      const isSelected = selectedStudentExperience === exp.id;
+                      const isAvailable = exp.available;
+                      return (
+                        <label
+                          key={exp.id}
+                          onClick={() => {
+                            if (isAvailable) setSelectedStudentExperience(exp.id);
+                          }}
+                          className={`flex items-center justify-between rounded-xl border p-3.5 text-xs transition ${
+                            !isAvailable
+                              ? 'border-slate-200 bg-slate-50/70 text-slate-400 cursor-not-allowed opacity-75'
+                              : isSelected
+                              ? 'border-emerald-600 bg-emerald-50/60 text-emerald-950 font-bold shadow-2xs cursor-pointer'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50/50 cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="radio"
+                              name="workflowStudentExperience"
+                              disabled={!isAvailable}
+                              checked={isSelected}
+                              onChange={() => {
+                                if (isAvailable) setSelectedStudentExperience(exp.id);
+                              }}
+                              className="size-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 disabled:opacity-40"
+                            />
+                            <div className="truncate">
+                              <span className="block truncate font-semibold">{exp.label}</span>
+                              {exp.description && (
+                                <span className="text-[11px] text-slate-500 block truncate">{exp.description}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {!isAvailable && (
+                            <span className="rounded-md bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 text-[10px] font-semibold italic shrink-0 ml-2">
+                              no generator yet
+                            </span>
+                          )}
+                          {isAvailable && (
+                            <span className="rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold shrink-0 ml-2">
+                              Available
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3B: Multiple Professionally Designed Templates */}
+                <div className="space-y-3 pt-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <Palette className="size-3.5 text-indigo-600" />
+                        Choose Visual Presentation &amp; Document Template
+                      </span>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Select a distinct visual layout with custom color palettes, clear headings, student-friendly analogies, and SVG vector diagrams.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full shrink-0">
+                      8 Professional Templates
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {CONTENT_TEMPLATES.map((tmpl) => {
+                      const isSelected = selectedTemplate === tmpl.id;
+                      return (
+                        <div
+                          key={tmpl.id}
+                          onClick={() => {
+                            setSelectedTemplate(tmpl.id);
+                            // Also sync theme attribute in browser for preview
+                            if (typeof document !== 'undefined') {
+                              document.documentElement.setAttribute('data-template', tmpl.id);
+                            }
+                          }}
+                          className={`group relative flex flex-col justify-between rounded-xl border p-3.5 text-xs transition cursor-pointer ${
+                            isSelected
+                              ? 'border-indigo-600 bg-indigo-50/40 shadow-sm ring-1 ring-indigo-600'
+                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                          }`}
+                        >
+                          <div>
+                            {/* Top row: Radio + Title + Badge */}
+                            <div className="flex items-start justify-between gap-1.5 mb-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className={`flex size-4 shrink-0 items-center justify-center rounded-full border transition ${
+                                    isSelected
+                                      ? 'border-indigo-600 bg-indigo-600 text-white'
+                                      : 'border-slate-300 bg-white group-hover:border-slate-400'
+                                  }`}
+                                >
+                                  {isSelected && <span className="size-1.5 rounded-full bg-white" />}
+                                </span>
+                                <div className="min-w-0 truncate">
+                                  <span className="font-bold text-slate-900 block leading-tight truncate">
+                                    {tmpl.name}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 block truncate">
+                                    {tmpl.tagline}
+                                  </span>
+                                </div>
+                              </div>
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 ${tmpl.badgeColor}`}
+                              >
+                                {tmpl.badge}
+                              </span>
+                            </div>
+
+                            {/* Template visual preview pill */}
+                            <div
+                              className="rounded-lg p-2.5 my-2 border flex items-center justify-between gap-2 shadow-2xs"
+                              style={{
+                                backgroundColor: tmpl.previewBg,
+                                borderColor: tmpl.borderColor,
+                              }}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div
+                                  className="size-3 rounded-full shrink-0 shadow-xs"
+                                  style={{ backgroundColor: tmpl.paletteDot }}
+                                />
+                                <span
+                                  className="text-[11px] font-mono font-bold truncate"
+                                  style={{ color: tmpl.previewText }}
+                                >
+                                  {tmpl.name}
+                                </span>
+                              </div>
+                              <span
+                                className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
+                                style={{
+                                  backgroundColor: tmpl.previewAccent + '25',
+                                  color: tmpl.previewAccent,
+                                }}
+                              >
+                                SVG Visuals
+                              </span>
+                            </div>
+
+                            <p className="text-[11px] text-slate-600 leading-relaxed mb-2.5 line-clamp-2">
+                              {tmpl.description}
+                            </p>
+                          </div>
+
+                          {/* Bottom row: supported formats */}
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                            <span className="text-slate-400 font-medium">Supported:</span>
+                            <div className="flex flex-wrap gap-1">
+                              {tmpl.supportedTypes.slice(0, 3).map((st) => (
+                                <span
+                                  key={st}
+                                  className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700"
+                                >
+                                  {st}
+                                </span>
+                              ))}
+                              {tmpl.supportedTypes.length > 3 && (
+                                <span className="rounded bg-slate-100 px-1 py-0.5 font-semibold text-slate-500">
+                                  +{tmpl.supportedTypes.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* 3C: Live Interactive Design View (Preview Before Generation) */}
+                  <div className="mt-6 rounded-2xl border border-indigo-200/80 bg-gradient-to-b from-indigo-50/30 via-white to-slate-50/50 p-4 sm:p-5 shadow-xs space-y-4">
+                    {/* Preview Header & Controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100/80 pb-3.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="flex size-7 items-center justify-center rounded-lg shadow-2xs"
+                          style={{ backgroundColor: currentTmpl.paletteDot }}
+                        >
+                          <Palette className="size-4 text-white" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-slate-900">
+                              Live Interactive Design View
+                            </span>
+                            <span
+                              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border shadow-2xs"
+                              style={{
+                                backgroundColor: currentTmpl.badgeBg,
+                                color: currentTmpl.badgeTextColor,
+                                borderColor: currentTmpl.borderColor,
+                              }}
+                            >
+                              <span
+                                className="size-2 rounded-full animate-pulse"
+                                style={{ backgroundColor: currentTmpl.paletteDot }}
+                              />
+                              Active: {currentTmpl.name}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Real-time visual preview of how your slides and documents will render with full fonts, layouts, SVG diagrams, and high-quality images.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Format Toggles & Actions */}
+                      <div className="flex items-center gap-2">
+                        <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewMode('ppt')}
+                            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                              previewMode === 'ppt'
+                                ? 'bg-white text-indigo-700 shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            <Monitor className="size-3.5 text-indigo-600" />
+                            <span>PPT Slide (16:9)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewMode('pdf')}
+                            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                              previewMode === 'pdf'
+                                ? 'bg-white text-indigo-700 shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            <FileText className="size-3.5 text-indigo-600" />
+                            <span>PDF Document (A4)</span>
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setPreviewFullscreenOpen(true)}
+                          className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+                          title="Expand to Fullscreen View"
+                        >
+                          <Maximize2 className="size-3.5 text-slate-600" />
+                          <span className="hidden sm:inline">Expand Fullscreen</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Switch Palette Bar for Simultaneous Immediate Updates */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 border-b border-indigo-100/60">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+                        <Palette className="size-3 text-indigo-600" />
+                        Quick Switch Palette:
+                      </span>
+                      {CONTENT_TEMPLATES.map((tmpl) => {
+                        const isSelected = selectedTemplate === tmpl.id;
+                        return (
+                          <button
+                            key={tmpl.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedTemplate(tmpl.id);
+                              if (typeof document !== 'undefined') {
+                                document.documentElement.setAttribute('data-template', tmpl.id);
+                              }
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white shadow-2xs ring-2 ring-indigo-400 font-bold'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                            }`}
+                          >
+                            <span
+                              className="size-2 rounded-full shrink-0 shadow-2xs"
+                              style={{ backgroundColor: tmpl.paletteDot }}
+                            />
+                            <span className="truncate">{tmpl.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* PPT Mode Slide Selector Bar */}
+                    {previewMode === 'ppt' && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                          {[
+                            { idx: 0, label: '01: Hero Cover & Intentions' },
+                            { idx: 1, label: '02: Real-World Hook & Photo' },
+                            { idx: 2, label: '03: Core Law & SVG Diagram' },
+                            { idx: 3, label: '04: Active Challenge & Summary' },
+                          ].map((tab) => (
+                            <button
+                              key={tab.idx}
+                              type="button"
+                              onClick={() => setPreviewSlideIdx(tab.idx)}
+                              className={`rounded-lg px-3 py-1 font-semibold transition shrink-0 cursor-pointer ${
+                                previewSlideIdx === tab.idx
+                                  ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewSlideIdx((p) => Math.max(0, p - 1))}
+                            disabled={previewSlideIdx === 0}
+                            className="rounded-lg border border-slate-200 bg-white p-1 text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition"
+                            title="Previous slide"
+                          >
+                            <ChevronLeft className="size-4" />
+                          </button>
+                          <span className="font-mono font-bold text-slate-600 text-[11px] px-1">
+                            Slide {previewSlideIdx + 1} of 4
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewSlideIdx((p) => Math.min(3, p + 1))}
+                            disabled={previewSlideIdx === 3}
+                            className="rounded-lg border border-slate-200 bg-white p-1 text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition"
+                            title="Next slide"
+                          >
+                            <ChevronRight className="size-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Real-time Synchronized Dynamic Design Canvas */}
+                    <TemplateDesignCanvas
+                      template={currentTmpl}
+                      mode={previewMode}
+                      slideIdx={previewSlideIdx}
+                      standardName={activePreviewStandard}
+                      subjectName={activePreviewSubject}
+                      chapterName={activePreviewChapter}
+                      teachingApproach={selectedTeachingApproach}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setWorkflowStage(2)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    ← Back to Teaching Method
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWorkflowStage(4)}
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition cursor-pointer"
+                  >
+                    Next: Select Classroom Resources ➔
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 4: Select Classroom Resources */}
+            {workflowStage === 4 && (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Database className="size-4 text-emerald-600" />
+                      Stage 4 – Select Classroom Resources
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Select required classroom resources. Support single, multiple, or all content types.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={toggleAllResourceTypes}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+                  >
+                    {selectedResourceTypes.length === CLASSROOM_RESOURCE_TYPES.length
+                      ? 'Deselect All Resources'
+                      : 'Select All Content Types'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {CLASSROOM_RESOURCE_TYPES.map((res) => {
+                    const isChecked = selectedResourceTypes.includes(res.id);
+                    return (
+                      <button
+                        key={res.id}
+                        type="button"
+                        onClick={() => toggleResourceType(res.id)}
+                        className={`flex items-center justify-between rounded-xl border p-3.5 text-xs transition cursor-pointer ${
+                          isChecked
+                            ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 font-bold shadow-2xs'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                        }`}
+                      >
+                        <span className="font-semibold">{res.label}</span>
+                        <span
+                          className={`flex size-4.5 items-center justify-center rounded-sm border ${
+                            isChecked
+                              ? 'border-indigo-600 bg-indigo-600 text-white'
+                              : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {isChecked && <Check className="size-3" />}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Assessment Option */}
+                <label className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50/50 p-3.5 cursor-pointer hover:bg-indigo-50/80 transition">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={includeAssessment}
+                      onChange={(e) => setIncludeAssessment(e.target.checked)}
+                      className="size-4.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">
+                        Generate Relevant Chapter Assessment
+                      </span>
+                      <span className="text-[11px] text-slate-600 block">
+                        Calibrated cognitive ladder across 5 Bloom tiers: Remember, Understand, Apply, Analyze, Evaluate.
+                      </span>
+                    </div>
+                  </div>
+                  <span className="rounded-md bg-white border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700 shrink-0">
+                    Bloom&apos;s Calibrated
+                  </span>
+                </label>
+
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setWorkflowStage(3)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    ← Back to Learning Experience
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWorkflowStage(5)}
+                    disabled={selectedResourceTypes.length === 0 && !includeAssessment}
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition cursor-pointer"
+                  >
+                    Next: Review &amp; Start ➔
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 5: Review Selections & Start Agents */}
+            {workflowStage === 5 && (
+              <div className="space-y-5">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Play className="size-4 text-emerald-600" />
+                    Stage 5 – Review Selections &amp; Start Agents
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Review your confirmed scope and preferences before executing the sequential multi-agent workflow.
+                  </p>
+                </div>
+
+                {/* Summary Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Academic Scope Summary */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                      <Layers className="size-3.5 text-indigo-600" />
+                      Academic Scope (Database Grounded)
+                    </span>
+                    <div className="space-y-1.5 text-xs text-slate-700">
+                      <div>
+                        <span className="font-semibold text-slate-500">Standards: </span>
+                        <span className="font-bold text-slate-900">
+                          {selectedStandardIds.length === catalogueStandards.length
+                            ? 'All Standards'
+                            : selectedStandardIds
+                                .map((id) => {
+                                  const std = catalogueStandards.find((s) => s.id === id);
+                                  return std ? `Standard ${std.name}` : `Std ${id}`;
+                                })
+                                .join(', ')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-500">Subjects: </span>
+                        <span className="font-bold text-slate-900">
+                          {selectedSubjectIds.length === catalogueSubjects.length
+                            ? 'All Subjects'
+                            : selectedSubjectIds
+                                .map((id) => {
+                                  const sub = catalogueSubjects.find((s) => s.subject_id === id);
+                                  return sub?.subject_name || `Subject ${id}`;
+                                })
+                                .join(', ')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-500">Chapters: </span>
+                        <span className="font-bold text-slate-900">
+                          {selectedChapterIds.length === catalogueChapters.length
+                            ? `All ${catalogueChapters.length} Chapters`
+                            : `${selectedChapterIds.length} Chapter(s) Selected`}
+                        </span>
+                        {selectedChapterIds.length > 0 && selectedChapterIds.length <= 5 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {selectedChapterIds.map((id) => {
+                              const ch = catalogueChapters.find((c) => c.id === id);
+                              return (
+                                <span key={id} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-800">
+                                  {ch?.chapter_name || `Ch #${id}`}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Method & Resources Summary */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                      <Sparkles className="size-3.5 text-emerald-600" />
+                      Pedagogy &amp; Resources to Generate
+                    </span>
+                    <div className="space-y-1.5 text-xs text-slate-700">
+                      <div>
+                        <span className="font-semibold text-slate-500">Teaching Approach: </span>
+                        <span className="font-bold text-emerald-800">{selectedTeachingApproach}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-500">Learning Experience: </span>
+                        <span className="font-bold text-purple-800">
+                          {STUDENT_EXPERIENCES.find((e) => e.id === selectedStudentExperience)?.label || selectedStudentExperience}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-500">Design Template: </span>
+                        {(() => {
+                          const tmpl = CONTENT_TEMPLATES.find((t) => t.id === selectedTemplate) || CONTENT_TEMPLATES[0];
+                          return (
+                            <span className="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] font-bold text-indigo-900">
+                              <span
+                                className="inline-block size-2.5 rounded-full shadow-2xs"
+                                style={{ backgroundColor: tmpl.paletteDot }}
+                              />
+                              {tmpl.name}
+                              <span className="text-[10px] font-semibold text-indigo-600">
+                                ({tmpl.badge})
+                              </span>
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-500">Classroom Resources: </span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {selectedResourceTypes.map((t) => (
+                            <span key={t} className="rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] font-bold text-indigo-800">
+                              {t}
+                            </span>
+                          ))}
+                          {includeAssessment && (
+                            <span className="rounded-md bg-violet-50 border border-violet-200 px-2 py-0.5 text-[11px] font-bold text-violet-800">
+                              Chapter Assessment
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sequential Execution & Duplicate Prevention Notice */}
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-950">
+                    <ShieldCheck className="size-4 text-emerald-600 shrink-0" />
+                    Strict Sequential Execution &amp; Idempotency Guarantee
+                  </div>
+                  <p className="text-xs text-emerald-900 leading-relaxed">
+                    When you click <strong>Start Agents</strong>, the three agents will execute sequentially: 
+                    <strong> Agent 1</strong> validates your selected scope → 
+                    <strong> Agent 2</strong> checks existing content in the database → 
+                    <strong> Agent 3</strong> generates ONLY the missing selected resources. If content already exists, it is verified and reused without duplicate creation.
+                  </p>
+                </div>
+
+                {/* Final Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setWorkflowStage(4)}
+                    disabled={pipelineRunning}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    ← Edit Resources
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleStartAgents()}
+                    disabled={pipelineRunning || selectedChapterIds.length === 0}
+                    className="flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 transition cursor-pointer"
+                  >
+                    {pipelineRunning ? (
+                      <>
+                        <RefreshCw className="size-4 animate-spin" />
+                        Agents Executing Sequentially…
+                      </>
+                    ) : (
+                      <>
+                        <Play className="size-4 fill-white" />
+                        Start Agents (Agent 1 ➔ Agent 2 ➔ Agent 3)
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {pipelineError && (
               <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-800 flex items-center gap-2">
@@ -1790,6 +3140,366 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
               </div>
             )}
           </div>
+
+          {/* LIVE SEQUENTIAL AGENT EXECUTION TIMELINE */}
+          {(pipelineRunning || pipelineResult) && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${
+                        pipelineRunning
+                          ? 'border border-amber-300 bg-amber-50 text-amber-900 animate-pulse'
+                          : pipelineResult?.success
+                          ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
+                          : 'border border-red-200 bg-red-50 text-red-800'
+                      }`}
+                    >
+                      {pipelineRunning ? (
+                        <>
+                          <RefreshCw className="size-3 animate-spin" />
+                          Live Sequential Execution In Progress
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="size-3 text-emerald-600" />
+                          Sequential Execution Completed
+                        </>
+                      )}
+                    </span>
+                    {pipelineResult?.generated_at && (
+                      <span className="text-xs text-slate-500 font-mono">
+                        {new Date(pipelineResult.generated_at).toLocaleTimeString('en-IN')}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 mt-1">
+                    Live Sequential Agent Execution Timeline
+                  </h3>
+                </div>
+
+                {pipelineResult && (
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-center">
+                      <span className="block text-[10px] font-bold uppercase text-slate-400">Total Duration</span>
+                      <span className="font-mono text-xs font-extrabold text-slate-800">
+                        {pipelineResult.total_duration_ms} ms
+                      </span>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-emerald-50/60 px-3 py-1.5 text-center">
+                      <span className="block text-[10px] font-bold uppercase text-emerald-700">Verified Existing</span>
+                      <span className="font-mono text-xs font-extrabold text-emerald-800">
+                        {pipelineResult.content_generation?.verified_count ?? 0}
+                      </span>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-violet-50/60 px-3 py-1.5 text-center">
+                      <span className="block text-[10px] font-bold uppercase text-violet-700">Newly Generated</span>
+                      <span className="font-mono text-xs font-extrabold text-violet-800">
+                        {pipelineResult.content_generation?.generated_count ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3 Agents Sequential Timeline Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* AGENT 1 - COURSE CATALOGUE READER */}
+                <div
+                  className={`rounded-xl border p-4 space-y-3 transition-all duration-300 ${
+                    step1State.status === 'running'
+                      ? 'border-indigo-400 bg-indigo-50/40 ring-2 ring-indigo-500/30 shadow-md'
+                      : step1State.status === 'completed'
+                      ? 'border-emerald-300 bg-emerald-50/30 shadow-xs'
+                      : step1State.status === 'failed'
+                      ? 'border-red-300 bg-red-50/30'
+                      : 'border-slate-200 bg-slate-50/60 opacity-80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`flex size-6 items-center justify-center rounded-full font-bold text-xs ${
+                      step1State.status === 'completed'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : step1State.status === 'running'
+                        ? 'bg-indigo-600 text-white animate-pulse'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      1
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        step1State.status === 'running'
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
+                          : step1State.status === 'completed'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : step1State.status === 'failed'
+                          ? 'bg-red-100 text-red-800 border border-red-200'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {step1State.status === 'running' && <RefreshCw className="size-2.5 animate-spin text-amber-700" />}
+                      {step1State.status === 'completed' && <CheckCircle2 className="size-2.5 text-emerald-700" />}
+                      {step1State.status === 'failed' && <XCircle className="size-2.5 text-red-700" />}
+                      {step1State.status === 'running'
+                        ? 'Validating…'
+                        : step1State.status === 'completed'
+                        ? 'Gate 1 Passed'
+                        : step1State.status === 'failed'
+                        ? 'Failed'
+                        : 'Pending'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      Agent 1 – Course Catalogue Reader
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      <strong>Work:</strong> Validating selected academic scope
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-white border border-slate-200/80 p-2.5 text-[11px] space-y-1.5">
+                    <div className="text-slate-700 leading-tight">
+                      <span className="font-semibold text-slate-900">Target Scope: </span>
+                      <span className="font-medium text-indigo-700">
+                        {step1State.scopeText || `${selectedStandardIds.length} Std, ${selectedSubjectIds.length} Sub, ${selectedChapterIds.length} Ch`}
+                      </span>
+                    </div>
+                    {step1State.duration_ms !== undefined && (
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+                        <span>Validation Gate 1:</span>
+                        <span className="font-mono font-bold text-emerald-700">Passed ({step1State.duration_ms} ms)</span>
+                      </div>
+                    )}
+                    {step1State.summary && (
+                      <p className="text-slate-600 border-t border-slate-100 pt-1 text-[11px] leading-relaxed">
+                        {step1State.summary}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* AGENT 2 - ACTIVITY TIMELINE READER */}
+                <div
+                  className={`rounded-xl border p-4 space-y-3 transition-all duration-300 ${
+                    step2State.status === 'running'
+                      ? 'border-blue-400 bg-blue-50/40 ring-2 ring-blue-500/30 shadow-md'
+                      : step2State.status === 'completed'
+                      ? 'border-emerald-300 bg-emerald-50/30 shadow-xs'
+                      : step2State.status === 'failed'
+                      ? 'border-red-300 bg-red-50/30'
+                      : 'border-slate-200 bg-slate-50/60 opacity-80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`flex size-6 items-center justify-center rounded-full font-bold text-xs ${
+                      step2State.status === 'completed'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : step2State.status === 'running'
+                        ? 'bg-blue-600 text-white animate-pulse'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      2
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        step2State.status === 'running'
+                          ? 'bg-blue-100 text-blue-900 border border-blue-300 animate-pulse'
+                          : step2State.status === 'completed'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : step2State.status === 'failed'
+                          ? 'bg-red-100 text-red-800 border border-red-200'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {step2State.status === 'running' && <RefreshCw className="size-2.5 animate-spin text-blue-700" />}
+                      {step2State.status === 'completed' && <CheckCircle2 className="size-2.5 text-emerald-700" />}
+                      {step2State.status === 'failed' && <XCircle className="size-2.5 text-red-700" />}
+                      {step2State.status === 'running'
+                        ? 'Auditing Scope…'
+                        : step2State.status === 'completed'
+                        ? 'Gate 2 Passed'
+                        : step2State.status === 'failed'
+                        ? 'Failed'
+                        : executingStep === 1
+                        ? 'Waiting for Agent 1'
+                        : 'Pending'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      Agent 2 – Activity Timeline Reader
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      <strong>Work:</strong> Checking existing content and activities
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-white border border-slate-200/80 p-2.5 text-[11px] space-y-1.5">
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Existing Content Found:</span>
+                      <span className="font-bold text-emerald-700">
+                        {step2State.status === 'running'
+                          ? 'Auditing database…'
+                          : step2State.existingFound !== undefined
+                          ? step2State.existingFound
+                          : (pipelineResult?.content_generation?.verified_count ?? '—')}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Missing Content Identified:</span>
+                      <span className="font-bold text-amber-700">
+                        {step2State.status === 'running'
+                          ? 'Auditing database…'
+                          : step2State.missingIdentified !== undefined
+                          ? step2State.missingIdentified
+                          : (pipelineResult?.content_generation?.missing_identified?.length ?? '—')}
+                      </span>
+                    </div>
+                    {step2State.duration_ms !== undefined && (
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+                        <span>Content Audit Gate 2:</span>
+                        <span className="font-mono font-bold text-emerald-700">Passed ({step2State.duration_ms} ms)</span>
+                      </div>
+                    )}
+                    {step2State.summary && (
+                      <p className="text-slate-600 border-t border-slate-100 pt-1 text-[11px] leading-relaxed">
+                        {step2State.summary}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* AGENT 3 - CONTENT GENERATION AGENT */}
+                <div
+                  className={`rounded-xl border p-4 space-y-3 transition-all duration-300 ${
+                    step3State.status === 'running'
+                      ? 'border-violet-400 bg-violet-50/40 ring-2 ring-violet-500/30 shadow-md'
+                      : step3State.status === 'completed'
+                      ? 'border-emerald-300 bg-emerald-50/30 shadow-xs'
+                      : step3State.status === 'failed'
+                      ? 'border-red-300 bg-red-50/30'
+                      : 'border-slate-200 bg-slate-50/60 opacity-80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`flex size-6 items-center justify-center rounded-full font-bold text-xs ${
+                      step3State.status === 'completed'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : step3State.status === 'running'
+                        ? 'bg-violet-600 text-white animate-pulse'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      3
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        step3State.status === 'running'
+                          ? 'bg-violet-100 text-violet-900 border border-violet-300 animate-pulse'
+                          : step3State.status === 'completed'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : step3State.status === 'failed'
+                          ? 'bg-red-100 text-red-800 border border-red-200'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {step3State.status === 'running' && <RefreshCw className="size-2.5 animate-spin text-violet-700" />}
+                      {step3State.status === 'completed' && <CheckCircle2 className="size-2.5 text-emerald-700" />}
+                      {step3State.status === 'failed' && <XCircle className="size-2.5 text-red-700" />}
+                      {step3State.status === 'running'
+                        ? 'Generating…'
+                        : step3State.status === 'completed'
+                        ? 'Gate 3 Completed'
+                        : step3State.status === 'failed'
+                        ? 'Failed'
+                        : executingStep === 1 || executingStep === 2
+                        ? 'Waiting for Agent 2'
+                        : 'Pending'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      Agent 3 – Content Generation Agent
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      <strong>Work:</strong> Generating only selected missing resources
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-white border border-slate-200/80 p-2.5 text-[11px] space-y-1.5">
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Approach Used:</span>
+                      <span className="font-bold text-slate-900 truncate max-w-[130px]" title={selectedTeachingApproach}>
+                        {selectedTeachingApproach}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Template:</span>
+                      <span className="font-bold text-indigo-700 truncate max-w-[130px]" title={CONTENT_TEMPLATES.find(t => t.id === selectedTemplate)?.name}>
+                        {CONTENT_TEMPLATES.find(t => t.id === selectedTemplate)?.badge || selectedTemplate}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Newly Generated:</span>
+                      <span className="font-bold text-violet-700">
+                        {step3State.status === 'running'
+                          ? 'Generating…'
+                          : step3State.generatedCount !== undefined
+                          ? step3State.generatedCount
+                          : (pipelineResult?.content_generation?.generated_count ?? 0)}
+                      </span>
+                    </div>
+                    {step3State.duration_ms !== undefined && (
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+                        <span>Generation Gate 3:</span>
+                        <span className="font-mono font-bold text-emerald-700">Passed ({step3State.duration_ms} ms)</span>
+                      </div>
+                    )}
+                    {step3State.summary && (
+                      <p className="text-slate-600 border-t border-slate-100 pt-1 text-[11px] leading-relaxed truncate">
+                        {step3State.summary}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Execution Summary Notice & Details */}
+              {pipelineResult && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                        <CheckCircle2 className="size-4 text-emerald-600" />
+                        Execution Summary &amp; Verification Outcome
+                      </h4>
+                      <p className="text-xs text-emerald-900 mt-1 leading-relaxed">
+                        {pipelineResult.content_generation?.summary_message ||
+                          `Validation sweep completed across ${pipelineResult.standard?.name}. Verified ${pipelineResult.content_generation?.verified_count ?? 0} existing resource(s); generated ${pipelineResult.content_generation?.generated_count ?? 0} new resource(s).`}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPipelineResult(null);
+                        setWorkflowStage(1);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50 transition shrink-0 cursor-pointer"
+                    >
+                      <RefreshCw className="size-3 text-emerald-600" />
+                      Configure Another Scope
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Unified Report View */}
           {pipelineResult && (
@@ -2056,6 +3766,174 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                     </div>
                   </div>
                 )}
+
+                {/* 4. Content Generation & Classroom Resources (Third Agent Output Handover) */}
+                {pipelineResult.content_generation && (
+                  <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/30 p-4 space-y-4 pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white tracking-wider">
+                            Third Agent Handover
+                          </span>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                            <Sparkles className="size-4 text-indigo-600" />
+                            4. Content Generation & Classroom Resources
+                          </h4>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Pedagogical classroom resource generation and assessment creation executed by Agent 3
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {pipelineResult.content_generation.scope?.chapter_name && (
+                          <span className="rounded-lg bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-xs font-bold text-indigo-900">
+                            Ch: {pipelineResult.content_generation.scope.chapter_name}
+                          </span>
+                        )}
+                        {pipelineResult.content_generation.teaching_approach && (
+                          <span className="rounded-lg bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-900">
+                            Approach: {pipelineResult.content_generation.teaching_approach}
+                          </span>
+                        )}
+                        {pipelineResult.content_generation.student_experiences && pipelineResult.content_generation.student_experiences.length > 0 && (
+                          <span className="rounded-lg bg-purple-50 border border-purple-200 px-2.5 py-1 text-xs font-medium text-purple-900">
+                            Experience: {pipelineResult.content_generation.student_experiences.join(', ')}
+                          </span>
+                        )}
+                        {pipelineResult.content_generation.selected_template && (
+                          <span className="rounded-lg bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                            <Palette className="size-3 text-indigo-600" />
+                            Template: {CONTENT_TEMPLATES.find((t) => t.id === pipelineResult.content_generation?.selected_template)?.name || pipelineResult.content_generation.selected_template}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Summary Counters */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="rounded-lg border border-slate-200 bg-white p-2.5 text-center">
+                        <span className="block text-[10px] font-bold uppercase text-slate-400">Generated New</span>
+                        <span className="font-mono text-base font-extrabold text-violet-700">
+                          {pipelineResult.content_generation.generated_count ?? 0}
+                        </span>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white p-2.5 text-center">
+                        <span className="block text-[10px] font-bold uppercase text-slate-400">Verified Existing</span>
+                        <span className="font-mono text-base font-extrabold text-emerald-700">
+                          {pipelineResult.content_generation.verified_count ?? 0}
+                        </span>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white p-2.5 text-center">
+                        <span className="block text-[10px] font-bold uppercase text-slate-400">Duplicate Prevention</span>
+                        <span className="text-xs font-bold text-emerald-700 mt-1 block">
+                          100% Enforced
+                        </span>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white p-2.5 text-center">
+                        <span className="block text-[10px] font-bold uppercase text-slate-400">Chapter Assessment</span>
+                        <span className={`text-xs font-bold mt-1 block ${
+                          pipelineResult.content_generation.assessment_created ? 'text-indigo-700' : 'text-slate-600'
+                        }`}>
+                          {pipelineResult.content_generation.assessment_created ? '✓ Generated' : 'Verified'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Generated Resources List */}
+                    {pipelineResult.content_generation.generated_resources && pipelineResult.content_generation.generated_resources.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                          Newly Generated Classroom Resources
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {pipelineResult.content_generation.generated_resources.map((res, i) => (
+                            <div key={i} className="rounded-xl border border-violet-200 bg-violet-50/40 p-3.5 flex items-start justify-between gap-2 shadow-2xs hover:shadow-xs transition">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="rounded-md bg-violet-600 text-white font-mono text-[10px] font-bold px-1.5 py-0.5">
+                                    #{res.content_id}
+                                  </span>
+                                  <span className="font-bold text-xs text-slate-900 truncate">
+                                    {res.resource_type}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-800 mt-1 truncate font-semibold" title={res.title}>
+                                  {res.title}
+                                </p>
+                                <p className="text-[10px] text-slate-500 mt-0.5">
+                                  Category: {res.category} {res.chapter_name ? `· ${res.chapter_name}` : ''}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800 shrink-0">
+                                  Generated
+                                </span>
+                                {res.content_id && (
+                                  <a
+                                    href={resolveContentViewUrl(res.content_id, res.url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-lg border border-violet-300 bg-white px-2.5 py-1 text-xs font-bold text-violet-700 hover:bg-violet-100 transition shadow-2xs cursor-pointer"
+                                    title="Open and view content in responsive viewer"
+                                  >
+                                    <Eye className="size-3.5 text-violet-600" />
+                                    <span>View Content</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Verified Existing Resources List */}
+                    {pipelineResult.content_generation.verified_resources && pipelineResult.content_generation.verified_resources.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            Verified Existing Resources (Zero Duplicates Created)
+                          </p>
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                            Idempotent Execution
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {pipelineResult.content_generation.verified_resources.map((res, i) => (
+                            <div key={i} className="rounded-lg border border-emerald-100 bg-emerald-50/30 p-2.5 flex items-center justify-between gap-2">
+                              <div className="min-w-0 flex items-center gap-2">
+                                <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
+                                <div className="truncate">
+                                  <span className="font-bold text-xs text-slate-800">{res.type}: </span>
+                                  <span className="text-xs text-slate-600 truncate">{res.title}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-mono text-[10px] font-bold text-slate-500">
+                                  #{res.content_id}
+                                </span>
+                                {res.content_id && (
+                                  <a
+                                    href={resolveContentViewUrl(res.content_id, res.url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-white px-2 py-0.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs cursor-pointer"
+                                    title="Open and view existing content in viewer"
+                                  >
+                                    <Eye className="size-3 text-emerald-700" />
+                                    <span>View</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -2124,6 +4002,202 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
               >
                 Close Preview
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Interactive Design View Modal */}
+      {previewFullscreenOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-6xl rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden text-white">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-6 py-3.5 shrink-0">
+              <div className="flex items-center gap-3">
+                <div
+                  className="size-3 rounded-full"
+                  style={{ backgroundColor: currentTmpl.paletteDot }}
+                />
+                <div>
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <span>Fullscreen Design Preview</span>
+                    <span className="text-slate-400 font-normal">|</span>
+                    <span className="text-indigo-400">{currentTmpl.name}</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {activePreviewStandard} • {activePreviewSubject} • {activePreviewChapter}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Switch Template Dropdown inside Modal */}
+                <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs">
+                  <span className="text-slate-400 text-[10px] font-bold">Template:</span>
+                  <select
+                    value={selectedTemplate}
+                    onChange={(e) => {
+                      setSelectedTemplate(e.target.value);
+                      if (typeof document !== 'undefined') {
+                        document.documentElement.setAttribute('data-template', e.target.value);
+                      }
+                    }}
+                    className="bg-transparent text-white font-semibold outline-none cursor-pointer"
+                  >
+                    {CONTENT_TEMPLATES.map((t) => (
+                      <option key={t.id} value={t.id} className="bg-slate-900 text-white">
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Format Toggle */}
+                <div className="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode('ppt')}
+                    className={`px-2.5 py-1 rounded font-bold transition cursor-pointer ${
+                      previewMode === 'ppt' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    PPT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode('pdf')}
+                    className={`px-2.5 py-1 rounded font-bold transition cursor-pointer ${
+                      previewMode === 'pdf' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    PDF
+                  </button>
+                </div>
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setPreviewFullscreenOpen(false)}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition cursor-pointer"
+                  title="Close fullscreen preview"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-950 flex flex-col items-center space-y-4">
+              {/* Quick Switch Palette Bar inside Modal */}
+              <div className="w-full max-w-4xl flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+                  <Palette className="size-3 text-indigo-400" />
+                  Quick Palette:
+                </span>
+                {CONTENT_TEMPLATES.map((tmpl) => {
+                  const isSelected = selectedTemplate === tmpl.id;
+                  return (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplate(tmpl.id);
+                        if (typeof document !== 'undefined') {
+                          document.documentElement.setAttribute('data-template', tmpl.id);
+                        }
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 font-bold'
+                          : 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'
+                      }`}
+                    >
+                      <span
+                        className="size-2 rounded-full shrink-0 shadow-2xs"
+                        style={{ backgroundColor: tmpl.paletteDot }}
+                      />
+                      <span className="truncate">{tmpl.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {previewMode === 'ppt' && (
+                <div className="w-full max-w-4xl flex items-center justify-between text-xs text-slate-400 shrink-0">
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                    {[
+                      { idx: 0, label: '01: Hero Cover & Intentions' },
+                      { idx: 1, label: '02: Real-World Hook & Photo' },
+                      { idx: 2, label: '03: Core Law & SVG Diagram' },
+                      { idx: 3, label: '04: Active Challenge & Summary' },
+                    ].map((tab) => (
+                      <button
+                        key={tab.idx}
+                        type="button"
+                        onClick={() => setPreviewSlideIdx(tab.idx)}
+                        className={`rounded-lg px-2.5 py-1 font-semibold transition shrink-0 cursor-pointer ${
+                          previewSlideIdx === tab.idx
+                            ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                            : 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewSlideIdx((p) => Math.max(0, p - 1))}
+                      disabled={previewSlideIdx === 0}
+                      className="rounded px-2.5 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-40"
+                    >
+                      ◀ Prev
+                    </button>
+                    <span className="font-mono font-bold text-white text-[11px]">
+                      Slide {previewSlideIdx + 1} of 4
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewSlideIdx((p) => Math.min(3, p + 1))}
+                      disabled={previewSlideIdx === 3}
+                      className="rounded px-2.5 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-40"
+                    >
+                      Next ▶
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="w-full max-w-4xl flex justify-center">
+                <TemplateDesignCanvas
+                  template={currentTmpl}
+                  mode={previewMode}
+                  slideIdx={previewSlideIdx}
+                  standardName={activePreviewStandard}
+                  subjectName={activePreviewSubject}
+                  chapterName={activePreviewChapter}
+                  teachingApproach={selectedTeachingApproach}
+                  isFullscreen={true}
+                />
+              </div>
+
+              {previewMode === 'pdf' && (
+                <div className="w-full max-w-4xl flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 cursor-pointer shadow-xs"
+                  >
+                    <Printer className="size-4" /> Print / Save PDF
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

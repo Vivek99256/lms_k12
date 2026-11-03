@@ -14,6 +14,10 @@ export const INCOMPLETE_DOCUMENT_MESSAGE = 'This resource has an incomplete file
 export function documentTarget(url: string | null | undefined): DocumentTarget {
   const raw = (url ?? '').trim();
   if (raw === '') return { ok: false, message: MISSING_DOCUMENT_MESSAGE };
+  if (raw.startsWith('/')) {
+    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim().replace(/\/$/, '');
+    return { ok: true, url: apiBase ? `${apiBase}${raw}` : raw };
+  }
   let parsed: URL;
   try {
     parsed = new URL(raw);
