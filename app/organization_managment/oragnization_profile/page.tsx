@@ -808,7 +808,7 @@ export default function OrganizationProfilePage() {
         onSubmit={handleSave}
         className="min-h-screen px-4 py-0 text-[12px] text-slate-950 sm:px-5 lg:px-6"
       >
-        <div className="mx-auto flex w-full max-w-[1160px] min-w-0 flex-col gap-6 py-4">
+        <div className="mx-auto flex w-full  min-w-0 flex-col gap-6 py-4">
           <Card
             size="sm"
             className="flex min-h-[58px] flex-row items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 shadow-sm"
@@ -1103,7 +1103,7 @@ export default function OrganizationProfilePage() {
       onSubmit={handleSave}
       className="min-h-screen px-4 py-0 text-[12px] text-slate-950 sm:px-5 lg:px-6"
     >
-      <div className="mx-auto flex w-full max-w-[1160px] min-w-0 flex-col gap-6 py-4">
+      <div className="mx-auto flex w-full min-w-0 flex-col gap-6 py-4">
         <Card
           size="sm"
           className="flex min-h-[58px] flex-row items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 shadow-sm"

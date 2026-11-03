@@ -7,8 +7,13 @@
  * (see that component's header comment for the data-layer adaptation notes).
  */
 
+import { BLUE_THEME } from '../_lib/blue-theme'
 import { DisciplinaryManagement } from './components'
 
 export default function DisciplinaryLibraryPage() {
-  return <DisciplinaryManagement />
+  return (
+    <div style={BLUE_THEME}>
+      <DisciplinaryManagement />
+    </div>
+  )
 }

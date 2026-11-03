@@ -9,6 +9,7 @@
  */
 
 import { lazy, Suspense } from 'react'
+import { BLUE_THEME } from '../_lib/blue-theme'
 
 const LazyEmployeeDirectory = lazy(() =>
   import('./components/employee-directory').then((module) => ({ default: module.EmployeeDirectory })),
@@ -16,7 +17,7 @@ const LazyEmployeeDirectory = lazy(() =>
 
 export default function EmployeeDirectoryPage() {
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full flex-col p-6 md:p-8">
+    <div style={BLUE_THEME} className="flex h-[calc(100vh-4rem)] w-full flex-col p-6 md:p-8">
       <Suspense fallback={<div className="h-full rounded-2xl bg-muted/40 animate-pulse" />}>
         <LazyEmployeeDirectory />
       </Suspense>

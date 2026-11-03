@@ -15,7 +15,7 @@ function screen(loader: () => Promise<{ default: ScreenComponent }>): ScreenComp
 
 /**
  * Route -> page component, for every page in this app that can be mounted
- * inside a category tab. 582 entries.
+ * inside a category tab. 586 entries.
  */
 export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/academic_setup/create_batch': screen(() => import('@/app/academic_setup/create_batch/page')),
@@ -242,6 +242,7 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/general/mobile_app_rights': screen(() => import('@/app/general/mobile_app_rights/page')),
   '/general/native_dynamic_pages': screen(() => import('@/app/general/native_dynamic_pages/page')),
   '/general/onboarding': screen(() => import('@/app/general/onboarding/page')),
+  '/general/role_access': screen(() => import('@/app/general/role_access/page')),
   '/general/template_management': screen(() => import('@/app/general/template_management/page')),
   '/general/user_profile_masters': screen(() => import('@/app/general/user_profile_masters/page')),
   '/h5p/h5p_arithmetic_quiz': screen(() => import('@/app/h5p/h5p_arithmetic_quiz/page')),
@@ -413,6 +414,9 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/organization-management/compliance-library': screen(() => import('@/app/organization-management/compliance-library/page')),
   '/organization-management/disciplinary-library': screen(() => import('@/app/organization-management/disciplinary-library/page')),
   '/organization-management/employee-directory': screen(() => import('@/app/organization-management/employee-directory/page')),
+  '/organization-management/reports/compliance': screen(() => import('@/app/organization-management/reports/compliance/page')),
+  '/organization-management/reports/disciplinary': screen(() => import('@/app/organization-management/reports/disciplinary/page')),
+  '/organization-management/reports/employee-directory': screen(() => import('@/app/organization-management/reports/employee-directory/page')),
   '/organization-management/role-and-permissions': screen(() => import('@/app/organization-management/role-and-permissions/page')),
   '/pal': screen(() => import('@/app/pal/page')),
   '/pal/content': screen(() => import('@/app/pal/content/page')),
