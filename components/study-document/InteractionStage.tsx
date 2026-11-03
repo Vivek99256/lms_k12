@@ -56,6 +56,14 @@ export function InteractionStage({ interaction, image = null, eyebrow, title, su
     case 'order':
       view = <OrderView interaction={interaction} done={done} onDone={onDone} lead={lead} memoryKey={memoryKey} />;
       break;
+    case 'hub':
+    case 'flow':
+    case 'bars':
+    case 'decision':
+    case 'outcome':
+      // The professional deck's own screens: they are not part of a document's practice.
+      view = null;
+      break;
     default:
       view = <ExploreView interaction={interaction} done={done} onDone={onDone} lead={lead} image={null} assetBase={null} memoryKey={memoryKey} />;
   }

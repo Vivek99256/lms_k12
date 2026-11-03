@@ -19,6 +19,8 @@ export interface ImageEditDialogProps {
   state: ImageEditState;
   onClose: () => void;
   onChanged: (result: ImageEditResult) => void;
+  /** True for a presentation that is already stored: a change is saved with it at once, so the window says so. */
+  saved?: boolean;
 }
 
 const button = 'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50';
@@ -33,7 +35,7 @@ type Busy = '' | 'saving' | 'removing' | 'restoring';
  * own, look at it beside the current one, then confirm. Shared by every lesson that can be edited: it knows only the adapter's operations.
  * Only this picture changes; the server refuses anything else.
  */
-export function ImageEditDialog({ adapter, target, title, current, state, onClose, onChanged }: ImageEditDialogProps) {
+export function ImageEditDialog({ adapter, target, title, current, state, onClose, onChanged, saved = false }: ImageEditDialogProps) {
   const panel = useRef<HTMLDivElement>(null);
   const adding = !state.has_image;
   const mayPick = state.can_add || state.can_replace;
@@ -151,7 +153,7 @@ export function ImageEditDialog({ adapter, target, title, current, state, onClos
 
   const canSave = busy === '' && mayPick && ((tab === 'search' && chosen !== null) || (tab === 'upload' && file !== null && rights));
   const newSrc = tab === 'search' ? chosen?.thumbnail_url ?? null : preview;
-  const verb = adding ? 'Add image' : 'Replace image';
+  const verb = 'Save image';
 
   return (
     <div className="fixed inset-0 z-[330] flex items-center justify-center bg-slate-900/50 p-3" onMouseDown={(e) => e.target === e.currentTarget && busy === '' && onClose()}>
@@ -169,7 +171,10 @@ export function ImageEditDialog({ adapter, target, title, current, state, onClos
             <p id="image-edit-title" className="text-base font-bold text-slate-900">
               {adding ? 'Add image' : 'Change image'}
             </p>
-            <p className="text-xs text-slate-600">{title}. Only this picture changes; the text and activities stay as they are.</p>
+            <p className="text-xs text-slate-600">
+              {title}. Only this picture changes; the text and activities stay as they are.
+              {saved ? ' Saving puts the new picture in this presentation straight away, and you can restore the original.' : ''}
+            </p>
           </div>
           <button type="button" onClick={onClose} disabled={busy !== ''} aria-label="Close" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">
             <X className="h-5 w-5" aria-hidden="true" />
@@ -216,7 +221,27 @@ export function ImageEditDialog({ adapter, target, title, current, state, onClos
                         Search
                       </button>
                     </form>
-                    <p className="text-xs text-slate-600">Only openly licensed pictures are shown. The source and licence are kept with the slide.</p>
+                    {found?.suggestions && found.suggestions.length > 0 ? (
+                      <div data-testid="search-suggestions" className="flex flex-wrap items-center gap-2 text-xs text-slate-700">
+                        <span>Search by:</span>
+                        {found.suggestions.map((s) => (
+                          <button
+                            key={s.label}
+                            type="button"
+                            disabled={searching}
+                            aria-pressed={query.trim().toLowerCase() === s.query.toLowerCase()}
+                            onClick={() => {
+                              setQuery(s.query);
+                              void search(s.query);
+                            }}
+                            className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 disabled:opacity-50 aria-pressed:border-indigo-600 aria-pressed:bg-indigo-50"
+                          >
+                            {s.label}: {s.query}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    <p className="text-xs text-slate-600">Only openly licensed photographs are shown. Look at each one before you choose it. The source, creator and licence are kept with the slide.</p>
                     {searching ? (
                       <p role="status" className="flex items-center gap-2 text-sm text-slate-700">
                         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Searching…
@@ -250,9 +275,16 @@ export function ImageEditDialog({ adapter, target, title, current, state, onClos
                                 <span className="block truncate">{c.creator ?? 'Unknown creator'}</span>
                                 <span className="block truncate">
                                   {c.licence} · {c.provider}
+                                  {c.width && c.height ? ` · ${c.width}×${c.height}` : ''}
                                 </span>
+                                {c.matches && c.matches.length > 0 ? <span className="block truncate">Matches: {c.matches.join(', ')}</span> : null}
                               </span>
                             </button>
+                            {c.source_url ? (
+                              <a href={c.source_url} target="_blank" rel="noopener noreferrer" className="block px-2 pb-2 text-xs text-indigo-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">
+                                View source page
+                              </a>
+                            ) : null}
                           </li>
                         ))}
                       </ul>
@@ -303,6 +335,11 @@ export function ImageEditDialog({ adapter, target, title, current, state, onClos
                   No picture yet
                 </div>
               )}
+              {state.kind === 'diagram' ? (
+                <p data-testid="current-is-diagram" className="mt-1 text-xs text-amber-900">
+                  This is a drawn diagram, not a photograph. Search for a real photograph to replace it.
+                </p>
+              ) : null}
             </figure>
             {mayPick ? (
               <figure>
@@ -313,6 +350,11 @@ export function ImageEditDialog({ adapter, target, title, current, state, onClos
                 ) : (
                   <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-slate-300 p-3 text-center text-xs text-slate-600">Choose a picture to preview it here.</div>
                 )}
+                {tab === 'search' && chosen ? (
+                  <p data-testid="new-credit" className="mt-1 text-xs text-slate-700">
+                    {chosen.title || 'Untitled'} by {chosen.creator ?? 'an unnamed creator'}, {chosen.licence}, from {chosen.provider}.
+                  </p>
+                ) : null}
               </figure>
             ) : null}
           </aside>

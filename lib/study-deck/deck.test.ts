@@ -16,6 +16,8 @@ import {
   resolveActivity,
   stageLabel,
   topicOfSlide,
+  workflowOutcomeRefs,
+  workflowStageLabel,
 } from './deck';
 import type { DeckActivity, StudyDeck } from './types';
 
@@ -271,6 +273,34 @@ test('slide types read as plain stages for the learner', () => {
   assert.equal(stageLabel('relationship'), 'How ideas connect');
   assert.equal(stageLabel('exit_ticket'), 'Exit ticket');
   assert.equal(stageLabel('something_new'), 'Lesson');
+});
+
+test('a slide shows its workflow stage and outcomes only when the deck proved its workflow', () => {
+  const deck = parseDeck(JSON.parse(JSON.stringify(golden)));
+  const slide = deck.slides[1];
+
+  // A deck with no workflow (every other chapter) shows nothing.
+  assert.equal(workflowStageLabel(deck, slide), null);
+  assert.deepEqual(workflowOutcomeRefs(deck, slide), []);
+
+  slide.workflow_stage = 2;
+  slide.workflow_stage_name = 'Ask: driving questions';
+  slide.outcome_refs = ['C5.2-LO-3', 'NOT-STORED'];
+  deck.workflow = {
+    method: { key: 'inquiry_based', name: 'Inquiry-based learning' },
+    format: { key: 'interactive_slides', name: 'PPT / interactive slides' },
+    stages: [1, 2, 3, 4, 5, 6].map((number) => ({ number, name: `Stage ${number}`, minutes: 5, objective: 'o', outcome: 'x' })),
+    outcomes: [{ ref: 'C5.2-LO-3', type: 'learning_outcome', description: 'Explains the branches of science.' }],
+    validation: { validated: true, errors: [], outcomes_checked: true },
+  };
+  assert.equal(workflowStageLabel(deck, slide), 'Stage 2 of 6: Ask: driving questions');
+  // Only a code the deck itself lists is shown.
+  assert.deepEqual(workflowOutcomeRefs(deck, slide), ['C5.2-LO-3']);
+
+  // A workflow that was not validated (or failed) is never presented as followed.
+  deck.workflow.validation = { validated: false, errors: ['Slide 3 needs a "workflow_stage".'], outcomes_checked: true };
+  assert.equal(workflowStageLabel(deck, slide), null);
+  assert.deepEqual(workflowOutcomeRefs(deck, slide), []);
 });
 
 test('the photo carries alt text made from the picture, and a credit', () => {

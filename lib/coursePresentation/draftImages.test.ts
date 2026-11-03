@@ -12,7 +12,7 @@ import { checkUploadFile, checkUploadSize, createDraftImageAdapter, fetchDraftIm
 
 // The session the client reads its bearer token from (a browser's storage).
 const store = { getItem: (key: string) => (key === 'userData' ? JSON.stringify({ token: 'tok' }) : null) };
-Object.assign(globalThis, { window: {}, localStorage: store, sessionStorage: store });
+Object.assign(globalThis, { window: { location: { hostname: 'localhost' } }, localStorage: store, sessionStorage: store });
 
 const image = (id: number) => ({ type: 'photo', url: `https://api.test/images/${id}`, alt: `alt ${id}`, caption: null, width: 400, height: 300, licence: 'BY 2.0', source_url: null, creator: null, attribution: '', attribution_required: false }) as unknown as DeckImage;
 
@@ -161,7 +161,7 @@ const st = (over: Partial<ImageEditState> = {}): ImageEditState => ({ has_image:
 const dialog = (state: ImageEditState, current: DeckImage | null = image(2)) =>
   renderToStaticMarkup(createElement(ImageEditDialog, { adapter: none, target: { slide: 2 }, title: 'Slide 2: Rain', current, state, onClose: () => {}, onChanged: () => {} }));
 
-test('changing a picture opens on search and upload, shows the current picture, and offers Replace, Remove and Cancel', () => {
+test('changing a picture opens on search and upload, shows the current picture, and offers Save, Remove and Cancel', () => {
   const html = dialog(st());
   assert.match(html, /role="dialog"/);
   assert.match(html, /aria-modal="true"/);
@@ -172,8 +172,8 @@ test('changing a picture opens on search and upload, shows the current picture, 
   assert.match(html, /role="tablist"/);
   assert.match(html, /src="https:\/\/api.test\/images\/2"/, 'the current picture is shown');
   assert.match(html, /Choose a picture to preview it here/);
-  assert.match(html, /data-testid="replace-image"[^>]*disabled/, 'nothing is chosen: Replace is off');
-  assert.match(html, />Replace image</);
+  assert.match(html, /data-testid="replace-image"[^>]*disabled/, 'nothing is chosen: Save is off');
+  assert.match(html, />Save image</);
   assert.match(html, /data-testid="remove-image"/);
   assert.match(html, />Cancel</);
   assert.doesNotMatch(html, /data-testid="restore-image"/, 'nothing to restore yet');
@@ -182,7 +182,7 @@ test('changing a picture opens on search and upload, shows the current picture, 
 test('a slide with no picture is offered Add image, and no Remove', () => {
   const html = dialog(st({ has_image: false, can_add: true, can_replace: false, can_remove: false }), null);
   assert.match(html, /<p id="image-edit-title"[^>]*>Add image</);
-  assert.match(html, />Add image</);
+  assert.match(html, />Save image</);
   assert.match(html, /data-testid="no-current"/);
   assert.doesNotMatch(html, /data-testid="remove-image"/);
 });

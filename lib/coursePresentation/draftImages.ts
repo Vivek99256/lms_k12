@@ -84,11 +84,16 @@ export function createDraftImageAdapter(chapterId: number, run: string): ImageEd
  * server (the draft is only edited once the whole file has arrived and passed the checks).
  */
 export function uploadPicture(chapterId: number, run: string, target: ImageTarget, file: File, options: UploadOptions): Promise<ImageEditResult> {
+  return sendPicture('draft-image/replace', where(chapterId, run, target), file, options);
+}
+
+/** The same upload to any of the picture endpoints (a draft's, or a stored presentation's): the fields name the picture, the server decides the rest. */
+export function sendPicture(endpoint: string, fields: Record<string, string>, file: File, options: UploadOptions): Promise<ImageEditResult> {
   const { token } = buildSessionContext();
   if (!token) return Promise.reject(new CoursePresentationApiError('Your session has expired. Please sign in again.', 401));
 
   const body = new FormData();
-  for (const [key, value] of Object.entries(where(chapterId, run, target))) body.set(key, value);
+  for (const [key, value] of Object.entries(fields)) body.set(key, value);
   body.set('rights_confirmed', '1');
   body.set('image', file);
   if (options.credit?.trim()) body.set('credit', options.credit.trim());
@@ -96,7 +101,7 @@ export function uploadPicture(chapterId: number, run: string, target: ImageTarge
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_BASE_URL}/api/lms/course-presentation/draft-image/replace`);
+    xhr.open('POST', `${API_BASE_URL}/api/lms/course-presentation/${endpoint}`);
     xhr.setRequestHeader('Accept', 'application/json');
     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     xhr.upload.onprogress = (e) => e.lengthComputable && options.onProgress?.(e.loaded / e.total);

@@ -12,14 +12,19 @@
 
 import { scoreHotspotVisit } from '../h5p/image-hotspots';
 import type {
+  BarsInteraction,
+  DecisionInteraction,
   DeckImage,
   DeckInteraction,
   DeckSlide,
+  FlowInteraction,
   HotspotSpot,
   HotspotsInteraction,
+  HubInteraction,
   ItemsInteraction,
   MatchInteraction,
   OrderInteraction,
+  OutcomeInteraction,
   ScenarioChoice,
   ScenarioInteraction,
   ScenarioNode,
@@ -41,6 +46,11 @@ export const INTERACTION_HEADING: Record<DeckInteraction['kind'], string> = {
   compare: 'Compare',
   match: 'Match',
   order: 'Put in order',
+  hub: 'Choose a product',
+  flow: 'Watch it work',
+  bars: 'Explore the figures',
+  decision: 'Make a decision',
+  outcome: 'What happens next',
 };
 
 /** A stable key for a slide's example screen (worked example, common mistake, key idea) in the progress record. */
@@ -507,9 +517,75 @@ export function interactionProblem(value: unknown, slideImageIsDiagram: boolean)
       if (new Set(items.map((c) => c.id)).size !== items.length) return 'repeats an item id';
       return null;
     }
+    case 'hub': {
+      const options = (i as HubInteraction).options;
+      if (!Array.isArray(options) || options.length < 2) return 'has fewer than two options';
+      if (options.some((o) => !o.id || !o.label || !Number.isInteger(o.goto) || o.goto < 1 || !Number.isInteger(o.end) || !Number.isInteger(o.image_slide) || !o.art)) return 'has a malformed option';
+      if (new Set(options.map((o) => o.id)).size !== options.length) return 'repeats an option id';
+      return null;
+    }
+    case 'decision': {
+      const d = i as DecisionInteraction;
+      if (!d.question || !Array.isArray(d.options) || d.options.length < 2) return 'has no question or fewer than two answers';
+      if (d.options.some((o) => !o.id || !o.text || !Number.isInteger(o.goto) || o.goto < 1)) return 'has an answer that opens no slide';
+      if (new Set(d.options.map((o) => o.id)).size !== d.options.length) return 'repeats an answer id';
+      return null;
+    }
+    case 'outcome': {
+      const o = i as OutcomeInteraction;
+      if (!o.what || !o.choice?.text || !Array.isArray(o.actions) || o.actions.length === 0) return 'has no consequence or no way on';
+      if (o.actions.some((a) => !a.label || !Number.isInteger(a.goto) || a.goto < 1)) return 'has a button that opens no slide';
+      return null;
+    }
+    case 'flow': {
+      const steps = (i as FlowInteraction).steps;
+      if (!Array.isArray(steps) || steps.length < 3) return 'has fewer than three steps';
+      if (steps.some((s) => !s.id || !s.label)) return 'has a malformed step';
+      if (new Set(steps.map((s) => s.id)).size !== steps.length) return 'repeats a step id';
+      return null;
+    }
+    case 'bars': {
+      const groups = (i as BarsInteraction).groups;
+      if (!Array.isArray(groups) || groups.length === 0) return 'has no bars';
+      const all = groups.flatMap((g) => g.bars ?? []);
+      if (all.length < 2 || all.some((b) => !b.id || !b.label || !b.display || typeof b.value !== 'number' || !(b.value >= 0))) return 'has a malformed bar';
+      if (new Set(all.map((b) => b.id)).size !== all.length) return 'repeats a bar id';
+      return null;
+    }
     default:
       return `has an unknown kind "${String((i as { kind?: unknown }).kind)}"`;
   }
+}
+
+/**
+ * A branching deck must never strand a learner: every slide that a choice, a button or a slide's own "Continue" names has to exist.
+ * Returns the first one that does not as a sentence for the person who wrote the deck, or null when every way on leads somewhere.
+ */
+export function branchProblem(slides: ReadonlyArray<Pick<DeckSlide, 'n' | 'interaction' | 'next'>>): string | null {
+  const have = new Set(slides.map((s) => s.n));
+  const gone = (n: number) => !have.has(n);
+
+  for (const slide of slides) {
+    const at = `Slide ${slide.n}`;
+    // -1 is the one number that is not a slide: Continue waits for the learner to choose.
+    if (slide.next !== undefined && slide.next !== -1 && gone(slide.next)) return `${at} continues to slide ${slide.next}, which does not exist`;
+    const i = slide.interaction;
+    if (!i) continue;
+
+    if (i.kind === 'hub') {
+      for (const o of i.options) {
+        const named: Array<[string, number]> = [['opens', o.goto], ['ends at', o.end], ['takes its picture from', o.image_slide]];
+        for (const [what, target] of named) if (gone(target)) return `${at}'s "${o.label}" ${what} slide ${target}, which does not exist`;
+      }
+      if (i.skip_to && gone(i.skip_to.goto)) return `${at}'s "${i.skip_to.label}" button opens slide ${i.skip_to.goto}, which does not exist`;
+    } else if (i.kind === 'decision') {
+      for (const o of i.options) if (gone(o.goto)) return `${at}'s answer ${o.id.toUpperCase()} opens slide ${o.goto}, which does not exist`;
+    } else if (i.kind === 'outcome') {
+      for (const a of i.actions) if (gone(a.goto)) return `${at}'s "${a.label}" button opens slide ${a.goto}, which does not exist`;
+    }
+  }
+
+  return null;
 }
 
 /**

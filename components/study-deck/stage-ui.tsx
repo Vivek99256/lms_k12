@@ -98,6 +98,8 @@ export interface SlideStageProps {
  */
 export function SlideStage({ theme, children, number, count, bare = false, photo = null }: SlideStageProps) {
   const [wash0, wash1] = theme.wash;
+  // The professional theme is flat: a plain white page, no wash, no top stripe and a plain page number.
+  const flat = theme.key === 'navy';
 
   return (
     <ThemeContext.Provider value={theme}>
@@ -106,7 +108,7 @@ export function SlideStage({ theme, children, number, count, bare = false, photo
           // eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies
           <img src={photo.src} alt="" aria-hidden="true" className={`pointer-events-none absolute inset-0 z-0 h-full w-full object-cover object-top ${photo.led ? '' : 'opacity-[0.2]'}`} />
         ) : null}
-        {bare ? null : (
+        {bare || flat ? null : (
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 z-0"
@@ -117,13 +119,13 @@ export function SlideStage({ theme, children, number, count, bare = false, photo
             }}
           />
         )}
-        {bare || photo?.led ? null : <StageBackdrop theme={theme} />}
-        {bare ? null : <div aria-hidden="true" className="absolute inset-x-0 top-0 z-10 h-[0.32em]" style={{ background: `linear-gradient(90deg, ${theme.accent}, ${theme.line})` }} />}
+        {bare || photo?.led || flat ? null : <StageBackdrop theme={theme} />}
+        {bare || flat ? null : <div aria-hidden="true" className="absolute inset-x-0 top-0 z-10 h-[0.32em]" style={{ background: `linear-gradient(90deg, ${theme.accent}, ${theme.line})` }} />}
         <div className="relative z-10 min-h-0 flex-1">{children}</div>
         {bare || number === undefined ? null : (
           <span
             aria-hidden="true"
-            className="absolute bottom-[0.8em] right-[1.2em] z-30 inline-flex items-baseline gap-[0.3em] rounded-full bg-sd-accent px-[0.9em] py-[0.15em] text-[0.62em] font-bold tabular-nums text-white shadow-sm"
+            className={flat ? 'absolute bottom-[0.7em] right-[1.4em] z-30 inline-flex items-baseline gap-[0.3em] text-[0.62em] font-semibold tabular-nums text-slate-500' : 'absolute bottom-[0.8em] right-[1.2em] z-30 inline-flex items-baseline gap-[0.3em] rounded-full bg-sd-accent px-[0.9em] py-[0.15em] text-[0.62em] font-bold tabular-nums text-white shadow-sm'}
           >
             {String(number).padStart(2, '0')}
             {count ? <span className="font-medium">/ {count}</span> : null}
@@ -316,6 +318,8 @@ export interface VisualFigureProps {
 const CAPTION_ROOM = 40;
 
 export function VisualFigure({ image, assetBase, children, className = '', camera = null, crop = null }: VisualFigureProps) {
+  // The professional look carries no credit or source line on a slide.
+  const professional = useTheme().key === 'navy';
   const ratio = image.width > 0 && image.height > 0 ? image.width / image.height : 16 / 9;
   const band = crop && crop.bottom > crop.top ? (crop.bottom - crop.top) / 100 : 1;
   const frameRatio = ratio / band;
@@ -406,17 +410,19 @@ export function VisualFigure({ image, assetBase, children, className = '', camer
             <Search className="h-[1.1em] w-[1.1em]" aria-hidden="true" />
             {magnify ? 'Magnifier on' : 'Magnify'}
           </button>
-          <p className="absolute left-0 right-0 top-full flex items-start justify-between gap-[0.8em] px-[0.3em] pt-[0.45em] text-[0.55em] leading-tight text-slate-700">
-            <span className="line-clamp-2 min-w-0">
-              {image.caption ? <span className="font-semibold text-sd-strong">{trimStop(image.caption)}. </span> : null}
-              {creditOf(image)}
-            </span>
-            {photo ? (
-              <a href={webSource(image) ?? undefined} target="_blank" rel="noreferrer noopener" className="shrink-0 font-semibold text-sd-strong underline">
-                Source
-              </a>
-            ) : null}
-          </p>
+          {professional ? null : (
+            <p className="absolute left-0 right-0 top-full flex items-start justify-between gap-[0.8em] px-[0.3em] pt-[0.45em] text-[0.55em] leading-tight text-slate-700">
+              <span className="line-clamp-2 min-w-0">
+                {image.caption ? <span className="font-semibold text-sd-strong">{trimStop(image.caption)}. </span> : null}
+                {creditOf(image)}
+              </span>
+              {photo ? (
+                <a href={webSource(image) ?? undefined} target="_blank" rel="noreferrer noopener" className="shrink-0 font-semibold text-sd-strong underline">
+                  Source
+                </a>
+              ) : null}
+            </p>
+          )}
         </FitFrame>
       </div>
     </div>

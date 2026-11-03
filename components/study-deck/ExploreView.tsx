@@ -8,7 +8,7 @@ import { INTERACTION_HEADING, itemsProgress, nextItem, selectItem, teaserOf } fr
 import type { DeckImage, ExploreItem, ItemsInteraction } from '@/lib/study-deck/types';
 import { BeforeAfter } from './BeforeAfter';
 import { ImageMarks, MarkInsetView, MarkLegend } from './ImageMarks';
-import { CompletedSlot, GlyphIcon, motion, PANEL, PhotoCredit, Tag, TONES, useRememberedReducer, useStage, VisualFigure } from './stage-ui';
+import { CompletedSlot, GlyphIcon, motion, PANEL, PhotoCredit, Tag, TONES, useRememberedReducer, useStage, useTheme, VisualFigure } from './stage-ui';
 
 export interface ExploreViewProps {
   interaction: ItemsInteraction;
@@ -19,6 +19,8 @@ export interface ExploreViewProps {
   lead: ReactNode;
   /** A picture the slide also carries, kept beside the items. */
   image?: DeckImage | null;
+  /** The professional look names the slide in a slim header. */
+  heading?: { kicker: string; title: string };
   assetBase: string | null;
   /** Where this screen's state is kept for the session. */
   memoryKey: string;
@@ -45,8 +47,9 @@ const WATERMARK = { position: 'absolute', right: '0.25em', bottom: '-0.15em', fo
  * The explanation always appears INSIDE the slide (a panel, or the card itself) and never pushes anything below the
  * fold. Nothing is scored; the screen says "All ideas explored" when everything has been opened.
  */
-export function ExploreView({ interaction, done, onDone, lead, image = null, assetBase, memoryKey, bleed = false }: ExploreViewProps) {
+export function ExploreView({ interaction, done, onDone, lead, image = null, assetBase, memoryKey, bleed = false, heading }: ExploreViewProps) {
   const { portrait } = useStage();
+  const pro = useTheme().key === 'navy';
   const [state, select] = useRememberedReducer(memoryKey, (s: State, id: string) => selectItem(s, id), (): State => ({ open: null, seen: [] }));
   const progress = itemsProgress(interaction, state.seen);
   const finished = progress.done || done;
@@ -68,6 +71,15 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
       onDone();
     }
   }, [progress.done, onDone]);
+
+  // The professional look sets a comparison out as plain columns, all visible at once: there is nothing to open, so it counts as seen.
+  const proColumns = pro && kind === 'compare' && !withImage && !portrait && Boolean(heading);
+  useEffect(() => {
+    if (proColumns && !reported.current) {
+      reported.current = true;
+      onDone();
+    }
+  }, [proColumns, onDone]);
 
   const seen = (id: string) => state.seen.includes(id) || done;
 
@@ -119,6 +131,40 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
       )}
     </div>
   );
+
+  if (proColumns && heading) {
+    return (
+      <section aria-label={INTERACTION_HEADING[kind]} className="flex h-full min-h-0 flex-col gap-[1em] p-[1.4em]">
+        <header className="border-b border-slate-300 pb-[0.6em]">
+          <p className="text-[0.7em] font-semibold uppercase tracking-[0.14em] text-sd-accent">{heading.kicker}</p>
+          <h2 tabIndex={-1} className="text-[1.7em] font-bold leading-tight text-slate-900 outline-none">
+            {heading.title}
+          </h2>
+        </header>
+        <div className="grid min-h-0 flex-1 gap-[2em]" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
+          {items.map((item, index) => (
+            <div key={item.id} className="flex min-h-0 flex-col">
+              <h3 className="border-b-2 border-sd-accent pb-[0.4em] text-[1.15em] font-bold text-slate-900">
+                <span className="mr-[0.5em] text-sd-accent tabular-nums">{String(index + 1).padStart(2, '0')}</span>
+                {item.label}
+              </h3>
+              <ul className="divide-y divide-slate-200 text-[1.02em] text-slate-800">
+                {item.text
+                  .split(/(?<=\.)\s+/)
+                  .filter(Boolean)
+                  .map((line, i) => (
+                    <li key={i} className="py-[0.4em]">
+                      {line.replace(/\.$/, '')}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <p className="border-l-[0.3em] border-sd-accent bg-slate-50 px-[0.9em] py-[0.6em] text-[1em] leading-snug text-slate-800">{interaction.wrapup}</p>
+      </section>
+    );
+  }
 
   const doneBanner = <CompletedSlot show={finished}>{kind === 'compare' ? null : interaction.wrapup}</CompletedSlot>;
 
@@ -238,7 +284,8 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
           </ul>
           {doneBanner}
         </div>
-        {marked ? (
+        {/* The explanation is always a panel under the picture, never a small box over its lower edge, so it can be read at once. */}
+        {(
           <div className="flex min-h-0 min-w-0 flex-col gap-[0.6em]">
             <div className="relative min-h-0 flex-1">
               <VisualFigure image={image} assetBase={assetBase}>
@@ -250,29 +297,19 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
                 <div key={open.id} className={`flex items-start gap-[1em] ${motion.fadeUp}`}>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-[1em]">
-                      <h3 className="text-[1.05em] font-semibold text-slate-900">{open.label}</h3>
+                      <h3 className="text-[1.25em] font-semibold text-slate-900">{open.label}</h3>
                       {openMarks.length > 0 ? <MarkLegend marks={openMarks} label={open.label} /> : null}
                     </div>
-                    <p className="mt-[0.2em] text-[0.95em] leading-snug text-slate-800">{open.text}</p>
+                    <p className="mt-[0.2em] text-[1.15em] leading-snug text-slate-800">{open.text}</p>
                     {noMark(open) ? <p className="mt-[0.3em] text-[0.8em] italic text-slate-600">{NO_MARK_NOTE}</p> : null}
                   </div>
                   {open.inset ? <div className="max-w-[45%] shrink-0"><MarkInsetView inset={open.inset} /></div> : null}
                 </div>
               ) : (
-                <p className="text-[0.85em] text-slate-600">Select a card to see where it is on the picture.</p>
+                <p className="text-[0.85em] text-slate-600">Select a card to read about it.</p>
               )}
             </div>
           </div>
-        ) : (
-        <div className="relative min-h-0 min-w-0">
-          <VisualFigure image={image} assetBase={assetBase} />
-          {open ? (
-            <div role="dialog" aria-label={open.label} className={`absolute bottom-[3%] left-[8%] right-[8%] z-20 rounded-[0.9em] border border-sd-line bg-white p-[0.9em] shadow-xl ${motion.fadeUp}`}>
-              <h3 className="text-[1.05em] font-semibold text-slate-900">{open.label}</h3>
-              <p className="mt-[0.25em] text-[0.95em] leading-snug text-slate-800">{open.text}</p>
-            </div>
-          ) : null}
-        </div>
         )}
       </section>
     );
