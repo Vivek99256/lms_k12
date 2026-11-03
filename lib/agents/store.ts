@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import mysql from 'mysql2/promise';
+import { mintMcpToken } from '@/lib/security/session-token';
 
 import type { Agent, AgentModuleKey, AgentRun, AgentRunStatus, AgentRunTrigger } from './types';
 
@@ -249,6 +250,139 @@ export const BASELINE_AGENTS: Agent[] = [
     created_at: '2026-09-21T10:17:53.706Z',
     updated_at: '2026-09-21T10:17:53.706Z',
   },
+  {
+    id: 'agt_curriculum_coverage_reader',
+    name: 'Curriculum coverage reader',
+    description: 'Reads curriculum, unit and chapter coverage for a subject and standard. Changes nothing.',
+    module: 'curriculum_planning',
+    tenant_id: '1',
+    tools_allowed: ['curriculum_planning.status'],
+    instructions:
+      'Report coverage exactly as recorded. State chapter and completion counts, not a judgement about teaching quality — coverage is an administrative fact, not an outcome.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:00:00.000Z',
+    updated_at: '2026-10-31T10:00:00.000Z',
+  },
+  {
+    id: 'agt_lesson_plan_pace_auditor',
+    name: 'Lesson plan pace auditor',
+    description:
+      'Audits scheduled teaching periods against the calendar and identifies behind-schedule chapters. Changes nothing.',
+    module: 'curriculum_planning',
+    tenant_id: '1',
+    tools_allowed: ['curriculum_planning.lesson_pace'],
+    instructions:
+      'Compare scheduled lesson dates against the current date objectively. Report behind-schedule periods without attributing fault to individual educators.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:05:00.000Z',
+    updated_at: '2026-10-31T10:05:00.000Z',
+  },
+  {
+    id: 'agt_curriculum_outcomes_alignment_drafter',
+    name: 'Learning outcomes alignment drafter',
+    description:
+      'Drafts actionable pacing recovery and competency alignment proposals for educator review. Changes nothing.',
+    module: 'curriculum_planning',
+    tenant_id: '1',
+    tools_allowed: ['curriculum_planning.draft_alignment_note'],
+    instructions:
+      'Draft objective, constructive pacing proposals citing exact lesson dates and learning outcomes. Mark all proposals as draft_pending_human_approval.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:10:00.000Z',
+    updated_at: '2026-10-31T10:10:00.000Z',
+  },
+  {
+    id: 'agt_curriculum_outcomes_reader',
+    name: 'Learning outcomes reader',
+    description:
+      'Reads the learning outcomes and competencies declared against a curriculum. Changes nothing.',
+    module: 'curriculum_planning',
+    tenant_id: '1',
+    tools_allowed: ['curriculum_planning.outcomes'],
+    instructions: 'Report outcomes and competencies exactly as recorded, with their codes.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:15:00.000Z',
+    updated_at: '2026-10-31T10:15:00.000Z',
+  },
+  {
+    id: 'agt_pal_gamification_reader',
+    name: 'PAL gamification & streak reader',
+    description:
+      'Reads recorded learning events, streaks, badges and framework progress for a learner or class. Changes nothing.',
+    module: 'new_pal',
+    tenant_id: '1',
+    tools_allowed: ['new_pal.gamification_summary'],
+    instructions:
+      'Report the learner’s recorded activity exactly as returned. Never characterise the learner’s ability beyond the figures given.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:20:00.000Z',
+    updated_at: '2026-10-31T10:20:00.000Z',
+  },
+  {
+    id: 'agt_pal_content_mastery_agent',
+    name: 'PAL content mastery diagnostic agent',
+    description:
+      'Audits chapter content model depth and concept relations, diagnosing mastery progression bottlenecks. Changes nothing.',
+    module: 'new_pal',
+    tenant_id: '1',
+    tools_allowed: ['new_pal.content_model_status'],
+    instructions:
+      'Report content model coverage and coherence gaps exactly as recorded without fabricating scores.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:25:00.000Z',
+    updated_at: '2026-10-31T10:25:00.000Z',
+  },
+  {
+    id: 'agt_pal_coherence_intervention_drafter',
+    name: 'PAL adaptive remediation drafter',
+    description:
+      'Synthesizes practice telemetry and stuck mastery concepts to draft actionable remediation proposals for educator review. Changes nothing.',
+    module: 'new_pal',
+    tenant_id: '1',
+    tools_allowed: ['new_pal.draft_adaptive_intervention'],
+    instructions:
+      'Synthesize practice telemetry and stuck mastery concepts to draft actionable remediation proposals. Mark all proposals as draft_pending_human_approval.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:30:00.000Z',
+    updated_at: '2026-10-31T10:30:00.000Z',
+  },
+  {
+    id: 'agt_pal_coherence_reader',
+    name: 'Coherence map reader',
+    description:
+      'Reads concept relations and mastery evidence for one class and subject. Changes nothing.',
+    module: 'new_pal',
+    tenant_id: '1',
+    tools_allowed: ['new_pal.coherence_gaps'],
+    instructions: 'Report gaps exactly as recorded. If the coherence map is unavailable, say so rather than estimating a figure.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'Kalpesh1 Sheth1',
+    created_at: '2026-10-31T10:35:00.000Z',
+    updated_at: '2026-10-31T10:35:00.000Z',
+  },
 ];
 
 function emptyStore(): StoreShape {
@@ -276,7 +410,7 @@ function mergeWithBaseline(agents: Agent[], tenantId?: string): Agent[] {
 
 function applyAgentFilter(agents: Agent[], tenantId: string, filter?: AgentListFilter): Agent[] {
   return agents
-    .filter((agent) => !tenantId || agent.tenant_id === tenantId)
+    .filter((agent) => !tenantId || agent.tenant_id === tenantId || agent.tenant_id === '1')
     .filter((agent) => !filter?.module || agent.module === filter.module)
     .filter((agent) => !filter?.status || agent.status === filter.status)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -321,20 +455,64 @@ function getDbPool(): mysql.Pool {
   return agentDbPool;
 }
 
+async function fetchHttpCapabilityRuns(tenantId: string, limit = 100): Promise<Array<Record<string, unknown>>> {
+  try {
+    const token = mintMcpToken({ id: 1, sub_institute_id: tenantId });
+    const aiBase = (process.env.NEXT_PUBLIC_AI_BASE_URL || 'https://dev.triz.co.in').trim().replace(/\/$/, '');
+    const url = `${aiBase}/api/ai/capabilities/agents?limit=${encodeURIComponent(limit)}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { data?: { table?: { rows?: Array<Record<string, unknown>> } } };
+    return json.data?.table?.rows || [];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<AgentRun[]> {
+  const limit = Math.max(300, (filter?.limit && filter.limit > 0 ? filter.limit * 10 : 300));
+  let rows: Array<Record<string, unknown>> = [];
+
   try {
     const pool = getDbPool();
-    const limit = filter?.limit && filter.limit > 0 ? Math.min(200, filter.limit * 2) : 100;
-    const [rows] = (await pool.query(
-      'SELECT * FROM ai_agent_runs ORDER BY id DESC LIMIT ?',
-      [limit]
-    )) as [Array<Record<string, unknown>>, unknown];
-
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return [];
+    if (tenantId && tenantId !== '1') {
+      const [scopedRows] = (await pool.query(
+        'SELECT * FROM ai_agent_runs WHERE sub_institute_id = ? OR sub_institute_id = 1 OR sub_institute_id IS NULL ORDER BY id DESC LIMIT ?',
+        [Number(tenantId) || tenantId, limit]
+      )) as [Array<Record<string, unknown>>, unknown];
+      rows = scopedRows || [];
+      if (rows.length === 0) {
+        const [allRows] = (await pool.query(
+          'SELECT * FROM ai_agent_runs ORDER BY id DESC LIMIT ?',
+          [limit]
+        )) as [Array<Record<string, unknown>>, unknown];
+        rows = allRows || [];
+      }
+    } else {
+      const [allRows] = (await pool.query(
+        'SELECT * FROM ai_agent_runs ORDER BY id DESC LIMIT ?',
+        [limit]
+      )) as [Array<Record<string, unknown>>, unknown];
+      rows = allRows || [];
     }
+  } catch {
+    rows = [];
+  }
 
-    return rows.map((row) => {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    rows = await fetchHttpCapabilityRuns(tenantId, limit);
+  }
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return [];
+  }
+
+  try {
+
+    return rows.map((row, idx) => {
       const key = String(row.agent_key || '');
       let mod: AgentModuleKey = 'teach_learn';
       let agtId = 'agt_34dc52f6dc24';
@@ -348,10 +526,18 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
         mod = 'teach_learn';
         agtId = 'agt_e39a5505022e';
         agtName = 'Activity timeline reader';
-      } else if (key === 'teach_learn.content_model_coverage') {
+      } else if (key === 'teach_learn.content_model_coverage' || key === 'k12_content_generator' || key.includes('content')) {
         mod = 'teach_learn';
         agtId = 'agt_a52e39ddbd8b';
         agtName = 'Content model coverage agent';
+      } else if (key.includes('activit')) {
+        mod = 'teach_learn';
+        agtId = 'agt_e39a5505022e';
+        agtName = 'Activity timeline reader';
+      } else if (key.startsWith('teach_learn.') || key.startsWith('lms.')) {
+        mod = 'teach_learn';
+        agtId = 'agt_34dc52f6dc24';
+        agtName = 'Course catalogue reader';
       } else if (key === 'exam_assessment.online_exam_summary' || key === 'k12_exam_assessment') {
         mod = 'exam_assessment';
         agtId = 'agt_exam_summary_reader';
@@ -380,6 +566,54 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
         mod = 'engagement';
         agtId = 'agt_engagement_attention_reader';
         agtName = 'Engagement Master Agent';
+      } else if (key === 'curriculum_planning.status' || key === 'agt_curriculum_coverage_reader') {
+        mod = 'curriculum_planning';
+        agtId = 'agt_curriculum_coverage_reader';
+        agtName = 'Curriculum coverage reader';
+      } else if (key === 'curriculum_planning.lesson_pace' || key === 'agt_lesson_plan_pace_auditor') {
+        mod = 'curriculum_planning';
+        agtId = 'agt_lesson_plan_pace_auditor';
+        agtName = 'Lesson plan pace auditor';
+      } else if (key === 'curriculum_planning.draft_alignment_note' || key === 'agt_curriculum_outcomes_alignment_drafter') {
+        mod = 'curriculum_planning';
+        agtId = 'agt_curriculum_outcomes_alignment_drafter';
+        agtName = 'Learning outcomes alignment drafter';
+      } else if (key === 'curriculum_planning.outcomes' || key === 'agt_curriculum_outcomes_reader') {
+        mod = 'curriculum_planning';
+        agtId = 'agt_curriculum_outcomes_reader';
+        agtName = 'Learning outcomes reader';
+      } else if (key === 'k12_curriculum_planning') {
+        mod = 'curriculum_planning';
+        agtId = 'agt_curriculum_coverage_reader';
+        agtName = 'Curriculum Planning Master Agent';
+      } else if (key.startsWith('curriculum_planning.') || key.startsWith('curriculum.')) {
+        mod = 'curriculum_planning';
+        agtId = 'agt_curriculum_coverage_reader';
+        agtName = 'Curriculum Planning Agent';
+      } else if (key === 'new_pal.gamification_summary' || key === 'agt_pal_gamification_reader') {
+        mod = 'new_pal';
+        agtId = 'agt_pal_gamification_reader';
+        agtName = 'PAL gamification & streak reader';
+      } else if (key === 'new_pal.content_model_status' || key === 'agt_pal_content_mastery_agent') {
+        mod = 'new_pal';
+        agtId = 'agt_pal_content_mastery_agent';
+        agtName = 'PAL content mastery diagnostic agent';
+      } else if (key === 'new_pal.draft_adaptive_intervention' || key === 'agt_pal_coherence_intervention_drafter') {
+        mod = 'new_pal';
+        agtId = 'agt_pal_coherence_intervention_drafter';
+        agtName = 'PAL adaptive remediation drafter';
+      } else if (key === 'new_pal.coherence_gaps' || key === 'agt_pal_coherence_reader') {
+        mod = 'new_pal';
+        agtId = 'agt_pal_coherence_reader';
+        agtName = 'Coherence map reader';
+      } else if (key === 'k12_new_pal' || key === 'k12_pal') {
+        mod = 'new_pal';
+        agtId = 'agt_pal_gamification_reader';
+        agtName = 'New PAL Master Agent';
+      } else if (key.startsWith('new_pal.') || key.startsWith('pal.')) {
+        mod = 'new_pal';
+        agtId = 'agt_pal_gamification_reader';
+        agtName = 'PAL Agent';
       } else if (key.startsWith('fees.')) {
         mod = 'fees';
         agtId = 'agt_8294009535e7';
@@ -413,11 +647,11 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
             : 'failure';
 
       return {
-        id: 'run_' + row.id,
+        id: 'run_' + (row.id || (row.started_at ? String(Date.parse(String(row.started_at))) : Date.now()) + '_' + idx),
         agent_id: agtId,
         agent_name: agtName,
         module: mod,
-        tenant_id: String(row.sub_institute_id || '1'),
+        tenant_id: String(row.sub_institute_id || tenantId || '1'),
         started_at: row.started_at ? new Date(row.started_at as string).toISOString() : new Date().toISOString(),
         finished_at: row.finished_at ? new Date(row.finished_at as string).toISOString() : new Date().toISOString(),
         duration_ms: Number(row.duration_ms || 100),
@@ -475,14 +709,22 @@ async function insertDbRun(run: AgentRun): Promise<void> {
 
 /** In-memory store: the engine's tests use it, and so does a host with no writable disk. */
 export class MemoryAgentStore implements AgentStore {
-  private data: StoreShape = emptyStore();
+  private data: StoreShape;
+  private withBaseline: boolean;
+
+  constructor(initial?: StoreShape, withBaseline = false) {
+    this.data = initial ?? emptyStore();
+    this.withBaseline = withBaseline;
+  }
 
   async listAgents(tenantId: string, filter?: AgentListFilter) {
-    return applyAgentFilter(this.data.agents, tenantId, filter);
+    const list = this.withBaseline ? mergeWithBaseline(this.data.agents, tenantId) : this.data.agents;
+    return applyAgentFilter(list, tenantId, filter);
   }
 
   async getAgent(tenantId: string, id: string) {
-    return this.data.agents.find((agent) => (!tenantId || agent.tenant_id === tenantId) && agent.id === id) ?? null;
+    const list = this.withBaseline ? mergeWithBaseline(this.data.agents, tenantId) : this.data.agents;
+    return list.find((agent) => (!tenantId || agent.tenant_id === tenantId) && agent.id === id) ?? null;
   }
 
   async insertAgent(agent: Agent) {

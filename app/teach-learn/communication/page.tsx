@@ -1,11 +1,15 @@
 'use client';
 
 import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { TEACH_LEARN_COMMUNICATION_SCREENS } from './_screens/teach-learn-communication-screens';
 
-/**
- * Teach/Learn → communication. One of the ten Teach/Learn category pages; all ten
- * share ModuleCategoryPage and differ only by which category they render.
- */
-export default function Page() {
-  return <ModuleCategoryPage moduleName="teach_learn" categoryKey="communication" />;
+export default function TeachLearnCommunicationPage() {
+  return (
+    <ModuleCategoryPage
+      moduleName="teach_learn"
+      categoryKey="communication"
+      staticScreens={TEACH_LEARN_COMMUNICATION_SCREENS}
+      platformModuleKey="teach_learn"
+    />
+  );
 }

@@ -497,6 +497,70 @@ const STUDENT_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'show_student_homework_review': '/lms/homework/review',
 };
 
+const ADMISSION_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
+  // Enquiry report
+  'admission_enquiry_report': '/admissions/admission_reports/admission-inquiry',
+  'admission_enquiry_report.index': '/admissions/admission_reports/admission-inquiry',
+  'admission/admission_enquiry_report': '/admissions/admission_reports/admission-inquiry',
+  'show_enquiry_report': '/admissions/admission_reports/admission-inquiry',
+  'show_enquiry_report.index': '/admissions/admission_reports/admission-inquiry',
+  'admission/show_enquiry_report': '/admissions/admission_reports/admission-inquiry',
+  'admission_inquiry': '/admissions/admission_reports/admission-inquiry',
+  'admission_inquiry.index': '/admissions/admission_reports/admission-inquiry',
+
+  // Enquiry followup report
+  'admission_enquiry_followup_report': '/admissions/admission_reports/inquiry-followup',
+  'admission_enquiry_followup_report.index': '/admissions/admission_reports/inquiry-followup',
+  'admission/admission_enquiry_followup_report': '/admissions/admission_reports/inquiry-followup',
+  'show_enquiry_followup_report': '/admissions/admission_reports/inquiry-followup',
+  'show_enquiry_followup_report.index': '/admissions/admission_reports/inquiry-followup',
+  'admission/show_enquiry_followup_report': '/admissions/admission_reports/inquiry-followup',
+  'inquiry_followup': '/admissions/admission_reports/inquiry-followup',
+  'inquiry_followup.index': '/admissions/admission_reports/inquiry-followup',
+
+  // Registration report
+  'admission_registration_report': '/admissions/admission_reports/admission-registration',
+  'admission_registration_report.index': '/admissions/admission_reports/admission-registration',
+  'admission/admission_registration_report': '/admissions/admission_reports/admission-registration',
+  'show_form_report': '/admissions/admission_reports/admission-registration',
+  'show_form_report.index': '/admissions/admission_reports/admission-registration',
+  'admission/show_form_report': '/admissions/admission_reports/admission-registration',
+  'admission_registration_report_v2': '/admissions/admission_reports/admission-registration',
+  'admission/admission_registration_report_v2': '/admissions/admission_reports/admission-registration',
+  'admission_registration': '/admissions/admission_reports/admission-registration',
+  'admission_registration.index': '/admissions/admission_reports/admission-registration',
+
+  // Without confirmation report
+  'admission_without_con_report': '/admissions/admission_reports/admission-without-confirmation',
+  'admission_without_con_report.index': '/admissions/admission_reports/admission-without-confirmation',
+  'admission/admission_without_con_report': '/admissions/admission_reports/admission-without-confirmation',
+  'show_reg_report': '/admissions/admission_reports/admission-without-confirmation',
+  'show_reg_report.index': '/admissions/admission_reports/admission-without-confirmation',
+  'admission/show_reg_report': '/admissions/admission_reports/admission-without-confirmation',
+  'admission_without_confirmation': '/admissions/admission_reports/admission-without-confirmation',
+  'admission_without_confirmation.index': '/admissions/admission_reports/admission-without-confirmation',
+
+  // Confirmation report
+  'admission_confirmation_report': '/admissions/admission_reports/admission-confirmation',
+  'admission_confirmation_report.index': '/admissions/admission_reports/admission-confirmation',
+  'admission/admission_confirmation_report': '/admissions/admission_reports/admission-confirmation',
+  'show_con_report': '/admissions/admission_reports/admission-confirmation',
+  'show_con_report.index': '/admissions/admission_reports/admission-confirmation',
+  'admission/show_con_report': '/admissions/admission_reports/admission-confirmation',
+  'admission_confirmation_report_v2': '/admissions/admission_reports/admission-confirmation',
+  'admission/admission_confirmation_report_v2': '/admissions/admission_reports/admission-confirmation',
+  'admission_confirmation': '/admissions/admission_reports/admission-confirmation',
+  'admission_confirmation.index': '/admissions/admission_reports/admission-confirmation',
+
+  // General admission reports hub
+  'admission_reports': '/admissions/admission_reports',
+  'admission_reports.index': '/admissions/admission_reports',
+  'admission/admission_reports': '/admissions/admission_reports',
+  'admission_report': '/admissions/admission_reports',
+  'admission_report.index': '/admissions/admission_reports',
+  'admission/admission_report': '/admissions/admission_reports',
+};
+
 // Legacy ERP modules now served by the stateless migration API.
 const MIGRATION_MODULE_ROUTES: Record<string, string> = {
   'lo_master.index': '/learning-outcome/lo-master',
@@ -934,6 +998,13 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   }
 
   // Teacher Transfer Utility: legacy Laravel route name → the Next.js page.
+  const admissionReportRoute =
+    ADMISSION_REPORT_ROUTE_NAME_MAP[cleanLink.toLowerCase()] ||
+    ADMISSION_REPORT_ROUTE_NAME_MAP[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (admissionReportRoute) {
+    return admissionReportRoute;
+  }
+
   if (cleanLink.toLowerCase() === 'teachertransfer.index') {
     return '/teachertransfer';
   }

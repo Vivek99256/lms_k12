@@ -26,6 +26,7 @@ import {
 } from '@/app/pal/_components/CompletionState';
 import { COMPLETED_THROUGH_CHECK, JourneyRail } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
+import { recordStageProgression } from '@/app/pal/data/pal-progression';
 
 /**
  * Stage 10 - mastery across a chapter.
@@ -105,7 +106,16 @@ function ChapterMasteryView() {
       setLoading(true);
       setError(null);
       fetchChapterMastery(chapterId, controller.signal)
-        .then(setData)
+        .then((masteryData) => {
+          setData(masteryData);
+          if (masteryData?.concepts) {
+            masteryData.concepts.forEach((c) => {
+              if (c.stage === 'mastered' || (c.pMastery != null && c.pMastery >= 0.8)) {
+                recordStageProgression(c.conceptId, 'completed');
+              }
+            });
+          }
+        })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
           setError(reason instanceof Error ? reason.message : 'Your mastery couldn’t be loaded.');
