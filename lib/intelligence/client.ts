@@ -12,8 +12,18 @@ import type {
   CaseRecord,
   ConversationTranscript,
   DecisionResult,
+  ErpModule,
+  ErpSubmodule,
+  ErpSubmoduleGraph,
   GenerationOutcome,
+  GraphBrowserResult,
+  GraphModule,
+  GraphNodeDetail,
+  GraphPathResult,
+  GraphSearchResult,
+  GraphSubmodule,
   GraphTraversal,
+  OrganizationStaffGraph,
   LifecycleModule,
   OntologyEntity,
   OntologyRelationship,
@@ -498,6 +508,110 @@ export function availableRelations(context: IntelligenceContext, entity: string)
     context,
     `/knowledge-graph/relations/${entity}`
   );
+}
+
+// ---- Centralized Knowledge Graph browser: Modules -> Submodules -> Data flow,
+// read straight from Neo4j (GraphModuleBrowser) — no SQL fallback, no ontology
+// layer. Separate from the entity-search/traversal functions above.
+
+export function listGraphModules(context: IntelligenceContext) {
+  return get<{ modules: GraphModule[] }>(context, "/knowledge-graph/browser/modules");
+}
+
+export function listGraphSubmodules(context: IntelligenceContext, family: string) {
+  return get<{ family: string; submodules: GraphSubmodule[] }>(
+    context,
+    `/knowledge-graph/browser/modules/${encodeURIComponent(family)}/submodules`
+  );
+}
+
+export function fetchGraphForLabel(
+  context: IntelligenceContext,
+  label: string,
+  options: { sampleSize?: number; limit?: number } = {}
+) {
+  return get<GraphBrowserResult>(context, `/knowledge-graph/browser/submodules/${encodeURIComponent(label)}/graph`, {
+    sample_size: options.sampleSize,
+    limit: options.limit,
+  });
+}
+
+// The real ERP module/submodule navigation (tblmenumaster-backed) — what the
+// Knowledge Graph's "All Modules" screen actually uses.
+
+export function listErpModules(context: IntelligenceContext) {
+  return get<{ modules: ErpModule[] }>(context, "/knowledge-graph/browser/erp-modules");
+}
+
+export function listErpSubmodules(context: IntelligenceContext, moduleId: number) {
+  return get<{ module_id: number; submodules: ErpSubmodule[] }>(
+    context,
+    `/knowledge-graph/browser/erp-modules/${moduleId}/submodules`
+  );
+}
+
+export function fetchErpSubmoduleGraph(
+  context: IntelligenceContext,
+  submoduleId: number,
+  options: { sampleSize?: number; limit?: number } = {}
+) {
+  return get<ErpSubmoduleGraph>(context, `/knowledge-graph/browser/erp-submodules/${submoduleId}/graph`, {
+    sample_size: options.sampleSize,
+    limit: options.limit,
+  });
+}
+
+// ---- Global search, path-finder, full node drill-down, and Organization
+// Management's own staff/department/role graph — all additive to the six
+// browser endpoints above, same GraphModuleBrowser/Neo4j path, tenant scope
+// always derived server-side from the JWT (never sent from here).
+
+export function searchKnowledgeGraph(context: IntelligenceContext, term: string, limit?: number) {
+  return get<GraphSearchResult>(context, "/knowledge-graph/browser/search", { q: term, limit });
+}
+
+export function findKnowledgeGraphPath(
+  context: IntelligenceContext,
+  spec: {
+    fromLabel: string;
+    fromId: string | number;
+    toLabel: string;
+    toId: string | number;
+    maxDepth?: number;
+    relationshipTypes?: string[];
+  }
+) {
+  return post<GraphPathResult>(context, "/knowledge-graph/browser/path", {
+    from_label: spec.fromLabel,
+    from_id: spec.fromId,
+    to_label: spec.toLabel,
+    to_id: spec.toId,
+    max_depth: spec.maxDepth,
+    relationship_types: spec.relationshipTypes,
+  });
+}
+
+export function fetchGraphNodeDetail(
+  context: IntelligenceContext,
+  label: string,
+  recordId: string | number,
+  options: { relationshipLimit?: number; skip?: number } = {}
+) {
+  return get<GraphNodeDetail>(
+    context,
+    `/knowledge-graph/browser/node/${encodeURIComponent(label)}/${encodeURIComponent(String(recordId))}`,
+    { relationship_limit: options.relationshipLimit, skip: options.skip }
+  );
+}
+
+export function fetchOrganizationStaffGraph(
+  context: IntelligenceContext,
+  options: { perRole?: number; subjects?: boolean } = {}
+) {
+  return get<OrganizationStaffGraph>(context, "/knowledge-graph/browser/organization/staff-graph", {
+    per_role: options.perRole,
+    subjects: options.subjects ? 1 : undefined,
+  });
 }
 
 // ---- Generation ------------------------------------------------------------
