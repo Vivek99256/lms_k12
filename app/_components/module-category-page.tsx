@@ -12,6 +12,7 @@ import {
   LayoutList,
   Loader2,
   ScrollText,
+  Share2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -20,6 +21,8 @@ import Link from 'next/link';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { ModuleAuditTrail } from '@/app/_components/module-audit-trail';
 import { ModuleIntelligence } from '@/app/_components/module-intelligence';
+import { ModuleKnowledgeGraph } from '@/app/_components/ModuleKnowledgeGraph';
+import CentralizedKnowledgeGraphExplorer from '@/app/ai/_components/CentralizedKnowledgeGraphExplorer';
 import {
   intelligenceEntryFor,
   ModuleIntelligenceContractScreen,
@@ -152,6 +155,15 @@ const USER_LOG_ROUTE = '/user_log';
  * ("Fees Prediction"), and those follow this one.
  */
 const INTELLIGENCE_CATEGORY_KEY = 'intelligence';
+
+/**
+ * The decentralized Knowledge Graph: one module's own scoped view onto the
+ * shared graph (see ModuleKnowledgeGraph). Seeded onto every bar the same
+ * way Audit Trail was, but unlike Audit Trail it carries no per-row config —
+ * whether it has anything to show depends on `ai_ontology_views` coverage
+ * for this module, resolved at request time rather than at seed time.
+ */
+const KNOWLEDGE_GRAPH_CATEGORY_KEY = 'knowledge-graph';
 
 /**
  * The categories that are a console rather than a group of menus.
@@ -681,6 +693,45 @@ export function ModuleCategoryPage({
   }, [categoryKey, category, auditModuleKeys, moduleName]);
 
   /**
+   * The Knowledge Graph tab, for any module.
+   *
+   * Organization Management is special-cased to the rebuilt centralized
+   * explorer (`CentralizedKnowledgeGraphExplorer`, the same component
+   * `/ai/knowledge-graph` renders) rather than the per-module
+   * `ModuleKnowledgeGraph` every other module keeps — pre-focused on
+   * Organization Management (`initialFocusModuleKey`) but never restricted
+   * to it; every module and submodule stays explorable from here too.
+   * Every other module's tab is completely unchanged: no empty/not-
+   * configured branch here the way Audit Trail has one for a missing
+   * prefix list — ModuleKnowledgeGraph itself renders the "isn't set up
+   * for this module yet" state, because that answer depends on live
+   * `ai_ontology_views` coverage rather than anything this page can know
+   * in advance.
+   */
+  const graphScreens = useMemo<ModuleStaticScreen[]>(() => {
+    if (categoryKey !== KNOWLEDGE_GRAPH_CATEGORY_KEY && category?.key !== KNOWLEDGE_GRAPH_CATEGORY_KEY) {
+      return [];
+    }
+
+    const label = moduleLabel(moduleName);
+    const isOrganizationManagement = moduleName === 'organization-management';
+
+    return [
+      {
+        id: 'knowledge-graph',
+        label: 'Knowledge Graph',
+        icon: Share2,
+        render: () =>
+          isOrganizationManagement ? (
+            <CentralizedKnowledgeGraphExplorer initialFocusModuleKey="organization-management" />
+          ) : (
+            <ModuleKnowledgeGraph moduleName={moduleName} label={label} />
+          ),
+      },
+    ];
+  }, [categoryKey, category, moduleName]);
+
+  /**
    * The Intelligence tab, for any module that has not brought its own.
    *
    * Fees passes its native workspace through `staticScreens`, and that view is
@@ -792,6 +843,7 @@ export function ModuleCategoryPage({
     const staticTabs = [
       ...consoleScreens,
       ...auditScreens,
+      ...graphScreens,
       ...intelligenceScreens,
       ...dedupedStaticScreens,
     ].map<Tab>((entry) => ({
@@ -805,6 +857,7 @@ export function ModuleCategoryPage({
   }, [
     consoleScreens,
     auditScreens,
+    graphScreens,
     intelligenceScreens,
     staticScreens,
     staticScreensPlacement,
