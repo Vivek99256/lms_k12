@@ -10,6 +10,7 @@ import {
   GitBranch,
   LifeBuoy,
   Share2,
+  Network,
   SlidersHorizontal,
   UserPlus,
   Workflow,
@@ -44,6 +45,7 @@ const TOOL_ICONS: Record<(typeof TOOL_STRIP_CATEGORY_KEYS)[number], LucideIcon> 
   workflow: GitBranch,
   'audit-trail': FileClock,
   'knowledge-graph': Share2,
+  'knowledge-graph': Network,
 };
 
 function categoryKeyOf(item: Level3Item): (typeof TOOL_STRIP_CATEGORY_KEYS)[number] | null {

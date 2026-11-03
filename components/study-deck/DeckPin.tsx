@@ -1,3 +1,5 @@
+import { Plus } from 'lucide-react';
+
 export interface DeckPinProps {
   /** Zero-based; the pin shows the number the parts list shows. */
   index: number;
@@ -16,6 +18,8 @@ export interface DeckPinProps {
   callout?: string;
   /** The callout opens to the left of the pin (a pin near the right edge). */
   calloutLeft?: boolean;
+  /** The professional look: a plain "+" button on the picture instead of a number (the parts list is not shown beside it). */
+  plus?: boolean;
 }
 
 /**
@@ -26,7 +30,29 @@ export interface DeckPinProps {
  * hairline so it reads on a dark or a coloured part of a picture, and an indigo border. Selected, it fills with the accent and
  * grows a little; explored, its border turns green. The button around it is 24px so it is still an easy target.
  */
-export function DeckPin({ index, x, y, name, selected, explored, onSelect, compact = false, scale = 1, callout, calloutLeft = false }: DeckPinProps) {
+export function DeckPin({ index, x, y, name, selected, explored, onSelect, compact = false, scale = 1, callout, calloutLeft = false, plus = false }: DeckPinProps) {
+  if (plus) {
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-label={name}
+        aria-pressed={selected}
+        title={name}
+        data-testid="deck-pin"
+        data-selected={selected ? 'true' : undefined}
+        className="group absolute z-20 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        style={{ left: `${x}%`, top: `${y}%` }}
+      >
+        <span aria-hidden="true" className="transition-transform duration-200 motion-reduce:transition-none" style={{ transform: `scale(${scale})` }}>
+          <span className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border-[2.5px] border-white text-white shadow-[0_1px_6px_rgba(0,0,0,0.45)] transition-transform group-hover:scale-110 ${selected ? 'bg-sd-strong' : explored ? 'bg-slate-600' : 'bg-sd-accent'}`}>
+            <Plus className={`h-[18px] w-[18px] transition-transform ${selected ? 'rotate-45' : ''}`} strokeWidth={3} />
+          </span>
+        </span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"

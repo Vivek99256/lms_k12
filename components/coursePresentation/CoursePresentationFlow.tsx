@@ -22,6 +22,8 @@ import { carriesEarlierChoice, startState, type CpState } from '@/lib/coursePres
 import { resolveSelectedContent } from '@/lib/coursePresentation/contentRoute';
 import type { CpWatch } from '@/lib/coursePresentation/poller';
 import { GenerationPanel } from '@/components/coursePresentation/GenerationPanel';
+import { WorkflowStages } from '@/components/coursePresentation/WorkflowStages';
+import { formatAfterMethodChange, formatOptions, usesWorkflow } from '@/lib/coursePresentation/workflow';
 import { cn } from '@/lib/utils';
 
 const STATUS_LABEL: Record<CpSourceStatus, string> = {
@@ -319,6 +321,11 @@ export function CoursePresentationFlow({
         if (controller.signal.aborted) return;
         if (!Array.isArray(res.pedagogies) || !Array.isArray(res.formats)) throw new Error('The service gave an unexpected answer. Please try again.');
         setOptions(res);
+        // A format restored from the address that the server does not offer under the chosen method is dropped, not sent.
+        setState((s) => {
+          const kept = formatAfterMethodChange(res, s.pedagogy, s.format);
+          return kept === s.format ? s : { ...s, format: kept };
+        });
       } catch (e) {
         if (!controller.signal.aborted) setOptionsError(e instanceof Error ? e.message : 'Something went wrong.');
       }
@@ -430,7 +437,7 @@ export function CoursePresentationFlow({
                       name="cp-pedagogy"
                       value={p.key}
                       checked={state.pedagogy === p.key}
-                      onChange={() => onState({ ...state, pedagogy: p.key })}
+                      onChange={() => onState({ ...state, pedagogy: p.key, format: formatAfterMethodChange(options, p.key, state.format) })}
                     />
                     <span>{p.label}</span>
                   </label>
@@ -445,20 +452,27 @@ export function CoursePresentationFlow({
             <fieldset className="mt-4">
               <legend className="text-sm font-semibold">What should students experience?</legend>
               <div role="radiogroup" aria-label="Delivery format" className="mt-2 grid gap-1.5 sm:grid-cols-2">
-                {(options?.formats ?? []).map((f) => (
+                {formatOptions(options, state.pedagogy).map((f) => (
                   <label
                     key={f.key}
-                    className={cn('flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm', state.format === f.key ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50')}
+                    className={cn(
+                      'flex items-center gap-2 rounded-md border px-3 py-2 text-sm',
+                      f.selectable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60',
+                      state.format === f.key ? 'border-indigo-600 bg-indigo-50' : cn('border-slate-200', f.selectable && 'hover:bg-slate-50'),
+                    )}
                   >
-                    <input type="radio" name="cp-format" value={f.key} checked={state.format === f.key} onChange={() => onState({ ...state, format: f.key })} />
+                    <input type="radio" name="cp-format" value={f.key} checked={state.format === f.key} disabled={!f.selectable} onChange={() => onState({ ...state, format: f.key })} />
                     <span>
                       {f.label}
-                      {!f.generator_exists && <span className="ml-1 text-xs text-slate-500">(no generator yet)</span>}
+                      {f.note && <span className="ml-1 text-xs text-slate-500">{f.note}</span>}
                     </span>
                   </label>
                 ))}
               </div>
+              {usesWorkflow(options) && state.pedagogy === null && <p className="mt-2 text-xs text-slate-500">Choose a teaching method to see the formats that suit it.</p>}
             </fieldset>
+
+            {usesWorkflow(options) && state.pedagogy !== null && <WorkflowStages chapterId={chapterId} method={state.pedagogy} format={state.format} />}
 
             {bothChosen && fit === null && !fitError && <p role="status" className="mt-3 text-sm text-slate-600">Checking whether this combination suits the chapter&hellip;</p>}
             {bothChosen && fitError && <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{fitError}</p>}

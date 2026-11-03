@@ -63,12 +63,51 @@ export interface CpFit {
   continue_allowed: boolean;
 }
 
+/** A format offered under one teaching method by the staged-workflow pilot (the server decides compatibility and availability). */
+export interface CpWorkflowFormat {
+  key: string;
+  name: string;
+  description: string;
+  available: boolean;
+  unavailable_reason: string | null;
+}
+
+export interface CpWorkflowStage {
+  number: number;
+  name: string;
+  objective: string;
+  teacher: string;
+  student: string;
+  activity: string;
+  questions: string[];
+  interactions: string;
+  visual: string;
+  outcome: string;
+  minutes: number;
+}
+
+export interface CpWorkflow {
+  key: string;
+  name: string;
+  description: string;
+  objectives: string[];
+  teacher_role: string;
+  student_role: string;
+  activity_types: string[];
+  interaction_types: string[];
+  assessment: string;
+  total_minutes: number;
+  stages: CpWorkflowStage[];
+}
+
 export interface CpOptions {
   chapter: { id: number; name: string };
   suitability: Record<string, CpSuitability>;
   pedagogies: CpChoice[];
   formats: CpFormatChoice[];
   pedagogy_note: string;
+  /** Present only for the chapter the staged workflow is switched on for; every other chapter keeps the unfiltered lists above. */
+  workflow?: { enabled: boolean; formats_by_method: Record<string, CpWorkflowFormat[]> };
 }
 
 /** Whether it is there and how good. */
@@ -330,6 +369,9 @@ export const fetchCpDraft = (chapterId: number, run: string, signal?: AbortSigna
   request<{ notice: string; deck: unknown; slide_images?: ImageEditStates }>('GET', 'draft', { chapter_id: String(chapterId), run }, signal);
 
 export const fetchCpOptions = (chapterId: number, signal?: AbortSignal) => request<CpOptions>('GET', 'options', { chapter_id: String(chapterId) }, signal);
+
+export const fetchCpWorkflow = (chapterId: number, pedagogy: string, format: string | null, signal?: AbortSignal) =>
+  request<{ workflow: CpWorkflow; formats: CpWorkflowFormat[] }>('GET', 'workflow', { chapter_id: String(chapterId), pedagogy, ...(format ? { format } : {}) }, signal);
 
 export const fetchCpFit = (chapterId: number, pedagogy: string, format: string, signal?: AbortSignal) =>
   request<{ fit: CpFit }>('GET', 'fit', { chapter_id: String(chapterId), pedagogy, format }, signal);

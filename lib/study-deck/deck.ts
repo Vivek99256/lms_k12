@@ -13,7 +13,7 @@
 
 import { mapQuestionToPlayerPayload, type RuntimeScope } from '../h5p/question-bank-runtime';
 import { repairGenericLabels } from './cardTitle';
-import { interactionProblem } from './interactions';
+import { branchProblem, interactionProblem } from './interactions';
 import type { BankQuestion, H5pTargetKind } from '../h5p/question-bank-h5p-map';
 import {
   ACTIVITY_LABELS,
@@ -84,6 +84,9 @@ export function parseDeck(raw: unknown): StudyDeck {
       }
     });
   });
+
+  const stranded = branchProblem(deck.slides);
+  if (stranded) throw new DeckError(`${stranded}.`);
 
   return deck as StudyDeck;
 }
@@ -302,4 +305,21 @@ export const STAGE_LABEL: Record<string, string> = {
 
 export function stageLabel(slideType: string): string {
   return STAGE_LABEL[slideType] ?? 'Lesson';
+}
+
+/**
+ * The workflow stage a slide belongs to ("Stage 2 of 6: Ask - driving questions"), or null. Shown only when the deck's own validation passed:
+ * a deck whose stage order was not checked (or failed) never presents itself as following the workflow.
+ */
+export function workflowStageLabel(deck: StudyDeck, slide: DeckSlide): string | null {
+  const wf = deck.workflow;
+  if (!wf || wf.validation?.validated !== true) return null;
+  if (typeof slide.workflow_stage !== 'number' || !slide.workflow_stage_name) return null;
+  return `Stage ${slide.workflow_stage} of ${wf.stages.length}: ${slide.workflow_stage_name}`;
+}
+
+/** The outcomes and competencies a slide addresses, as their stored codes, only for a deck whose workflow validation passed. */
+export function workflowOutcomeRefs(deck: StudyDeck, slide: DeckSlide): string[] {
+  if (deck.workflow?.validation?.validated !== true) return [];
+  return (slide.outcome_refs ?? []).filter((ref) => deck.workflow?.outcomes.some((o) => o.ref === ref));
 }

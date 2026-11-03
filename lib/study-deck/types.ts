@@ -91,6 +91,8 @@ export interface DeckImage {
   height: number;
   /** The labels drawn on a diagram, in reading order. */
   texts?: string[];
+  /** The flat colour a picture sits on when it does not fill the slide (an illustration with its own paper colour). */
+  bg?: string;
   /** A drawn diagram has no licence, source or creator because nothing was found. */
   licence: string | null;
   source_url: string | null;
@@ -291,7 +293,97 @@ export interface OrderInteraction {
   wrapup: string;
 }
 
-export type DeckInteraction = HotspotsInteraction | ScenarioInteraction | ItemsInteraction | MatchInteraction | OrderInteraction;
+/** A choice of where to go next (the professional look's opening slide): each option jumps to the first slide of its own path. */
+export interface HubOption {
+  id: string;
+  label: string;
+  tagline: string;
+  /** The slide number it opens. */
+  goto: number;
+  /** The last slide of its path: reaching it marks the option as completed. */
+  end: number;
+  /** The slide whose picture is this option's picture (so the picture is stored once), and the labels drawn on it (see ProTour.tsx). */
+  image_slide: number;
+  art: 'k12' | 'g2g' | 'eb';
+}
+
+export interface HubInteraction {
+  kind: 'hub';
+  reason: string;
+  intro: string;
+  options: HubOption[];
+  /** A slide the learner may jump to at any time (the proposal), shown below the options. */
+  skip_to?: { label: string; goto: number };
+}
+
+/** A question asked in a pop-up over the slide's picture. Each answer opens its own slide, so the story branches and the learner can go back. */
+export interface DecisionOption {
+  id: string;
+  text: string;
+  /** The slide this answer opens. */
+  goto: number;
+}
+
+export interface DecisionInteraction {
+  kind: 'decision';
+  reason: string;
+  kicker: string;
+  question: string;
+  options: DecisionOption[];
+}
+
+/** What an answer leads to: the consequence and the reason, and where to go next (usually back to the question, or on). */
+export interface OutcomeInteraction {
+  kind: 'outcome';
+  reason: string;
+  tone: 'sound' | 'caution';
+  choice: { id: string; text: string };
+  what: string;
+  why: string;
+  actions: Array<{ label: string; goto: number; primary?: boolean }>;
+}
+
+/** A process played as a short animation, step by step: nothing to answer, only to watch (or step through). */
+export interface FlowStep {
+  id: string;
+  label: string;
+}
+
+export interface FlowInteraction {
+  kind: 'flow';
+  reason: string;
+  intro: string;
+  steps: FlowStep[];
+  wrapup: string;
+  /** `tour:<art>` plays the steps as a guided camera tour over the slide's picture, labelled for that art (see ProTour.tsx); without it the steps play as a list only. */
+  world?: string;
+}
+
+/** An animated bar chart whose bars can be opened for their detail. Values only scale the bars;  is what is written. */
+export interface BarItem {
+  id: string;
+  label: string;
+  value: number;
+  display: string;
+  detail: string;
+  tone?: 'primary' | 'accent' | 'muted';
+}
+
+export interface BarGroup {
+  title: string;
+  bars: BarItem[];
+}
+
+export interface BarsInteraction {
+  kind: 'bars';
+  reason: string;
+  intro: string;
+  orientation: 'vertical' | 'horizontal';
+  groups: BarGroup[];
+  wrapup: string;
+}
+
+export type DeckInteraction = HotspotsInteraction | ScenarioInteraction | ItemsInteraction | MatchInteraction | OrderInteraction | HubInteraction | FlowInteraction | BarsInteraction | DecisionInteraction | OutcomeInteraction;
 
 export interface DeckExplanation {
   concept_id: number;
@@ -329,11 +421,35 @@ export interface DeckSlide {
   activities: DeckActivity[];
   /** What the learner explores or decides on this slide, or null where plain teaching is enough. */
   interaction: DeckInteraction | null;
+  /** Where Continue goes (a slide number); the default is the next slide, and -1 means Continue waits for the learner to choose. */
+  next?: number;
   /** Why this slide has the interaction it has, or why it was left as plain teaching. */
   interaction_reason: string;
   h5p_pattern: { type: string; reason: string } | null;
   image: DeckImage | null;
   image_missing: string | null;
+  /** The pedagogical-workflow stage this slide belongs to (1-based) and its name. Present only on decks made with a staged workflow. */
+  workflow_stage?: number | null;
+  workflow_stage_name?: string | null;
+  /** Codes of the stored learning outcomes and competencies this slide addresses. */
+  outcome_refs?: string[];
+}
+
+/** What a deck says about the staged workflow it was made with; `validation.validated` is true only when the stage and outcome rules passed on its slides. */
+export interface DeckWorkflow {
+  method: { key: string; name: string; source?: string };
+  format: { key: string; name: string };
+  stages: Array<{ number: number; name: string; minutes: number; objective: string; outcome: string }>;
+  outcomes: Array<{ ref: string; type: 'learning_outcome' | 'competency'; description: string }>;
+  outcomes_note?: string | null;
+  validation: {
+    validated: boolean;
+    errors: string[];
+    outcomes_checked: boolean;
+    missing_outcomes?: string[];
+    stage_count?: number;
+    reason?: string;
+  };
 }
 
 export interface DeckConcept {
@@ -347,6 +463,10 @@ export interface DeckConcept {
 
 export interface StudyDeck {
   version: number;
+  /** Optional: a title for the player's header instead of the chapter's name (a deck shown outside its chapter's topic). */
+  title?: string;
+  /** Optional: `professional` draws every slide in one navy colour family with no corner artwork, instead of the topic colours. */
+  theme?: 'professional';
   /** Every stored picture the deck uses, by sha1. Present once the deck has been stored. */
   assets?: Record<string, DeckAsset>;
   chapter: { id: number; name: string; /** The chapter's place in its subject ("Chapter 2"), when the school's list numbers it. */ number?: number; standard_id: number; subject_id: number; standard_name: string; subject_name: string };
@@ -358,4 +478,6 @@ export interface StudyDeck {
   concept_slides: Record<string, number[]>;
   taught_by: Record<string, number[]>;
   concept_questions: Record<string, number[]>;
+  /** Present only on a deck made with the staged pedagogical workflow. */
+  workflow?: DeckWorkflow;
 }

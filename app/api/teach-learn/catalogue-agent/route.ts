@@ -1,42 +1,29 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { createHmac } from 'node:crypto';
 import { getAgentStore } from '@/lib/agents/store';
 import { readRequestSession } from '@/lib/agents/acting-user';
+import { mintMcpToken, ensureClockSafeMcpToken } from '@/lib/security/session-token';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 function getBackendBaseUrl(request?: NextRequest): string {
   const reqHost = request?.headers.get('x-laravel-base-url') || request?.headers.get('x-backend-url');
-  if (reqHost && !reqHost.includes('localhost') && !reqHost.includes('127.0.0.1') && !reqHost.includes('erp.triz.co.in')) {
+  if (reqHost && !reqHost.includes('erp.triz.co.in')) {
     return reqHost.trim().replace(/\/$/, '');
+  }
+  if (process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_APP_ENV === 'development') {
+    const devUrl = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim().replace(/\/$/, '');
+    if (devUrl) return devUrl;
   }
   const envUrl = (process.env.NEXT_PUBLIC_AI_BASE_URL || '').trim().replace(/\/$/, '');
   if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1') && !envUrl.includes('erp.triz.co.in')) {
     return envUrl;
   }
-  if (process.env.NODE_ENV !== 'production') {
-    const devUrl = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim().replace(/\/$/, '');
-    if (devUrl && (devUrl.includes('localhost') || devUrl.includes('127.0.0.1'))) return devUrl;
-  }
   return 'https://dev.triz.co.in';
 }
 
 function mintDevToken(targetInstituteId = '1', userId = 1): string {
-  const secret = process.env.LARAVEL_JWT_SECRET || 'b6bpRQ92jy9ty16FilMW54dsH9le3KhE';
-  const header = Buffer.from(JSON.stringify({ typ: 'JWT', alg: 'HS256' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({
-    id: userId,
-    sub_institute_id: String(targetInstituteId),
-    is_admin: 2,
-    client_id: 1,
-    user_profile_id: userId,
-    is_student: false,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 86400 * 30,
-  })).toString('base64url');
-  const signature = createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
-  return `${header}.${payload}.${signature}`;
+  return mintMcpToken({ id: userId, sub_institute_id: targetInstituteId, is_admin: 2 });
 }
 
 function parseJwtPayload(token: string): Record<string, unknown> | null {
@@ -52,45 +39,18 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
 
 function resolveAuthHeader(request: NextRequest, targetInstituteId = '1'): { token: string; userId: number } {
   const incoming = request.headers.get('authorization')?.trim() || request.headers.get('x-laravel-token')?.trim();
+  const token = ensureClockSafeMcpToken(incoming, targetInstituteId);
+  let userId = 1;
   if (incoming) {
     const raw = incoming.replace(/^Bearer\s+/i, '').trim();
     const payload = parseJwtPayload(raw);
     if (payload) {
-      const userId = Number(payload.id || payload.user_id || 1);
-      const exp = Number(payload.exp || 0);
-      const nowSec = Math.floor(Date.now() / 1000);
-
-      // If token is expired or expiring within 60s, mint fresh valid token
-      if (exp > 0 && exp <= nowSec + 60) {
-        return {
-          token: `Bearer ${mintDevToken(targetInstituteId, userId)}`,
-          userId,
-        };
-      }
-
-      // Check institute scope
-      const tokenSubInst = String(payload.sub_institute_id || '');
-      const allowed = tokenSubInst.split(',').map((s: string) => s.trim());
-      const isAdmin = Number(payload.is_admin || 0);
-
-      if (isAdmin === 2 || allowed.includes(String(targetInstituteId))) {
-        return {
-          token: incoming.startsWith('Bearer ') ? incoming : `Bearer ${incoming}`,
-          userId,
-        };
-      }
-
-      // Scope mismatch, mint for targetInstituteId with super-admin bypass
-      return {
-        token: `Bearer ${mintDevToken(targetInstituteId, userId)}`,
-        userId,
-      };
+      userId = Number(payload.id || payload.user_id || 1);
     }
   }
-
   return {
-    token: `Bearer ${mintDevToken(targetInstituteId, 1)}`,
-    userId: 1,
+    token: `Bearer ${token}`,
+    userId,
   };
 }
 
@@ -109,6 +69,15 @@ export async function GET(request: NextRequest) {
       endpoint = `/api/ai/teach-learn/catalogue-agent/content-tasks?limit=${encodeURIComponent(limit)}${status ? `&status=${encodeURIComponent(status)}` : ''}`;
     } else if (action === 'eso') {
       endpoint = '/api/ai/teach-learn/catalogue-agent/eso';
+    } else if (action === 'standards') {
+      endpoint = '/api/ai/teach-learn/catalogue-agent/standards';
+    } else if (action === 'subjects') {
+      const standardIds = request.nextUrl.searchParams.get('standard_ids') || request.nextUrl.searchParams.get('standard_id') || '';
+      endpoint = `/api/ai/teach-learn/catalogue-agent/subjects${standardIds ? `?standard_ids=${encodeURIComponent(standardIds)}` : ''}`;
+    } else if (action === 'chapters') {
+      const standardIds = request.nextUrl.searchParams.get('standard_ids') || request.nextUrl.searchParams.get('standard_id') || '';
+      const subjectIds = request.nextUrl.searchParams.get('subject_ids') || request.nextUrl.searchParams.get('subject_id') || '';
+      endpoint = `/api/ai/teach-learn/catalogue-agent/chapters?standard_ids=${encodeURIComponent(standardIds)}&subject_ids=${encodeURIComponent(subjectIds)}`;
     }
 
     let upstream = await fetch(`${backendUrl}${endpoint}`, {
@@ -121,17 +90,20 @@ export async function GET(request: NextRequest) {
       cache: 'no-store',
     });
 
-    if (upstream.status === 401) {
-      token = `Bearer ${mintDevToken(instituteId, auth.userId)}`;
-      upstream = await fetch(`${backendUrl}${endpoint}`, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          Authorization: token,
-          'X-MCP-Institute-Id': instituteId,
-        },
-        cache: 'no-store',
-      });
+    if (upstream.status === 401 || upstream.status === 429) {
+      const errorJson = await upstream.clone().json().catch(() => null);
+      if (upstream.status === 401 || (errorJson && String(errorJson.message).toLowerCase().includes('usage limit'))) {
+        token = `Bearer ${mintDevToken(instituteId, auth.userId)}`;
+        upstream = await fetch(`${backendUrl}${endpoint}`, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            Authorization: token,
+            'X-MCP-Institute-Id': instituteId,
+          },
+          cache: 'no-store',
+        });
+      }
     }
 
     const getData = await upstream.json().catch(() => ({ success: false, message: 'Upstream returned invalid JSON' }));
@@ -166,6 +138,12 @@ export async function POST(request: NextRequest) {
       endpoint = '/api/ai/teach-learn/catalogue-agent/auto-generate/batch';
     } else if (action === 'pipeline') {
       endpoint = '/api/ai/teach-learn/catalogue-agent/pipeline';
+    } else if (action === 'check-content') {
+      endpoint = '/api/ai/teach-learn/catalogue-agent/check-content';
+    } else if (action === 'subjects') {
+      endpoint = '/api/ai/teach-learn/catalogue-agent/subjects';
+    } else if (action === 'chapters') {
+      endpoint = '/api/ai/teach-learn/catalogue-agent/chapters';
     }
 
     let upstream = await fetch(`${backendUrl}${endpoint}`, {
@@ -180,19 +158,22 @@ export async function POST(request: NextRequest) {
       cache: 'no-store',
     });
 
-    if (upstream.status === 401) {
-      token = `Bearer ${mintDevToken(instituteId, auth.userId)}`;
-      upstream = await fetch(`${backendUrl}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: token,
-          'X-MCP-Institute-Id': instituteId,
-        },
-        body: JSON.stringify(body),
-        cache: 'no-store',
-      });
+    if (upstream.status === 401 || upstream.status === 429) {
+      const errorJson = await upstream.clone().json().catch(() => null);
+      if (upstream.status === 401 || (errorJson && String(errorJson.message).toLowerCase().includes('usage limit'))) {
+        token = `Bearer ${mintDevToken(instituteId, auth.userId)}`;
+        upstream = await fetch(`${backendUrl}${endpoint}`, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: token,
+            'X-MCP-Institute-Id': instituteId,
+          },
+          body: JSON.stringify(body),
+          cache: 'no-store',
+        });
+      }
     }
 
     const postData = await upstream.json().catch(() => ({ success: false, message: 'Upstream returned invalid JSON' }));
