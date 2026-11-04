@@ -39,6 +39,91 @@ interface StoreShape {
 
 export const BASELINE_AGENTS: Agent[] = [
   {
+    id: 'agt_master_course_catalogue',
+    name: 'Course Catalogue Master Autonomous Agent',
+    description:
+      'Autonomous master pipeline agent for Teach/Learn: validates 5-tier content hierarchy (Standard -> Subject -> Chapter -> Topic -> Intelligence), scans course structures, and schedules content generation.',
+    module: 'teach_learn',
+    tenant_id: '1',
+    tools_allowed: ['teach_learn.courses', 'teach_learn.activities', 'teach_learn.content_model_coverage'],
+    instructions:
+      'Execute full 5-tier curriculum audit and course hierarchy scan across all configured classes and subjects.',
+    trigger: 'scheduled',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'System Admin',
+    created_at: '2026-10-25T08:00:00.000Z',
+    updated_at: '2026-10-28T12:00:00.000Z',
+  },
+  {
+    id: 'agt_master_exam_assessment',
+    name: 'Exam & Assessment Master Autonomous Agent',
+    description:
+      'Autonomous master pipeline agent for Exam & Assessment: aggregates teacher exams, audits coursework submissions, detects at-risk performance, and drafts educator intervention notes.',
+    module: 'exam_assessment',
+    tenant_id: '1',
+    tools_allowed: ['exam_assessment.online_exam_summary', 'exam_assessment.assignment_status', 'exam_assessment.draft_review_note'],
+    instructions:
+      'Run 3-step assessment pipeline: scan exams, verify assignments, and synthesize at-risk student intervention drafts for teacher sign-off.',
+    trigger: 'scheduled',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'System Admin',
+    created_at: '2026-10-25T08:00:00.000Z',
+    updated_at: '2026-10-28T12:00:00.000Z',
+  },
+  {
+    id: 'agt_master_engagement',
+    name: 'Student Engagement Master Autonomous Agent',
+    description:
+      'Autonomous master pipeline agent for Student Engagement: continuously monitors attendance, homework, and coursework activity to detect at-risk engagement deficits.',
+    module: 'engagement',
+    tenant_id: '1',
+    tools_allowed: ['engagement.students_needing_attention', 'engagement.student_summary', 'engagement.draft_intervention_note'],
+    instructions:
+      'Monitor student engagement trends, aggregate attendance and homework completion, and draft intervention recommendations for educators.',
+    trigger: 'scheduled',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'System Admin',
+    created_at: '2026-10-25T08:00:00.000Z',
+    updated_at: '2026-10-28T12:00:00.000Z',
+  },
+  {
+    id: 'agt_master_curriculum_planning',
+    name: 'Curriculum Planning Master Autonomous Agent',
+    description:
+      'Autonomous master pipeline agent for Curriculum Planning: tracks unit and chapter coverage, audits lesson planning pace, and aligns learning outcomes with syllabus pacing.',
+    module: 'curriculum_planning',
+    tenant_id: '1',
+    tools_allowed: ['curriculum_planning.status', 'curriculum_planning.lesson_pace', 'curriculum_planning.draft_alignment_note', 'curriculum_planning.outcomes'],
+    instructions:
+      'Audit syllabus pacing and chapter completion against academic calendar, detecting lag and proposing remediation pacing notes.',
+    trigger: 'scheduled',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'System Admin',
+    created_at: '2026-10-25T08:00:00.000Z',
+    updated_at: '2026-10-28T12:00:00.000Z',
+  },
+  {
+    id: 'agt_master_pal',
+    name: 'PAL Adaptive Learning Master Autonomous Agent',
+    description:
+      'Autonomous master pipeline agent for PAL: audits concept mastery progression, evaluates learner practice streaks, identifies bottleneck concepts, and drafts adaptive learning interventions.',
+    module: 'new_pal',
+    tenant_id: '1',
+    tools_allowed: ['new_pal.gamification_summary', 'new_pal.content_model_status', 'new_pal.coherence_gaps', 'new_pal.draft_adaptive_intervention'],
+    instructions:
+      'Continuously analyze adaptive practice sessions, track concept mastery, and generate personalized remediation plans for student mastery advancement.',
+    trigger: 'scheduled',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'System Admin',
+    created_at: '2026-10-25T08:00:00.000Z',
+    updated_at: '2026-10-28T12:00:00.000Z',
+  },
+  {
     id: 'agt_34dc52f6dc24',
     name: 'Course catalogue reader',
     description:
@@ -129,7 +214,7 @@ export const BASELINE_AGENTS: Agent[] = [
       'Synthesizes exam performance and coursework status into constructive draft review notes for teacher approval.',
     module: 'exam_assessment',
     tenant_id: '1',
-    tools_allowed: ['exam_assessment.review_note_drafter'],
+    tools_allowed: ['exam_assessment.draft_review_note'],
     instructions:
       'Generate evidence-backed constructive review drafts citing specific marks and missing work. Requires human teacher sign-off.',
     trigger: 'manual',
@@ -518,7 +603,7 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
       let agtId = 'agt_34dc52f6dc24';
       let agtName = 'Course catalogue reader';
 
-      if (key === 'teach_learn.courses' || key === 'lms.courses' || key === 'k12_course_catalogue') {
+      if (key === 'teach_learn.courses' || key === 'lms.courses') {
         mod = 'teach_learn';
         agtId = 'agt_34dc52f6dc24';
         agtName = 'Course catalogue reader';
@@ -538,7 +623,7 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
         mod = 'teach_learn';
         agtId = 'agt_34dc52f6dc24';
         agtName = 'Course catalogue reader';
-      } else if (key === 'exam_assessment.online_exam_summary' || key === 'k12_exam_assessment') {
+      } else if (key === 'exam_assessment.online_exam_summary') {
         mod = 'exam_assessment';
         agtId = 'agt_exam_summary_reader';
         agtName = 'Online exam summary reader';
@@ -564,8 +649,8 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
         agtName = 'Re-engagement intervention drafter';
       } else if (key === 'k12_engagement') {
         mod = 'engagement';
-        agtId = 'agt_engagement_attention_reader';
-        agtName = 'Engagement Master Agent';
+        agtId = 'agt_master_engagement';
+        agtName = 'Student Engagement Master Autonomous Agent';
       } else if (key === 'curriculum_planning.status' || key === 'agt_curriculum_coverage_reader') {
         mod = 'curriculum_planning';
         agtId = 'agt_curriculum_coverage_reader';
@@ -584,8 +669,8 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
         agtName = 'Learning outcomes reader';
       } else if (key === 'k12_curriculum_planning') {
         mod = 'curriculum_planning';
-        agtId = 'agt_curriculum_coverage_reader';
-        agtName = 'Curriculum Planning Master Agent';
+        agtId = 'agt_master_curriculum_planning';
+        agtName = 'Curriculum Planning Master Autonomous Agent';
       } else if (key.startsWith('curriculum_planning.') || key.startsWith('curriculum.')) {
         mod = 'curriculum_planning';
         agtId = 'agt_curriculum_coverage_reader';
@@ -608,8 +693,8 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
         agtName = 'Coherence map reader';
       } else if (key === 'k12_new_pal' || key === 'k12_pal') {
         mod = 'new_pal';
-        agtId = 'agt_pal_gamification_reader';
-        agtName = 'New PAL Master Agent';
+        agtId = 'agt_master_pal';
+        agtName = 'PAL Adaptive Learning Master Autonomous Agent';
       } else if (key.startsWith('new_pal.') || key.startsWith('pal.')) {
         mod = 'new_pal';
         agtId = 'agt_pal_gamification_reader';
