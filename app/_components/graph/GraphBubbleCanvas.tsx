@@ -78,6 +78,11 @@ const SURFACE: Record<Mode, { canvas: string; bg: string; panel: string; panelBo
 
 const gradientId = (hex: string) => `kgb-${hex.slice(1)}`;
 
+const iconButton =
+  'flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border shadow-sm backdrop-blur-md transition-transform hover:scale-105 active:scale-95';
+const pill =
+  'flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border px-3 text-xs font-medium shadow-sm backdrop-blur-md transition-transform hover:scale-[1.03] active:scale-95';
+
 interface View {
   x: number;
   y: number;
@@ -153,17 +158,29 @@ export default function GraphBubbleCanvas({
   const s = SURFACE[mode];
   const dark = mode === 'dark';
 
-  const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
-  const categories = useMemo(() => categoriesPresent(nodes.map((n) => n.entityKey)), [nodes]);
+  const safeNodes = useMemo(
+    () => (Array.isArray(nodes) ? nodes.filter((n): n is KgNodeInput => Boolean(n && n.id)) : []),
+    [nodes]
+  );
+  const safeEdges = useMemo(
+    () =>
+      Array.isArray(edges)
+        ? edges.filter((e): e is KgEdgeInput => Boolean(e && e.id && e.source && e.target))
+        : [],
+    [edges]
+  );
+
+  const byId = useMemo(() => new Map(safeNodes.map((n) => [n.id, n])), [safeNodes]);
+  const categories = useMemo(() => categoriesPresent(safeNodes.map((n) => n.entityKey)), [safeNodes]);
 
   const visibleNodes = useMemo(
-    () => nodes.filter((n) => !hiddenCategories.includes(categoryColor(n.entityKey).key)),
-    [nodes, hiddenCategories]
+    () => safeNodes.filter((n) => !hiddenCategories.includes(categoryColor(n.entityKey).key)),
+    [safeNodes, hiddenCategories]
   );
   const visibleIds = useMemo(() => new Set(visibleNodes.map((n) => n.id)), [visibleNodes]);
   const visibleEdges = useMemo(
-    () => edges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target)),
-    [edges, visibleIds]
+    () => safeEdges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target)),
+    [safeEdges, visibleIds]
   );
 
   const kindOf = useCallback(
@@ -405,7 +422,7 @@ export default function GraphBubbleCanvas({
   const toggleCategory = (key: string) =>
     setHiddenCategories((current) => (current.includes(key) ? current.filter((value) => value !== key) : [...current, key]));
 
-  const matches = (n: KgNodeInput) => needle !== '' && n.label.toLowerCase().includes(needle);
+  const matches = (n: KgNodeInput) => needle !== '' && typeof n.label === 'string' && n.label.toLowerCase().includes(needle);
   const palette = useMemo(
     () => [...new Set(categories.map((c) => c.color.dot))],
     [categories]
@@ -490,7 +507,7 @@ export default function GraphBubbleCanvas({
             const open = meta?.open ?? false;
             const loading = loadingNodeId === n.id;
             const showBadge = kind !== 'leaf';
-            const labelText = n.label.length > 24 ? `${n.label.slice(0, 23)}…` : n.label;
+            const labelText = typeof n.label === 'string' ? (n.label.length > 24 ? `${n.label.slice(0, 23)}…` : n.label) : String(n.label ?? n.id ?? 'Node');
             const showLabel = kind !== 'center' ? showNames || lit || kind === 'hub' : false;
 
             return (
@@ -521,10 +538,10 @@ export default function GraphBubbleCanvas({
                 {kind === 'center' ? (
                   <>
                     <text y={-4} textAnchor="middle" fill="#fff" fontSize={12} fontWeight={700} style={{ pointerEvents: 'none' }}>
-                      {n.label.length > 16 ? `${n.label.slice(0, 15)}…` : n.label}
+                      {typeof n.label === 'string' && n.label.length > 16 ? `${n.label.slice(0, 15)}…` : String(n.label ?? n.id ?? 'Node')}
                     </text>
                     <text y={14} textAnchor="middle" fill="#dbeafe" fontSize={10} style={{ pointerEvents: 'none' }}>
-                      {n.entityKey}
+                      {n.entityKey ?? ''}
                     </text>
                   </>
                 ) : (
@@ -652,7 +669,7 @@ export default function GraphBubbleCanvas({
               <ul className="max-h-60 space-y-1.5 overflow-y-auto pr-1">
                 {categories.map(({ key, color }: { key: string; color: CategoryColor }) => {
                   const off = hiddenCategories.includes(key);
-                  const count = nodes.filter((n) => categoryColor(n.entityKey).key === key).length;
+                  const count = safeNodes.filter((n) => categoryColor(n?.entityKey).key === key).length;
                   return (
                     <li key={key}>
                       <button
