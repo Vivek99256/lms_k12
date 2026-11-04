@@ -45,6 +45,18 @@ export default function AiCapabilityPage() {
 
   if (!capability) return <UnknownCapability slug={slug} />;
 
+  const isKnowledgeGraph = capability.slug === 'knowledge-graph';
+
+  // Knowledge Graph gets a full-screen application viewport without outer gutters
+  // or redundant headers that push the canvas down and create page-level scrollbars.
+  if (isKnowledgeGraph) {
+    return (
+      <div className="h-[calc(100vh-4.25rem)] w-full overflow-hidden p-2">
+        <KnowledgeGraphExplorer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-full px-6 py-5">
       <div className="mx-auto max-w-[1100px]">
@@ -97,10 +109,6 @@ export default function AiCapabilityPage() {
              context for it, not a substitute. */
           <CapabilityLiveData slug={capability.slug} name={capability.name} />
         )}
-
-       
-
-        {/*  */}
       </div>
     </div>
   );

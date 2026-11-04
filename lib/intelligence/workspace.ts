@@ -464,6 +464,36 @@ export function fetchOntologyView(
   return post<OntologyViewResult>(session, `/ontology-views/${viewKey}`, input);
 }
 
+/**
+ * One node's real connections in every direction, from
+ * `POST /api/ai/workspace/nodes/{entity}/{id}/expand` — the click-to-expand
+ * backend for the decentralized canvas, as opposed to `fetchOntologyView`'s
+ * fixed, pre-authored hop path.
+ */
+export interface NodeExpansionResult {
+  found: boolean;
+  node: { entity: string; id: number | string | null; label: string; attributes: Record<string, unknown> } | null;
+  relations: Array<{
+    relation: string;
+    direction: 'outgoing' | 'incoming';
+    entity: string | null;
+    available: boolean;
+    reason: string | null;
+    source: 'sql' | 'graph' | null;
+    total: number;
+    items: Array<{ entity: string; id: number | string | null; label: string; attributes: Record<string, unknown> }>;
+  }>;
+}
+
+export function expandGraphNode(
+  session: WorkspaceSession,
+  entity: string,
+  id: string | number,
+  limit = 10
+) {
+  return post<NodeExpansionResult>(session, `/nodes/${entity}/${id}/expand`, { limit });
+}
+
 export function startWorkspaceWorkflow(
   session: WorkspaceSession,
   workflowKey: string,

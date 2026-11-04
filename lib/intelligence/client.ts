@@ -139,6 +139,17 @@ function get<T>(context: IntelligenceContext, path: string, query?: Record<strin
   const params = new URLSearchParams();
 
   for (const [key, value] of Object.entries(query || {})) {
+    if (Array.isArray(value)) {
+      // PHP's query-string parsing only collects repeats into an array when
+      // the key carries the `[]` suffix — a bare repeated key keeps only the
+      // last value. Laravel's `labels` => "array" validation depends on this.
+      for (const item of value) {
+        if (item !== undefined && item !== null && `${item}` !== "") {
+          params.append(`${key}[]`, String(item));
+        }
+      }
+      continue;
+    }
     if (value !== undefined && value !== null && `${value}` !== "") {
       params.set(key, String(value));
     }
@@ -566,8 +577,15 @@ export function fetchErpSubmoduleGraph(
 // browser endpoints above, same GraphModuleBrowser/Neo4j path, tenant scope
 // always derived server-side from the JWT (never sent from here).
 
-export function searchKnowledgeGraph(context: IntelligenceContext, term: string, limit?: number) {
-  return get<GraphSearchResult>(context, "/knowledge-graph/browser/search", { q: term, limit });
+/**
+ * Cross-label search. A non-empty `term` searches by name, optionally
+ * restricted to `labels`. An empty `term` with `labels` given instead
+ * returns a few real sample nodes of those labels, no text filter — the
+ * "pick a starting point for this submodule" case the contextual explorer
+ * uses in place of a flat cross-label sample.
+ */
+export function searchKnowledgeGraph(context: IntelligenceContext, term: string, limit?: number, labels?: string[]) {
+  return get<GraphSearchResult>(context, "/knowledge-graph/browser/search", { q: term, limit, labels });
 }
 
 export function findKnowledgeGraphPath(
@@ -595,12 +613,17 @@ export function fetchGraphNodeDetail(
   context: IntelligenceContext,
   label: string,
   recordId: string | number,
-  options: { relationshipLimit?: number; skip?: number } = {}
+  options: { relationshipLimit?: number; skip?: number; relation?: string; direction?: 'incoming' | 'outgoing' } = {}
 ) {
   return get<GraphNodeDetail>(
     context,
     `/knowledge-graph/browser/node/${encodeURIComponent(label)}/${encodeURIComponent(String(recordId))}`,
-    { relationship_limit: options.relationshipLimit, skip: options.skip }
+    {
+      relationship_limit: options.relationshipLimit,
+      skip: options.skip,
+      relation: options.relation,
+      direction: options.direction,
+    }
   );
 }
 

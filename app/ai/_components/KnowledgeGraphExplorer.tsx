@@ -17,15 +17,8 @@ import CentralizedKnowledgeGraphExplorer from './CentralizedKnowledgeGraphExplor
 
 export default function KnowledgeGraphExplorer() {
   return (
-    <section className="mt-6">
-      <header className="mb-3">
-        <h2 className="text-sm font-semibold text-card-foreground">Knowledge Graph</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Every module, submodule, node and relationship below is read live from Neo4j.
-        </p>
-      </header>
-
+    <div className="h-full w-full">
       <CentralizedKnowledgeGraphExplorer />
-    </section>
+    </div>
   );
 }
