@@ -41,7 +41,11 @@ import type { ErpModule, GraphPathResult } from '@/lib/intelligence/types';
 import GraphBreadcrumbHeader from '@/app/_components/graph/GraphBreadcrumbHeader';
 import GraphBubbleCanvas from '@/app/_components/graph/GraphBubbleCanvas';
 import GraphDetailPanel from '@/app/_components/graph/GraphDetailPanel';
-import GraphModuleTree, { type TreeSubmodule } from '@/app/_components/graph/GraphModuleTree';
+import GraphModuleTree, {
+  ORG_MANAGEMENT_STAFF_SUBMODULE,
+  isOrganizationManagement,
+  type TreeSubmodule,
+} from '@/app/_components/graph/GraphModuleTree';
 import GraphPathFinder from '@/app/_components/graph/GraphPathFinder';
 import GraphSearchBar from '@/app/_components/graph/GraphSearchBar';
 import GraphSyncStatus from '@/app/_components/graph/GraphSyncStatus';
@@ -255,10 +259,12 @@ export default function CentralizedKnowledgeGraphExplorer({
   };
 
   /** A fresh starting point — clears every expanded group and everything learned about nodes so far, since none of it applies to the new sample. */
-  const applyBase = (nodes: KgNodeInput[], edges: KgEdgeInput[] = []) => {
-    setBaseRoots({ nodes, edges });
-    setRootNodes(nodes);
-    setRootEdges(edges);
+  const applyBase = (nodes: KgNodeInput[] = [], edges: KgEdgeInput[] = []) => {
+    const safeNodes = Array.isArray(nodes) ? nodes : [];
+    const safeEdges = Array.isArray(edges) ? edges : [];
+    setBaseRoots({ nodes: safeNodes, edges: safeEdges });
+    setRootNodes(safeNodes);
+    setRootEdges(safeEdges);
     setExpandedGroups(new Map());
     setNodeTotals(new Map());
     nodeGroupsCache.current = new Map();
@@ -266,16 +272,38 @@ export default function CentralizedKnowledgeGraphExplorer({
 
   /** "Reset" — back to the last base view, collapsing every expansion made since, with no new fetch. */
   const resetView = () => {
-    setRootNodes(baseRoots.nodes);
-    setRootEdges(baseRoots.edges);
+    setRootNodes(baseRoots.nodes || []);
+    setRootEdges(baseRoots.edges || []);
     setExpandedGroups(new Map());
     setSelectedNode(null);
     setSelectedEdge(null);
     setExpandNotice('');
   };
 
-  const openModule = (module: ErpModule) => {
+  const openModule = async (module: ErpModule) => {
     setSelectedModule(module);
+    setSelectedSubmodule(null);
+    setGraphState('loading');
+    setGraphError('');
+    resetSelection();
+    applyBase([], []);
+
+    try {
+      const payload = await listErpSubmodules(session, module.id);
+      const isOrg = isOrganizationManagement(module.label);
+      const extra = isOrg ? [ORG_MANAGEMENT_STAFF_SUBMODULE] : [];
+      const submodules = Array.isArray(payload?.submodules) ? payload.submodules : [];
+      const allSubmodules = [...extra, ...submodules];
+      const first = allSubmodules.find((s) => s.mapped);
+      if (first) {
+        await openSubmodule(module, first);
+      } else {
+        setGraphState('not-mapped');
+      }
+    } catch (cause) {
+      setGraphError(cause instanceof Error ? cause.message : 'The request failed.');
+      setGraphState('error');
+    }
   };
 
   const openSubmodule = async (module: ErpModule, submodule: TreeSubmodule) => {
@@ -290,12 +318,13 @@ export default function CentralizedKnowledgeGraphExplorer({
       if (submodule.kind === 'organization-staff') {
         const result = await fetchOrganizationStaffGraph(session, { perRole: 25 });
         const mapped = mapOrganizationStaffGraph(result);
-        applyBase(mapped.nodes, mapped.edges);
+        applyBase(mapped.nodes || [], mapped.edges || []);
         setGraphState('ready');
         return;
       }
 
-      if (submodule.labels.length === 0) {
+      const labels = Array.isArray(submodule?.labels) ? submodule.labels : [];
+      if (labels.length === 0) {
         setGraphState('not-mapped');
         return;
       }
@@ -306,8 +335,13 @@ export default function CentralizedKnowledgeGraphExplorer({
       // label comes first, rendered directly as the initial canvas nodes.
       // Nothing is pre-expanded: clicking one shows what it's actually
       // connected to, and the user chooses which relationship to reveal.
-      const result = await searchKnowledgeGraph(session, '', ROOT_SAMPLE_LIMIT, submodule.labels);
-      applyBase(result.nodes);
+      const result = await searchKnowledgeGraph(session, '', ROOT_SAMPLE_LIMIT, labels);
+      const safeNodes = Array.isArray(result?.nodes) ? result.nodes : [];
+      if (safeNodes.length === 0) {
+        setGraphState('not-mapped');
+        return;
+      }
+      applyBase(safeNodes, []);
       setGraphState('ready');
     } catch (cause) {
       setGraphError(cause instanceof Error ? cause.message : 'The request failed.');
@@ -318,16 +352,7 @@ export default function CentralizedKnowledgeGraphExplorer({
   const jumpToModule = async (moduleId: number) => {
     const module = modules.find((m) => m.id === moduleId);
     if (!module) return;
-    setSelectedModule(module);
-    setSelectedSubmodule(null);
-    setGraphState('idle');
-    try {
-      const payload = await listErpSubmodules(session, moduleId);
-      const first = payload.submodules.find((s) => s.mapped);
-      if (first) await openSubmodule(module, first);
-    } catch {
-      // The tree itself will still let the user expand this module manually.
-    }
+    await openModule(module);
   };
 
   const fetchNodeDetailPage = (node: KgNodeInput, skip: number) =>

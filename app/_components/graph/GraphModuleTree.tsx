@@ -26,7 +26,7 @@ import type { ErpModule, ErpSubmodule } from '@/lib/intelligence/types';
 
 export type TreeSubmodule = ErpSubmodule & { kind?: 'organization-staff' };
 
-const ORG_MANAGEMENT_STAFF_SUBMODULE: TreeSubmodule = {
+export const ORG_MANAGEMENT_STAFF_SUBMODULE: TreeSubmodule = {
   id: -1,
   label: 'Staff, Department & Role',
   mapped: true,
@@ -34,8 +34,8 @@ const ORG_MANAGEMENT_STAFF_SUBMODULE: TreeSubmodule = {
   kind: 'organization-staff',
 };
 
-function isOrganizationManagement(label: string): boolean {
-  return label.toLowerCase().includes('organization management');
+export function isOrganizationManagement(label?: string | null): boolean {
+  return typeof label === 'string' && label.toLowerCase().includes('organization management');
 }
 
 export default function GraphModuleTree({
@@ -68,7 +68,8 @@ export default function GraphModuleTree({
       const payload = await listErpSubmodules(session, moduleId);
       const module = modules.find((m) => m.id === moduleId);
       const extra = module && isOrganizationManagement(module.label) ? [ORG_MANAGEMENT_STAFF_SUBMODULE] : [];
-      setSubmodulesByModule((prev) => ({ ...prev, [moduleId]: [...extra, ...payload.submodules] }));
+      const submodules = Array.isArray(payload?.submodules) ? payload.submodules : [];
+      setSubmodulesByModule((prev) => ({ ...prev, [moduleId]: [...extra, ...submodules] }));
     } catch {
       setSubmodulesByModule((prev) => ({ ...prev, [moduleId]: 'error' }));
     }

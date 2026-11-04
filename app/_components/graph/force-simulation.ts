@@ -127,8 +127,8 @@ export function shade(hex: string, amount: number): string {
   return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
 }
 
-export const initials = (label: string) =>
-  label
+export const initials = (label?: string | null) =>
+  String(label || '')
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
