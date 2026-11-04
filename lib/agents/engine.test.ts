@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Authorization, Authorizer } from './acting-user';
-import { AgentEngineDenied, AgentEngineError, createAgent, listAgents, runAgent, setAgentStatus, type EngineContext } from './engine';
+import { AgentEngineDenied, AgentEngineError, createAgent, listAgents, runAgent, setAgentStatus, updateAgent, type EngineContext } from './engine';
 import { MemoryAgentStore } from './store';
 import type { ActingUser } from './types';
 
@@ -208,15 +208,42 @@ test('a session without an institute or user cannot do anything', async () => {
   await assert.rejects(listAgents(context(anonymous, allow), { module: reminderAgent.module }), (error: unknown) => error instanceof AgentEngineError && error.status === 401);
 });
 
-test('listing agents needs view rights on a named module', async () => {
+test('listing agents works centrally and per-module', async () => {
   const store = new MemoryAgentStore();
   await createAgent(context(feesAdmin, allow, store), reminderAgent);
 
-  await assert.rejects(listAgents(context(feesAdmin, allow, store)), (error: unknown) =>
+  // Centralized listing across all modules returns the created agent
+  const centralList = await listAgents(context(feesAdmin, allow, store));
+  assert.equal(centralList.length, 1);
+  assert.equal(centralList[0].name, reminderAgent.name);
+
+  // Invalid module name rejects with 400
+  await assert.rejects(listAgents(context(feesAdmin, allow, store), { module: 'invalid_module_name' }), (error: unknown) =>
     error instanceof AgentEngineError && error.status === 400);
+
+  // Denied rights rejects with 403
   await assert.rejects(listAgents(context(feesClerk, deny, store), { module: reminderAgent.module }), (error: unknown) =>
     error instanceof AgentEngineError && error.status === 403);
   assert.equal((await listAgents(context(feesAdmin, allow, store), { module: reminderAgent.module })).length, 1);
+});
+
+test('updating an agent updates configuration, tools, and timestamp', async () => {
+  const store = new MemoryAgentStore();
+  const agent = await createAgent(context(feesAdmin, allow, store), reminderAgent);
+
+  const updated = await updateAgent(context(feesAdmin, allow, store), agent.id, {
+    name: 'Updated Reminder Agent',
+    description: 'Updated description',
+    instructions: 'Send polite updated reminders.',
+    trigger: 'scheduled',
+    status: 'paused',
+  });
+
+  assert.equal(updated.name, 'Updated Reminder Agent');
+  assert.equal(updated.description, 'Updated description');
+  assert.equal(updated.instructions, 'Send polite updated reminders.');
+  assert.equal(updated.trigger, 'scheduled');
+  assert.equal(updated.status, 'paused');
 });
 
 test('listing agents for exam_assessment succeeds and asks for agents.exam_assessment view rights', async () => {

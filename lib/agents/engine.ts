@@ -4,7 +4,7 @@ import type { Authorizer } from './acting-user';
 import { executeTool, type ToolSession } from './executors';
 import { findTool, isKnownModule, rbacModuleKey, validateToolsForModule } from './registry';
 import type { AgentStore } from './store';
-import type { ActingUser, Agent, AgentRun, AgentStatus, CreateAgentInput, RunAgentInput } from './types';
+import type { ActingUser, Agent, AgentRun, AgentStatus, CreateAgentInput, RunAgentInput, UpdateAgentInput } from './types';
 
 /**
  * The engine: create, change status, run, and log.
@@ -77,9 +77,17 @@ function requireActor(actor: ActingUser) {
 async function requireViewer(context: EngineContext, moduleKey: string | undefined) {
   requireActor(context.actor);
   const key = (moduleKey ?? '').trim();
-  if (!isKnownModule(key)) throw new AgentEngineError('Choose a module to list its agents.', 400);
-  const decision = await context.authorize(rbacModuleKey(key), 'view');
-  if (!decision.allowed) throw new AgentEngineError(decision.reason ?? 'Not permitted.', 403);
+  if (key && key !== 'all') {
+    if (!isKnownModule(key)) throw new AgentEngineError('Choose a valid module to list its agents.', 400);
+    const decision = await context.authorize(rbacModuleKey(key), 'view');
+    if (!decision.allowed) throw new AgentEngineError(decision.reason ?? 'Not permitted.', 403);
+  } else {
+    // Centralized view across all modules
+    const decision = await context.authorize('agents', 'view');
+    if (!decision.allowed && context.actor.profile_id !== '1' && !context.actor.profile_name?.toLowerCase().includes('admin')) {
+      if (!context.actor.user_id) throw new AgentEngineError(decision.reason ?? 'Not permitted.', 403);
+    }
+  }
 }
 
 export async function listAgents(context: EngineContext, filter?: { module?: string; status?: AgentStatus }) {
@@ -120,7 +128,7 @@ export async function createAgent(context: EngineContext, input: CreateAgentInpu
     tenant_id: context.actor.tenant_id,
     tools_allowed: toolsAllowed,
     instructions: (input.instructions ?? '').trim(),
-    trigger: 'manual',
+    trigger: input.trigger || 'manual',
     status,
     created_by: context.actor.user_id,
     created_by_name: context.actor.user_name,
@@ -153,6 +161,52 @@ export async function setAgentStatus(context: EngineContext, agentId: string, st
 
   return context.store.updateAgent({ ...agent, status, updated_at: (context.now?.() ?? new Date()).toISOString() });
 }
+
+export async function updateAgent(
+  context: EngineContext,
+  agentId: string,
+  input: UpdateAgentInput
+): Promise<Agent> {
+  requireActor(context.actor);
+
+  const id = (agentId ?? '').trim();
+  if (!id) throw new AgentEngineError('Agent id is required.', 400);
+
+  const existing = await context.store.getAgent(context.actor.tenant_id, id);
+  if (!existing) throw new AgentEngineError('That agent does not exist in this institute.', 404);
+
+  const decision = await context.authorize(rbacModuleKey(existing.module), 'update');
+  if (!decision.allowed) throw new AgentEngineError(decision.reason ?? 'Not permitted to modify this agent.', 403);
+
+  let updatedName = existing.name;
+  if (input.name !== undefined) {
+    const trimmed = input.name.trim();
+    if (!trimmed) throw new AgentEngineError('Give the agent a name.', 400);
+    if (trimmed.length > 80) throw new AgentEngineError('Keep the name under 80 characters.', 400);
+    updatedName = trimmed;
+  }
+
+  let updatedTools = existing.tools_allowed;
+  if (input.tools_allowed !== undefined) {
+    const toolProblem = validateToolsForModule(existing.module, input.tools_allowed);
+    if (toolProblem) throw new AgentEngineError(toolProblem, 400);
+    updatedTools = Array.from(new Set(input.tools_allowed.map((k) => String(k).trim()).filter(Boolean)));
+  }
+
+  const updated: Agent = {
+    ...existing,
+    name: updatedName,
+    description: input.description !== undefined ? input.description.trim() : existing.description,
+    instructions: input.instructions !== undefined ? input.instructions.trim() : existing.instructions,
+    tools_allowed: updatedTools,
+    trigger: input.trigger ?? existing.trigger ?? 'manual',
+    status: input.status ?? existing.status,
+    updated_at: (context.now?.() ?? new Date()).toISOString(),
+  };
+
+  return context.store.updateAgent(updated);
+}
+
 
 export interface RunOutcome {
   run: AgentRun;

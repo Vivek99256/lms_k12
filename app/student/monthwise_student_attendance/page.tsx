@@ -532,6 +532,8 @@ export default function MonthwiseStudentAttendancePage() {
           headers: {
             Accept: 'application/json',
             ...(currentSession.token ? { Authorization: `Bearer ${currentSession.token}` } : {}),
+            ...(currentSession.subInstituteId ? { 'x-sub-institute-id': currentSession.subInstituteId } : {}),
+            ...(currentSession.academicYearId ? { 'x-academic-year': currentSession.academicYearId, 'x-academic-year-id': currentSession.academicYearId } : {}),
           },
         });
 
@@ -700,6 +702,8 @@ export default function MonthwiseStudentAttendancePage() {
           Accept: 'application/json',
           'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
           ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          ...(session.subInstituteId ? { 'x-sub-institute-id': session.subInstituteId } : {}),
+          ...(session.academicYearId ? { 'x-academic-year': session.academicYearId, 'x-academic-year-id': session.academicYearId } : {}),
         },
         body: body.toString(),
       });

@@ -2,7 +2,7 @@
 
 import { API_BASE_URL, resolveAiBaseUrl } from '@/app/components/utils/api_url';
 
-import type { Agent, AgentRun, AgentStatus, CreateAgentInput, RunAgentInput } from './types';
+import type { Agent, AgentRun, AgentStatus, CreateAgentInput, RunAgentInput, UpdateAgentInput } from './types';
 
 /**
  * Browser client for the Agent Management API.
@@ -160,16 +160,47 @@ export function fetchRuns(filter: { module?: string; agentId?: string; limit?: n
   return call<AgentRun[]>(`/api/agents/runs${query ? `?${query}` : ''}`);
 }
 
-export function createAgent(input: CreateAgentInput): Promise<Agent> {
-  return call<Agent>('/api/agents', { method: 'POST', body: input });
+
+export function notifyAgentsChanged(agentId?: string, action: string = 'changed') {
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent('agents:changed', { detail: { agentId, action } }));
+    } catch {}
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel('agents_sync_channel');
+        channel.postMessage({ type: 'agents:changed', agentId, action });
+        channel.close();
+      }
+    } catch {}
+  }
 }
 
-export function setAgentStatus(agentId: string, status: AgentStatus): Promise<Agent> {
-  return call<Agent>(`/api/agents/${encodeURIComponent(agentId)}`, { method: 'PATCH', body: { status } });
+export async function createAgent(input: CreateAgentInput): Promise<Agent> {
+  const agent = await call<Agent>('/api/agents', { method: 'POST', body: input });
+  notifyAgentsChanged(agent.id, 'create');
+  return agent;
 }
 
-export function runAgent(agentId: string, input: RunAgentInput = {}): Promise<AgentRun> {
-  return call<{ run: AgentRun }>(`/api/agents/${encodeURIComponent(agentId)}/run`, { method: 'POST', body: input }).then(
-    (result) => result.run,
-  );
+export async function setAgentStatus(agentId: string, status: AgentStatus): Promise<Agent> {
+  const agent = await call<Agent>(`/api/agents/${encodeURIComponent(agentId)}`, { method: 'PATCH', body: { status } });
+  notifyAgentsChanged(agent.id, 'status');
+  return agent;
+}
+
+export async function updateAgent(agentId: string, input: UpdateAgentInput): Promise<Agent> {
+  const agent = await call<Agent>(`/api/agents/${encodeURIComponent(agentId)}`, { method: 'PUT', body: input });
+  notifyAgentsChanged(agent.id, 'update');
+  return agent;
+}
+
+export async function runAgent(agentId: string, input: RunAgentInput = {}): Promise<AgentRun> {
+  const result = await call<{ run: AgentRun }>(`/api/agents/${encodeURIComponent(agentId)}/run`, { method: 'POST', body: input });
+  notifyAgentsChanged(agentId, 'run');
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent('agents:runs-updated', { detail: { module: result.run.module } }));
+    } catch {}
+  }
+  return result.run;
 }

@@ -7,7 +7,7 @@ import ScreenView from '../../_components/ScreenView';
 import { Badge } from '@/components/ui/badge';
 import { getRoadmapItem } from '@/lib/roadmap';
 import { AgentManagement } from './_components/AgentManagement';
-import { AGENT_MODULES } from '@/lib/agents/registry';
+import { AGENT_MODULES, findModule } from '@/lib/agents/registry';
 import { ModulePicker } from '../../../ai/_components/ModulePicker';
 import { DomainAgentPanel } from '../../../ai/_components/DomainAgentPanel';
 
@@ -64,10 +64,13 @@ export default function AgentsPage() {
       <section className="px-1">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-foreground">Tool agents, by module</h2>
+            <h2 className="text-base font-semibold text-foreground">
+              {toolModule ? `${findModule(toolModule)?.label ?? toolModule} Agents` : 'Centralized Agent Management (All Modules)'}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              The same agentic library a module&rsquo;s own AI Stack &rarr; Automations tab shows, scoped to one
-              module at a time.
+              {toolModule
+                ? `Managing all agents scoped to ${findModule(toolModule)?.label ?? toolModule}. Synchronized with module-level AI Stack.`
+                : 'Centralized view and configuration of all agents across LMS + PAL and ERP modules in real-time two-way synchronization.'}
             </p>
           </div>
           <ModulePicker modules={AGENT_MODULES} value={toolModule} onChange={setToolModule} allowAll />
