@@ -95,6 +95,14 @@ const LEGACY_LINK_ROUTES: Record<string, string> = {
   'chapter_master.index': '/course-master',
   'class_face_attendance.index': '/face_attendance/class_face_attendance',
   'student_face_attendance.index': '/face_attendance/student_face_attendance',
+  'leave.report': '/hrit/leave-management/leave-reports',
+  'hostel_allocation.index': '/hostel/allocations',
+  'inward_register.index': '/inward_outward/inward-register',
+  'transport_vehicle.index': '/Transportation/vehicles',
+  'inventory_po.index': '/Inventory/purchase-orders',
+  'ptm_booking.index': '/admin-services/ptm-ai-stack',
+  'complaint_register.index': '/admin-services/complaint-ai-stack',
+  'petty_cash.index': '/admin-services/petty-cash-ai-stack',
 };
 
 const RESULT_LEGACY_ROUTES: Record<string, string> = Object.fromEntries(

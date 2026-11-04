@@ -185,6 +185,8 @@ export function createAuthHeaders(
     Accept: 'application/json',
     ...(contentType ? { 'Content-Type': contentType } : {}),
     ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+    ...(session.subInstituteId ? { 'x-sub-institute-id': session.subInstituteId } : {}),
+    ...(session.syear ? { 'x-academic-year': session.syear, 'x-academic-year-id': session.syear } : {}),
   };
 }
 
@@ -245,11 +247,20 @@ export function installErpAuthFetch() {
       const liveChatRelay = sameOriginNextApi && target.pathname.startsWith('/api/live-chat/');
       if (liveChatRelay || (!sameOriginNextApi && erpOrigins().has(target.origin))) {
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
-        const { token } = buildSessionContext();
-        if (token && !headers.has('Authorization')) {
-          headers.set('Authorization', `Bearer ${token}`);
-          return nativeFetch(input, { ...init, headers });
+        const sessionCtx = buildSessionContext();
+        if (sessionCtx.token && !headers.has('Authorization')) {
+          headers.set('Authorization', `Bearer ${sessionCtx.token}`);
         }
+        if (sessionCtx.subInstituteId && !headers.has('x-sub-institute-id')) {
+          headers.set('x-sub-institute-id', sessionCtx.subInstituteId);
+        }
+        if (sessionCtx.syear && !headers.has('x-academic-year')) {
+          headers.set('x-academic-year', sessionCtx.syear);
+        }
+        if (sessionCtx.syear && !headers.has('x-academic-year-id')) {
+          headers.set('x-academic-year-id', sessionCtx.syear);
+        }
+        return nativeFetch(input, { ...init, headers });
       }
     } catch {
       /* never let auth decoration break a request */

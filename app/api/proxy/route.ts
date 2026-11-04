@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
   const authorization = request.headers.get('authorization');
   const cookie = request.headers.get('cookie');
   const referer = request.headers.get('referer');
+  const subInstituteId = request.headers.get('x-sub-institute-id');
+  const academicYear = request.headers.get('x-academic-year') || request.headers.get('x-academic-year-id');
 
   try {
     const upstream = await fetch(`${url}?${queryParams.toString()}`, {
@@ -43,6 +45,8 @@ export async function GET(request: NextRequest) {
         ...(authorization ? { Authorization: authorization } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
         ...(referer ? { Referer: referer } : {}),
+        ...(subInstituteId ? { 'x-sub-institute-id': subInstituteId } : {}),
+        ...(academicYear ? { 'x-academic-year': academicYear, 'x-academic-year-id': academicYear } : {}),
       },
       cache: 'no-store',
     });
@@ -100,6 +104,8 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
   const bodyText = await request.text();
   const authorization = request.headers.get('authorization');
   const cookie = request.headers.get('cookie');
+  const subInstituteId = request.headers.get('x-sub-institute-id');
+  const academicYear = request.headers.get('x-academic-year') || request.headers.get('x-academic-year-id');
 
   try {
     const upstream = await fetch(url, {
@@ -109,6 +115,8 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
         Accept: 'application/json',
         ...(authorization ? { Authorization: authorization } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
+        ...(subInstituteId ? { 'x-sub-institute-id': subInstituteId } : {}),
+        ...(academicYear ? { 'x-academic-year': academicYear, 'x-academic-year-id': academicYear } : {}),
       },
       body: bodyText || undefined,
       cache: 'no-store',

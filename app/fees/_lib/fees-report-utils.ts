@@ -147,7 +147,10 @@ function buildReportProxyHeaders(session: FeesSession) {
   headers.set('x-laravel-base-url', getApiBaseUrl(session));
   if (session.token) headers.set('x-laravel-token', session.token);
   if (session.subInstituteId) headers.set('x-sub-institute-id', session.subInstituteId);
-  if (session.academicYearId) headers.set('x-academic-year-id', session.academicYearId);
+  if (session.academicYearId) {
+    headers.set('x-academic-year', session.academicYearId);
+    headers.set('x-academic-year-id', session.academicYearId);
+  }
   if (session.userId) headers.set('x-user-id', session.userId);
   if (session.termId) headers.set('x-term-id', session.termId);
   if (session.userProfileId) headers.set('x-user-profile-id', session.userProfileId);

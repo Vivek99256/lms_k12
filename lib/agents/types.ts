@@ -75,7 +75,18 @@ export interface CreateAgentInput {
   module: AgentModuleKey;
   tools_allowed: string[];
   instructions?: string;
+  trigger?: AgentTrigger;
   status?: Extract<AgentStatus, 'draft' | 'active'>;
+}
+
+/** What a caller supplies to update an existing agent's configuration. */
+export interface UpdateAgentInput {
+  name?: string;
+  description?: string;
+  tools_allowed?: string[];
+  instructions?: string;
+  trigger?: AgentTrigger;
+  status?: AgentStatus;
 }
 
 /** What a caller supplies to run an agent: one tool from its allow-list, plus arguments. */

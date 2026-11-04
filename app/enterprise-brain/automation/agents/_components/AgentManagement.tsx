@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Activity, BarChart3, Bot, Play, Plus, RefreshCw, ScrollText } from 'lucide-react';
+import { Activity, BarChart3, Bot, Pencil, Play, Plus, RefreshCw, ScrollText } from 'lucide-react';
 
 import { fetchAgents, fetchRuns, setAgentStatus } from '@/lib/agents/client';
 import { AGENT_MODULES, findModule, findTool } from '@/lib/agents/registry';
@@ -11,6 +11,7 @@ import { BreakdownBars, Card, ErrorState, HeroHeader, LoadingState, MetricTiles,
 import { useBrainResource } from '../../../_components/useBrainResource';
 import { CreateAgentForm, RiskPill } from './CreateAgentForm';
 import { RunAgentDialog } from './RunAgentDialog';
+import { EditAgentDialog } from './EditAgentDialog';
 
 /**
  * Agent Management — the one surface every module's agents share.
@@ -53,13 +54,8 @@ export function AgentManagement({
   const [running, setRunning] = useState<Agent | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
-  const isCreateDisabled =
-    hideCreate ||
-    moduleFilter === 'teach_learn' ||
-    moduleFilter === 'exam_assessment' ||
-    moduleFilter === 'engagement' ||
-    moduleFilter === 'curriculum_planning' ||
-    moduleFilter === 'new_pal';
+  const [editing, setEditing] = useState<Agent | null>(null);
+  const isCreateDisabled = hideCreate;
 
   const visibleTabs = useMemo(() => {
     if (isCreateDisabled) {
@@ -81,6 +77,27 @@ export function AgentManagement({
     agents.refresh();
     runs.refresh();
   }, [agents, runs]);
+
+  React.useEffect(() => {
+    const handler = () => {
+      refresh();
+    };
+    window.addEventListener('agents:changed', handler);
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('agents_sync_channel');
+      channel.onmessage = (msg) => {
+        if (msg.data?.type === 'agents:changed') {
+          refresh();
+        }
+      };
+    } catch {}
+
+    return () => {
+      window.removeEventListener('agents:changed', handler);
+      channel?.close();
+    };
+  }, [refresh]);
 
   const changeStatus = useCallback(
     async (agent: Agent, status: AgentStatus) => {
@@ -106,7 +123,7 @@ export function AgentManagement({
 
     switch (tab) {
       case 'library':
-        return <LibraryTab agents={agentRows} runs={runRows} onRun={setRunning} onStatus={changeStatus} onCreate={isCreateDisabled ? undefined : () => setTab('create')} />;
+        return <LibraryTab agents={agentRows} runs={runRows} onRun={setRunning} onEdit={setEditing} onStatus={changeStatus} onCreate={isCreateDisabled ? undefined : () => setTab('create')} />;
       case 'dashboard':
         return <DashboardTab agents={agentRows} runs={runRows} moduleLabel={moduleLabel} />;
       case 'create':
@@ -215,12 +232,14 @@ function LibraryTab({
   agents,
   runs,
   onRun,
+  onEdit,
   onStatus,
   onCreate,
 }: {
   agents: Agent[];
   runs: AgentRun[];
   onRun: (agent: Agent) => void;
+  onEdit: (agent: Agent) => void;
   onStatus: (agent: Agent, status: AgentStatus) => void;
   onCreate?: () => void;
 }) {
@@ -306,6 +325,14 @@ function LibraryTab({
                         className="flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Play size={12} /> Run
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onEdit(agent)}
+                        className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                        title="Edit agent configuration"
+                      >
+                        <Pencil size={12} /> Edit
                       </button>
                       {agent.status === 'draft' && <SmallButton onClick={() => onStatus(agent, 'active')}>Activate</SmallButton>}
                       {agent.status === 'active' && <SmallButton onClick={() => onStatus(agent, 'paused')}>Pause</SmallButton>}
