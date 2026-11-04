@@ -54,7 +54,7 @@ import {
   ShieldCheck,
   TriangleAlert,
   Workflow,
-  XCircle,
+  XCircle, Activity, BookOpen, Clock, Layers, Sparkles, X,
 } from 'lucide-react';
 
 import { AgentManagement } from '@/app/enterprise-brain/automation/agents/_components/AgentManagement';
@@ -76,6 +76,1145 @@ import { logModuleOperation, readModuleWorkspaceSession } from '@/lib/module-ai/
 import { ModuleApprovalQueue } from './module-approval-queue';
 import { AiStackCard, AiStackCardHeading, AiStackPill, formatWhen } from './ai-stack-chrome';
 import { aiStackRbacKey, type AiStackBoundAgent, type AiStackModule } from './ai-stack-module';
+import { CatalogueAgentControlCard } from './catalogue-agent-control-card';
+import { ExamAssessmentAgentControlCard } from './exam-assessment-agent-control-card';
+import { EngagementAgentControlCard } from './engagement-agent-control-card';
+import { CurriculumPlanningAgentControlCard } from './curriculum-planning-agent-control-card';
+import { PalAgentControlCard } from './pal-agent-control-card';
+
+interface ToolAgentEsoInfo {
+  name: string;
+  module: string;
+  tool: string;
+  knowledge: {
+    summary: string;
+    items: string[];
+    tables: string[];
+  };
+  activities: {
+    summary: string;
+    items: string[];
+  };
+  abilities: {
+    summary: string;
+    skills: string[];
+    safeguards: string[];
+  };
+  usage: {
+    summary: string;
+    step_by_step_flow: string[];
+  };
+}
+
+const TOOL_AGENT_ESO_MAP: Record<string, ToolAgentEsoInfo> = {
+  'exam_assessment.online_exam_summary': {
+    name: 'Online exam summary reader',
+    module: 'Exam & Assessment',
+    tool: 'exam_assessment.online_exam_summary',
+    knowledge: {
+      summary: 'Teacher-published online question papers, recorded student exam attempts, obtained marks, passing benchmarks (40%), and PAL test segregation rules.',
+      items: [
+        'Teacher-published exam master papers, marks, and configurations from question_paper',
+        'Student attempt records, obtained marks, total marks, and timestamps from lms_online_exam',
+        'Student directory and enrollment records from tblstudent',
+        'Academic passing benchmark criteria (default 40%, matching the LMS Result Dashboard)',
+        'PAL paper exclusion rule: strictly disregards papers where exam_type = "PAL"',
+      ],
+      tables: ['question_paper', 'lms_online_exam', 'tblstudent', 'standard', 'subject'],
+    },
+    activities: {
+      summary: 'Scans published teacher online exams, filters out PAL tests, computes attempt metrics and average cohort scores, and isolates at-risk students below the passing bar.',
+      items: [
+        'Scanning published teacher exams scoped to the institute and target standard',
+        'Strict exclusion of PAL-generated practice tests',
+        'Calculation of attempt counts, total students assessed, and cohort average score (obtain_marks / total_marks * 100)',
+        'Identification and extraction of at-risk student attempts scoring below the 40% threshold',
+        'Gate 1 validation and formatting of at-risk student records for downstream intervention drafting',
+      ],
+    },
+    abilities: {
+      summary: 'Deterministic score calculation, PAL test segregation, tenant boundary isolation, and read-only extraction.',
+      skills: [
+        'Accurate percentage calculation and threshold filtering',
+        'Selective filtering separating formal teacher exams from automated practice papers',
+        'Safe student name resolution with graceful fallback for unmapped profiles',
+        'At-risk attempt cohort packaging',
+      ],
+      safeguards: [
+        'Read-only operations (zero modifications to student marks or exam status)',
+        'Tenant institute boundary enforcement (sub_institute_id)',
+        'Gate 1 validation pass requires valid exam attempt calculations',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 1 of the Exam & Assessment pipeline, establishing the baseline exam performance and feeding at-risk student records to Agent 3.',
+      step_by_step_flow: [
+        'Step 1: Receives institute ID and standard parameter (or runs all-standards sweep)',
+        'Step 2: Queries question_paper joined with lms_online_exam, filtering by institute and excluding PAL papers',
+        'Step 3: Aggregates attempt counts and cohort average marks, then filters attempts scoring under at_risk_percent (40%)',
+        'Step 4: Resolves student names from tblstudent and structures at-risk records',
+        'Step 5: Validates Gate 1 and delivers at-risk exam records to Gate 1 output and downstream to Agent 3',
+      ],
+    },
+  },
+  'exam_assessment.assignment_status': {
+    name: 'Assignment status reader',
+    module: 'Exam & Assessment',
+    tool: 'exam_assessment.assignment_status',
+    knowledge: {
+      summary: 'Assigned coursework records across assignments, worksheets, and projects, submission statuses, teacher review logs, due dates, and student class rosters.',
+      items: [
+        'Coursework records, instructions, due dates, and standard bindings from lms_assignment',
+        'Work type taxonomy: differentiation between assignment, worksheet, and project stored in the same table',
+        'Student submission and review status flags: submitted, reviewed by teacher, pending review, and not submitted',
+        'Student directory and enrollment rosters from tblstudent for delinquent submission reconciliation',
+      ],
+      tables: ['lms_assignment', 'tblstudent', 'standard', 'subject'],
+    },
+    activities: {
+      summary: 'Scans all coursework allocated to a standard, categorizes by work type, tracks submission and review counts, and compiles the delinquent not-submitted list.',
+      items: [
+        'Institute and standard-scoped querying of lms_assignment',
+        'Taxonomic grouping and counting by work type (assignment, worksheet, project)',
+        'Auditing submission completeness and teacher evaluation rates',
+        'Compiling detailed list of students with unsubmitted coursework past scheduled due dates',
+        'Gate 2 validation ensuring coursework integrity across the target standard',
+      ],
+    },
+    abilities: {
+      summary: 'Unified coursework schema disambiguation, class roster cross-referencing, and non-submitted student isolation.',
+      skills: [
+        'Multi-work-type aggregation over unified coursework storage',
+        'Cross-table join between assignments and student enrollment rosters',
+        'Accurate overdue status tracking without timezone drift',
+        'Coursework delinquency ledger formatting',
+      ],
+      safeguards: [
+        'Read-only execution with zero updates to student submission states',
+        'Tenant institute boundary enforcement (sub_institute_id)',
+        'Gate 2 validation ensures work status is fully accounted for',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2 of the Exam & Assessment pipeline, providing comprehensive coursework submission and review data to complement exam performance.',
+      step_by_step_flow: [
+        'Step 1: Receives standard scope from Gate 1',
+        'Step 2: Queries lms_assignment filtered by institute ID, standard ID, and division',
+        'Step 3: Breaks down coursework totals by work type (assignment, worksheet, project)',
+        'Step 4: Tallies submitted, reviewed, and unsubmitted counts, isolating delinquent student records',
+        'Step 5: Validates Gate 2 and delivers the unsubmitted coursework ledger to Gate 2 and Agent 3',
+      ],
+    },
+  },
+  'exam_assessment.draft_review_note': {
+    name: 'Assessment review drafter',
+    module: 'Exam & Assessment',
+    tool: 'exam_assessment.draft_review_note',
+    knowledge: {
+      summary: 'Fused multi-source academic evidence: at-risk exam scores from Agent 1, unsubmitted coursework from Agent 2, pedagogical intervention strategies, and draft safety rules.',
+      items: [
+        'At-risk exam attempt scores, percentages, and exam names received from Agent 1 (Gate 1)',
+        'Unsubmitted coursework items, due dates, and work types received from Agent 2 (Gate 2)',
+        'Pedagogical intervention guidelines (1-on-1 concept reinforcement, submission extensions, guided practice)',
+        'Safety and governance guardrails: mandatory draft status, no automated external dispatching, objective and supportive wording standards',
+      ],
+      tables: ['ai_cases', 'ai_evidence', 'ai_recommendations', 'question_paper', 'lms_assignment'],
+    },
+    activities: {
+      summary: 'Synthesizes exam gaps and missing coursework to draft individualized educator review notes, prepares a comprehensive cohort executive summary, and applies human sign-off guardrails.',
+      items: [
+        'Synthesizing at-risk attempts from Agent 1 into individualized exam review notes citing exact scores and percentages',
+        'Synthesizing unsubmitted coursework from Agent 2 into coursework follow-up notes citing exact assignment titles',
+        'Compiling the overall Cohort Executive Review Summary with participation metrics, average scores, and recommended interventions',
+        'Applying the strict draft_pending_human_approval status tag to all drafted notes',
+        'Gate 3 safety validation ensuring zero external communication was dispatched',
+      ],
+    },
+    abilities: {
+      summary: 'Multi-agent evidence fusion, grounded factual synthesis, human-in-the-loop guardrail enforcement, and pedagogical recommendation generation.',
+      skills: [
+        'Correlating multi-agent performance deficits per student into a single cohesive profile',
+        'Grounded factual drafting citing exact scores, benchmarks, and dates with zero fabricated numbers',
+        'Pedagogical remediation mapping (linking specific failure modes to actionable teacher follow-ups)',
+        'Cohort-level strategic intervention synthesis',
+      ],
+      safeguards: [
+        'Strict draft-only policy: zero external messages, SMS, or emails are ever dispatched automatically',
+        'Human-in-the-loop requirement: notes remain pending until approved by an authorized educator',
+        'Objective, constructive pedagogical language with zero disparaging comments',
+        'All drafts recorded in pipeline audit logs',
+      ],
+    },
+    usage: {
+      summary: 'Acts as the final synthesis step (Step 3) of the Exam & Assessment pipeline, converting raw exam and assignment data from Agents 1 & 2 into actionable, safe draft review notes ready for teacher sign-off.',
+      step_by_step_flow: [
+        'Step 1: Consumes at-risk exam records from Agent 1 (Gate 1) and unsubmitted coursework records from Agent 2 (Gate 2)',
+        'Step 2: Drafts individual student review notes for low exam attempts (citing student name, exam title, score, total marks, percentage, and 1-on-1 reinforcement recommendation)',
+        'Step 3: Drafts individual student follow-up notes for missing assignments (citing student name, work title, work type, and extension recommendation)',
+        'Step 4: Compiles the Cohort Executive Review Summary consolidating institute stats, exams published, attempts, pass rates, and action items',
+        'Step 5: Enforces Gate 3 safety validation, confirms no external dispatch, marks drafts as draft_pending_human_approval, and returns the final report',
+      ],
+    },
+  },
+  'lms.courses': {
+    name: 'Course Catalogue Reader',
+    module: 'Teach / Learn',
+    tool: 'lms.courses',
+    knowledge: {
+      summary: 'Master academic hierarchy standards, standard-subject active mappings with content publishing enablement (allow_content = "Yes"), chapter sequences, topic definitions, and concept linkage records.',
+      items: [
+        'Standards curriculum definitions and board bindings from standard',
+        'Subject mappings with active content publishing enabled (allow_content = "Yes") from sub_std_map and subject',
+        'Chapter hierarchy sequences, titles, and academic years from chapter_master',
+        'Topic definitions and sub-topic linkages from topic_master',
+        'Concept nodes and published content relationships from lms_concept and content_master',
+      ],
+      tables: ['standard', 'sub_std_map', 'subject', 'chapter_master', 'topic_master', 'content_master', 'lms_concept'],
+    },
+    activities: {
+      summary: 'Traverses the complete 5-tier content hierarchy sequentially, calculates estate content metrics, detects structural curriculum gaps, and enforces Gate 1 validation.',
+      items: [
+        'Standard ID resolution from user string inputs or institute roster queries',
+        '5-tier hierarchical traversal across Standard -> Subject -> Chapter -> Topic -> Intelligence',
+        'Gap classification across 5 defect classes: missing subjects, missing chapters, missing topics, missing intelligence/concepts, and broken mappings',
+        'Estate metric aggregation (live counts of standards, courses with content, chapters, and topics)',
+        'Generation and hashing of curriculum inventory for caching and downstream pipeline handoff',
+      ],
+    },
+    abilities: {
+      summary: 'Deterministic read-only recursive tree traversal, zero-fabrication gap scoring, standard ID resolution, and strict Gate 1 pipeline halting.',
+      skills: [
+        'Multi-tier relational graph traversal without data mutations (risk: read)',
+        'Standard and board resolution logic',
+        'Zero-fabrication reporting (preserves genuine database nulls instead of synthetic data)',
+        'Curriculum hash calculation to avoid redundant database roundtrips',
+      ],
+      safeguards: [
+        'Read-only enforcement (modifies zero database records)',
+        'Tenant boundary isolation via sub_institute_id',
+        'Mandatory Gate 1 halting if zero courses or invalid standard is returned',
+      ],
+    },
+    usage: {
+      summary: 'Serves as the foundation (Step 1) of the Teach / Learn pipeline, resolving class curriculum targets, validating structural integrity, and handing off clean standard and chapter scopes to downstream agents.',
+      step_by_step_flow: [
+        'Step 1: Receives institute ID and standard parameter (e.g. Standard 7 or "all")',
+        'Step 2: Queries sub_std_map joined with standard and subject to filter active courses where allow_content = "Yes"',
+        'Step 3: Traverses chapter_master and topic_master to measure catalog depth and checks content_master for concept links',
+        'Step 4: Evaluates Gate 1 rules (must resolve valid standard_id, must find >= 1 active course, must extract chapter list)',
+        'Step 5: Passes the validated standard_id to Agent 2 (Timeline Reader) and standard chapters scope to Agent 3 (Content Model Coverage)',
+      ],
+    },
+  },
+  'teach_learn.courses': {
+    name: 'Course Catalogue Reader',
+    module: 'Teach / Learn',
+    tool: 'teach_learn.courses',
+    knowledge: {
+      summary: 'Master academic hierarchy standards, standard-subject active mappings with content publishing enablement (allow_content = "Yes"), chapter sequences, topic definitions, and concept linkage records.',
+      items: [
+        'Standards curriculum definitions and board bindings from standard',
+        'Subject mappings with active content publishing enabled (allow_content = "Yes") from sub_std_map and subject',
+        'Chapter hierarchy sequences, titles, and academic years from chapter_master',
+        'Topic definitions and sub-topic linkages from topic_master',
+        'Concept nodes and published content relationships from lms_concept and content_master',
+      ],
+      tables: ['standard', 'sub_std_map', 'subject', 'chapter_master', 'topic_master', 'content_master', 'lms_concept'],
+    },
+    activities: {
+      summary: 'Traverses the complete 5-tier content hierarchy sequentially, calculates estate content metrics, detects structural curriculum gaps, and enforces Gate 1 validation.',
+      items: [
+        'Standard ID resolution from user string inputs or institute roster queries',
+        '5-tier hierarchical traversal across Standard -> Subject -> Chapter -> Topic -> Intelligence',
+        'Gap classification across 5 defect classes: missing subjects, missing chapters, missing topics, missing intelligence/concepts, and broken mappings',
+        'Estate metric aggregation (live counts of standards, courses with content, chapters, and topics)',
+        'Generation and hashing of curriculum inventory for caching and downstream pipeline handoff',
+      ],
+    },
+    abilities: {
+      summary: 'Deterministic read-only recursive tree traversal, zero-fabrication gap scoring, standard ID resolution, and strict Gate 1 pipeline halting.',
+      skills: [
+        'Multi-tier relational graph traversal without data mutations (risk: read)',
+        'Standard and board resolution logic',
+        'Zero-fabrication reporting (preserves genuine database nulls instead of synthetic data)',
+        'Curriculum hash calculation to avoid redundant database roundtrips',
+      ],
+      safeguards: [
+        'Read-only enforcement (modifies zero database records)',
+        'Tenant boundary isolation via sub_institute_id',
+        'Mandatory Gate 1 halting if zero courses or invalid standard is returned',
+      ],
+    },
+    usage: {
+      summary: 'Serves as the foundation (Step 1) of the Teach / Learn pipeline, resolving class curriculum targets, validating structural integrity, and handing off clean standard and chapter scopes to downstream agents.',
+      step_by_step_flow: [
+        'Step 1: Receives institute ID and standard parameter (e.g. Standard 7 or "all")',
+        'Step 2: Queries sub_std_map joined with standard and subject to filter active courses where allow_content = "Yes"',
+        'Step 3: Traverses chapter_master and topic_master to measure catalog depth and checks content_master for concept links',
+        'Step 4: Evaluates Gate 1 rules (must resolve valid standard_id, must find >= 1 active course, must extract chapter list)',
+        'Step 5: Passes the validated standard_id to Agent 2 (Timeline Reader) and standard chapters scope to Agent 3 (Content Model Coverage)',
+      ],
+    },
+  },
+  'lms.activities': {
+    name: 'Activity Timeline Reader',
+    module: 'Teach / Learn',
+    tool: 'lms.activities',
+    knowledge: {
+      summary: 'Classroom instructional timeline data, scheduled virtual and offline periods, assigned student homework, and chronological date prioritization policies.',
+      items: [
+        'Homework assignments, descriptions, submission deadlines, and subject allocations from homework',
+        'Scheduled virtual classroom sessions and daily timetable slots from timetable_schedule and daily_attendance',
+        'Chronological date prioritization policy (prioritizes actual calendar timestamps over syear tags to support seamless multi-year/archival retrieval)',
+        'Division and section roster mappings for the selected standard',
+      ],
+      tables: ['homework', 'daily_attendance', 'timetable_schedule', 'academic_year'],
+    },
+    activities: {
+      summary: 'Aggregates homework and scheduled class sessions across a sliding temporal window around today, categorizes timeline status, and sanitizes sensitive meeting links.',
+      items: [
+        'Sliding window temporal scoping (default +/-7 days, configurable up to 90 days)',
+        'Timeline orientation classification tagging each activity as past, today, or upcoming',
+        'Class roster and division scope validation against the target standard',
+        'Automatic redaction of virtual classroom join links to protect classroom meeting privacy',
+        'Gate 2 validation ensuring activity records match standard scope',
+      ],
+    },
+    abilities: {
+      summary: 'Sliding-window temporal normalization, break and vacation period tolerance (non-blocking validation), and meeting URL redaction.',
+      skills: [
+        'Chronological multi-source timeline indexing and sorting',
+        'Date normalization across changing academic years',
+        'Non-blocking vacation tolerance (allows 0 activities during school breaks if class scope is valid)',
+        'Privacy-preserving link sanitization',
+      ],
+      safeguards: [
+        'Read-only enforcement (modifies zero homework or timetable records)',
+        'Meeting join URLs are never returned in agent payloads',
+        'Tenant and standard boundary enforcement',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2 of the Teach / Learn pipeline, consuming the validated standard from Agent 1 to verify instructional pacing and recent/upcoming class activity.',
+      step_by_step_flow: [
+        'Step 1: Receives the validated standard_id directly from Agent 1\'s Gate 1 output',
+        'Step 2: Computes the sliding window boundary [today - days_back, today + days_ahead]',
+        'Step 3: Queries homework and timetable_schedule for the standard within the window',
+        'Step 4: Categorizes each record into past, today, or upcoming, and strips join URLs',
+        'Step 5: Evaluates Gate 2 rules (standard ownership verified) and outputs the unified activity timeline to Gate 2',
+      ],
+    },
+  },
+  'teach_learn.activities': {
+    name: 'Activity Timeline Reader',
+    module: 'Teach / Learn',
+    tool: 'teach_learn.activities',
+    knowledge: {
+      summary: 'Classroom instructional timeline data, scheduled virtual and offline periods, assigned student homework, and chronological date prioritization policies.',
+      items: [
+        'Homework assignments, descriptions, submission deadlines, and subject allocations from homework',
+        'Scheduled virtual classroom sessions and daily timetable slots from timetable_schedule and daily_attendance',
+        'Chronological date prioritization policy (prioritizes actual calendar timestamps over syear tags to support seamless multi-year/archival retrieval)',
+        'Division and section roster mappings for the selected standard',
+      ],
+      tables: ['homework', 'daily_attendance', 'timetable_schedule', 'academic_year'],
+    },
+    activities: {
+      summary: 'Aggregates homework and scheduled class sessions across a sliding temporal window around today, categorizes timeline status, and sanitizes sensitive meeting links.',
+      items: [
+        'Sliding window temporal scoping (default +/-7 days, configurable up to 90 days)',
+        'Timeline orientation classification tagging each activity as past, today, or upcoming',
+        'Class roster and division scope validation against the target standard',
+        'Automatic redaction of virtual classroom join links to protect classroom meeting privacy',
+        'Gate 2 validation ensuring activity records match standard scope',
+      ],
+    },
+    abilities: {
+      summary: 'Sliding-window temporal normalization, break and vacation period tolerance (non-blocking validation), and meeting URL redaction.',
+      skills: [
+        'Chronological multi-source timeline indexing and sorting',
+        'Date normalization across changing academic years',
+        'Non-blocking vacation tolerance (allows 0 activities during school breaks if class scope is valid)',
+        'Privacy-preserving link sanitization',
+      ],
+      safeguards: [
+        'Read-only enforcement (modifies zero homework or timetable records)',
+        'Meeting join URLs are never returned in agent payloads',
+        'Tenant and standard boundary enforcement',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2 of the Teach / Learn pipeline, consuming the validated standard from Agent 1 to verify instructional pacing and recent/upcoming class activity.',
+      step_by_step_flow: [
+        'Step 1: Receives the validated standard_id directly from Agent 1\'s Gate 1 output',
+        'Step 2: Computes the sliding window boundary [today - days_back, today + days_ahead]',
+        'Step 3: Queries homework and timetable_schedule for the standard within the window',
+        'Step 4: Categorizes each record into past, today, or upcoming, and strips join URLs',
+        'Step 5: Evaluates Gate 2 rules (standard ownership verified) and outputs the unified activity timeline to Gate 2',
+      ],
+    },
+  },
+  'teach_learn.content_model_coverage': {
+    name: 'Content Model Coverage Agent',
+    module: 'Teach / Learn',
+    tool: 'teach_learn.content_model_coverage',
+    knowledge: {
+      summary: 'The 4-Type Pedagogical Content Model (Concept Learning, Practice Ladder, Misconception Library, Assessment Bank) and chapter semantic intelligence extractions.',
+      items: [
+        'Type 1: Concept Learning models (4 variants: definition, knowledge anchor, real-world application, evidence)',
+        'Type 2: Practice Ladder (5-level Bloom\'s taxonomy cognitive ladder from assessment blueprints)',
+        'Type 3: Misconception Library (common student traps, flawed heuristics, diagnostic feedback)',
+        'Type 4: Assessment Bank (calibrated rubrics, marking schemes, question items)',
+        'Semantic intelligence extraction records and section slice counts from semantic_intelligence and content_master',
+      ],
+      tables: ['semantic_intelligence', 'content_master', 'chapter_master', 'lms_concept'],
+    },
+    activities: {
+      summary: 'Evaluates pedagogical depth across all standard chapters, measures 4-type model coverage percentages, detects authoring gaps, and generates coordinator insights.',
+      items: [
+        'Granular SQL slice analysis across chapter semantic extraction columns',
+        'Evaluation of 4-type content coverage percentages for each chapter and across the institute estate',
+        'Diagnosis of curriculum bottlenecks (e.g. chapters with Type 1-3 complete but lacking Type 4 assessment rubrics)',
+        'Synthesis of actionable curriculum insights and pedagogical authoring priorities for educators',
+        'Gate 3 content readiness validation and generation of the Unified Teach / Learn Report',
+      ],
+    },
+    abilities: {
+      summary: 'High-performance memory-safe SQL slicing, strict zero-fabrication metric scoring, and multi-agent evidence fusion.',
+      skills: [
+        'Targeted SQL column aggregations without heavy JSON blob hydration',
+        'Multi-type pedagogical taxonomy evaluation against Bloom\'s cognitive tiers',
+        'Zero-fabrication scoring (reports true 0% rather than synthesized default values when assets are unauthored)',
+        'Multi-agent output consolidation into a unified executive report',
+      ],
+      safeguards: [
+        'Read-only execution with zero database writes',
+        'Institute-level tenant isolation',
+        'Memory leak prevention on high-volume extraction tables',
+      ],
+    },
+    usage: {
+      summary: 'Acts as the analytical culmination (Step 3) of the Teach / Learn pipeline, fusing curriculum structure from Agent 1 and instructional timeline from Agent 2 with semantic intelligence to deliver the final Content Readiness Report.',
+      step_by_step_flow: [
+        'Step 1: Ingests the verified standard_id and chapter roster from Gate 1 and Gate 2',
+        'Step 2: Executes SQL slice queries on semantic_intelligence and content_master matching chapter IDs',
+        'Step 3: Measures coverage percentages across Type 1, Type 2, Type 3, and Type 4 models',
+        'Step 4: Compiles learning gaps summary highlighting missing assessment rubrics and unextracted concepts',
+        'Step 5: Enforces Gate 3 validation and outputs the consolidated Unified Teach / Learn Report',
+      ],
+    },
+  },
+  'engagement.students_needing_attention': {
+    name: 'Engagement attention reader',
+    module: 'Engagement',
+    tool: 'engagement.students_needing_attention',
+    knowledge: {
+      summary: 'Live student attendance records, assigned homework, and LMS coursework submissions across the institute estate, participation benchmark thresholds (default 60%), and academic temporal windows.',
+      items: [
+        'Student directory and roster profiles from tblstudent',
+        'Daily student attendance marks and attendance rates from tblstudent_attendance',
+        'Assigned homework and submission rates from tblhomework and tblhomework_submission',
+        'LMS assignment completion records from lms_assignment and lms_assignment_submission',
+        'Configurable participation threshold (default 60%, evaluated across attendance and submissions)',
+      ],
+      tables: ['tblstudent', 'tblstudent_attendance', 'tblhomework', 'tblhomework_submission', 'lms_assignment'],
+    },
+    activities: {
+      summary: 'Scans cohort attendance, homework, and assignment participation, identifies learners falling below the participation threshold, and isolates specific deficit vectors.',
+      items: [
+        'Auditing attendance percentage over the configured temporal window (default: 30 days)',
+        'Evaluating homework submission and coursework completion rates against class benchmarks',
+        'Detecting specific deficiencies: low attendance, missing homework, unsubmitted assignments',
+        'Isolating at-risk learners without altering any marks or attendance records',
+        'Gate 1 validation pass packaging flagged students for downstream activity profiling',
+      ],
+    },
+    abilities: {
+      summary: 'High-performance cross-table deficit calculation, tenant boundary isolation, zero synthetic scoring, and read-only extraction.',
+      skills: [
+        'Multi-source participation aggregation without fabricating default scores',
+        'Temporal sliding window normalization',
+        'Deficiency vector tagging and cohort packaging',
+        'Strict tenant isolation via sub_institute_id',
+      ],
+      safeguards: [
+        'Read-only enforcement (zero modifications to student records, marks, or attendance)',
+        'Strict tenant isolation via sub_institute_id',
+        'Gate 1 validation requires verified flagged students before pipeline progression',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 1 of the Engagement pipeline, detecting which students need academic attention and passing validated candidates to Agent 2.',
+      step_by_step_flow: [
+        'Step 1: Ingests target standard, threshold percentage (default 60%), and days back (default 30 days)',
+        'Step 2: Scans tblstudent_attendance, tblhomework, and lms_assignment for candidate records',
+        'Step 3: Calculates individual participation rates and flags students falling below threshold',
+        'Step 4: Tag specific deficit causes (low attendance, homework gaps, coursework delinquency)',
+        'Step 5: Enforces Gate 1 validation and hands off validated flagged students to Agent 2 (Activity Profiler)',
+      ],
+    },
+  },
+  'engagement.student_summary': {
+    name: 'Engagement activity profiler',
+    module: 'Engagement',
+    tool: 'engagement.student_summary',
+    knowledge: {
+      summary: 'Granular platform telemetry from lms_student_engagement, learning content views, interactive practice sessions, and student doubt discussions in lms_doubt.',
+      items: [
+        'Per-event digital platform interactions from lms_student_engagement (content views, practice attempts)',
+        'Discussion forums and academic queries from lms_doubt and lms_doubt_conversation',
+        'Unanswered doubt detection and student query timestamps',
+        'Diagnostic disengagement vector classification taxonomy',
+      ],
+      tables: ['lms_student_engagement', 'lms_doubt', 'lms_doubt_conversation', 'tblstudent'],
+    },
+    activities: {
+      summary: 'Consumes flagged students from Agent 1, profiles their learning platform usage, audits discussion engagement, and isolates root causes of participation decline.',
+      items: [
+        'Consuming validated candidate cohort from Gate 1 without re-scanning the estate independently',
+        'Inspecting digital learning touchpoints (video lectures viewed, chapter practice sessions)',
+        'Auditing social discussion activity and identifying unresolved student doubts',
+        'Diagnosing participation gaps (platform inactivity, unanswered questions, delayed practice)',
+        'Gate 2 validation ensuring activity timestamps and diagnostic accuracy',
+      ],
+    },
+    abilities: {
+      summary: 'Multi-channel digital telemetry correlation, objective diagnostic classification, and downstream evidence enrichment.',
+      skills: [
+        'Event stream aggregation from lms_student_engagement',
+        'Social discussion and question resolution state analysis',
+        'Non-judgmental diagnostic classification',
+        'Evidence-enriched diagnostic profile packaging',
+      ],
+      safeguards: [
+        'Read-only operations with zero modifications to doubt or platform engagement records',
+        'Strict tenant isolation via sub_institute_id',
+        'Gate 2 validation ensures diagnostic evidence matches verified platform data',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2 of the Engagement pipeline, explaining why learners are disengaged and feeding diagnostic evidence to Agent 3.',
+      step_by_step_flow: [
+        'Step 1: Receives validated flagged student cohort from Gate 1',
+        'Step 2: Inspects digital event telemetry in lms_student_engagement for each learner',
+        'Step 3: Checks doubt topics and unanswered questions in lms_doubt',
+        'Step 4: Formulates enriched diagnostic profiles with specific disengagement causes',
+        'Step 5: Enforces Gate 2 validation and passes diagnostic profiles to Agent 3 (Intervention Drafter)',
+      ],
+    },
+  },
+  'engagement.draft_intervention_note': {
+    name: 'Re-engagement intervention drafter',
+    module: 'Engagement',
+    tool: 'engagement.draft_intervention_note',
+    knowledge: {
+      summary: 'Pedagogical intervention blueprints, non-judgmental educator communication standards, human approval workflows, and governance safety rules.',
+      items: [
+        'Actionable intervention strategies (1-on-1 check-ins, doubt clearance, remedial practice, submission extensions)',
+        'Safety policies strictly forbidding negative labeling or character assumptions from raw metrics',
+        'Human-in-the-loop approval workflows (engagement_intervention_review)',
+        'Pending approval queue integration (ai_agent_approvals, ai_audit_logs)',
+      ],
+      tables: ['ai_agent_approvals', 'ai_audit_logs', 'tblstudent', 'lms_student_engagement'],
+    },
+    activities: {
+      summary: 'Synthesizes diagnostic evidence into objective, constructive draft intervention proposals for teacher review and deposits them in the approval queue.',
+      items: [
+        'Ingesting enriched diagnostic profiles from Gate 2',
+        'Drafting personalized student follow-up plans citing specific attendance or coursework evidence',
+        'Composing cohort-level engagement briefs for academic coordinators',
+        'Enforcing strict draft-only governance without automatic message dispatching',
+        'Gate 3 validation depositing intervention proposals into the educator approval queue',
+      ],
+    },
+    abilities: {
+      summary: 'Non-judgmental natural language synthesis, policy compliance, and approval queue management.',
+      skills: [
+        'Generating objective, evidence-cited follow-up notes',
+        'Recommending targeted pedagogical remedies without changing records',
+        'Strict draft-only confinement (max_verb=recommend, may_execute=0)',
+        'Dual-level execution history synchronization',
+      ],
+      safeguards: [
+        'Zero automated external communication (no SMS, WhatsApp, or emails dispatched)',
+        'Zero modifications to student marks, attendance, or enrollment records',
+        'Human educator review and approval required before execution',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 3 of the Engagement pipeline, producing the final educator-facing intervention drafts and completing the pipeline run.',
+      step_by_step_flow: [
+        'Step 1: Receives enriched diagnostic profiles from Gate 2',
+        'Step 2: Composes factual evidence statements citing platform data',
+        'Step 3: Formulates recommended educator actions tailored to observed deficits',
+        'Step 4: Marks all proposals as draft_pending_human_approval',
+        'Step 5: Enforces Gate 3 validation and records run results in ai_agent_runs and agent state',
+      ],
+    },
+  },
+  'curriculum_planning.status': {
+    name: 'Curriculum coverage reader',
+    module: 'Curriculum Planning',
+    tool: 'curriculum_planning.status',
+    knowledge: {
+      summary: 'Curriculum authoring definitions, unit breakdowns, chapter masters, and completion states across standards and subjects.',
+      items: [
+        'Institute-scoped curriculum structures from lms_curriculum',
+        'Unit allocations and unit sequence numbers from lms_units',
+        'Chapter master records, sort orders, and completion flags from chapter_master',
+        'Topic and sub-topic breakdown records from topic_master',
+        'Standard and subject bindings from standard and subject',
+      ],
+      tables: ['lms_curriculum', 'lms_units', 'chapter_master', 'topic_master', 'standard', 'subject'],
+    },
+    activities: {
+      summary: 'Scans academic curriculum configurations, tallies unit and chapter counts, calculates completion percentages, and validates Gate 1.',
+      items: [
+        'Filtering active curricula by academic year and target standard/subject',
+        'Traversing unit-to-chapter hierarchy to detect unmapped or empty units',
+        'Calculating coverage percentage: (completed chapters / total chapters) * 100',
+        'Identifying subjects with zero configured chapters or missing units',
+        'Packaging validated syllabus hierarchy for Gate 1 delivery to downstream pacing auditor',
+      ],
+    },
+    abilities: {
+      summary: 'High-precision relational traversal, zero-fabrication gap calculation, and read-only extraction.',
+      skills: [
+        'Recursive curriculum tree validation without modifying database rows',
+        'Multi-subject coverage normalization',
+        'Deficit detection across missing units and orphaned chapters',
+        'Strict tenant isolation via sub_institute_id',
+      ],
+      safeguards: [
+        'Strictly read-only: does not alter chapter statuses or curriculum definitions',
+        'Tenant boundary isolation via sub_institute_id',
+        'Gate 1 requires valid curriculum structures before progressing to pacing audit',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 1 of the Curriculum Planning pipeline, establishing the syllabus baseline and passing validated curriculum targets to Agent 2.',
+      step_by_step_flow: [
+        'Step 1: Receives target standard, subject, and academic school year (default 2026)',
+        'Step 2: Queries lms_curriculum joined with subject and standard',
+        'Step 3: Gathers lms_units and chapter_master to compute coverage percentages',
+        'Step 4: Evaluates Gate 1 validation rules and packages findings',
+        'Step 5: Delivers validated curriculum objects to Agent 2 (Lesson Pace Auditor)',
+      ],
+    },
+  },
+  'curriculum_planning.lesson_pace': {
+    name: 'Lesson plan pace auditor',
+    module: 'Curriculum Planning',
+    tool: 'curriculum_planning.lesson_pace',
+    knowledge: {
+      summary: 'Macro and micro lesson schedules, scheduled period slots, teacher allocations, calendar milestones, and period completion statuses.',
+      items: [
+        'Term lesson plan schedules from lms_intelligence_lesson_plans',
+        'Individual scheduled periods, dates, and slots from lms_lesson_plan_periods',
+        'Faculty teacher allocations from tbluser',
+        'Period statuses: completed, in_progress, not_started',
+        'Temporal academic calendar boundaries (term_start_date, term_end_date)',
+      ],
+      tables: ['lms_intelligence_lesson_plans', 'lms_lesson_plan_periods', 'tbluser', 'standard', 'subject'],
+    },
+    activities: {
+      summary: 'Consumes curriculum targets from Gate 1, audits scheduled teaching periods against current calendar date, and isolates behind-schedule chapters.',
+      items: [
+        'Matching macro lesson plans to target standard and subject scope',
+        'Evaluating each scheduled period against current calendar date (scheduled_date < today AND status != completed)',
+        'Aggregating completed vs pending period totals and computing overall velocity rate',
+        'Identifying assigned teachers with overdue teaching periods',
+        'Packaging behind-schedule items and passing to Gate 2 for intervention drafting',
+      ],
+    },
+    abilities: {
+      summary: 'Temporal calendar reconciliation, faculty period auditing, velocity metric computation, and read-only extraction.',
+      skills: [
+        'Date-windowed pacing comparison against academic term schedules',
+        'Teacher allocation cross-referencing',
+        'Identification of delayed units risking exam milestone readiness',
+        'Strict tenant boundary enforcement',
+      ],
+      safeguards: [
+        'Read-only operations: zero modifications to period schedules or teacher assignments',
+        'Tenant boundary isolation via sub_institute_id',
+        'Gate 2 validation requires period records to match verified Gate 1 curricula',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2 of the Curriculum Planning pipeline, evaluating whether actual classroom delivery is keeping pace with planned syllabus schedules.',
+      step_by_step_flow: [
+        'Step 1: Consumes validated curriculum targets from Gate 1',
+        'Step 2: Queries lms_intelligence_lesson_plans and lms_lesson_plan_periods',
+        'Step 3: Identifies behind-schedule periods where scheduled_date has elapsed without completion',
+        'Step 4: Compiles upcoming 14-day delivery schedule and velocity rates',
+        'Step 5: Delivers behind-schedule period findings to Agent 3 via Gate 2',
+      ],
+    },
+  },
+  'curriculum_planning.outcomes': {
+    name: 'Learning outcomes reader',
+    module: 'Curriculum Planning',
+    tool: 'curriculum_planning.outcomes',
+    knowledge: {
+      summary: 'Competencies, curricular goals, and learning outcomes taxonomy defined across curriculum units.',
+      items: [
+        'Curricular goals (CG) and competencies (C) from lms_learning_outcomes',
+        'Unit associations and standard bindings from lms_units and standard',
+        'Outcome coding standards conforming to National Curriculum Framework (NCF)',
+      ],
+      tables: ['lms_learning_outcomes', 'lms_units', 'standard', 'subject'],
+    },
+    activities: {
+      summary: 'Reads declared learning outcomes and competencies linked to curriculum units and validates competency distribution.',
+      items: [
+        'Scans lms_learning_outcomes mapped to target curriculum and units',
+        'Validates outcome codes against national education guidelines',
+        'Delivers competency rosters to curriculum coordinators',
+      ],
+    },
+    abilities: {
+      summary: 'Deterministic taxonomy query, zero mutation, and tenant isolation.',
+      skills: ['Curriculum competency tree parsing', 'Standard code verification'],
+      safeguards: ['Read-only operations', 'Strict tenant boundary enforcement'],
+    },
+    usage: {
+      summary: 'Provides reference learning outcomes mapped to syllabus chapters for alignment verification.',
+      step_by_step_flow: [
+        'Step 1: Ingests curriculum or unit identifiers',
+        'Step 2: Queries lms_learning_outcomes for active competency declarations',
+        'Step 3: Returns structured competency hierarchy',
+      ],
+    },
+  },
+  'curriculum_planning.draft_alignment_note': {
+    name: 'Learning outcomes alignment drafter',
+    module: 'Curriculum Planning',
+    tool: 'curriculum_planning.draft_alignment_note',
+    knowledge: {
+      summary: 'National Curriculum Framework (NCF) competencies, learning outcome hierarchies, semantic intelligence concepts, and safety guardrails.',
+      items: [
+        'Curricular goals (CG) and competencies (C) from lms_learning_outcomes',
+        'Semantic intelligence concept linkages from semantic_intelligence',
+        'Pacing gap findings from Agent 2 (Gate 2)',
+        'Coverage deficit findings from Agent 1 (Gate 1)',
+        'Draft-only safety guardrails (max_verb=recommend, may_execute=0)',
+      ],
+      tables: ['lms_learning_outcomes', 'semantic_intelligence', 'lms_curriculum', 'lms_lesson_plan_periods'],
+    },
+    activities: {
+      summary: 'Synthesizes coverage and pacing deficits, aligns with learning outcome milestones, and drafts actionable recovery proposals for educator review.',
+      items: [
+        'Correlating behind-schedule lesson periods with uncompleted chapter competencies',
+        'Drafting personalized schedule recovery proposals for assigned educators citing specific period dates',
+        'Drafting cohort-level syllabus alignment notes for academic coordinators',
+        'Enforcing strict draft_pending_human_approval status with zero external dispatching',
+        'Gate 3 safety validation ensuring all recommendations are non-consequential drafts',
+      ],
+    },
+    abilities: {
+      summary: 'Pedagogical synthesis, grounded factual drafting, human-in-the-loop guardrail enforcement, and remediation proposal formulation.',
+      skills: [
+        'Cross-referencing syllabus delays with required learning competencies',
+        'Objective, constructive pedagogical drafting citing exact dates and chapters',
+        'Generating actionable timetable catch-up and zero-period recommendations',
+        'Multi-agent evidence fusion',
+      ],
+      safeguards: [
+        'Strict draft-only policy: zero automatic emails, SMS, or schedule changes are dispatched',
+        'Human-in-the-loop requirement: all drafts remain pending until approved by faculty/coordinator',
+        'Objective language with zero disciplinary judgements',
+        'Comprehensive logging in ai_agent_runs audit trail',
+      ],
+    },
+    usage: {
+      summary: 'Acts as the final synthesis step (Step 3) of the Curriculum Planning pipeline, converting raw coverage and pacing data into safe draft proposals ready for coordinator sign-off.',
+      step_by_step_flow: [
+        'Step 1: Ingests coverage gaps from Gate 1 and overdue periods from Gate 2',
+        'Step 2: Evaluates affected learning outcomes from lms_learning_outcomes',
+        'Step 3: Drafts individual teacher pacing recovery notes citing exact delayed periods',
+        'Step 4: Compiles coordinator executive summary with syllabus velocity recommendations',
+        'Step 5: Enforces Gate 3 safety validation and stores drafts in approval queue',
+      ],
+    },
+  },
+  'new_pal.gamification_summary': {
+    name: 'PAL gamification reader',
+    module: 'New PAL',
+    tool: 'new_pal.gamification_summary',
+    knowledge: {
+      summary: 'Real learner practice records, question paper attempts where exam_type="PAL", daily practice streaks, earned badges, and points.',
+      items: [
+        'PAL generated practice papers and attempts from question_paper and lms_online_exam',
+        'Per-question answer records and correctness from lms_online_exam_answer',
+        'Mastery points and consecutive practice days from LearnerActivitySource',
+        'Competency badges and career quest progression metrics',
+        'Student profiles from tblstudent and tblstudent_enrollment',
+      ],
+      tables: ['question_paper', 'lms_online_exam', 'lms_online_exam_answer', 'tblstudent', 'tblstudent_enrollment'],
+    },
+    activities: {
+      summary: 'Profiles learner practice telemetry, evaluates practice streaks and badge accumulation, and validates Gate 1.',
+      items: [
+        'Aggregating practice paper attempts under exam_type = "PAL"',
+        'Calculating consecutive daily practice streaks and accuracy trends',
+        'Auditing competency badges earned against class milestones',
+        'Extracting student practice velocity for downstream diagnostic correlation',
+        'Gate 1 validation pass ensuring telemetry integrity',
+      ],
+    },
+    abilities: {
+      summary: 'Longitudinal practice tracking, gamification metric calculation, zero-synthetic evaluation, and read-only extraction.',
+      skills: [
+        'Deterministic practice attempt tallying without altering student records',
+        'Dynamic streak calculation from real attempt timestamps',
+        'Multi-source learner profile normalization',
+        'Strict tenant isolation via sub_institute_id',
+      ],
+      safeguards: [
+        'Strictly read-only: does not modify attempts, points, or streaks',
+        'Tenant boundary isolation via sub_institute_id',
+        'Gate 1 requires genuine learner practice telemetry before progressing',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 1 of the PAL pipeline, capturing student practice velocity and passing verified learner telemetry to Agent 2.',
+      step_by_step_flow: [
+        'Step 1: Ingests student ID or resolves active candidate from the class roster',
+        'Step 2: Gathers attempt history from lms_online_exam for PAL papers',
+        'Step 3: Aggregates streaks, points, and badge credentials',
+        'Step 4: Evaluates Gate 1 validation criteria',
+        'Step 5: Delivers verified practice profile to Agent 2 (Mastery Diagnostic Agent)',
+      ],
+    },
+  },
+  'new_pal.content_model_status': {
+    name: 'PAL content mastery diagnostic agent',
+    module: 'New PAL',
+    tool: 'new_pal.content_model_status',
+    knowledge: {
+      summary: 'Chapter content models, 4-type Bloom cognitive nodes, mastery level thresholds, and Stream-tier stagnation rules.',
+      items: [
+        'Chapter content model configuration and cognitive mapping from ContentModelCoverageService',
+        'Learner mastery tier classifications from PalInterventionDetector',
+        'Threshold registry criteria (learners with >= 50% attempted concepts stuck at Stream)',
+        'Concept prerequisite relations from pal_concept_relations',
+        'Mastery attempt counts and session logs',
+      ],
+      tables: ['pal_concept_relations', 'pal_learning_events', 'chapter_master', 'lms_concept', 'tblstudent'],
+    },
+    activities: {
+      summary: 'Audits content model coverage across estate chapters, diagnoses learners stuck at the foundational Stream tier, and validates Gate 2.',
+      items: [
+        'Auditing chapter content model depth (concept learning, practice, assessment)',
+        'Evaluating attempted concepts against mastery progression tiers',
+        'Isolating students whose attempted concepts fail to advance beyond Stream',
+        'Detecting specific prerequisite concept bottlenecks and misconceptions',
+        'Packaging flagged candidate cohort for Gate 2 delivery to Agent 3',
+      ],
+    },
+    abilities: {
+      summary: 'Multi-tier cognitive model analysis, BKT mastery threshold classification, and deficit isolation.',
+      skills: [
+        'Cognitive taxonomy evaluation without fabricating test scores',
+        'Stalled mastery share calculation (stream_share = stuck_nodes / attempted_nodes)',
+        'Non-judgmental diagnostic deficit tagging',
+        'Strict tenant boundary enforcement',
+      ],
+      safeguards: [
+        'Zero character judgements: describes recorded mastery patterns only',
+        'Strict read-only execution: modifies no student records',
+        'Gate 2 validation requires verified mastery data',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2 of the PAL pipeline, diagnosing which concepts present mastery obstacles for candidate learners.',
+      step_by_step_flow: [
+        'Step 1: Consumes learner practice telemetry from Gate 1',
+        'Step 2: Inspects estate content models via ContentModelCoverageService',
+        'Step 3: Executes PalInterventionDetector to isolate students stuck at Stream',
+        'Step 4: Catalogs specific stuck concept nodes and misconception patterns',
+        'Step 5: Passes flagged learner records to Agent 3 via Gate 2',
+      ],
+    },
+  },
+  'new_pal.coherence_gaps': {
+    name: 'Adaptive coherence reader',
+    module: 'New PAL',
+    tool: 'new_pal.coherence_gaps',
+    knowledge: {
+      summary: 'Concept prerequisite trees, coherence mapping graphs, and mastery gap diagnostics across subjects.',
+      items: [
+        'Concept relations and dependency edges from pal_concept_relations',
+        'Topic-to-concept bindings from lms_concept',
+        'Missing prerequisite chains and cyclic dependency detection',
+      ],
+      tables: ['pal_concept_relations', 'lms_concept', 'topic_master', 'chapter_master'],
+    },
+    activities: {
+      summary: 'Traverses concept prerequisite graphs to identify broken dependencies and knowledge gaps preventing progression.',
+      items: [
+        'Tracing prerequisite paths for difficult concept nodes',
+        'Identifying missing prerequisite mastery records',
+        'Packaging graph coherence gaps for targeted remediation',
+      ],
+    },
+    abilities: {
+      summary: 'Graph traversal, circular link prevention, and read-only analysis.',
+      skills: ['DAG dependency verification', 'Prerequisite chain resolution'],
+      safeguards: ['Read-only execution', 'Strict tenant boundary isolation'],
+    },
+    usage: {
+      summary: 'Provides graph-level concept dependency insights to pinpoint foundational concepts requiring reteaching.',
+      step_by_step_flow: [
+        'Step 1: Identifies candidate struggling concept',
+        'Step 2: Traverses pal_concept_relations upstream to locate required antecedents',
+        'Step 3: Identifies unmastered prerequisites for scaffolding intervention',
+      ],
+    },
+  },
+  'new_pal.draft_adaptive_intervention': {
+    name: 'PAL adaptive coherence drafter',
+    module: 'New PAL',
+    tool: 'new_pal.draft_adaptive_intervention',
+    knowledge: {
+      summary: 'Coherence map knowledge graphs, concept prerequisite trees, remediation strategies, and draft safety rules.',
+      items: [
+        'Concept graph relationships and prerequisite links from CoherenceMapRepository',
+        'Flagged learner profiles and stuck concepts from Agent 2 (Gate 2)',
+        'Gamification streak and practice context from Agent 1 (Gate 1)',
+        'Remedial scaffolding strategies (worked examples, prerequisite reteach)',
+        'Safety guardrails (max_verb=recommend, may_execute=0, zero automated messaging)',
+      ],
+      tables: ['pal_concept_relations', 'ai_cases', 'ai_evidence', 'ai_recommendations', 'lms_concept'],
+    },
+    activities: {
+      summary: 'Synthesizes gamification metrics and stuck mastery concepts to draft personalized adaptive learning intervention plans for educator review.',
+      items: [
+        'Cross-referencing stalled concepts with graph prerequisite dependencies',
+        'Drafting individualized pedagogical action plans citing exact stuck concepts',
+        'Proposing worked-example reinforcement and scaffolding modules',
+        'Enforcing strict draft_pending_human_approval status tags',
+        'Gate 3 safety validation confirming zero external messages were dispatched',
+      ],
+    },
+    abilities: {
+      summary: 'Graph-grounded pedagogical synthesis, adaptive pathway generation, human-in-the-loop guardrail enforcement, and objective drafting.',
+      skills: [
+        'Prerequisite tree traversal to identify optimal remediation entry points',
+        'Grounded factual drafting citing exact concept titles and mastery percentages',
+        'Personalized adaptive recommendation drafting',
+        'Audit logging compliance',
+      ],
+      safeguards: [
+        'Strict draft-only policy: zero automatic emails, SMS, or test reassignments are dispatched',
+        'Human-in-the-loop requirement: plans remain pending until approved by the teacher',
+        'Objective, constructive pedagogical language',
+        'Comprehensive logging in ai_agent_runs audit trail',
+      ],
+    },
+    usage: {
+      summary: 'Acts as the final synthesis step (Step 3) of the PAL pipeline, converting raw practice and concept bottlenecks into safe draft interventions ready for teacher sign-off.',
+      step_by_step_flow: [
+        'Step 1: Consumes practice telemetry from Gate 1 and stuck concepts from Gate 2',
+        'Step 2: Traverses prerequisite trees in pal_concept_relations for foundational gap roots',
+        'Step 3: Drafts personalized intervention plans citing exact stuck concepts and recommended scaffolding',
+        'Step 4: Compiles coordinator executive summary with cohort mastery distributions',
+        'Step 5: Enforces Gate 3 safety validation and deposits proposals in the approval queue',
+      ],
+    },
+  },
+};
+
+function ToolAgentEsoModal({
+  eso,
+  onClose,
+}: {
+  eso: ToolAgentEsoInfo;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex items-start justify-between border-b border-slate-200 bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-slate-50 px-6 py-4 shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-md bg-blue-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
+                Executive Skill Object (ESO)
+              </span>
+              <span className="rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-800">
+                {eso.module}
+              </span>
+              <span className="rounded-md bg-slate-100 font-mono text-[10px] font-bold text-slate-700">
+                {eso.tool}
+              </span>
+            </div>
+            <h2 className="text-base font-bold text-slate-950 mt-1">
+              {eso.name}
+            </h2>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Specific grounded specification of Knowledge, Activities, Abilities, and Usage for this agent.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-xl border border-blue-200 bg-white p-4 space-y-2 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                  <BookOpen className="size-3.5 text-blue-600" />
+                  1. Knowledge
+                </span>
+                <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                  Data & Schemas
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                {eso.knowledge.summary}
+              </p>
+              <ul className="space-y-1 text-[11px] text-slate-700 pt-1">
+                {eso.knowledge.items.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-blue-500 font-bold">•</span>
+                    <span className="leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="pt-2 border-t border-slate-100">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                  Database Tables:
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {eso.knowledge.tables.map((t) => (
+                    <span key={t} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-700">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-purple-200 bg-white p-4 space-y-2 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+                <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                  <Activity className="size-3.5 text-purple-600" />
+                  2. Activities
+                </span>
+                <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md">
+                  Operations & Audits
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                {eso.activities.summary}
+              </p>
+              <ul className="space-y-1 text-[11px] text-slate-700 pt-1">
+                {eso.activities.items.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-purple-500 font-bold">➔</span>
+                    <span className="leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-white p-4 space-y-2 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+                <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                  <ShieldCheck className="size-3.5 text-emerald-600" />
+                  3. Abilities
+                </span>
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                  Skills & Safeguards
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                {eso.abilities.summary}
+              </p>
+              <div className="space-y-2 pt-1">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-emerald-800 block mb-1">
+                    Technical Skills:
+                  </span>
+                  <ul className="space-y-1 text-[11px] text-slate-700">
+                    {eso.abilities.skills.map((skill, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 font-bold">✓</span>
+                        <span className="leading-snug">{skill}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="pt-2 border-t border-slate-100">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                    Safety & Safeguards:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {eso.abilities.safeguards.map((c, idx) => (
+                      <span key={idx} className="rounded bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-800">
+                        🛡️ {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-white p-4 space-y-2 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                  <Workflow className="size-3.5 text-amber-600" />
+                  4. Usage
+                </span>
+                <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
+                  Step-by-Step Flow
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                {eso.usage.summary}
+              </p>
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] font-bold uppercase text-amber-800 block mb-1">
+                  Concrete Execution Sequence:
+                </span>
+                <ol className="space-y-1 text-[11px] text-slate-700">
+                  {eso.usage.step_by_step_flow.map((step, idx) => (
+                    <li key={idx} className="flex items-start gap-1.5">
+                      <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-900 font-bold text-[9px] mt-0.5">
+                        {idx + 1}
+                      </span>
+                      <span className="leading-snug">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-3 shrink-0">
+          <span className="text-[11px] text-slate-500">
+            {eso.name} · Distinct Executive Skill Object
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 cursor-pointer"
+          >
+            Close ESO
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** The manifest as `/api/ai/agents` returns it. Loosely typed — it is a config row. */
 interface AgentManifestRow {
@@ -123,6 +1262,7 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [running, setRunning] = useState<Agent | null>(null);
+  const [selectedEso, setSelectedEso] = useState<ToolAgentEsoInfo | null>(null);
   // Remounts the scoped console after a preset action so its own lists refresh.
   const [consoleKey, setConsoleKey] = useState(0);
 
@@ -141,8 +1281,18 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
   const refreshAll = useCallback(() => {
     agents.refresh();
     runs.refresh();
-    setConsoleKey((key) => key + 1);
-  }, [agents, runs]);
+  }, [agents.refresh, runs.refresh]);
+
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const customEvt = evt as CustomEvent<{ module?: string }>;
+      if (!customEvt.detail?.module || customEvt.detail.module === module.key) {
+        refreshAll();
+      }
+    };
+    window.addEventListener('agents:runs-updated', handler);
+    return () => window.removeEventListener('agents:runs-updated', handler);
+  }, [refreshAll, module.key]);
 
   const enable = useCallback(
     async (preset: CreateAgentInput) => {
@@ -154,6 +1304,7 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
           `${agent.name} enabled as ${agent.id}. It runs only when someone presses Run, and only as that person.`,
         );
         refreshAll();
+        setConsoleKey((key) => key + 1);
       } catch (cause) {
         setNote(cause instanceof Error ? cause.message : 'The agent could not be enabled.');
       } finally {
@@ -198,7 +1349,17 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
 
   return (
     <div className="space-y-6">
-      {module.boundAgent ? (
+      {module.boundAgent?.agentKey === 'k12_course_catalogue' ? (
+        <CatalogueAgentControlCard onValidated={refreshAll} />
+      ) : module.boundAgent?.agentKey === 'k12_exam_assessment' ? (
+        <ExamAssessmentAgentControlCard onValidated={refreshAll} />
+      ) : module.boundAgent?.agentKey === 'k12_engagement' ? (
+        <EngagementAgentControlCard onValidated={refreshAll} />
+      ) : module.boundAgent?.agentKey === 'k12_curriculum_planning' ? (
+        <CurriculumPlanningAgentControlCard onValidated={refreshAll} />
+      ) : module.boundAgent?.agentKey === 'k12_new_pal' ? (
+        <PalAgentControlCard onValidated={refreshAll} />
+      ) : module.boundAgent ? (
         <BoundAgentPanel module={module} agent={module.boundAgent} />
       ) : (
         <NoBoundAgentPanel module={module} />
@@ -257,6 +1418,10 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
               onEnable={() => void enable(preset)}
               onToggle={(agent) => void toggle(agent)}
               onRun={setRunning}
+              onShowEso={() => {
+                const info = TOOL_AGENT_ESO_MAP[preset.tools_allowed[0]];
+                if (info) setSelectedEso(info);
+              }}
             />
           ))}
         </div>
@@ -266,7 +1431,18 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
         <h3 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">
           {module.label} agent management
         </h3>
-        <AgentManagement key={consoleKey} moduleFilter={module.key} embedded />
+        <AgentManagement
+          key={consoleKey}
+          moduleFilter={module.key}
+          embedded
+          hideCreate={
+            module.key === 'teach_learn' ||
+            module.key === 'exam_assessment' ||
+            module.key === 'engagement' ||
+            module.key === 'curriculum_planning' ||
+            module.key === 'new_pal'
+          }
+        />
       </div>
 
       {running && (
@@ -277,6 +1453,13 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
             runs.refresh();
             setConsoleKey((key) => key + 1);
           }}
+        />
+      )}
+
+      {selectedEso && (
+        <ToolAgentEsoModal
+          eso={selectedEso}
+          onClose={() => setSelectedEso(null)}
         />
       )}
     </div>
@@ -878,6 +2061,7 @@ function PresetCard({
   onEnable,
   onToggle,
   onRun,
+  onShowEso,
 }: {
   preset: CreateAgentInput;
   agent: Agent | null;
@@ -889,6 +2073,7 @@ function PresetCard({
   onEnable: () => void;
   onToggle: (agent: Agent) => void;
   onRun: (agent: Agent) => void;
+  onShowEso?: () => void;
 }) {
   const tool = findTool(preset.tools_allowed[0]);
   const lastRun = agent ? (runs.find((run) => run.agent_id === agent.id) ?? null) : null;
@@ -945,16 +2130,40 @@ function PresetCard({
               {agent.status === 'active' ? <Pause size={12} /> : <Play size={12} />}
               {agent.status === 'active' ? 'Pause' : 'Resume'}
             </button>
+            {onShowEso && (
+              <button
+                type="button"
+                onClick={onShowEso}
+                className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors cursor-pointer"
+                title="View Executive Skill Object (Knowledge, Activities, Abilities, Usage)"
+              >
+                <Sparkles size={12} className="text-indigo-600" />
+                ESO
+              </button>
+            )}
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={onEnable}
-            disabled={busy || !canCreate}
-            className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {busy ? 'Enabling…' : 'Enable agent'}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onEnable}
+              disabled={busy || !canCreate}
+              className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? 'Enabling…' : 'Enable agent'}
+            </button>
+            {onShowEso && (
+              <button
+                type="button"
+                onClick={onShowEso}
+                className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors cursor-pointer"
+                title="View Executive Skill Object (Knowledge, Activities, Abilities, Usage)"
+              >
+                <Sparkles size={12} className="text-indigo-600" />
+                ESO
+              </button>
+            )}
+          </div>
         )}
 
         {lastRun && (

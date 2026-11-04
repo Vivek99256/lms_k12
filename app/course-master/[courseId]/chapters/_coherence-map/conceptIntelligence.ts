@@ -124,7 +124,7 @@ export function difficultyChipClass(difficulty: string): string {
     case 'hard':
       return 'bg-rose-50 text-rose-700';
     default:
-      return 'bg-amber-50 text-amber-800';
+      return 'bg-amber-50 text-amber-700';
   }
 }
 

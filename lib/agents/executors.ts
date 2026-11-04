@@ -583,7 +583,9 @@ const EXECUTORS: Record<string, Executor> = {
         subject_id: count(args.subject_id),
         category: text(args.category),
         query: text(args.query),
-        include_chapters: args.include_chapters === false ? false : undefined,
+        include_chapters: typeof args.include_chapters === 'boolean' ? args.include_chapters : true,
+        validate_hierarchy: typeof args.validate_hierarchy === 'boolean' ? args.validate_hierarchy : true,
+        force: typeof args.force === 'boolean' ? args.force : false,
         limit: count(args.limit),
       }),
     ).then((output) => ({ output })),
@@ -601,6 +603,19 @@ const EXECUTORS: Record<string, Executor> = {
       }),
     ).then((output) => ({ output })),
 
+  'teach_learn.content_model_coverage': (args, context) =>
+    readViaMcp(
+      context,
+      'teach_learn.content_model_coverage',
+      given({
+        standard_id: count(args.standard_id ?? args.class_id),
+        standard: count(args.standard),
+        subject_id: count(args.subject_id),
+        subject: text(args.subject ?? args.subject_name),
+        limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
   // ---- Curriculum Planning ---------------------------------------------------
 
   'curriculum_planning.status': (args, context) =>
@@ -611,6 +626,28 @@ const EXECUTORS: Record<string, Executor> = {
         standard_id: count(args.standard_id ?? args.class_id),
         subject_id: count(args.subject_id),
         syear: text(args.syear),
+      }),
+    ).then((output) => ({ output })),
+
+  'curriculum_planning.lesson_pace': (args, context) =>
+    readViaMcp(
+      context,
+      'curriculum_planning.lesson_pace',
+      given({
+        standard_id: count(args.standard_id ?? args.class_id),
+        subject_id: count(args.subject_id),
+        syear: text(args.syear),
+      }),
+    ).then((output) => ({ output })),
+
+  'curriculum_planning.draft_alignment_note': (args, context) =>
+    readViaMcp(
+      context,
+      'curriculum_planning.draft_alignment_note',
+      given({
+        standard_name: text(args.standard_name, 'Class'),
+        curricula_gaps: args.curricula_gaps ?? [],
+        pacing_gaps: args.pacing_gaps ?? [],
       }),
     ).then((output) => ({ output })),
 
@@ -645,6 +682,17 @@ const EXECUTORS: Record<string, Executor> = {
         threshold_percent: count(args.threshold_percent),
         days_back: count(args.days_back),
         limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  'engagement.draft_intervention_note': (args, context) =>
+    readViaMcp(
+      context,
+      'engagement.draft_intervention_note',
+      given({
+        student_id: count(args.student_id),
+        student_name: text(args.student_name),
+        deficiency_reasons: list(args.deficiency_reasons),
       }),
     ).then((output) => ({ output })),
 
@@ -702,6 +750,16 @@ const EXECUTORS: Record<string, Executor> = {
         standard_id: count(args.standard_id ?? args.class_id),
         subject_id: count(args.subject_id),
         limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  'new_pal.draft_adaptive_intervention': (args, context) =>
+    readViaMcp(
+      context,
+      'new_pal.draft_adaptive_intervention',
+      given({
+        flagged_learners: args.flagged_learners ?? [],
+        coherence_summary: args.coherence_summary ?? {},
       }),
     ).then((output) => ({ output })),
 
@@ -1989,6 +2047,64 @@ const EXECUTORS: Record<string, Executor> = {
 
   'hr.departments': (_args, context) =>
     readViaMcp(context, 'hr.departments', {}).then((output) => ({ output })),
+
+  // ---- Exam & Assessment ---------------------------------------------------
+
+  'exam_assessment.online_exam_summary': (args, context) =>
+    readViaMcp(
+      context,
+      'exam_assessment.online_exam_summary',
+      given({
+        standard_id: count(args.standard_id),
+        subject_id: count(args.subject_id),
+        student_id: count(args.student_id),
+        at_risk_percent: count(args.at_risk_percent),
+        limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  'exam_assessment.assignment_status': (args, context) =>
+    readViaMcp(
+      context,
+      'exam_assessment.assignment_status',
+      given({
+        standard_id: count(args.standard_id),
+        division_id: count(args.division_id),
+        subject_id: count(args.subject_id),
+        student_id: count(args.student_id),
+        work_type: text(args.work_type),
+        limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  'exam_assessment.draft_review_note': (args) => {
+    const student = text(args.student_name, 'the student');
+    const className = text(args.class_name);
+    const assessment = text(args.assessment_title, 'the assessment');
+    const rawScore = typeof args.score === 'number' ? args.score : Number(String(args.score ?? '').trim());
+    const rawTotal = typeof args.total_marks === 'number' ? args.total_marks : Number(String(args.total_marks ?? '').trim());
+    const score = Number.isFinite(rawScore) && rawScore >= 0 ? rawScore : undefined;
+    const total = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : undefined;
+    const workType = text(args.work_type, 'assessment');
+
+    const scoreLine =
+      score !== undefined && total !== undefined
+        ? `Score: ${score} / ${total}${total > 0 ? ` (${Math.round((score / total) * 100)}%)` : ''}.`
+        : score !== undefined
+          ? `Score: ${score}.`
+          : `An attempt was recorded for ${assessment}.`;
+
+    const body = `Assessment review note for ${student}${className ? ` (${className})` : ''} on ${workType} "${assessment}".\n\n${scoreLine}\n\nDrafted for review and follow-up.`;
+
+    return {
+      output: {
+        subject: `${assessment}${student !== 'the student' ? ` — ${student}` : ''}`,
+        body,
+        student,
+        assessment,
+      },
+    };
+  },
 
   'shared.compose_note': (args) => {
     const heading = text(args.heading, 'Note');

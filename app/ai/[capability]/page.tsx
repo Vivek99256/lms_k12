@@ -35,6 +35,7 @@ import { capabilityStatusLabel, getCapabilityBySlug } from '@shared/ai-intellige
 
 import { CapabilityLiveData } from '../_components/CapabilityLiveData';
 import { KnowledgeRagAsk } from '../_components/KnowledgeRagAsk';
+import KnowledgeGraphExplorer from '../_components/KnowledgeGraphExplorer';
 import { PointList, SectionCard, StatusChip } from '../_components/console-ui';
 
 export default function AiCapabilityPage() {
@@ -85,10 +86,17 @@ export default function AiCapabilityPage() {
           </div>
         )}
 
-        {/* Live records lead. What the capability holds for this school is the
-            thing an administrator opened the screen for; the explanation below is
-            context for it, not a substitute. */}
-        <CapabilityLiveData slug={capability.slug} name={capability.name} />
+        {/* Knowledge Graph gets its own canvas rather than the generic live-records
+            table: a graph of entities and relationships is not a list of rows,
+            and CapabilityLiveData's table view has nowhere to put one. */}
+        {capability.slug === 'knowledge-graph' ? (
+          <KnowledgeGraphExplorer />
+        ) : (
+          /* Live records lead. What the capability holds for this school is the
+             thing an administrator opened the screen for; the explanation below is
+             context for it, not a substitute. */
+          <CapabilityLiveData slug={capability.slug} name={capability.name} />
+        )}
 
        
 

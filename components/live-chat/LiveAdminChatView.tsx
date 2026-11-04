@@ -97,6 +97,7 @@ export function LiveAdminChatView({
   const [showInstantMeetModal, setShowInstantMeetModal] = useState(false);
   const [instantMeetUrl, setInstantMeetUrl] = useState(defaultMeetUrl || '');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (defaultMeetUrl && !instantMeetUrl) {
@@ -105,7 +106,10 @@ export function LiveAdminChatView({
   }, [defaultMeetUrl, instantMeetUrl]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesContainerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [messages]);
 
   const handleFetchSlotsForAdmin = useCallback(
@@ -133,7 +137,7 @@ export function LiveAdminChatView({
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
       {/* Live Chat Sub-Header */}
-      <div className="flex items-center justify-between border-b border-gray-200/80 bg-white/95 px-4 py-3 shadow-2xs backdrop-blur-md">
+      <div className="shrink-0 flex items-center justify-between border-b border-gray-200/80 bg-white/95 px-4 py-3 shadow-2xs backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -418,7 +422,7 @@ export function LiveAdminChatView({
         </div>
       ) : (
         <>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.map((msg) => {
           if (msg.type === 'system') {
             return (
@@ -581,7 +585,7 @@ export function LiveAdminChatView({
       ) : null}
 
       {/* Bottom Message Input Bar */}
-      <div className="border-t border-gray-200/80 bg-white/90 p-3 backdrop-blur-md">
+      <div className="shrink-0 border-t border-gray-200/80 bg-white/90 p-3 backdrop-blur-md">
         {isClosed ? (
           <div className="flex items-center justify-between rounded-xl bg-gray-100 px-4 py-2.5 text-xs text-gray-600">
             <span>This live session has ended.</span>

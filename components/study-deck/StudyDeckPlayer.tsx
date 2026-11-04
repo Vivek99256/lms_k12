@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Dumbbell, List, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Dumbbell, LayoutGrid, List, Maximize, Minimize, X } from 'lucide-react';
 
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import { activityKey, resolveActivity } from '@/lib/study-deck/deck';
@@ -19,6 +19,7 @@ import {
 import { nextPosition, pendingHint, previousPosition, stepsOf } from '@/lib/study-deck/stage';
 import { THEMES, themeOf, themeVars } from '@/lib/study-deck/theme';
 import type { StudyDeck } from '@/lib/study-deck/types';
+import { ImageEditButton, ImageEditingProvider, type ImageEditing } from './ImageEditing';
 import { OutlineDrawer } from './OutlinePanel';
 import { slidePlays } from '@/lib/study-document/play';
 import { PracticeDialog } from './PracticeDialog';
@@ -37,6 +38,11 @@ export interface StudyDeckPlayerProps {
   storage?: StorageLike | null;
   /** Open on this slide instead of where the learner left off (a link from the PDF names one). Ignored if the deck has no such slide. */
   startSlide?: number | null;
+  /**
+   * Editing mode, offered only while a teacher reviews a draft: a Change image button on every slide with a picture. The player itself
+   * stays read-only; it only reports which slide the teacher wants to change, and the caller opens the editor.
+   */
+  imageEditing?: Omit<ImageEditing, 'slide'> | null;
 }
 
 /**
@@ -50,7 +56,7 @@ export interface StudyDeckPlayerProps {
  * It does not open the PPTX. Nothing is written to the database by the lesson itself: progress lives in this browser
  * (see lib/study-deck/progress.ts), and the practice questions are the existing shared players.
  */
-export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null, startSlide = null }: StudyDeckPlayerProps) {
+export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null, startSlide = null, imageEditing = null }: StudyDeckPlayerProps) {
   const router = useRouter();
   const chapterId = deck.chapter.id;
   const storeKey = progressKey(userKey, chapterId);
@@ -67,6 +73,24 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
   // Which way the learner is travelling, so the next screen arrives from that side.
   const [direction, setDirection] = useState<'next' | 'back'>('next');
   const stageRef = useRef<HTMLDivElement>(null);
+  // Where the learner has been, in order, so Back returns to the question they came from rather than to the previous slide number.
+  const [trail, setTrail] = useState<number[]>([]);
+  const currentRef = useRef(1);
+  // Browser full screen (the lesson already fills the window; this also hides the browser's own bars). The browser can leave it
+  // by itself (Esc), so the button follows the document rather than its own click.
+  const [fullScreen, setFullScreen] = useState(false);
+  useEffect(() => {
+    const sync = () => setFullScreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', sync);
+
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, []);
+  // A deck that opens on a choice of products (the professional look) can always be returned to it.
+  const hubSlide = deck.slides.find((s) => s.interaction?.kind === 'hub')?.n ?? null;
+  const toggleFullScreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  };
   // What the learner has opened on each screen, kept while the lesson is open.
   const [memory] = useState(() => new Map<string, unknown>());
 
@@ -89,6 +113,10 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
   const steps = stepsOf(slide);
   const stepIndex = Math.min(step, steps.length - 1);
 
+  useEffect(() => {
+    currentRef.current = slide.n;
+  }, [slide.n]);
+
   // Opening a slide marks it visited. The reducer ignores a repeat.
   useEffect(() => {
     if (!finished && !progress.visited.includes(slide.n)) {
@@ -106,6 +134,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
   }, [slide.n, stepIndex, finished]);
 
   const goto = useCallback((n: number) => {
+    if (n !== currentRef.current) setTrail((previous) => [...previous, currentRef.current]);
     setDirection('next');
     setFinished(false);
     setOutlineOpen(false);
@@ -119,22 +148,32 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
 
   const stepKind = steps[stepIndex];
   const exploredDone = Boolean(progress.activities[(stepKind === 'example' ? exampleKey : interactionKey)(slide)]?.done);
-  const hint = finished ? null : pendingHint(slide, stepKind, exploredDone);
+  const waiting = !finished && slide.next === -1;
+  const hint = finished ? null : pendingHint(slide, stepKind, exploredDone) ?? (waiting ? 'Choose an answer to continue.' : null);
   const totals = deckTotals(deck, progress, playable);
   // The lesson wears the colours of the topic on screen: the chrome around the slide follows it.
-  const theme = finished ? THEMES.brand : themeOf(deck, slide);
+  const brand = deck.theme === 'professional' ? THEMES.navy : THEMES.brand;
+  const theme = finished ? brand : themeOf(deck, slide);
 
   const forward = useCallback(() => {
-    if (finished) return;
+    if (finished || slide.next === -1) return;
+    // A slide may name where Continue goes (the branches of a story); otherwise it is the next screen.
+    if (typeof slide.next === 'number' && slide.next > 0 && deck.slides.some((s) => s.n === slide.next)) {
+      goto(slide.next);
+      return;
+    }
     setDirection('next');
     const next = nextPosition(deck, { n: slide.n, step: stepIndex });
     if (!next) {
       setFinished(true);
       return;
     }
-    if (next.n !== slide.n) dispatch({ type: 'goto', n: next.n });
+    if (next.n !== slide.n) {
+      setTrail((previous) => [...previous, slide.n]);
+      dispatch({ type: 'goto', n: next.n });
+    }
     setStep(next.step);
-  }, [deck, finished, slide.n, stepIndex]);
+  }, [deck, finished, goto, slide.n, slide.next, stepIndex]);
 
   const back = useCallback(() => {
     setDirection('back');
@@ -143,11 +182,19 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
       setStep(stepsOf(deck.slides[lastIndex]).length - 1);
       return;
     }
+    if (trail.length > 0) {
+      const previous = trail[trail.length - 1];
+      setTrail(trail.slice(0, -1));
+      setOutlineOpen(false);
+      setStep(0);
+      dispatch({ type: 'goto', n: previous });
+      return;
+    }
     const before = previousPosition(deck, { n: slide.n, step: stepIndex });
     if (!before) return;
     if (before.n !== slide.n) dispatch({ type: 'goto', n: before.n });
     setStep(before.step);
-  }, [deck, finished, lastIndex, slide.n, stepIndex]);
+  }, [deck, finished, lastIndex, slide.n, stepIndex, trail]);
 
   const exit = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) router.back();
@@ -168,12 +215,15 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
     return () => window.removeEventListener('keydown', onKey);
   }, [forward, back, outlineOpen, practiceOpen]);
 
-  const atStart = !finished && index === 0 && stepIndex === 0;
-  const last = !finished && nextPosition(deck, { n: slide.n, step: stepIndex }) === null;
+  const atStart = !finished && index === 0 && stepIndex === 0 && trail.length === 0;
+  const last = !finished && slide.next === undefined && nextPosition(deck, { n: slide.n, step: stepIndex }) === null;
+  // The end of a path leads back to the choice of products, and says so.
+  const toProducts = typeof slide.next === 'number' && deck.slides.find((s) => s.n === slide.next)?.interaction?.kind === 'hub';
   const nav =
     'inline-flex items-center gap-1.5 rounded-xl px-5 py-2 text-sm font-semibold shadow-sm transition active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sd-accent';
 
   return (
+    <ImageEditingProvider value={imageEditing ? { ...imageEditing, slide: slide.n } : null}>
     <section
       aria-label="Study lesson"
       data-sd-theme={theme.key}
@@ -185,8 +235,9 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
           <X className="h-4 w-4" aria-hidden="true" />
           Exit
         </button>
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-sd-strong">{deck.chapter.name}</p>
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-sd-strong">{deck.title ?? deck.chapter.name}</p>
         <p className="shrink-0 text-xs font-medium text-slate-700">{finished ? 'Finished' : `Slide ${slide.n} of ${deck.slides.length}`}</p>
+        {!finished ? <ImageEditButton target={{ slide: slide.n }} /> : null}
         {!finished && (slide.activities.length > 0 || slidePlays(deck.concepts, slide).length > 0) ? (
           <button
             type="button"
@@ -198,6 +249,25 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
             <span className="hidden sm:inline">Practice</span>
           </button>
         ) : null}
+        {hubSlide !== null && !finished && slide.n !== hubSlide ? (
+          <button
+            type="button"
+            onClick={() => goto(hubSlide)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
+          >
+            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Products</span>
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={toggleFullScreen}
+          aria-label={fullScreen ? 'Exit full screen' : 'Full screen'}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sd-accent"
+        >
+          {fullScreen ? <Minimize className="h-4 w-4" aria-hidden="true" /> : <Maximize className="h-4 w-4" aria-hidden="true" />}
+          <span className="hidden sm:inline">{fullScreen ? 'Exit full screen' : 'Full screen'}</span>
+        </button>
         <button
           type="button"
           onClick={() => setOutlineOpen(true)}
@@ -224,7 +294,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
           <MemoryContext.Provider value={memory}>
           <div key={`${slide.n}:${stepIndex}:${finished}`} className={`h-full ${direction === 'back' ? motion.enterPrev : motion.enterNext}`}>
           {finished ? (
-            <SlideStage theme={THEMES.brand}>
+            <SlideStage theme={brand}>
             <SummaryScreen
               deck={deck}
               progress={progress}
@@ -249,6 +319,7 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
               onResult={onResult}
               onGoto={goto}
               onNext={forward}
+              onBack={back}
             />
           )}
           </div>
@@ -290,9 +361,10 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
           <button
             type="button"
             onClick={forward}
-            className={`${nav} ${hint ? 'border border-sd-line bg-white text-sd-strong hover:bg-sd-softer' : 'bg-sd-accent text-white hover:bg-sd-strong'}`}
+            disabled={waiting}
+            className={`${nav} disabled:cursor-not-allowed disabled:opacity-40 ${hint ? 'border border-sd-line bg-white text-sd-strong hover:bg-sd-softer' : 'bg-sd-accent text-white hover:bg-sd-strong'}`}
           >
-            {last ? 'Finish' : 'Continue'}
+            {last ? 'Finish' : toProducts ? 'Back to products' : 'Continue'}
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
@@ -303,5 +375,6 @@ export function StudyDeckPlayer({ deck, bank, assetBase, userKey, storage = null
         <PracticeDialog deck={deck} slide={slide} bank={bankMap} progress={progress} onResult={onResult} onClose={() => setPracticeOpen(false)} />
       ) : null}
     </section>
+    </ImageEditingProvider>
   );
 }

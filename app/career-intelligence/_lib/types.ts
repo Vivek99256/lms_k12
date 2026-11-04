@@ -197,3 +197,78 @@ export interface CareerRecommendationPayload {
   alignment: AlignmentStatus | 'INSUFFICIENT_DATA';
   insufficient_data_reason?: string;
 }
+
+/**
+ * Staff mentor match (Laravel: App\CareerIntelligence\StaffMentorMatchService).
+ * `crosswalk_ready=false` means the HR crosswalk table does not exist yet.
+ * Mentors expose id, name and job title only: no contact data.
+ */
+export type MentorEmptyReason =
+  | 'crosswalk_not_ready'
+  | 'no_requirements'
+  | 'no_mapped_skills'
+  | 'no_matching_staff'
+  | null;
+
+export interface MentorMatchedSkill {
+  skill_id: number;
+  skill_title: string;
+  skill_level: number;
+  element_id: string;
+  element_name: string;
+  element_type: 'skill' | 'knowledge';
+  importance: number;
+}
+
+export interface MentorSuggestion {
+  staff_id: number;
+  name: string;
+  job_title: string | null;
+  /** Importance-weighted share (0-100) of the career's skill and knowledge requirements covered. */
+  score: number;
+  matched_element_count: number;
+  matched_skills: MentorMatchedSkill[];
+}
+
+export interface MentorSuggestionsPayload {
+  crosswalk_ready: boolean;
+  occupation_code: string;
+  reason: MentorEmptyReason;
+  requirement_count: number;
+  mapped_requirement_count: number;
+  mentors: MentorSuggestion[];
+}
+
+export interface ElementSuggestion {
+  element_id: string;
+  element_name: string;
+  element_type: string;
+  similarity: number;
+}
+
+export interface UnmappedStaffSkill {
+  id: number;
+  title: string;
+  category: string | null;
+  skill_code: string | null;
+  holder_count: number;
+  /** Text-similarity PROPOSALS only; never saved until an HR user confirms one. */
+  suggestions: ElementSuggestion[];
+}
+
+export interface MappedStaffSkill {
+  id: number;
+  skill_id: number;
+  skill_title: string | null;
+  element_id: string;
+  element_name: string | null;
+  element_type: string;
+}
+
+export interface MentorCrosswalkPayload {
+  crosswalk_ready: boolean;
+  unmapped: UnmappedStaffSkill[];
+  mapped: MappedStaffSkill[];
+  can_write: boolean;
+  note?: string;
+}

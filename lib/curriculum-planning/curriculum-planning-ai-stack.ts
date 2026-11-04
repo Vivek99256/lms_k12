@@ -39,8 +39,9 @@ export const CURRICULUM_PLANNING_AI_STACK: AiStackModule = {
     reportCanPrint: 'the coverage figures come from the curriculum and chapter records themselves rather than from a model.',
     groundedOn: 'the recorded curriculum, unit and chapter data above, which is the stronger ground of the two.',
     capabilityAgent:
-      'No agent manifest is bound to Curriculum Planning, so nothing here opens a case or drafts a recommendation. The tool agents on the Automations tab still read the coverage records.',
-    capabilityWorkflow: 'No workflow is bound to Curriculum Planning, so nothing in this module pauses for an approval.',
+      'The Curriculum Planning Agent audits syllabus hierarchy, evaluates lesson plan delivery pace against the academic calendar, and drafts pacing alignment proposals for educators. It never modifies curriculum records directly.',
+    capabilityWorkflow:
+      'A drafted syllabus alignment note must be approved by an educator or coordinator through the curriculum_planning_review workflow before any schedule changes are actioned.',
   },
 
   report: {
@@ -66,6 +67,24 @@ export const CURRICULUM_PLANNING_AI_STACK: AiStackModule = {
       status: 'active',
     },
     {
+      name: 'Lesson plan pace auditor',
+      description: 'Audits scheduled teaching periods against the calendar and identifies behind-schedule chapters. Changes nothing.',
+      module: CURRICULUM_PLANNING_MODULE_KEY,
+      tools_allowed: ['curriculum_planning.lesson_pace'],
+      instructions:
+        'Compare scheduled lesson dates against the current date objectively. Report behind-schedule periods without attributing fault to individual educators.',
+      status: 'active',
+    },
+    {
+      name: 'Learning outcomes alignment drafter',
+      description: 'Drafts actionable pacing recovery and competency alignment proposals for educator review. Changes nothing.',
+      module: CURRICULUM_PLANNING_MODULE_KEY,
+      tools_allowed: ['curriculum_planning.draft_alignment_note'],
+      instructions:
+        'Draft objective, constructive pacing proposals citing exact lesson dates and learning outcomes. Mark all proposals as draft_pending_human_approval.',
+      status: 'active',
+    },
+    {
       name: 'Learning outcomes reader',
       description: 'Reads the learning outcomes and competencies declared against a curriculum. Changes nothing.',
       module: CURRICULUM_PLANNING_MODULE_KEY,
@@ -75,9 +94,17 @@ export const CURRICULUM_PLANNING_AI_STACK: AiStackModule = {
     },
   ],
 
-  boundAgent: null,
-  noAgentReason:
-    'Curriculum Planning has no case-opening agent yet; reports and conversational answers are grounded directly on curriculum and chapter records.',
+  boundAgent: {
+    agentKey: 'k12_curriculum_planning',
+    workflowKey: 'curriculum_planning_review',
+    fallbackName: 'Curriculum Planning Agent',
+    filters: [
+      { key: 'limit', label: 'Curricula limit', placeholder: '50' },
+    ],
+    sweepDescription:
+      'Continuously audits syllabus structure, lesson plan delivery pace, and competency coverage against learning outcomes.',
+  },
+  noAgentReason: undefined,
 
   operations: {
     curriculum_planning_status_report: {

@@ -21,6 +21,7 @@ import {
 } from '@/app/pal/data/pal-intervention';
 import { defaultLearnerId } from '@/app/pal/data/pal-v4';
 import { BandRow } from '@/app/pal/_components/BandMeter';
+import { recordStageProgression } from '@/app/pal/data/pal-progression';
 import {
   CompletedBadge,
   CompletedConceptPanel,
@@ -445,7 +446,7 @@ function ConceptFeedbackView() {
               <CardContent className="pt-5">
                 <p className="text-sm font-semibold text-slate-900">You are ready for the check</p>
                 <p className="mt-1 text-sm text-slate-700">{feedback.checkReadiness.reason}</p>
-                <Link href={`/pal/eso?conceptId=${conceptId}`} className={cn(buttonVariants(), 'mt-3')}>
+                <Link href={`/pal/eso?conceptId=${conceptId}`} onClick={() => recordStageProgression(conceptId, 'check')} className={cn(buttonVariants(), 'mt-3')}>
                   Go to the check
                   <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
                 </Link>

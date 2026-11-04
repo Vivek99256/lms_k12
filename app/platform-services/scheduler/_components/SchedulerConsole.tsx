@@ -6,6 +6,7 @@ import { AlertTriangle, Clock, Lock, Pencil, RotateCcw, Save, X } from 'lucide-r
 import { usePermissions } from '@/app/hooks/usePermission';
 import { fetchScheduledTasks, PlatformApiError, runScheduledTaskNow, saveScheduledTask } from '@/lib/platform/client';
 import { CRON_FIELDS, describeSchedule, scheduleProblem, scheduleToString } from '@/lib/platform/cron';
+import { canRunOrToggle, lastRunSummary, NO_JOB_HINT, NO_JOB_LABEL } from '@/lib/platform/scheduler-display';
 import type { CronSchedule, ScheduledTaskRow, SchedulerPayload } from '@/lib/platform/types';
 
 import {
@@ -170,6 +171,24 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
     return [...byComponent.entries()];
   }, [payload]);
 
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const offTasks = (payload?.tasks ?? []).filter((row) => row.has_job && row.disabled);
+
+  /** Switch on every task in view that has a job and is off, one saved change per task, as if each toggle were pressed. */
+  const switchAllOn = async () => {
+    if (!mayEdit || bulkBusy || offTasks.length === 0) return;
+    setBulkBusy(true);
+    let done = 0;
+    for (const row of offTasks) {
+      if (await saveTask(row, { disabled: false }, `${row.label} switched on.`)) done += 1;
+    }
+    setNote({
+      tone: done === offTasks.length ? 'ok' : 'error',
+      text: `Switched on ${done} of ${offTasks.length} tasks.`,
+    });
+    setBulkBusy(false);
+  };
+
   if (registryLoading) return <div className="p-6"><LoadingState label="Loading the platform registry" /></div>;
   if (registryError || !registry) return <div className="p-6"><ErrorState message={registryError ?? 'The registry is unavailable.'} onRetry={reload} /></div>;
 
@@ -195,7 +214,21 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
         setComponentKey(null);
         setEditing(null);
       }}
-      actions={<RefreshButton onClick={() => load(true)} busy={loading} />}
+      actions={
+        <div className="flex items-center gap-2">
+          {mayEdit && offTasks.length > 0 && (
+            <button
+              type="button"
+              onClick={switchAllOn}
+              disabled={bulkBusy}
+              className="inline-flex items-center rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {bulkBusy ? 'Switching on…' : `Switch all on (${offTasks.length})`}
+            </button>
+          )}
+          <RefreshButton onClick={() => load(true)} busy={loading} />
+        </div>
+      }
     >
       {note && <Note tone={note.tone} text={note.text} onDismiss={() => setNote(null)} />}
 
@@ -353,18 +386,23 @@ function TaskRow({
       <div className="flex flex-wrap items-start gap-3">
         <div className="pt-0.5">
           <Switch
-            checked={!task.disabled}
+            checked={canRunOrToggle(task) && !task.disabled}
             onChange={toggleDisabled}
-            disabled={!mayEdit || busy}
+            disabled={!mayEdit || busy || !canRunOrToggle(task)}
             label={`${task.label} running`}
-            title={mayEdit ? `Switch ${task.label} ${task.disabled ? 'on' : 'off'}` : rightsReason}
+            title={!canRunOrToggle(task) ? NO_JOB_HINT : mayEdit ? `Switch ${task.label} ${task.disabled ? 'on' : 'off'}` : rightsReason}
           />
         </div>
 
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-slate-900">
             {task.label}
-            {task.disabled && <Pill tone="gray">off</Pill>}
+            {!canRunOrToggle(task) && (
+              <span title={NO_JOB_HINT}>
+                <Pill tone="gray">{NO_JOB_LABEL}</Pill>
+              </span>
+            )}
+            {canRunOrToggle(task) && task.disabled && <Pill tone="gray">off</Pill>}
             {task.customised && <Pill tone="blue">custom schedule</Pill>}
             {task.disabled_by_default && !task.overridden && <Pill tone="amber">off by default</Pill>}
             {task.last_run_status === 'failed' && (
@@ -381,6 +419,11 @@ function TaskRow({
               {sentence && <span>{sentence}</span>}
               {task.has_job ? (
                 <>
+                  {lastRunSummary(task) && (
+                    <span className="text-slate-700" title="Result of the last run">
+                      Last run: {lastRunSummary(task)}
+                    </span>
+                  )}
                   <button
                     type="button"
                     disabled={!mayEdit || busy}

@@ -42,6 +42,7 @@ import {
 import { useViewAsStudent } from '@/app/pal/data/pal-view-as';
 import AiTutorPanel from '@/app/pal/eso/_components/AiTutorPanel';
 import { isDirectMediaFile, looksLikeFile, toEmbedUrl } from '@/lib/video-embed';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 /**
  * Whether to show the "Your plan / Suggested content" panel above the step.
@@ -1149,7 +1150,7 @@ function DiagnosticQuestion({
         </span>
         <Badge variant="secondary">{item.nodeType}</Badge>
       </div>
-      <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+      <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
       <div className="mt-2 space-y-1.5">
         {item.options.map((option) => (
           <label
@@ -1166,7 +1167,7 @@ function DiagnosticQuestion({
               onChange={() => onSelect(option.id)}
               className="h-4 w-4 accent-indigo-600"
             />
-            <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+            <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
           </label>
         ))}
       </div>
@@ -1323,7 +1324,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
               </span>
               {/* <Badge variant="secondary">{item.nodeType}</Badge> */}
             </div>
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             <div className="mt-2 space-y-1.5">
               {item.options.map((option) => (
                 <label
@@ -1340,7 +1341,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
                     onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
                     className="h-4 w-4 accent-indigo-600"
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 </label>
               ))}
             </div>
@@ -1451,7 +1452,7 @@ function PrerequisiteProbeStep({
 
         {item && (
           <div data-eso-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             <div className="mt-2 space-y-1.5">
               {item.options.map((option) => (
                 <label
@@ -1468,7 +1469,7 @@ function PrerequisiteProbeStep({
                     onChange={() => setSelected(option.id)}
                     className="h-4 w-4 accent-sky-600"
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 </label>
               ))}
             </div>
@@ -1834,7 +1835,7 @@ function CheckUnderstandingStep({
                   copy of the same title above it would read as a duplicated
                   question. Only the radio fallback needs one of its own. */}
               {!playable && (
-                <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+                <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
               )}
 
               {playable ? (
@@ -1865,7 +1866,7 @@ function CheckUnderstandingStep({
                         onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
                         className="h-4 w-4 accent-indigo-600"
                       />
-                      <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                      <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                     </label>
                   ))}
                 </div>
@@ -2066,7 +2067,7 @@ function TeachOrPracticeStep({
                 copy of the same title above it would read as a duplicated
                 question. Only the radio fallback needs one of its own. */}
             {!playable && (
-              <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+              <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             )}
 
             {playable ? (
@@ -2097,7 +2098,7 @@ function TeachOrPracticeStep({
                       onChange={() => setSelected(option.id)}
                       className="h-4 w-4 accent-indigo-600"
                     />
-                    <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                    <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                   </label>
                 ))}
               </div>
@@ -2220,7 +2221,7 @@ function ContrastPairStep({
         {action.contrastPair?.body && (
           <div
             className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
-            dangerouslySetInnerHTML={{ __html: action.contrastPair.body }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.contrastPair.body) }}
           />
         )}
 
@@ -2254,7 +2255,7 @@ function ContrastPairStep({
         )}
         {readyToRetest && item && item !== 'loading' && (
           <div data-eso-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             <div className="mt-2 space-y-1.5">
               {item.options.map((option) => (
                 <label
@@ -2271,7 +2272,7 @@ function ContrastPairStep({
                     onChange={() => setSelected(option.id)}
                     className="h-4 w-4 accent-indigo-600"
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 </label>
               ))}
             </div>
@@ -2585,7 +2586,7 @@ function RetrievalDueStep({
         {items?.map((item, index) => (
           <div key={item.questionId} data-eso-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
             <div className="mb-1 text-xs text-slate-400">Item {index + 1}</div>
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             <div className="mt-2 space-y-1.5">
               {item.options.map((option) => (
                 <label
@@ -2602,7 +2603,7 @@ function RetrievalDueStep({
                     onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
                     className="h-4 w-4 accent-indigo-600"
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 </label>
               ))}
             </div>

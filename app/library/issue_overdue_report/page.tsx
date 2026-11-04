@@ -20,6 +20,7 @@ import {
 import type { SearchDropdownValues } from '@/components/search-dropdown/types';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
 import { downloadFile, escapeCsv, exportRowsToPdf, formatDate, formatDateTime, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type Row = {
   studentName: string;
@@ -66,7 +67,7 @@ function printRows(rows: Row[]) {
   const printWindow = window.open('', '_blank', 'width=1400,height=900');
   if (!printWindow) return;
   printWindow.document.open();
-  printWindow.document.write(html);
+  printWindow.document.write(sanitizeHtml(html, { document: true }));
   printWindow.document.close();
   printWindow.focus();
   printWindow.print();

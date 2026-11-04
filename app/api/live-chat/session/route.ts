@@ -55,7 +55,7 @@ export async function GET(request: Request) {
         excludeAdminRole: true,
       }).catch(() => null);
 
-      if (!sessions || sessions.length === 0) {
+      if (sessions === null) {
         const memSessions = listSessions({
           subInstituteId: subInstituteId ? Number(subInstituteId) : undefined,
           excludeAdminRole: true,
@@ -140,15 +140,36 @@ export async function POST(request: Request) {
     }
 
     if (action === 'close_session') {
-      const { sessionId, closedBy } = body;
+      const { sessionId } = body;
       if (!sessionId) {
         return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
       }
 
-      let updated = await dbCloseSession(sessionId, closedBy || { id: 'admin', name: 'Admin', role: 'admin' }).catch(() => null);
-      if (!updated) {
-        updated = closeSession(sessionId, closedBy || { id: 'admin', name: 'Admin', role: 'admin' }) || null;
+      let updated = null;
+      let databaseError: unknown;
+      try {
+        updated = await dbCloseSession(sessionId);
+      } catch (error) {
+        databaseError = error;
+        console.error('[LiveChat API] Failed to close session in database:', error);
       }
+
+      if (!updated) {
+        updated = closeSession(sessionId) || null;
+      } else {
+        closeSession(sessionId);
+      }
+
+      if (!updated && databaseError) {
+        return NextResponse.json(
+          { error: 'Failed to close live chat session' },
+          { status: 500 }
+        );
+      }
+      if (!updated) {
+        return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      }
+
       return NextResponse.json({ session: updated });
     }
 

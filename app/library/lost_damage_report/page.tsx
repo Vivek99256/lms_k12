@@ -18,6 +18,7 @@ import {
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
 import { downloadFile, escapeCsv, exportRowsToPdf, getStoredAcademicYears, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type StatusOption = { id: string; label: string };
 type Row = { itemCode: string; title: string; collectionType: string; remarks: string; itemStatus: string };
@@ -32,7 +33,7 @@ function printRows(rows: Row[]) {
   const printWindow = window.open('', '_blank', 'width=1200,height=900');
   if (!printWindow) return;
   printWindow.document.open();
-  printWindow.document.write(html);
+  printWindow.document.write(sanitizeHtml(html, { document: true }));
   printWindow.document.close();
   printWindow.focus();
   printWindow.print();

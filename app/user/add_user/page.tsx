@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUpDown, LoaderCircle, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowUpDown, LoaderCircle, Pencil, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { deactivateUser, loadUsers, saveUser, type PermissionSet, type UserBootstrap, type UserForm, type UserRecord } from "../api";
 import { friendlyError } from '@/lib/user-messages';
+import { StaffCompetencyDrawer } from "../_components/StaffCompetencyDrawer";
 
 const emptyBootstrap: UserBootstrap = { profiles: [], subjects: [], departments: [], jobTitles: [], employees: [], nameSuffixes: [], newEmployeeNo: "" };
 const noPermissions: PermissionSet = { view: false, add: false, edit: false, delete: false, admin: false };
@@ -21,6 +22,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<UserRecord[]>([]); const [bootstrap, setBootstrap] = useState(emptyBootstrap);
   const [rights, setRights] = useState(noPermissions); const [form, setForm] = useState(emptyForm); const [editing, setEditing] = useState<UserRecord | null>(null);
   const [showForm, setShowForm] = useState(false); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false);
+  const [competencyUser, setCompetencyUser] = useState<UserRecord | null>(null);
   const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("firstName"); const [sortAscending, setSortAscending] = useState(true); const [currentPage, setCurrentPage] = useState(1);
   const load = useCallback(async () => { setLoading(true); setError(""); try { const data = await loadUsers(); setUsers(data.users); setBootstrap(data.bootstrap); setRights(data.permissions); } catch (value: unknown) { setError(friendlyError(value, "We couldn't load the users. Please try again.")); } finally { setLoading(false); } }, []);
@@ -94,10 +96,11 @@ export default function UsersPage() {
     <section className="rounded-xl border bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-2"><Search className="size-4 text-slate-400"/><Input className="max-w-sm" placeholder="Search users" value={search} onChange={(e)=>{setSearch(e.target.value);setCurrentPage(1);}}/></div>
       <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>ID</TableHead><SortableHead label="Username" sortKey="userName" activeKey={sortKey} ascending={sortAscending} onSort={sortBy}/><SortableHead label="Name" sortKey="firstName" activeKey={sortKey} ascending={sortAscending} onSort={sortBy}/><SortableHead label="Email" sortKey="email" activeKey={sortKey} ascending={sortAscending} onSort={sortBy}/><SortableHead label="Mobile number" sortKey="mobile" activeKey={sortKey} ascending={sortAscending} onSort={sortBy}/><SortableHead label="Profile" sortKey="profileName" activeKey={sortKey} ascending={sortAscending} onSort={sortBy}/><SortableHead label="Status" sortKey="status" activeKey={sortKey} ascending={sortAscending} onSort={sortBy}/><TableHead>Actions</TableHead></TableRow></TableHeader><TableBody>
-        {loading ? <TableRow><TableCell colSpan={8} className="h-24 text-center"><LoaderCircle className="mx-auto size-5 animate-spin"/></TableCell></TableRow> : visibleUsers.length ? visibleUsers.map((u,index)=><TableRow key={u.id}><TableCell>{(safePage-1)*PAGE_SIZE+index+1}</TableCell><TableCell>{u.userName}</TableCell><TableCell>{[u.firstName,u.middleName,u.lastName].filter(Boolean).join(" ")}</TableCell><TableCell>{u.email}</TableCell><TableCell>{u.mobile}</TableCell><TableCell>{u.profileName}</TableCell><TableCell>{u.status===1?"Active":"Inactive"}</TableCell><TableCell><div className="flex gap-1">{rights.edit?<Button size="icon" variant="ghost" aria-label="Edit user" onClick={()=>startEdit(u)}><Pencil className="size-4"/></Button>:null}{rights.delete&&u.status===1?<Button size="icon" variant="ghost" aria-label="Deactivate user" onClick={()=>void deactivate(u)}><Trash2 className="size-4 text-red-600"/></Button>:null}</div></TableCell></TableRow>) : <TableRow><TableCell colSpan={8} className="h-24 text-center text-slate-500">No users found.</TableCell></TableRow>}
+        {loading ? <TableRow><TableCell colSpan={8} className="h-24 text-center"><LoaderCircle className="mx-auto size-5 animate-spin"/></TableCell></TableRow> : visibleUsers.length ? visibleUsers.map((u,index)=><TableRow key={u.id}><TableCell>{(safePage-1)*PAGE_SIZE+index+1}</TableCell><TableCell>{u.userName}</TableCell><TableCell>{[u.firstName,u.middleName,u.lastName].filter(Boolean).join(" ")}</TableCell><TableCell>{u.email}</TableCell><TableCell>{u.mobile}</TableCell><TableCell>{u.profileName}</TableCell><TableCell>{u.status===1?"Active":"Inactive"}</TableCell><TableCell><div className="flex gap-1">{rights.view?<Button size="icon" variant="ghost" aria-label="View competency" title="Competency" onClick={()=>setCompetencyUser(u)}><Sparkles className="size-4"/></Button>:null}{rights.edit?<Button size="icon" variant="ghost" aria-label="Edit user" onClick={()=>startEdit(u)}><Pencil className="size-4"/></Button>:null}{rights.delete&&u.status===1?<Button size="icon" variant="ghost" aria-label="Deactivate user" onClick={()=>void deactivate(u)}><Trash2 className="size-4 text-red-600"/></Button>:null}</div></TableCell></TableRow>) : <TableRow><TableCell colSpan={8} className="h-24 text-center text-slate-500">No users found.</TableCell></TableRow>}
       </TableBody></Table></div>
       {!loading && filtered.length > 0 ? <div className="mt-4 flex flex-col items-center justify-between gap-3 border-t pt-4 text-sm text-slate-500 sm:flex-row"><span>Showing {(safePage-1)*PAGE_SIZE+1}–{Math.min(safePage*PAGE_SIZE,filtered.length)} of {filtered.length}</span><div className="flex gap-2"><Button type="button" variant="outline" size="sm" disabled={safePage===1} onClick={()=>setCurrentPage((page)=>Math.max(1,page-1))}>Previous</Button><span className="flex items-center px-2">Page {safePage} of {pageCount}</span><Button type="button" variant="outline" size="sm" disabled={safePage===pageCount} onClick={()=>setCurrentPage((page)=>Math.min(pageCount,page+1))}>Next</Button></div></div> : null}
     </section>
+    {competencyUser ? <StaffCompetencyDrawer userId={competencyUser.id} userName={[competencyUser.firstName,competencyUser.lastName].filter(Boolean).join(" ")} onClose={()=>setCompetencyUser(null)}/> : null}
   </main>;
 }
 function Field({label,required,children}:{label:string;required?:boolean;children:React.ReactNode}) { return <div className="space-y-2"><Label>{label}{required?<span className="text-red-600"> *</span>:null}</Label>{children}</div>; }

@@ -28,6 +28,7 @@ import {
 import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 import { FlagToggle, ProgressRing, QuestionNavigator } from '@/app/pal/_components/DiagnosticNavigator';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 /**
  * Stage 2 - the concept diagnostic.
@@ -539,7 +540,7 @@ function DiagnosticQuestion({
           <>
             <div
               className="mb-3 text-base font-medium text-slate-900 [&_img]:max-w-full"
-              dangerouslySetInnerHTML={{ __html: question.title }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
             />
             <div className="space-y-2">
               {question.options.map((option) => {
@@ -566,7 +567,7 @@ function DiagnosticQuestion({
                     />
                     <span
                       className="min-w-0 flex-1 [&_img]:max-w-full"
-                      dangerouslySetInnerHTML={{ __html: option.answer }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }}
                     />
                   </label>
                 );

@@ -306,6 +306,111 @@ export interface GraphTraversal {
   sources: { sql: number; graph: number };
 }
 
+// ---- Centralized Knowledge Graph browser (Modules -> Submodules -> Data flow) ----
+//
+// Reads straight from Neo4j via GraphModuleBrowser — not the ontology-hybrid
+// GraphQueryService the entity-search path above and the decentralized
+// per-module tabs use. See routes/ai.php's /knowledge-graph/browser/* group.
+
+export interface GraphModule {
+  key: string;
+  label: string;
+  label_count: number;
+}
+
+export interface GraphSubmodule {
+  key: string;
+  label: string;
+  node_count: number;
+}
+
+export interface GraphBrowserNode {
+  id: string;
+  entityKey: string;
+  recordId: number | string | null;
+  label: string;
+  source: "graph";
+  attributes: Record<string, unknown>;
+}
+
+export interface GraphBrowserEdge {
+  id: string;
+  source: string;
+  target: string;
+  relation: string;
+}
+
+export interface GraphBrowserResult {
+  label: string;
+  nodes: GraphBrowserNode[];
+  edges: GraphBrowserEdge[];
+  error?: string;
+}
+
+// The real ERP module/submodule navigation (tblmenumaster-backed), layered on
+// the same GraphModuleBrowser/Neo4j path as the family-based types above.
+// "All Modules" shows Institute ERP/LMS + PAL/etc. exactly as the rest of the
+// app's own menus do.
+
+export interface ErpModule {
+  id: number;
+  label: string;
+  /** Real, tenant+rights-filtered count — same number erpSubmodules() would return. */
+  submodule_count: number;
+}
+
+export interface ErpSubmodule {
+  id: number;
+  label: string;
+  /** False when ModuleGraphMapper found no real GraphSchema labels for it. */
+  mapped: boolean;
+}
+
+export interface ErpSubmoduleGraph {
+  submodule: string | null;
+  labels: string[];
+  nodes: GraphBrowserNode[];
+  edges: GraphBrowserEdge[];
+  error?: string;
+}
+
+// ---- Centralized explorer rebuild: cross-label search, path-finder, full
+// node drill-down, and Organization Management's own staff/department/role
+// graph (PR #988's KnowledgeGraphController, reused rather than duplicated).
+// All four read straight from Neo4j via GraphModuleBrowser, same as the
+// erp-* functions above — no SQL fallback, no ontology layer.
+
+export interface GraphSearchResult {
+  term: string;
+  nodes: GraphBrowserNode[];
+  error?: string;
+}
+
+export interface GraphPathResult {
+  found: boolean;
+  nodes: GraphBrowserNode[];
+  edges: GraphBrowserEdge[];
+  error?: string;
+}
+
+/** One node's full properties plus a paginated page of its relationships. */
+export interface GraphNodeDetail {
+  node: GraphBrowserNode | null;
+  nodes: GraphBrowserNode[];
+  edges: GraphBrowserEdge[];
+  total_incoming: number;
+  total_outgoing: number;
+  has_more: boolean;
+  error?: string;
+}
+
+export interface OrganizationStaffGraph {
+  nodes: GraphBrowserNode[];
+  edges: GraphBrowserEdge[];
+  stats: Record<string, number>;
+  error?: string;
+}
+
 export interface OntologyEntity {
   key: string;
   label: string;

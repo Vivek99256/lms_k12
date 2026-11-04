@@ -13,6 +13,7 @@ import { JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 import { ScoreRing } from '@/app/pal/_components/DiagnosticNavigator';
 import { AnswerReviewButton } from '@/app/pal/_components/AnswerReview';
+import { recordStageProgression } from '@/app/pal/data/pal-progression';
 
 /**
  * Stage 2b - the concept diagnostic result.

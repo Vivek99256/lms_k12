@@ -146,18 +146,29 @@ export async function fetchFeesDashboardSummary(
 
   const text = await response.text();
 
+  if (!response.ok) {
+    let errorMessage = "Couldn't load the fee dashboard summary. Try again.";
+    try {
+      const errorPayload = JSON.parse(text) as Record<string, unknown>;
+      errorMessage = readString(errorPayload.message) || errorMessage;
+    } catch {
+      if (response.status === 404) {
+        errorMessage = 'Fees dashboard summary service endpoint was not found (404).';
+      } else if (response.status >= 500) {
+        errorMessage = 'Fees dashboard service encountered a server error. Please try again.';
+      } else {
+        errorMessage = `Fees dashboard service returned an unexpected response (HTTP ${response.status}).`;
+      }
+    }
+    throw new Error(errorMessage);
+  }
+
   let payload: FeesDashboardPayload;
   try {
     payload = JSON.parse(text) as FeesDashboardPayload;
   } catch {
     throw new Error(
-      `Fees dashboard proxy returned a non-JSON response (${response.headers.get('content-type') || 'unknown content type'}).`
-    );
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      readString(asRecord(payload).message) || "Couldn't load the fee dashboard summary. Try again."
+      `Fees dashboard proxy returned an invalid response (${response.headers.get('content-type') || 'unknown content type'}).`
     );
   }
 

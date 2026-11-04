@@ -6,7 +6,7 @@ import {
 } from '@/lib/erp-client';
 import type {
   AlignmentBand, AlignmentPayload, AspirationInput, AspirationSnapshot, CareerEvidencePayload,
-  CareerRecommendationPayload, CareerRecord,
+  CareerRecommendationPayload, CareerRecord, MentorCrosswalkPayload, MentorSuggestionsPayload,
 } from './types';
 
 const KEYS = ['data', 'result', 'results', 'records', 'list', 'career', 'question'];
@@ -205,4 +205,31 @@ function classifyBand(percentage: number): AlignmentBand {
 
 export async function loadOccupations(): Promise<CareerRecord[]> {
   return loadRecords('allOccupation');
+}
+
+/** Suggested staff mentors for an O*NET occupation (tenant-scoped on the server). */
+export async function loadMentorSuggestions(occupationCode: string): Promise<MentorSuggestionsPayload> {
+  const payload = await careerRequest<{ data: MentorSuggestionsPayload }>('careerMentorSuggestions', {
+    occupation_code: occupationCode,
+  });
+  return payload.data;
+}
+
+export async function loadMentorCrosswalk(search?: string): Promise<MentorCrosswalkPayload> {
+  const payload = await careerRequest<{ data: MentorCrosswalkPayload }>('careerMentorCrosswalk', {
+    search,
+  });
+  return payload.data;
+}
+
+/** Persist ONE mapping an HR user has confirmed. */
+export async function saveMentorMapping(skillId: number, elementId: string): Promise<void> {
+  await careerRequest('careerMentorCrosswalk', {}, {
+    method: 'POST',
+    body: JSON.stringify({ skill_id: skillId, element_id: elementId }),
+  });
+}
+
+export async function deleteMentorMapping(mappingId: number): Promise<void> {
+  await careerRequest(`careerMentorCrosswalk/${mappingId}`, {}, { method: 'DELETE' });
 }

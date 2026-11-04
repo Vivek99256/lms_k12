@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { callMcpTool } from "@/lib/ai/mcp-client";
 import { isTrustedBackendUrl } from "@/lib/security/trusted-backend";
+import { ensureClockSafeMcpToken } from "@/lib/security/session-token";
 
 export const runtime = "nodejs";
 
@@ -29,9 +30,12 @@ export async function POST(request: Request) {
     // configured backend may be named; anything else falls back to the default.
     const baseUrl = body.baseUrl && isTrustedBackendUrl(body.baseUrl) ? body.baseUrl : null;
 
+    const rawToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+    const token = rawToken ? ensureClockSafeMcpToken(rawToken, String(body.meta?.instituteId || '1')) : undefined;
+
     const payload = await callMcpTool(
       {
-        token: request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim(),
+        token,
         baseUrl,
         meta: body.meta,
       },

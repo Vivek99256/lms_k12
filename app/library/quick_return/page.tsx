@@ -27,6 +27,7 @@ import {
   readStatus,
 } from '@/app/library/_lib/library-module-utils';
 import { escapeHtml } from '@/lib/security/sanitize-html';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type ReturnRecord = {
   id: string;
@@ -105,7 +106,7 @@ function printRows(rows: ReturnRecord[]) {
   const printWindow = window.open('', '_blank', 'width=1280,height=900');
   if (!printWindow) return;
   printWindow.document.open();
-  printWindow.document.write(html);
+  printWindow.document.write(sanitizeHtml(html, { document: true }));
   printWindow.document.close();
   printWindow.focus();
   printWindow.print();

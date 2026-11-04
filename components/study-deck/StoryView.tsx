@@ -35,6 +35,7 @@ import { DeckPin } from './DeckPin';
 import { PartCallout } from './PartCallout';
 import { webSource } from '@/lib/study-deck/imageCredit';
 import { creditOf, PictureDialog, Tag, TONES, useRememberedReducer, useStage } from './stage-ui';
+import { SceneImageButton } from './ImageEditing';
 
 export interface StoryViewProps {
   interaction: ScenarioInteraction;
@@ -295,6 +296,7 @@ export function StoryView({ interaction, done, onDone, lead, memoryKey, image, a
         <span className="h-[0.45em] min-w-[6em] flex-1 overflow-hidden rounded-full bg-sd-soft" role="progressbar" aria-label="Story progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
           <span className="block h-full rounded-full bg-sd-accent transition-[width]" style={{ width: `${progress.percent}%` }} />
         </span>
+        <SceneImageButton node={node.id} />
         {done || state.ended ? (
           <span className="inline-flex items-center gap-[0.3em] text-[0.7em] font-medium text-emerald-700">
             <CheckCircle2 className="h-[1.1em] w-[1.1em]" aria-hidden="true" />

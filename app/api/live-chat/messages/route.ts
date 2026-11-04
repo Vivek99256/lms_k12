@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { addMessage, getMessages, getSession } from '@/lib/live-chat/store';
 import { dbAddMessage, dbGetMessages, dbGetSession } from '@/lib/live-chat/db';
-import type { SendMessageRequest } from '@/lib/live-chat/types';
+import type { LiveChatMessage, SendMessageRequest } from '@/lib/live-chat/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,6 +23,14 @@ export async function GET(request: Request) {
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    if (session.status === 'closed') {
+      return NextResponse.json({
+        messages: [],
+        sessionStatus: session.status,
+        meetUrl: session.activeMeetUrl || (session as any).meetUrl,
+      });
     }
 
     let messages = await dbGetMessages(sessionId, since).catch(() => null);
@@ -64,12 +72,22 @@ export async function POST(request: Request) {
       meetUrl: body.meetUrl,
     };
 
-    let message = await dbAddMessage(payload).catch((err) => {
+    let message: LiveChatMessage | null = null;
+    let databaseAvailable = true;
+    try {
+      message = await dbAddMessage(payload);
+    } catch (err) {
+      databaseAvailable = false;
       console.warn('[LiveChat API] Failed to add message to DB:', err);
-      return null;
-    });
+    }
 
     if (!message) {
+      if (databaseAvailable) {
+        const session = await dbGetSession(payload.sessionId).catch(() => null);
+        if (session?.status === 'closed') {
+          return NextResponse.json({ error: 'Session not found or closed' }, { status: 404 });
+        }
+      }
       message = addMessage(payload);
     }
 

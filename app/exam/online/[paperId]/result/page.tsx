@@ -108,7 +108,7 @@ function OnlineExamResultContent() {
 
   const percent = useMemo(() => {
     if (!result || result.totalMarks <= 0) return 0;
-    return Math.round((result.obtainMarks / result.totalMarks) * 100);
+    return Math.min(100, Math.max(0, Math.round((result.obtainMarks / result.totalMarks) * 100)));
   }, [result]);
 
   const attempt = useMemo(() => {
@@ -233,12 +233,19 @@ function OnlineExamResultContent() {
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
               <ScoreRing percent={percent} band={band} />
-              <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <Stat label="Marks" value={`${result.obtainMarks} / ${result.totalMarks}`} tone="indigo" />
                 <Stat label="Correct" value={String(result.totalRight)} tone="emerald" />
                 <Stat label="Wrong" value={String(result.totalWrong)} tone="rose" />
+                <Stat label="Unanswered" value={String(result.totalUnanswered)} tone="rose" />
+                <Stat label="Pending review" value={String(result.totalPendingReview)} tone="indigo" />
               </div>
             </div>
+            {result.totalPendingReview > 0 ? (
+              <p className="mt-4 text-center text-xs text-amber-700 sm:text-left">
+                Written responses are not awarded marks automatically and need teacher review.
+              </p>
+            ) : null}
           </section>
         ) : null}
 
@@ -369,6 +376,8 @@ function Stat({
 function ReviewCard({ question, index }: { question: ResultQuestion; index: number }) {
   const attempted = question.rightWrong === 'right' || question.rightWrong === 'wrong';
   const isRight = question.rightWrong === 'right';
+  const pendingReview = question.rightWrong === 'pending_review';
+  const unanswered = question.rightWrong === 'unanswered';
   const hasOptions = question.options.length > 0;
 
   return (
@@ -386,7 +395,15 @@ function ReviewCard({ question, index }: { question: ResultQuestion; index: numb
           </div>
 
           <div className="mt-2">
-            {!attempted ? (
+            {pendingReview ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
+                Pending teacher review
+              </span>
+            ) : unanswered ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500">
+                Not answered
+              </span>
+            ) : !attempted ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500">
                 —
               </span>
@@ -440,9 +457,7 @@ function ReviewCard({ question, index }: { question: ResultQuestion; index: numb
             </div>
           ) : (
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700">
-              {question.givenAnswerIds.length > 0
-                ? question.givenAnswerIds.join(', ')
-                : 'No response recorded.'}
+              {question.givenAnswer.trim() || 'No response recorded.'}
             </div>
           )}
 

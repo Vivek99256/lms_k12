@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
+import { ImageEditDialog } from '@/components/study-deck/ImageEditDialog';
 import { StudyDeckPlayer } from '@/components/study-deck/StudyDeckPlayer';
+import { createDraftImageAdapter, fetchDraftImageAccess } from '@/lib/coursePresentation/draftImages';
+import { createStoredImageAdapter, loadStoredImageStates, refusingAdapter, unavailableStates, viewerKind } from '@/lib/coursePresentation/storedImages';
+import { actionSentence, stateFor, withEditedImage, withEditedState, type ImageEditStates, type ImageTarget } from '@/lib/study-deck/imageEditing';
 import { CHAPTER_DATA_PREVIEW_TITLE, readDraftRun, readPreviewRequest } from '@/lib/coursePresentation/previewAddress';
 import { startSlideOf } from '@/lib/study-deck/stage';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
@@ -38,6 +42,14 @@ export default function StudyDeckPage() {
   const slideParam = search?.get('slide') ?? null;
   const [state, setState] = useState<State>({ phase: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  // Reviewing a draft: which picture is being changed, what was last done, what the server says may be done to each picture, and whether this
+  // user may change pictures at all (asked of the server's own permission gate; a student or a user without the right sees no control).
+  const [target, setTarget] = useState<ImageTarget | null>(null);
+  const [editNotice, setEditNotice] = useState('');
+  const [imageStates, setImageStates] = useState<ImageEditStates>({});
+  const [mayEditImages, setMayEditImages] = useState(false);
+  // A stored presentation whose pictures this user may change (the pilot chapter's; the server decides): its content id, or null.
+  const [storedContent, setStoredContent] = useState<number | null>(null);
 
   const invalid = !Number.isFinite(chapterId) || chapterId <= 0;
 
@@ -52,7 +64,28 @@ export default function StudyDeckPage() {
         const loaded = await loadStudyDeck(chapterId, { pilot, contentId, preview, draft, signal });
         // A preview or a story draft holds no practice question, so it never asks the question bank.
         const bank = loaded.source === 'preview' || loaded.source === 'draft' ? [] : await loadBank(chapterId, signal);
-        if (!signal.aborted) setState({ phase: 'ready', loaded, bank });
+        // A stored presentation opened from the Classroom Resource list. A student or parent gets no editing control and makes no editing call.
+        // Anyone else always gets the control on every slide with a picture: enabled where the server says the picture may be changed, and
+        // disabled WITH ITS REASON where it may not, or where the editor cannot be used at all (not installed on this server, no permission,
+        // unreachable). A failure is never turned into a control that is simply missing.
+        let storedStates: ImageEditStates | null = null;
+        let storedLive = false;
+        if (loaded.source === 'api' && contentId !== null && viewerKind() !== 'student') {
+          const answer = await loadStoredImageStates(chapterId, contentId, signal);
+          if (answer.ok) {
+            storedStates = answer.states;
+            storedLive = true;
+          } else if (viewerKind() === 'staff') {
+            storedStates = unavailableStates(loaded.deck, answer.reason);
+          }
+        }
+        const mayEdit = loaded.source === 'draft' ? await fetchDraftImageAccess(signal) : storedStates !== null;
+        if (!signal.aborted) {
+          setState({ phase: 'ready', loaded, bank });
+          setImageStates(loaded.draft?.slideImages ?? storedStates ?? {});
+          setMayEditImages(mayEdit);
+          setStoredContent(storedLive ? contentId : null);
+        }
       } catch (error) {
         if (signal.aborted) return;
         setState({ phase: 'error', message: error instanceof Error ? error.message : 'Something went wrong loading this chapter.' });
@@ -62,6 +95,19 @@ export default function StudyDeckPage() {
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invalid, chapterId, pilot, contentId, previewPedagogy, previewFormat, draft, attempt]);
+
+  // The draft's picture editor: the calls for this draft, and what is being edited (read from the deck on screen, so it is always current).
+  const draftRun = state.phase === 'ready' ? state.loaded.draft?.run ?? null : null;
+  // A control that is only explaining why it cannot be used gets an adapter that refuses everything (nothing can be chosen in that window).
+  const adapter = useMemo(
+    () => (draftRun ? createDraftImageAdapter(chapterId, draftRun) : storedContent !== null ? createStoredImageAdapter(chapterId, storedContent) : refusingAdapter),
+    [chapterId, draftRun, storedContent],
+  );
+  const editedState = target ? stateFor(imageStates, target) : null;
+  const editedSlide = state.phase === 'ready' && target ? state.loaded.deck.slides.find((s) => s.n === target.slide) ?? null : null;
+  const editedNode = editedSlide && target?.node !== undefined && editedSlide.interaction?.kind === 'scenario' ? editedSlide.interaction.nodes.find((n) => n.id === target.node) ?? null : null;
+  const editedImage = target?.node !== undefined ? editedNode?.image ?? null : editedSlide?.image ?? null;
+  const editedTitle = editedSlide ? `Slide ${editedSlide.n}: ${editedNode?.title ?? editedSlide.title}` : '';
 
   if (invalid) {
     return (
@@ -133,7 +179,23 @@ export default function StudyDeckPage() {
           {PILOT_NOTE}
         </p>
       ) : null}
+      {editNotice ? (
+        <p role="status" data-testid="image-edit-notice" className="bg-emerald-50 px-4 py-2 text-center text-sm text-emerald-900">
+          {editNotice}
+        </p>
+      ) : null}
       <StudyDeckPlayer
+        imageEditing={
+          adapter && mayEditImages
+            ? {
+                states: imageStates,
+                edit: (next) => {
+                  setEditNotice('');
+                  setTarget(next);
+                },
+              }
+            : null
+        }
         deck={state.loaded.deck}
         bank={state.bank}
         assetBase={state.loaded.assetBase}
@@ -141,6 +203,23 @@ export default function StudyDeckPage() {
         startSlide={startSlideOf(slideParam, state.loaded.deck)}
         storage={typeof window !== 'undefined' ? window.localStorage : null}
       />
+      {adapter && mayEditImages && target && editedState ? (
+        <ImageEditDialog
+          adapter={adapter}
+          target={target}
+          title={editedTitle}
+          current={editedImage}
+          state={editedState}
+          saved={storedContent !== null}
+          onClose={() => setTarget(null)}
+          onChanged={(result) => {
+            // Only this picture is put into the deck, and only its state is updated; nothing is reloaded, so the lesson stays where it was.
+            setState((s) => (s.phase === 'ready' ? { ...s, loaded: { ...s.loaded, deck: withEditedImage(s.loaded.deck, result) } } : s));
+            setImageStates((s) => withEditedState(s, result));
+            setEditNotice(actionSentence(result, storedContent !== null));
+          }}
+        />
+      ) : null}
     </>
   );
 }

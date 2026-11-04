@@ -71,6 +71,7 @@ export function useLiveAdminChat({
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const presenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const currentSessionIdRef = useRef<string | null>(null);
+  const closedSessionIdsRef = useRef<Set<string>>(new Set());
 
   // Keep ref synchronized
   const activeSessionId = isAdmin ? (activeAdminSessionId || session?.id || null) : (session?.id || null);
@@ -118,6 +119,10 @@ export function useLiveAdminChat({
    */
   const fetchMessages = useCallback(async (sessionId: string) => {
     if (!sessionId) return;
+    if (closedSessionIdsRef.current.has(sessionId)) {
+      setMessages([]);
+      return;
+    }
     try {
       const res = await fetch(`/api/live-chat/messages?sessionId=${encodeURIComponent(sessionId)}`, {
         cache: 'no-store',
@@ -125,7 +130,14 @@ export function useLiveAdminChat({
       if (!res.ok) return;
 
       const data = await res.json();
-      if (Array.isArray(data.messages)) {
+      if (closedSessionIdsRef.current.has(sessionId)) {
+        setMessages([]);
+        return;
+      }
+      if (data.sessionStatus === 'closed') {
+        closedSessionIdsRef.current.add(sessionId);
+        setMessages([]);
+      } else if (Array.isArray(data.messages)) {
         setMessages(data.messages);
       }
       if (data.sessionStatus) {
@@ -335,16 +347,20 @@ export function useLiveAdminChat({
           }
 
           if (chosenId) {
+            if (chosenId !== prevActive) {
+              setMessages([]);
+            }
             const chosenSession = queue.find((s) => s.id === chosenId);
             if (chosenSession) {
               setSession(chosenSession);
               currentSessionIdRef.current = chosenId;
-              if (!prevActive || prevActive !== chosenId) {
+              if (!prevActive || prevActive !== chosenId || (chosenSession.unreadCountForAdmin && chosenSession.unreadCountForAdmin > 0)) {
                 void fetchMessages(chosenId);
               }
             }
           } else {
             setSession(null);
+            setMessages([]);
             currentSessionIdRef.current = null;
           }
           return chosenId;
@@ -412,10 +428,22 @@ export function useLiveAdminChat({
    */
   const sendMessage = useCallback(
     async (text: string) => {
-      const targetSessionId = currentSessionIdRef.current;
-      if (!targetSessionId || !text.trim() || isSending) return;
-
+      if (!text.trim() || isSending) return;
       const trimmed = text.trim();
+      let targetSessionId = currentSessionIdRef.current;
+
+      if (!targetSessionId) {
+        if (!isAdmin) {
+          setIsSending(true);
+          try {
+            await startLiveSession(trimmed);
+          } finally {
+            setIsSending(false);
+          }
+        }
+        return;
+      }
+
       const senderRole = isAdmin ? 'admin' : 'user';
 
       // Optimistic message update
@@ -582,8 +610,9 @@ export function useLiveAdminChat({
 
       if (res.ok) {
         const data = await res.json();
+        closedSessionIdsRef.current.add(targetSessionId);
         setSession(data.session);
-        await fetchMessages(targetSessionId);
+        setMessages([]);
         if (isAdmin) {
           await fetchAdminQueue();
         }
@@ -591,7 +620,7 @@ export function useLiveAdminChat({
     } catch (err) {
       console.error('[LiveChat] Failed to close session:', err);
     }
-  }, [fetchAdminQueue, fetchMessages, isAdmin, user]);
+  }, [fetchAdminQueue, isAdmin, user]);
 
   /**
    * Admin updates their availability status
@@ -617,12 +646,39 @@ export function useLiveAdminChat({
     let cancelled = false;
 
     async function checkExisting() {
-      if (isAdmin) {
-        await fetchAdminQueue();
-        return;
-      }
-
       try {
+        const pendingCloseKey = `lms_live_chat_pending_close:${user.userId}`;
+        const pendingCloseSessionId = sessionStorage.getItem(pendingCloseKey);
+        if (pendingCloseSessionId) {
+          const closeRes = await fetch('/api/live-chat/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'close_session',
+              sessionId: pendingCloseSessionId,
+              closedBy: {
+                id: String(user.userId),
+                name: user.userName || (isAdmin ? 'Admin' : 'Student'),
+                role: isAdmin ? 'admin' : 'user',
+              },
+            }),
+          });
+          if (!closeRes.ok) {
+            throw new Error('Failed to finish closing the previous live chat session');
+          }
+
+          const closeData = await closeRes.json();
+          if (closeData.session?.status !== 'closed') {
+            throw new Error('The previous live chat session was not closed');
+          }
+          sessionStorage.removeItem(pendingCloseKey);
+        }
+
+        if (isAdmin) {
+          await fetchAdminQueue();
+          return;
+        }
+
         const res = await fetch(`/api/live-chat/session?userId=${encodeURIComponent(user.userId)}`, {
           cache: 'no-store',
         });
@@ -637,8 +693,8 @@ export function useLiveAdminChat({
         if (!cancelled && data.adminOnline !== undefined) {
           setIsAdminOnline(Boolean(data.adminOnline));
         }
-      } catch {
-        // Safe to ignore on initial load
+      } catch (err) {
+        console.error('[LiveChat] Failed to restore or retrieve the user session:', err);
       }
     }
 
@@ -655,6 +711,40 @@ export function useLiveAdminChat({
       cancelled = true;
     };
   }, [enabled, fetchAdminQueue, fetchAvailableSlots, fetchMessages, fetchPresence, isAdmin, sendAdminHeartbeat, user.userId]);
+
+  useEffect(() => {
+    if (!enabled || !activeSessionId || session?.status === 'closed') return;
+
+    const closeSessionOnPageExit = () => {
+      const sessionId = currentSessionIdRef.current;
+      if (!sessionId) return;
+
+      const pendingCloseKey = `lms_live_chat_pending_close:${user.userId}`;
+      try {
+        sessionStorage.setItem(pendingCloseKey, sessionId);
+      } catch (err) {
+        console.error('[LiveChat] Failed to persist the pending session close:', err);
+      }
+
+      const body = JSON.stringify({
+        action: 'close_session',
+        sessionId,
+        closedBy: {
+          id: String(user.userId),
+          name: user.userName || (isAdmin ? 'Admin' : 'Student'),
+          role: isAdmin ? 'admin' : 'user',
+        },
+      });
+
+      navigator.sendBeacon(
+        '/api/live-chat/session',
+        new Blob([body], { type: 'application/json' })
+      );
+    };
+
+    window.addEventListener('pagehide', closeSessionOnPageExit);
+    return () => window.removeEventListener('pagehide', closeSessionOnPageExit);
+  }, [activeSessionId, enabled, isAdmin, session?.status, user.userId, user.userName]);
 
   /**
    * Meeting Notifications & Reminder Watcher
@@ -741,6 +831,8 @@ export function useLiveAdminChat({
   useEffect(() => {
     if (!enabled || !isAdmin) return;
 
+    void sendAdminHeartbeat(adminAvailability);
+
     const heartbeatInterval = setInterval(() => {
       void sendAdminHeartbeat();
     }, 15000);
@@ -750,7 +842,7 @@ export function useLiveAdminChat({
     return () => {
       clearInterval(heartbeatInterval);
     };
-  }, [enabled, isAdmin, sendAdminHeartbeat]);
+  }, [adminAvailability, enabled, isAdmin, sendAdminHeartbeat]);
 
   /**
    * Active Polling: Sync messages, presence & expiration check every 2 seconds
@@ -759,8 +851,6 @@ export function useLiveAdminChat({
     if (!enabled) return;
 
     const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-
       const sid = currentSessionIdRef.current;
       if (sid) {
         void fetchMessages(sid);

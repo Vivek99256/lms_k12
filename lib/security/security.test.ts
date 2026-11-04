@@ -69,9 +69,13 @@ test('session token: verified with the secret, rejected when tampered or expired
     assert.equal(checkSessionToken(jwt({ ...claims, exp: 1 }, 'test-secret')), null);
     assert.equal(checkSessionToken('not-a-token'), null);
   });
-  withEnv({ LARAVEL_JWT_SECRET: undefined }, () => {
+  withEnv({ LARAVEL_JWT_SECRET: undefined, NODE_ENV: 'development' }, () => {
     assert.equal(checkSessionToken(jwt(claims, 'anything'))?.verified, false);
     assert.equal(checkSessionToken(''), null);
+  });
+  // Production without the secret must not accept self-made tokens.
+  withEnv({ LARAVEL_JWT_SECRET: undefined, NODE_ENV: 'production' }, () => {
+    assert.equal(checkSessionToken(jwt(claims, 'anything')), null);
   });
 });
 

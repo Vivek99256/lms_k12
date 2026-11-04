@@ -335,7 +335,8 @@ function numOrNull(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function mapAction(raw: unknown): EsoAction {
+/** Exported for context-inspector.ts, which parses this same shape out of a bundled response rather than its own /next-action call. */
+export function mapAction(raw: unknown): EsoAction {
   const r = toRecord(raw);
   const contrast = toRecord(r.contrast_pair);
   return {
@@ -1114,12 +1115,13 @@ function mapSupportBucket(raw: unknown): SupportBucket {
 }
 
 /**
- * Everything the "Mastery details" modal for one concept needs — see
- * EsoPolicyService::conceptMasteryDetails() on the backend. Read-only, same
- * as fetchChapterDashboard.
+ * Shared parser for both the student-only concept-mastery-details endpoint
+ * and its teacher-scoped sibling, and for the same object embedded inside
+ * the Context Graph Inspector's bundled response — one parser for
+ * EsoPolicyService::conceptMasteryDetails()'s one response shape, however
+ * it reaches the client.
  */
-export async function fetchConceptMasteryDetails(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<ConceptMasteryDetails> {
-  const data = toRecord(await esoGet(`api/pal/eso/concept-mastery-details/${learnerId}/${conceptId}`, signal));
+export function parseConceptMasteryDetails(data: Record<string, unknown>): ConceptMasteryDetails {
   const signals = Array.isArray(data.mastery_signals) ? data.mastery_signals : [];
   const misconceptions = Array.isArray(data.misconceptions) ? data.misconceptions : [];
   const recentResponses = Array.isArray(data.recent_responses) ? data.recent_responses : [];
@@ -1205,6 +1207,24 @@ export async function fetchConceptMasteryDetails(learnerId: string, conceptId: n
       };
     }),
   };
+}
+
+/**
+ * Everything the "Mastery details" modal for one concept needs — see
+ * EsoPolicyService::conceptMasteryDetails() on the backend. Read-only, same
+ * as fetchChapterDashboard. Student-only (eso.student). A teacher/admin
+ * reading another learner's details uses fetchConceptMasteryDetailsForViewer()
+ * in app/pal/learning-intelligence/data instead.
+ */
+export async function fetchConceptMasteryDetails(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<ConceptMasteryDetails> {
+  const data = toRecord(await esoGet(`api/pal/eso/concept-mastery-details/${learnerId}/${conceptId}`, signal));
+  return parseConceptMasteryDetails(data);
+}
+
+/** Teacher/admin-readable sibling of fetchConceptMasteryDetails() — same backend method and shape. */
+export async function fetchConceptMasteryDetailsForViewer(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<ConceptMasteryDetails> {
+  const data = toRecord(await esoGet(`api/pal/eso/teacher/concept-mastery-details/${learnerId}/${conceptId}`, signal));
+  return parseConceptMasteryDetails(data);
 }
 
 // ── Knowledge map — the whole chapter's real concept-relationship graph ──
@@ -1304,14 +1324,14 @@ function knowledgeMapAdjacentChapter(value: unknown): KnowledgeMapAdjacentChapte
 }
 
 /**
- * The whole chapter's real concept-relationship graph, with one concept
- * marked current, on the same ESO mastery pipeline as the rest of the
- * student dashboard — see EsoPolicyService::chapterKnowledgeMap() on the
- * backend. A dedicated feature, not an extension of the separate
- * BKT/Coherence-Map system.
+ * Shared parser for both the student-only knowledge-map endpoint
+ * (knowledgeMap(), used by this student's own in-lesson page) and its
+ * teacher-scoped sibling (teacher/knowledge-map, used by Learning
+ * Intelligence's Knowledge Graph Explorer and Context Inspector) — both
+ * return EsoPolicyService::chapterKnowledgeMap()'s identical shape, so the
+ * parsing has exactly one home rather than two copies that could drift.
  */
-export async function fetchKnowledgeMap(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<KnowledgeMap> {
-  const data = toRecord(await esoGet(`api/pal/eso/knowledge-map/${learnerId}/${conceptId}`, signal));
+export function parseKnowledgeMap(data: Record<string, unknown>): KnowledgeMap {
   const concepts = Array.isArray(data.concepts) ? data.concepts : [];
   const edges = Array.isArray(data.edges) ? data.edges : [];
   const stats = toRecord(data.stats);
@@ -1363,6 +1383,35 @@ export async function fetchKnowledgeMap(learnerId: string, conceptId: number, si
       misconceptions: num(stats.misconceptions),
     },
   };
+}
+
+/**
+ * The whole chapter's real concept-relationship graph, with one concept
+ * marked current, on the same ESO mastery pipeline as the rest of the
+ * student dashboard — see EsoPolicyService::chapterKnowledgeMap() on the
+ * backend. A dedicated feature, not an extension of the separate
+ * BKT/Coherence-Map system. Student-only (eso.student) — this learner's own
+ * in-lesson view. A teacher/admin reading another learner's map uses
+ * fetchKnowledgeMapForTeacher() in app/pal/learning-intelligence/data/
+ * knowledge-graph.ts instead, which hits the teacher-scoped sibling route
+ * and shares this same parser.
+ */
+export async function fetchKnowledgeMap(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<KnowledgeMap> {
+  const data = toRecord(await esoGet(`api/pal/eso/knowledge-map/${learnerId}/${conceptId}`, signal));
+  return parseKnowledgeMap(data);
+}
+
+/**
+ * Teacher/admin-readable sibling of fetchKnowledgeMap() — same backend
+ * method (EsoPolicyService::chapterKnowledgeMap()), same response shape,
+ * but reachable for a learner other than the caller themselves (subject to
+ * PalApiAuth's ordinary institute/class scoping). Used by the Knowledge
+ * Graph Explorer and Context Graph Inspector; a student's own in-lesson
+ * page keeps using fetchKnowledgeMap() above.
+ */
+export async function fetchKnowledgeMapForViewer(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<KnowledgeMap> {
+  const data = toRecord(await esoGet(`api/pal/eso/teacher/knowledge-map/${learnerId}/${conceptId}`, signal));
+  return parseKnowledgeMap(data);
 }
 
 // ── Learning path — PAL loop step 4, the Personal Learning Plan ─────────

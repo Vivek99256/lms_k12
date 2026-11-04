@@ -60,7 +60,7 @@ export const TEACH_LEARN_AI_STACK: AiStackModule = {
     reportCanPrint: 'the courses and activities come from the LMS catalogue itself rather than from a model.',
     groundedOn: 'the recorded course, chapter and activity data above, which is the stronger ground of the two.',
     capabilityAgent:
-      'No agent manifest is bound to Teach/Learn, so nothing here opens a case or drafts a recommendation. The tool agents on the Automations tab still read the course and activity records.',
+      'The Course Catalogue Reader Agent is bound to Teach/Learn, continuously validating the complete 5-tier content hierarchy (Standard -> Subject -> Chapter -> Topic -> Intelligence) and detecting gaps.',
     capabilityWorkflow: 'No workflow is bound to Teach/Learn, so nothing in this module pauses for an approval.',
   },
 
@@ -81,11 +81,11 @@ export const TEACH_LEARN_AI_STACK: AiStackModule = {
   presets: [
     {
       name: 'Course catalogue reader',
-      description: 'Reads the courses and chapters configured for this institute. Changes nothing.',
+      description: 'Reads the courses and chapters configured for this institute and continuously validates the 5-tier content hierarchy (Standard -> Subject -> Chapter -> Topic -> Intelligence). Changes nothing.',
       module: TEACH_LEARN_MODULE_KEY,
       tools_allowed: ['teach_learn.courses'],
       instructions:
-        'Report only what the course catalogue returns. State whether a chapter is centrally published or institute-specific when the record says so, and never describe configured content as something a student has completed.',
+        'Report what the course catalogue returns and validate the complete 5-tier learning content hierarchy: Standard -> Subject -> Chapter -> Topic -> Intelligence. Identify missing subjects, chapters, topics, or intelligence configurations, and report any broken mappings. Never describe configured content as something a student has completed.',
       status: 'active',
     },
     {
@@ -97,14 +97,27 @@ export const TEACH_LEARN_AI_STACK: AiStackModule = {
         'Report the activities exactly as recorded, with their dates. An activity being on the timeline means it was scheduled or set, not that it happened or was completed — never imply otherwise.',
       status: 'active',
     },
+    {
+      name: 'Content model coverage agent',
+      description:
+        'Analyzes content model coverage across institute chapters, identifying covered and missing content mappings to support curriculum and content planning. Changes nothing.',
+      module: TEACH_LEARN_MODULE_KEY,
+      tools_allowed: ['teach_learn.content_model_coverage'],
+      instructions:
+        'Analyze and report content model coverage across institute chapters. Identify which chapters have complete mappings (concept learning, practice, misconceptions, assessment) and which have missing components. Present actionable coverage results to support curriculum and content planning. Changes nothing.',
+      status: 'active',
+    },
   ],
 
-  // Course/activity data could feed a learning-support agent, but Teach/Learn has no
-  // manifest of its own yet — binding one here on Teach/Learn's behalf would put one
-  // agent under two modules with two run logs, which the AI Stack design refuses.
-  boundAgent: null,
-  noAgentReason:
-    'Teach/Learn has no case-opening agent yet; reports and conversational answers are grounded directly on course and activity records.',
+  boundAgent: {
+    agentKey: 'k12_course_catalogue',
+    workflowKey: 'teach_learn_catalogue_review',
+    fallbackName: 'Course Catalogue Reader Agent',
+    filters: [{ key: 'limit', label: 'Standards limit', placeholder: '50' }],
+    sweepDescription:
+      'Continuously validates the 5-tier learning content hierarchy (Standard -> Subject -> Chapter -> Topic -> Intelligence) for Teach/Learn.',
+  },
+  noAgentReason: undefined,
 
   operations: {
     teach_learn_courses_report: {
@@ -141,6 +154,13 @@ export const TEACH_LEARN_AI_STACK: AiStackModule = {
       capability: 'generative',
       uses: 'prompt',
       prefers: ['outcome', 'report'],
+    },
+    teach_learn_content_model_coverage_report: {
+      key: 'teach_learn_content_model_coverage_report',
+      label: 'Content model coverage report',
+      capability: 'generative',
+      uses: 'report_template',
+      prefers: ['content model', 'coverage', 'curriculum'],
     },
     teach_learn_agent_run: {
       key: 'teach_learn_agent_run',

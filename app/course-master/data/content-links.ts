@@ -82,6 +82,9 @@ export function resolveViewableUrl(
   const deckLink = httpCandidates.find((value) => GAMMA_DECK_PATTERN.test(value));
   if (deckLink) return deckLink;
 
+  const viewerLink = httpCandidates.find((value) => value.includes('lms-content-view') || value.includes('content-view'));
+  if (viewerLink) return viewerLink;
+
   const officeDocLink = httpCandidates.find((value) => isOfficeDocumentUrl(value, filename));
   if (officeDocLink) return toOfficeViewerUrl(officeDocLink);
 

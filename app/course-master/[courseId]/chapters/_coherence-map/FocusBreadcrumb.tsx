@@ -4,9 +4,10 @@
  * The trail across the top of the map: Grade | Subject | Chapter | Topic.
  *
  * Each chip is a solid label block joined to a tinted value block, as the reference
- * does, and each is a button that steps back to that level. It replaces the level
- * toggles and collapse-all controls the old toolbar carried, which existed only to
- * make a 233-node canvas survivable and have nothing to do once one concept is centred.
+ * does — down to its exact colours (green label, warm-beige value) — and each is a
+ * button that steps back to that level. It replaces the level toggles and
+ * collapse-all controls the old toolbar carried, which existed only to make a
+ * 233-node canvas survivable and have nothing to do once one concept is centred.
  *
  * The Topic chip is OMITTED when a concept has none rather than shown empty. Concepts
  * without a topic are the normal case on several courses — the backend reports
@@ -21,6 +22,33 @@ import type { CoherenceMap } from '@/app/course-master/data/coherenceMap';
 import type { FocusNode } from './focusLayout';
 
 export type Crumb = { label: string; value: string; onClick?: () => void };
+
+const CRUMB_THEMES: Record<string, { tagBg: string; valueBg: string; valueText: string; border: string }> = {
+  Grade: {
+    tagBg: 'bg-slate-700',
+    valueBg: 'bg-slate-50',
+    valueText: 'text-slate-800',
+    border: 'border-slate-300/80',
+  },
+  Subject: {
+    tagBg: 'bg-indigo-600',
+    valueBg: 'bg-indigo-50/70',
+    valueText: 'text-indigo-950 font-semibold',
+    border: 'border-indigo-200/80',
+  },
+  Chapter: {
+    tagBg: 'bg-sky-600',
+    valueBg: 'bg-sky-50/70',
+    valueText: 'text-sky-950 font-semibold',
+    border: 'border-sky-200/80',
+  },
+  Topic: {
+    tagBg: 'bg-purple-600',
+    valueBg: 'bg-purple-50/70',
+    valueText: 'text-purple-950 font-semibold',
+    border: 'border-purple-200/80',
+  },
+};
 
 /**
  * Build the trail for the centred concept.
@@ -70,49 +98,56 @@ export function FocusBreadcrumb({
   if (crumbs.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-1.5">
+    <div className="flex flex-wrap items-center justify-center gap-2">
       {canGoBack && (
         <button
           type="button"
           onClick={onBack}
-          className="mr-1 inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-[11.5px] font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
-          // The map is a walk, so "back" means the concept you came from — not the
-          // browser's history, which would leave the screen entirely.
+          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white/95 px-3 py-1.5 text-[12px] font-semibold text-slate-700 shadow-sm transition-all duration-150 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669] focus-visible:ring-offset-1"
           title="Back to the previous concept"
         >
-          <ChevronLeft size={13} strokeWidth={2} aria-hidden />
-          Back
+          <ChevronLeft size={14} strokeWidth={2.2} aria-hidden />
+          <span>Previous Concept</span>
         </button>
       )}
 
-      {crumbs.map((crumb) => {
-        const body = (
-          <>
-            <span className="bg-[#4F46E5] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-              {crumb.label}
-            </span>
-            <span className="max-w-[16rem] truncate bg-slate-100 px-2 py-1 text-[11.5px] font-medium text-slate-700">
-              {crumb.value}
-            </span>
-          </>
-        );
+      <div className="flex flex-wrap items-center gap-1.5">
+        {crumbs.map((crumb) => {
+          const theme = CRUMB_THEMES[crumb.label] ?? {
+            tagBg: 'bg-[#059669]',
+            valueBg: 'bg-slate-50',
+            valueText: 'text-slate-800',
+            border: 'border-slate-200',
+          };
 
-        return crumb.onClick ? (
-          <button
-            key={crumb.label}
-            type="button"
-            onClick={crumb.onClick}
-            className="inline-flex items-stretch overflow-hidden rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
-            title={`Back to ${crumb.value}`}
-          >
-            {body}
-          </button>
-        ) : (
-          <span key={crumb.label} className="inline-flex items-stretch overflow-hidden rounded-full">
-            {body}
-          </span>
-        );
-      })}
+          const body = (
+            <div className={`inline-flex items-stretch overflow-hidden rounded-full border ${theme.border} shadow-sm text-xs`}>
+              <span className={`${theme.tagBg} px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white select-none`}>
+                {crumb.label}
+              </span>
+              <span className={`max-w-[14rem] sm:max-w-[18rem] truncate ${theme.valueBg} ${theme.valueText} px-2.5 py-1 text-[11.5px]`}>
+                {crumb.value}
+              </span>
+            </div>
+          );
+
+          return crumb.onClick ? (
+            <button
+              key={crumb.label}
+              type="button"
+              onClick={crumb.onClick}
+              className="inline-flex items-stretch transition-transform duration-150 hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669] focus-visible:ring-offset-2 rounded-full"
+              title={`Jump to ${crumb.label}: ${crumb.value}`}
+            >
+              {body}
+            </button>
+          ) : (
+            <div key={crumb.label} className="inline-flex items-stretch select-none">
+              {body}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

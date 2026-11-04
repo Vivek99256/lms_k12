@@ -67,7 +67,7 @@ export function ConceptIntelligenceSection({ node }: { node: FocusNode }) {
   return (
     <section className="px-4 pt-3">
       {entry ? (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+        <div className="overflow-hidden rounded-xl ring-1 ring-slate-200">
           <button
             type="button"
             onClick={(event) => {
@@ -78,31 +78,44 @@ export function ConceptIntelligenceSection({ node }: { node: FocusNode }) {
               event.stopPropagation();
               setOpen((v) => !v);
             }}
-            className="nodrag nopan group flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400"
+            className="nodrag nopan group flex w-full items-center justify-between gap-2.5 bg-gradient-to-r from-emerald-50/90 via-teal-50/50 to-slate-50 px-3.5 py-2.5 text-left transition-colors duration-150 hover:from-emerald-100/80 hover:to-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
             aria-expanded={open}
             aria-controls={panelId}
           >
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[#4F46E5] shadow-[0_0_0_1px_rgba(0,0,0,0.08)] transition-transform duration-200 group-hover:scale-105">
-                <Brain size={13} strokeWidth={2.2} aria-hidden />
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#059669] to-[#0D9488] text-white shadow-xs transition-transform duration-200 group-hover:scale-105">
+                <Brain size={14} strokeWidth={2.2} aria-hidden />
               </span>
-              <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-                Concept Intelligence
-              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[12px] font-bold tracking-tight text-slate-800">
+                    AI Concept Intelligence
+                  </span>
+                  <span className="rounded-full bg-emerald-100/80 px-1.5 py-px text-[9px] font-bold text-emerald-800 uppercase tracking-wider">
+                    Live
+                  </span>
+                </div>
+                <p className="truncate text-[10.5px] text-slate-500 font-medium">
+                  Misconceptions · Pedagogical Strategies · Assessment Questions · Cognitive Depth
+                </p>
+              </div>
             </span>
 
-            <span className="flex shrink-0 items-center gap-1.5">
+            <span className="flex shrink-0 items-center gap-2">
               {glance?.difficulty && (
                 <span
-                  className={`animate-in fade-in rounded-full px-1.5 py-px text-[9.5px] font-medium duration-300 ${difficultyChipClass(glance.difficulty)}`}
+                  className={`animate-in fade-in rounded-full px-2 py-0.5 text-[10px] font-bold border duration-300 ${difficultyChipClass(glance.difficulty)}`}
                 >
                   {capitalize(glance.difficulty)}
                 </span>
               )}
+              <span className="hidden sm:inline-block text-[11px] font-semibold text-emerald-700">
+                {open ? 'Hide Tabs' : 'View 18 Tabs'}
+              </span>
               <ChevronRight
-                size={14}
-                strokeWidth={2.2}
-                className={`shrink-0 text-slate-400 transition-transform duration-200 motion-reduce:transition-none ${
+                size={15}
+                strokeWidth={2.4}
+                className={`shrink-0 text-emerald-700 transition-transform duration-200 motion-reduce:transition-none ${
                   open ? 'rotate-90' : 'rotate-0'
                 }`}
                 aria-hidden
@@ -122,7 +135,8 @@ export function ConceptIntelligenceSection({ node }: { node: FocusNode }) {
                   onPaneClick - its tab buttons don't stop propagation themselves.
                   Catching the click once here, at the panel's own boundary, protects
                   every control inside it (tabs, rename) without editing that shared
-                  component. */}
+                  component. Both this card and that page are light-themed now, so no
+                  framing is needed to avoid a seam. */}
               <div
                 className="nodrag nopan h-[420px] border-t border-slate-200 bg-white"
                 onClick={(event) => event.stopPropagation()}
@@ -133,7 +147,7 @@ export function ConceptIntelligenceSection({ node }: { node: FocusNode }) {
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-400">
+        <div className="flex items-center gap-1.5 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-400">
           <Brain size={12} strokeWidth={2.2} aria-hidden />
           <span className="font-semibold uppercase tracking-wide">Concept Intelligence</span>
           <span>— not generated yet for this concept</span>

@@ -88,11 +88,20 @@ function session() {
   return ctx;
 }
 
-/** type=API, sub_institute_id, syear, user_id - what the /lms/* routes expect. */
-function params(ctx: ReturnType<typeof buildSessionContext>): URLSearchParams {
+/**
+ * type=API, sub_institute_id, syear, user_id - what the /lms/* routes expect.
+ *
+ * `asStudentId` overrides `user_id` for a staff caller viewing another
+ * learner's PAL data (palController::resolveTargetStudent() already honours
+ * a staff-supplied user_id with teacher-of-student scope checking — this is
+ * the missing TS-side override, not a new backend capability). Omitted or
+ * empty, behaviour is unchanged: the signed-in session's own id.
+ */
+function params(ctx: ReturnType<typeof buildSessionContext>, asStudentId?: string): URLSearchParams {
   const search = new URLSearchParams();
   appendCommonParams(search, ctx);
-  if (ctx.userId) search.set('user_id', ctx.userId);
+  const userId = asStudentId || ctx.userId;
+  if (userId) search.set('user_id', userId);
   return search;
 }
 
@@ -532,11 +541,12 @@ export interface DiagnosticHistoryEntry {
 
 export async function fetchChapterDiagnosticHistory(
   chapterId: string | number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  asStudentId?: string
 ): Promise<{ chapterName: string; attempts: DiagnosticHistoryEntry[] }> {
   const ctx = session();
   const response = await fetch(
-    `${ctx.baseUrl}/lms/pal/diagnostic/history/${chapterId}?${params(ctx).toString()}`,
+    `${ctx.baseUrl}/lms/pal/diagnostic/history/${chapterId}?${params(ctx, asStudentId).toString()}`,
     { headers: headers(ctx), signal }
   );
   const payload = await readJson(response, 'load diagnostic history');
@@ -856,11 +866,12 @@ function readLadder(value: unknown): MasteryLadderState {
 
 export async function fetchConceptResult(
   conceptId: string | number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  asStudentId?: string
 ): Promise<ConceptDiagnosticResult> {
   const ctx = session();
   const response = await fetch(
-    `${ctx.baseUrl}/lms/pal/adaptive/concept-result/${conceptId}?${params(ctx).toString()}`,
+    `${ctx.baseUrl}/lms/pal/adaptive/concept-result/${conceptId}?${params(ctx, asStudentId).toString()}`,
     { headers: headers(ctx), signal }
   );
   const payload = await readJson(response, 'load the concept result');
@@ -1009,11 +1020,12 @@ export interface LearningPlan {
 
 export async function fetchLearningPlan(
   chapterId: string | number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  asStudentId?: string
 ): Promise<LearningPlan> {
   const ctx = session();
   const response = await fetch(
-    `${ctx.baseUrl}/lms/pal/plan/chapter/${chapterId}?${params(ctx).toString()}`,
+    `${ctx.baseUrl}/lms/pal/plan/chapter/${chapterId}?${params(ctx, asStudentId).toString()}`,
     { headers: headers(ctx), signal }
   );
   const payload = await readJson(response, 'load the learning plan');
@@ -1156,11 +1168,12 @@ export interface ChapterMastery {
 
 export async function fetchChapterMastery(
   chapterId: string | number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  asStudentId?: string
 ): Promise<ChapterMastery> {
   const ctx = session();
   const response = await fetch(
-    `${ctx.baseUrl}/lms/pal/mastery/chapter/${chapterId}?${params(ctx).toString()}`,
+    `${ctx.baseUrl}/lms/pal/mastery/chapter/${chapterId}?${params(ctx, asStudentId).toString()}`,
     { headers: headers(ctx), signal }
   );
   const payload = await readJson(response, 'load your mastery');
@@ -1231,10 +1244,11 @@ export interface RecallQueue {
  */
 export async function fetchRecallQueue(
   chapterId?: string | number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  asStudentId?: string
 ): Promise<RecallQueue> {
   const ctx = session();
-  const search = params(ctx);
+  const search = params(ctx, asStudentId);
   if (chapterId) search.set('chapter_id', String(chapterId));
 
   const response = await fetch(`${ctx.baseUrl}/lms/pal/recall?${search.toString()}`, {
@@ -1520,11 +1534,12 @@ export async function acknowledgeConceptLearn(
 
 export async function fetchConceptLearn(
   conceptId: string | number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  asStudentId?: string
 ): Promise<ConceptLearn> {
   const ctx = session();
   const response = await fetch(
-    `${ctx.baseUrl}/lms/pal/learn/concept/${conceptId}?${params(ctx).toString()}`,
+    `${ctx.baseUrl}/lms/pal/learn/concept/${conceptId}?${params(ctx, asStudentId).toString()}`,
     { headers: headers(ctx), signal }
   );
   const payload = await readJson(response, 'load the lesson');

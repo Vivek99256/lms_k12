@@ -127,6 +127,10 @@ export interface OntologyViewSummary {
   label: string;
   description: string | null;
   steps: string[];
+  /** Present on the module-level listing (fetchModuleViews); absent on the
+   * context-level one (fetchWorkspaceContext's ontology_views), which is
+   * already anchored to the record on screen. */
+  root_entity_key?: string;
 }
 
 export interface WorkspacePayload {
@@ -409,6 +413,47 @@ export interface CreateOptions {
 /** Every report and template this module can create, with suggested pairings. */
 export function fetchCreateOptions(session: WorkspaceSession, input: { route: string }) {
   return post<CreateOptions>(session, "/create-options", input);
+}
+
+/**
+ * The relationship views available for the module on screen, before any record
+ * is selected — what the decentralized Knowledge Graph tab shows before the
+ * user picks one. `module`, when the page already knows its own slug more
+ * reliably than the route can say (the generic /modules/<slug>/<category>
+ * family), is sent directly rather than left to route-pattern matching.
+ */
+export interface ModuleViewsPayload {
+  module: string | null;
+  module_label: string | null;
+  views: OntologyViewSummary[];
+}
+
+export function fetchModuleViews(
+  session: WorkspaceSession,
+  input: { route: string; module?: string | null }
+) {
+  return post<ModuleViewsPayload>(session, "/module-views", input);
+}
+
+/**
+ * Non-blocking sync health for both Knowledge Graph surfaces, from
+ * `GET|POST /api/ai/workspace/graph-sync-status`. MySQL-only on the backend
+ * (never opens a Neo4j connection), so it stays reliable even while a heavy
+ * drain/backfill is running. `status` is derived from real counts, never a
+ * fabricated percentage — render accordingly, not as a progress bar.
+ */
+export interface GraphSyncStatus {
+  available: boolean;
+  status?: "idle" | "draining" | "attention";
+  pending_nodes?: number;
+  pending_relationships?: number;
+  failed_nodes?: number;
+  failed_relationships?: number;
+  last_successful_sync_at?: string | null;
+}
+
+export function fetchGraphSyncStatus(session: WorkspaceSession) {
+  return post<GraphSyncStatus>(session, "/graph-sync-status", {});
 }
 
 export function fetchOntologyView(

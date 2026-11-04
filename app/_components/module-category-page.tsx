@@ -12,6 +12,7 @@ import {
   LayoutList,
   Loader2,
   ScrollText,
+  Share2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -20,6 +21,8 @@ import Link from 'next/link';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { ModuleAuditTrail } from '@/app/_components/module-audit-trail';
 import { ModuleIntelligence } from '@/app/_components/module-intelligence';
+import { ModuleKnowledgeGraph } from '@/app/_components/ModuleKnowledgeGraph';
+import CentralizedKnowledgeGraphExplorer from '@/app/ai/_components/CentralizedKnowledgeGraphExplorer';
 import {
   intelligenceEntryFor,
   ModuleIntelligenceContractScreen,
@@ -90,11 +93,6 @@ type LoadState = 'loading' | 'ready' | 'error';
 
 const TAB_PARAM = 'tab';
 
-/**
- * More tabs than this and the bar is one scrolling line with an "All" menu rather than underlined text.
- * A student's bar always uses the scrolling line, so it looks the same as the staff one whatever it holds.
- */
-const PILL_TAB_THRESHOLD = 6;
 
 /**
  * The one category that is a screen rather than a group of menus.
@@ -159,6 +157,15 @@ const USER_LOG_ROUTE = '/user_log';
 const INTELLIGENCE_CATEGORY_KEY = 'intelligence';
 
 /**
+ * The decentralized Knowledge Graph: one module's own scoped view onto the
+ * shared graph (see ModuleKnowledgeGraph). Seeded onto every bar the same
+ * way Audit Trail was, but unlike Audit Trail it carries no per-row config —
+ * whether it has anything to show depends on `ai_ontology_views` coverage
+ * for this module, resolved at request time rather than at seed time.
+ */
+const KNOWLEDGE_GRAPH_CATEGORY_KEY = 'knowledge-graph';
+
+/**
  * The categories that are a console rather than a group of menus.
  *
  * Approvals and scheduled tasks are both configured centrally — one registry of
@@ -211,6 +218,22 @@ const PLATFORM_CONSOLES: Record<
     ),
   },
   schedular: {
+    id: 'scheduler-tasks',
+    label: 'Scheduled tasks',
+    icon: CalendarClock,
+    title: 'Scheduled tasks',
+    description:
+      'Recurring activity in this module: when each task runs, whether it is switched on, and when it last did.',
+    route: '/platform-services/scheduler',
+    routeLabel: 'Open Platform services → Scheduler',
+    emptyTitle: 'No scheduled tasks for this menu',
+    emptyBody:
+      'Nothing in this module declares a task that runs on a schedule, so there is nothing to time here.',
+    render: (moduleKey, title, description) => (
+      <SchedulerConsole embedded module={moduleKey} title={title} description={description} />
+    ),
+  },
+  scheduler: {
     id: 'scheduler-tasks',
     label: 'Scheduled tasks',
     icon: CalendarClock,
@@ -316,7 +339,7 @@ function findCategory(
   );
 }
 
-type StripItem = { id: string; label: string; disabled: boolean };
+type StripItem = { id: string; label: string; disabled: boolean; icon?: LucideIcon };
 
 /**
  * One-line tab strip for a category with many screens.
@@ -400,6 +423,7 @@ function ScrollableTabStrip({
       >
         {items.map((item) => {
           const isActive = item.id === activeId;
+          const Icon = item.icon;
 
           return (
             <button
@@ -409,12 +433,13 @@ function ScrollableTabStrip({
               disabled={item.disabled}
               aria-current={isActive ? 'page' : undefined}
               onClick={() => onSelect(item.id)}
-              className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:text-[#94A3B8] disabled:hover:bg-transparent ${
+              className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:text-[#94A3B8] disabled:hover:bg-transparent ${
                 isActive
                   ? 'bg-[#5846EA] text-white shadow-sm'
                   : 'text-[#5F7087] hover:bg-slate-100 hover:text-[#1E293B]'
               }`}
             >
+              {Icon ? <Icon size={15} /> : null}
               {item.label}
             </button>
           );
@@ -439,23 +464,29 @@ function ScrollableTabStrip({
 
         {menuOpen ? (
           <div className="absolute right-0 top-full z-30 mt-2 max-h-[70vh] w-72 overflow-y-auto rounded-2xl border border-[#D9E3F1] bg-white p-1.5 shadow-xl">
-            {items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                disabled={item.disabled}
-                onClick={() => {
-                  setMenuOpen(false);
-                  onSelect(item.id);
-                }}
-                className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-[13px] font-medium transition disabled:cursor-not-allowed disabled:text-[#94A3B8] disabled:hover:bg-transparent ${
-                  item.id === activeId ? 'bg-[#EEF0FF] text-[#5846EA]' : 'text-[#334155] hover:bg-slate-50'
-                }`}
-              >
-                <span className="truncate">{item.label}</span>
-                {item.id === activeId ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#5846EA]" /> : null}
-              </button>
-            ))}
+            {items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={item.disabled}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onSelect(item.id);
+                  }}
+                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-[13px] font-medium transition disabled:cursor-not-allowed disabled:text-[#94A3B8] disabled:hover:bg-transparent ${
+                    item.id === activeId ? 'bg-[#EEF0FF] text-[#5846EA]' : 'text-[#334155] hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    {Icon ? <Icon size={14} className={item.id === activeId ? 'text-[#5846EA]' : 'text-slate-400'} /> : null}
+                    <span className="truncate">{item.label}</span>
+                  </span>
+                  {item.id === activeId ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#5846EA]" /> : null}
+                </button>
+              );
+            })}
           </div>
         ) : null}
       </div>
@@ -575,7 +606,20 @@ export function ModuleCategoryPage({
 
     if (!spec) return [];
 
-    const pinned = category?.platformModuleKey || platformModuleKey;
+    const pinned =
+      category?.platformModuleKey ||
+      platformModuleKey ||
+      (moduleName === 'admission' || moduleName === 'admissions'
+        ? 'admissions'
+        : moduleName === 'user' || moduleName === 'users' || moduleName === 'user-i-card'
+          ? 'hr'
+          : moduleName === 'fees'
+            ? 'fees'
+            : moduleName === 'timetable'
+              ? 'timetable'
+              : moduleName === 'communication' || moduleName === 'communication-report'
+                ? 'communication'
+              : undefined);
 
     return [
       {
@@ -649,6 +693,45 @@ export function ModuleCategoryPage({
   }, [categoryKey, category, auditModuleKeys, moduleName]);
 
   /**
+   * The Knowledge Graph tab, for any module.
+   *
+   * Organization Management is special-cased to the rebuilt centralized
+   * explorer (`CentralizedKnowledgeGraphExplorer`, the same component
+   * `/ai/knowledge-graph` renders) rather than the per-module
+   * `ModuleKnowledgeGraph` every other module keeps — pre-focused on
+   * Organization Management (`initialFocusModuleKey`) but never restricted
+   * to it; every module and submodule stays explorable from here too.
+   * Every other module's tab is completely unchanged: no empty/not-
+   * configured branch here the way Audit Trail has one for a missing
+   * prefix list — ModuleKnowledgeGraph itself renders the "isn't set up
+   * for this module yet" state, because that answer depends on live
+   * `ai_ontology_views` coverage rather than anything this page can know
+   * in advance.
+   */
+  const graphScreens = useMemo<ModuleStaticScreen[]>(() => {
+    if (categoryKey !== KNOWLEDGE_GRAPH_CATEGORY_KEY && category?.key !== KNOWLEDGE_GRAPH_CATEGORY_KEY) {
+      return [];
+    }
+
+    const label = moduleLabel(moduleName);
+    const isOrganizationManagement = moduleName === 'organization-management';
+
+    return [
+      {
+        id: 'knowledge-graph',
+        label: 'Knowledge Graph',
+        icon: Share2,
+        render: () =>
+          isOrganizationManagement ? (
+            <CentralizedKnowledgeGraphExplorer initialFocusModuleKey="organization-management" />
+          ) : (
+            <ModuleKnowledgeGraph moduleName={moduleName} label={label} />
+          ),
+      },
+    ];
+  }, [categoryKey, category, moduleName]);
+
+  /**
    * The Intelligence tab, for any module that has not brought its own.
    *
    * Fees passes its native workspace through `staticScreens`, and that view is
@@ -662,7 +745,20 @@ export function ModuleCategoryPage({
 
     if (!isIntelligence || staticScreens.length > 0) return [];
 
-    const pinned = category?.platformModuleKey || platformModuleKey;
+    const pinned =
+      category?.platformModuleKey ||
+      platformModuleKey ||
+      (moduleName === 'admission' || moduleName === 'admissions'
+        ? 'admissions'
+        : moduleName === 'user' || moduleName === 'users' || moduleName === 'user-i-card'
+          ? 'hr'
+          : moduleName === 'fees'
+            ? 'fees'
+            : moduleName === 'timetable'
+              ? 'timetable'
+              : moduleName === 'communication' || moduleName === 'communication-report'
+                ? 'communication'
+              : undefined);
     const label = moduleLabel(moduleName);
 
     /*
@@ -720,16 +816,6 @@ export function ModuleCategoryPage({
   }, [categoryKey, category, staticScreens, platformModuleKey, moduleName]);
 
   const tabs = useMemo<Tab[]>(() => {
-    const staticTabs = [
-      ...consoleScreens,
-      ...auditScreens,
-      ...intelligenceScreens,
-      ...staticScreens,
-    ].map<Tab>((entry) => ({
-      kind: 'static',
-      ...entry,
-    }));
-
     const menuTabs = (category?.items ?? []).map<Tab>((item: ModuleCategoryItem) => {
       const route = mapApiLinkToRoute(item.link);
 
@@ -742,12 +828,36 @@ export function ModuleCategoryPage({
       };
     });
 
+    const dedupedStaticScreens =
+      menuTabs.length > 0
+        ? staticScreens.filter(
+            (s) =>
+              !menuTabs.some(
+                (m) =>
+                  m.label.toLowerCase().trim() === s.label.toLowerCase().trim() ||
+                  (m.kind === 'menu' && m.route.toLowerCase().includes(s.id.toLowerCase().replace(/_/g, '-')))
+              )
+          )
+        : staticScreens;
+
+    const staticTabs = [
+      ...consoleScreens,
+      ...auditScreens,
+      ...graphScreens,
+      ...intelligenceScreens,
+      ...dedupedStaticScreens,
+    ].map<Tab>((entry) => ({
+      kind: 'static',
+      ...entry,
+    }));
+
     return staticScreensPlacement === 'after'
       ? [...menuTabs, ...staticTabs]
       : [...staticTabs, ...menuTabs];
   }, [
     consoleScreens,
     auditScreens,
+    graphScreens,
     intelligenceScreens,
     staticScreens,
     staticScreensPlacement,
@@ -780,6 +890,30 @@ export function ModuleCategoryPage({
     return renderable[0] ?? null;
   }, [tabs, requestedTab]);
 
+  /**
+   * The query a menu tab's own route carries, e.g. `?category=certificate` on
+   * Document Templates' "Certificates" tab. An embedded screen reads its filters
+   * from the browser URL, which only holds `?tab=<id>`, so without this every
+   * tab of such a module opened the same unfiltered screen.
+   */
+  const urlParamsForTab = useCallback(
+    (tab: Tab, current: URLSearchParams): URLSearchParams => {
+      const params = new URLSearchParams(current.toString());
+      // Drop what another tab of this bar put there, so "All templates" is not
+      // left filtered by the previous tab's category.
+      for (const other of tabs) {
+        if (other.kind !== 'menu') continue;
+        new URLSearchParams(other.route.split('?')[1] ?? '').forEach((_, key) => params.delete(key));
+      }
+      params.set(TAB_PARAM, tab.id);
+      if (tab.kind === 'menu') {
+        new URLSearchParams(tab.route.split('?')[1] ?? '').forEach((value, key) => params.set(key, value));
+      }
+      return params;
+    },
+    [tabs]
+  );
+
   const selectTab = useCallback(
     (tab: Tab) => {
       // Screens that live on their own page are opened, not selected. Anything
@@ -790,12 +924,23 @@ export function ModuleCategoryPage({
         return;
       }
 
-      const params = new URLSearchParams(searchParams?.toString() ?? '');
-      params.set(TAB_PARAM, tab.id);
+      const params = urlParamsForTab(tab, new URLSearchParams(searchParams?.toString() ?? ''));
       router.replace(`?${params.toString()}`, { scroll: false });
     },
-    [router, searchParams]
+    [router, searchParams, urlParamsForTab]
   );
+
+  // A link straight to `?tab=<id>` (or a refresh) still needs the tab's own
+  // query in the URL, so bring it in line once the tab is known.
+  useEffect(() => {
+    if (!activeTab || activeTab.kind !== 'menu' || !activeTab.route.includes('?')) return;
+
+    const current = new URLSearchParams(searchParams?.toString() ?? '');
+    const wanted = urlParamsForTab(activeTab, current);
+    if (wanted.toString() !== current.toString()) {
+      router.replace(`?${wanted.toString()}`, { scroll: false });
+    }
+  }, [activeTab, searchParams, urlParamsForTab, router]);
 
   // A `?tab=` naming a menu that lives on its own page is not a tab here: the
   // header's drill-down links every menu this way without knowing which ones
@@ -943,25 +1088,17 @@ export function ModuleCategoryPage({
       {tabs.length > 0 ? (
         <>
           {/*
-            * A ONE-TAB STRIP IS NOT NAVIGATION. Fees' Intelligence category has a
-            * single static screen, so the bar rendered one lone tab reading
-            * "Fees Intelligence" directly above a heading that already says Fees
-            * — pure chrome with nothing to switch to. It reappears the moment a
-            * second screen exists.
+            * A ONE-TAB STRIP IS NOT NAVIGATION. If a category has only one menu or
+            * screen, do not render a lone single tab. It reappears the moment two or
+            * more screens exist.
             */}
-          {/*
-            * A LONG BAR IS ONE SCROLLING LINE. With a dozen or more tabs (Student →
-            * Reports has 16) the underlined row wrapped over three lines with its
-            * own scrollbar, and a wrapped card of pills was no better. Past six
-            * tabs the bar is a single line that scrolls sideways, with an "All"
-            * menu to jump to any screen. Short bars keep the underline style.
-            */}
-          {tabs.length > PILL_TAB_THRESHOLD || isStudentProfile(getStoredMenuContext()?.user_profile_name) ? (
+          {tabs.length > 1 && (
             <ScrollableTabStrip
               items={tabs.map((tab) => ({
                 id: tab.id,
                 label: tab.label,
                 disabled: tab.kind === 'menu' && !tab.embeddable && !isResolvedRoute(tab.route),
+                icon: tab.kind === 'static' ? tab.icon : undefined,
               }))}
               activeId={activeTab?.id ?? null}
               onSelect={(id) => {
@@ -969,39 +1106,6 @@ export function ModuleCategoryPage({
                 if (tab) selectTab(tab);
               }}
             />
-          ) : (
-          <div
-            className={`flex flex-wrap items-center gap-5 overflow-x-auto border-b border-[#D9E3F1] ${
-              tabs.length < 2 ? 'hidden' : ''
-            }`}
-          >
-            {tabs.map((tab) => {
-              // A menu tab is clickable only if it leads somewhere: an inline
-              // screen, or a route this app actually serves.
-              const disabled = tab.kind === 'menu' && !tab.embeddable && !isResolvedRoute(tab.route);
-              const isActive = activeTab?.id === tab.id;
-              const Icon = tab.kind === 'static' ? tab.icon : undefined;
-
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  disabled={disabled}
-                  aria-current={isActive ? 'page' : undefined}
-                  onClick={() => selectTab(tab)}
-                  className={`-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition disabled:cursor-not-allowed disabled:text-[#94A3B8] disabled:hover:text-[#94A3B8] ${
-                    isActive
-                      ? 'border-[#5846EA] text-[#5846EA]'
-                      : 'border-transparent text-[#5F7087] hover:text-[#334155]'
-                  }`}
-                >
-                  {Icon ? <Icon size={16} /> : null}
-                  {tab.label}
-                  {Icon && isActive ? <span className="h-1.5 w-1.5 rounded-full bg-[#5846EA]" /> : null}
-                </button>
-              );
-            })}
-          </div>
           )}
 
           {activeTab?.kind === 'static' ? (

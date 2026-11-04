@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { loadAlignment, loadCareerEvidence } from '../_lib/api';
+import { MentorSuggestions } from './MentorSuggestions';
 import { CAREER_EVIDENCE_STATUS_LABEL, EVIDENCE_LEVEL_LABEL, formatEventDate } from '../_lib/evidence';
 import type {
   AlignmentPayload, AlignmentStatus, CareerEvidencePayload, CareerEvidenceStatus,
@@ -685,6 +686,7 @@ export function CareerIntelligence({ studentId }: { studentId?: string }) {
         <EvidenceSummaryPanel data={data} />
         <CounsellorActions onSelectAction={onSelectAction} />
       </div>
+      <MentorSuggestions occupationCode={data.aspiration?.occupation_id ?? null} />
       <LogInterventionForm
         interventionType={interventionType}
         setInterventionType={setInterventionType}

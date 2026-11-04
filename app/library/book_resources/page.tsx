@@ -34,6 +34,7 @@ import {
   readMessage,
   readStatus,
 } from '@/app/library/_lib/library-module-utils';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 // ---------------------------------------------------------------------------
 // This page is wired directly to Laravel's real Library "Books" catalogue
@@ -325,7 +326,7 @@ function printRows(rows: BookRow[]) {
   const printWindow = window.open('', '_blank', 'width=1400,height=900');
   if (!printWindow) return;
   printWindow.document.open();
-  printWindow.document.write(html);
+  printWindow.document.write(sanitizeHtml(html, { document: true }));
   printWindow.document.close();
   printWindow.focus();
   printWindow.print();

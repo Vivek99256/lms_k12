@@ -2350,6 +2350,13 @@ Temporary IDs: AI-01..AI-16 = lead auditor (E); AI-A## = PAL student flow; AI-B#
 **Verification:** Open a non-contract module's Intelligence tab; expect payload not 404.
 
 ## AI-C19
+**STALE as of 2026-10-28.** `taxonomy-ontology.tsx` was rewritten to call the LMS's own
+`/api/brain/{tenant}/graph` endpoint (Neo4j-backed, 16k+ Skill / 5.8k+ JobRole nodes) — no
+`skill-ontology-neo4j.vercel.app` reference remains anywhere in the file, and the line numbers
+cited below no longer contain iframe code. Verified live during a full SQL↔Neo4j sync audit; see
+`ERP_SQL_Neo4j_Complete_Synchronization_Audit.docx` §6/§8.2. Original entry preserved below for
+history.
+
 **Severity:** Medium   **Type:** Confirmed
 **Category:** Frontend
 **Module:** Capability Intelligence — Capability Explorer
@@ -2412,6 +2419,15 @@ Temporary IDs: AI-01..AI-16 = lead auditor (E); AI-A## = PAL student flow; AI-B#
 **Verification:** Unit test with a student who has Mathematics evidence at 2/5 vs an occupation needing Mathematics level 5.
 
 ## AI-C24
+**PARTIALLY STALE as of 2026-10-28.** `OCCUPATION_MAP` was deliberately expanded from 1 to 11
+curated O*NET occupations on 2026-10-12 (git commit `12e066b63`), still CBSE-only, still
+`INSUFFICIENT_DATA` outside the curated set (now ~98.8% of O*NET's 900+ codes, not ~99.9%) — so
+"only one occupation" is wrong, but the underlying concern (narrow coverage, UI doesn't distinguish
+`INSUFFICIENT_DATA` from a real request failure) still holds. Separately, "Neo4j dev credentials
+known broken" is also stale — both the main and secondary Neo4j instances were confirmed live and
+reachable with working auth on 2026-10-28. See `ERP_SQL_Neo4j_Complete_Synchronization_Audit.docx`
+§3 (pre-flight) and §6/§8.3. Original entry preserved below for history.
+
 **Severity:** Medium   **Type:** Confirmed
 **Category:** Business Logic
 **Module:** Career Intelligence — alignment

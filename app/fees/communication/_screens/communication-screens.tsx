@@ -1,19 +1,25 @@
 'use client';
 
-import { BellRing } from 'lucide-react';
+import { BellRing, History, Send } from 'lucide-react';
 
 import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
+import { FeesBroadcastNotice } from '@/app/fees/communication/_components/FeesBroadcastNotice';
+import { FeesDeliveryLog } from '@/app/fees/communication/_components/FeesDeliveryLog';
 import { FeesNotificationSettings } from '@/app/fees/communication/_components/FeesNotificationSettings';
 
-/**
- * Fees → Communication tabs.
- *
- * Scaffolding for fees notices, reminders and parent communication. Nothing
- * here sends anything yet, and nothing is wired to the existing Fees Circular
- * screen (which lives under Operations and stays there) or to the institute's
- * SMS/email settings. Each tab renders the shared placeholder.
- */
 export const FEES_COMMUNICATION_SCREENS: ModuleStaticScreen[] = [
+  {
+    id: 'broadcast-notice',
+    label: 'Send notice',
+    icon: Send,
+    render: () => <FeesBroadcastNotice />,
+  },
+  {
+    id: 'delivery-log',
+    label: 'Delivery log',
+    icon: History,
+    render: () => <FeesDeliveryLog />,
+  },
   {
     id: 'notification-settings',
     label: 'Notification settings',
