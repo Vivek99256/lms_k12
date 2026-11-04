@@ -9,7 +9,7 @@ import type {
   OntologyRelationship,
   OrganizationStaffGraph,
 } from '@/lib/intelligence/types';
-import type { ModuleViewsPayload, OntologyViewResult } from '@/lib/intelligence/workspace';
+import type { ModuleViewsPayload, NodeExpansionResult, OntologyViewResult } from '@/lib/intelligence/workspace';
 import type { KgEdgeInput, KgHop, KgNodeInput } from './graph-model';
 
 /**
@@ -163,6 +163,7 @@ export function mapOntologyViewResult(result: OntologyViewResult): {
           target: id,
           relation: hop.relation,
           directed: true,
+          sourceKind: hop.source === 'sql' ? 'sql' : 'graph',
         });
       }
 
@@ -173,6 +174,67 @@ export function mapOntologyViewResult(result: OntologyViewResult): {
   }
 
   return { nodes: Array.from(nodes.values()), edges, hops };
+}
+
+/**
+ * One node's click-to-expand result (`POST /workspace/nodes/{entity}/{id}/
+ * expand`) into nodes/edges to MERGE onto an existing decentralized canvas —
+ * not a replacement, since the point of expand-in-place is that everything
+ * already on screen stays put. Caller dedupes against its current node/edge
+ * ids before adding these (ids are the same `fingerprint()` scheme
+ * `mapOntologyViewResult` already uses, so they collide correctly when the
+ * same record is reachable two ways).
+ */
+export function mapExpandNodeResult(centerId: string, result: NodeExpansionResult): {
+  nodes: KgNodeInput[];
+  edges: KgEdgeInput[];
+  hops: KgHop[];
+} {
+  if (!result.found || !result.node) {
+    return { nodes: [], edges: [], hops: [] };
+  }
+
+  const nodes: KgNodeInput[] = [];
+  const edges: KgEdgeInput[] = [];
+  const hops: KgHop[] = [];
+
+  for (const group of result.relations) {
+    hops.push({
+      label: `${group.relation} (${group.direction})`,
+      entity: group.entity,
+      relation: group.relation,
+      direction: group.direction,
+      available: group.available,
+      reason: group.reason ?? undefined,
+      total: group.total,
+      items: group.items,
+    });
+
+    if (!group.available) continue;
+
+    for (const item of group.items) {
+      const id = fingerprint(item.entity, item.id);
+
+      nodes.push({
+        id,
+        entityKey: item.entity,
+        recordId: item.id,
+        label: item.label,
+        source: group.source ?? 'sql',
+        attributes: item.attributes,
+      });
+
+      const sourceKind: 'sql' | 'graph' = group.source === 'sql' ? 'sql' : 'graph';
+
+      edges.push(
+        group.direction === 'outgoing'
+          ? { id: `${centerId}->${group.relation}->${id}`, source: centerId, target: id, relation: group.relation, directed: true, sourceKind }
+          : { id: `${id}->${group.relation}->${centerId}`, source: id, target: centerId, relation: group.relation, directed: true, sourceKind }
+      );
+    }
+  }
+
+  return { nodes, edges, hops };
 }
 
 /**
@@ -282,6 +344,7 @@ export function buildHopsFromNodeDetail(
     label: `${group.relation} (${group.direction})`,
     entity: null,
     relation: group.relation,
+    direction: group.direction,
     available: true,
     total: group.items.length,
     items: group.items,

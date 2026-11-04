@@ -9,7 +9,6 @@ import {
   FileClock,
   GitBranch,
   LifeBuoy,
-  Share2,
   Network,
   SlidersHorizontal,
   UserPlus,
@@ -44,7 +43,6 @@ const TOOL_ICONS: Record<(typeof TOOL_STRIP_CATEGORY_KEYS)[number], LucideIcon> 
   'help-guide-support': LifeBuoy,
   workflow: GitBranch,
   'audit-trail': FileClock,
-  'knowledge-graph': Share2,
   'knowledge-graph': Network,
 };
 

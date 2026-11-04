@@ -158,28 +158,38 @@ function toFlowEdges(
     const dimmed = (selectedId !== null || selectedEdgeId !== null) && !highlighted;
     const alwaysShowLabel = variant === 'browser';
 
+    const isSqlSourced = e.sourceKind === 'sql';
+
     const stroke = isSelectedEdge
       ? coherenceTheme.color.accentBright
-      : highlighted
-        ? coherenceTheme.color.edgeHighlight
-        : coherenceTheme.color.edgeDim;
+      : isSqlSourced
+        ? coherenceTheme.color.edgeDim
+        : highlighted
+          ? coherenceTheme.color.edgeHighlight
+          : coherenceTheme.color.edgeDim;
 
     return {
       id: e.id,
       source: e.source,
       target: e.target,
       type: 'straight',
-      label: alwaysShowLabel || highlighted ? e.relation : undefined,
+      // A SQL-sourced edge always shows its label — "sql join" needs to read
+      // as different from a real Neo4j relationship at a glance, not only
+      // on hover/selection.
+      label: alwaysShowLabel || highlighted || isSqlSourced ? (isSqlSourced ? `${e.relation} (SQL)` : e.relation) : undefined,
       labelStyle: {
-        fill: variant === 'browser' ? '#cbd5e1' : coherenceTheme.color.text,
+        fill: isSqlSourced ? coherenceTheme.color.edgeDim : variant === 'browser' ? '#cbd5e1' : coherenceTheme.color.text,
         fontSize: 10.5,
+        fontStyle: isSqlSourced ? 'italic' : undefined,
       },
       labelBgStyle: { fill: variant === 'browser' ? '#1e293b' : coherenceTheme.color.bgCream },
       style: {
         stroke,
         strokeWidth: isSelectedEdge ? 3 : highlighted ? 2.5 : 1.5,
-        strokeDasharray: e.directed ? undefined : '5 4',
-        opacity: dimmed ? 0.25 : 1,
+        // Dashed for a non-directed edge OR a SQL-sourced one — a SQL join is
+        // never rendered as if it were a confirmed Neo4j relationship.
+        strokeDasharray: e.directed && !isSqlSourced ? undefined : '5 4',
+        opacity: dimmed ? 0.25 : isSqlSourced ? 0.55 : 1,
       },
       markerEnd: e.directed
         ? { type: MarkerType.ArrowClosed, color: stroke, width: 14, height: 14 }
@@ -327,6 +337,7 @@ export default function GraphCanvas({
   onNodeSelect,
   onEdgeSelect,
   onExpandNode,
+  onNodeDoubleClick,
   highlightedIds,
   variant = 'card',
   heightClassName = 'h-[560px]',
@@ -339,6 +350,8 @@ export default function GraphCanvas({
   onEdgeSelect?: (edge: KgEdgeInput | null) => void;
   /** Browser variant only — fired when a node's own "+" expand affordance is clicked. */
   onExpandNode?: (node: KgNodeInput) => void;
+  /** Browser variant only — fired on a real double-click (ReactFlow's own `onNodeDoubleClick`, tied to the native `dblclick` event — never inferred from click timing). */
+  onNodeDoubleClick?: (node: KgNodeInput) => void;
   /** Node ids to keep at full opacity when nothing is selected — e.g. search/filter matches. Ignored while a node is selected (selection takes over dimming). */
   highlightedIds?: ReadonlySet<string>;
   /** 'card' (default, unchanged) or 'browser' (Neo4j-Browser-styled, for the centralized explorer). */
@@ -393,6 +406,20 @@ export default function GraphCanvas({
     [selectedId, nodes, onNodeSelect, onExpandNode]
   );
 
+  const handleNodeDoubleClick = useCallback(
+    (event: React.MouseEvent, flowNode: Node) => {
+      // The "+" badge is itself inside the node, so a double-click landing
+      // on it would otherwise also fire this — same guard handleNodeClick
+      // already uses for the single-click case.
+      const target = event.target as HTMLElement;
+      if (target.closest('[data-node-expand]')) return;
+
+      const node = nodes.find((n) => n.id === flowNode.id);
+      if (node) onNodeDoubleClick?.(node);
+    },
+    [nodes, onNodeDoubleClick]
+  );
+
   const handleEdgeClick = useCallback(
     (_: React.MouseEvent, flowEdge: Edge) => {
       if (variant !== 'browser') return;
@@ -439,6 +466,7 @@ export default function GraphCanvas({
           edges={flowEdges}
           nodeTypes={nodeTypes}
           onNodeClick={handleNodeClick}
+          onNodeDoubleClick={handleNodeDoubleClick}
           onEdgeClick={handleEdgeClick}
           onPaneClick={handlePaneClick}
           fitView

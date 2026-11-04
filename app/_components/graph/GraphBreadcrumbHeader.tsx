@@ -16,7 +16,7 @@ export interface GraphCrumb {
   onClick?: () => void;
 }
 
-export default function GraphBreadcrumbHeader({ crumbs }: { crumbs: GraphCrumb[] }) {
+export default function GraphBreadcrumbHeader({ crumbs, dark = false }: { crumbs: GraphCrumb[]; dark?: boolean }) {
   if (crumbs.length === 0) return null;
 
   return (
@@ -26,13 +26,13 @@ export default function GraphBreadcrumbHeader({ crumbs }: { crumbs: GraphCrumb[]
           <>
             <span
               className="px-3 py-1.5 uppercase tracking-wide text-white"
-              style={{ backgroundColor: coherenceTheme.color.accent, fontFamily: coherenceTheme.font.eyebrow }}
+              style={{ backgroundColor: dark ? '#1e40af' : coherenceTheme.color.accent, fontFamily: coherenceTheme.font.eyebrow }}
             >
               {crumb.label}
             </span>
             <span
               className="px-3 py-1.5"
-              style={{ backgroundColor: coherenceTheme.color.bgCream, color: coherenceTheme.color.text }}
+              style={dark ? { backgroundColor: 'rgba(255,255,255,0.08)', color: '#f1f5f9' } : { backgroundColor: coherenceTheme.color.bgCream, color: coherenceTheme.color.text }}
             >
               {crumb.value}
             </span>
