@@ -17,6 +17,7 @@ import { fetchSemanticIntelligenceResult } from '../../data/chapters';
 import type { Chapter, SemanticIntelligenceResult } from '../../data/chapters';
 import type { Course } from '../../data/courses';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { buildSessionContext } from '@/lib/erp-client';
 import { getRequestContext, getSyear } from '../../page';
 
 const DEFAULT_SLIDE_COUNT = 30;
@@ -35,6 +36,19 @@ const CONTENT_TYPE_OPTIONS = [
 // Mirrors UPLOAD_PRESENTATION_TYPES in the chapters page: the library reads this
 // string out of content_category to decide the Teacher Workspace lane.
 const TEACHER_TRAINING_CONTENT_CATEGORY = 'Teacher training presentation';
+const TEACHER_PRESENTATION_TYPE = 'Teacher Presentation';
+/**
+ * The study documents the Teacher Workspace tab can also start.
+ *
+ * They are the same documents the Classroom tab writes (the backend builds them from the chapter's concept data and question
+ * bank, whatever the prompt says) and they keep their own content category, so they are READ under Classroom Resource, in the
+ * tab named here - the Teacher Workspace library only lists teacher training. `tab` is that library tab's label.
+ */
+const TEACHER_DOCUMENT_TYPES = [
+  { value: 'Revision Notes', tab: 'Revision notes' },
+  { value: 'Classroom Activity', tab: 'Classroom activity' },
+  { value: 'Remedial Class', tab: 'Remedial class' },
+] as const;
 
 /**
  * Order for an "All content types" run.
@@ -95,7 +109,8 @@ type TeacherScope = 'concept' | 'chapter';
  * whatever the Teacher Workspace tab happens to be left on.
  */
 type GenerationScope =
-  | { kind: 'classroom' }
+  // conceptNames is set only when a teacher narrowed a study document to some of the chapter's concepts.
+  | { kind: 'classroom'; conceptNames?: string[] }
   | { kind: 'teacher-concept'; conceptId: string }
   | { kind: 'teacher-chapter' };
 
@@ -208,6 +223,8 @@ interface GeneratePresentationDrawerProps {
   /** Board of the tenant's curriculum (CBSE / ICSE / IB / …), used in the prompt. */
   board?: string;
   onSuccess?: (data: Record<string, unknown>) => void;
+  /** Opens the Classroom Resource library on a chapter and tab, where a document started from Teacher Workspace is read. */
+  onOpenClassroomResource?: (chapterId: string, tab: string) => void;
 }
 
 export function GeneratePresentationDrawer({
@@ -220,6 +237,7 @@ export function GeneratePresentationDrawer({
   course,
   board,
   onSuccess,
+  onOpenClassroomResource,
 }: GeneratePresentationDrawerProps) {
   const [presentationMode, setPresentationMode] = useState<'Classroom' | 'Teacher training'>('Classroom');
   // A teacher training deck is built either for one concept - the original
@@ -229,7 +247,7 @@ export function GeneratePresentationDrawer({
   // already works, and it is the scope an "All content types" run uses.
   const [teacherScope, setTeacherScope] = useState<TeacherScope>('chapter');
   const [contentType, setContentType] = useState('Presentation');
-  const [teacherContentType, setTeacherContentType] = useState('Teacher Presentation');
+  const [teacherContentType, setTeacherContentType] = useState<string>(TEACHER_PRESENTATION_TYPE);
   const [presentationChapterId, setPresentationChapterId] = useState(initialChapterId);
   const [presentationConcept, setPresentationConcept] = useState(initialConcept);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -262,6 +280,19 @@ export function GeneratePresentationDrawer({
     }));
   }, [presentationChapterId, allChapters]);
 
+  // The Teacher Workspace tab starts either a teacher training deck or one of the study documents; everything that used to
+  // test "is this the Teacher Workspace tab" to mean "this is a deck" tests isTeacherDeck instead.
+  const teacherDocument = TEACHER_DOCUMENT_TYPES.find((type) => type.value === teacherContentType) ?? null;
+  const isTeacherDocument = presentationMode === 'Teacher training' && teacherDocument !== null;
+  const isTeacherDeck = presentationMode === 'Teacher training' && !isTeacherDocument;
+
+  // The chapter's own concepts (lms_concept rows), which are what the backend matches a narrowed study document against.
+  // Concept intelligence can name concepts more coarsely than the chapter lists them, so it is not the list to pick from here.
+  const chapterConceptNames = useMemo(
+    () => Array.from(new Set(presentationConceptOptions.map((concept) => concept.title.trim()).filter(Boolean))),
+    [presentationConceptOptions]
+  );
+
   // The chapters page seeds initialConcept with a concept *title* -- its content
   // library groups concepts by name and carries no ids -- while the Select below is
   // keyed by concept id. Matching on either means a seeded title still resolves to
@@ -286,7 +317,7 @@ export function GeneratePresentationDrawer({
   // state there would put a concept on the wire for a deck that covers all of
   // them - which is what content_master.concept_id would then claim.
   useEffect(() => {
-    if (!presentationChapterId || presentationMode !== 'Teacher training') return;
+    if (!presentationChapterId || !isTeacherDeck) return;
     if (teacherScope === 'chapter') return;
 
     const chapter = allChapters.find((ch) => ch.id === presentationChapterId);
@@ -302,7 +333,7 @@ export function GeneratePresentationDrawer({
 
     const timeoutId = window.setTimeout(() => setPresentationConcept(nextConcept), 0);
     return () => window.clearTimeout(timeoutId);
-  }, [presentationChapterId, presentationMode, teacherScope, allChapters, presentationConcept]);
+  }, [presentationChapterId, isTeacherDeck, teacherScope, allChapters, presentationConcept]);
 
   // Reset form when drawer opens
   useEffect(() => {
@@ -376,9 +407,12 @@ export function GeneratePresentationDrawer({
     return Array.from(new Set(names));
   }, [allChapters, presentationChapterId, chapterIntelligence]);
 
+  /** What the "Concepts to cover" list offers: the chapter's concepts for a study document, concept intelligence's otherwise. */
+  const pickerConceptNames = isTeacherDocument ? chapterConceptNames : intelligenceConceptNames;
+
   /** Empty selection means "all of them", so a chapter with no picker still works. */
   const effectiveConceptNames =
-    selectedConceptNames.length > 0 ? selectedConceptNames : intelligenceConceptNames;
+    selectedConceptNames.length > 0 ? selectedConceptNames : pickerConceptNames;
 
   // Pull the chapter's intelligence as soon as a chapter is picked: the options
   // below are built from it, and handleGenerate then reuses it instead of
@@ -416,10 +450,11 @@ export function GeneratePresentationDrawer({
     };
   }, [isOpen, presentationChapterId]);
 
-  // Concepts belong to a chapter, so a selection cannot survive changing one.
+  // Concepts belong to a chapter, so a selection cannot survive changing one. Nor can it survive switching to or from a study
+  // document, which lists the chapter's own concepts rather than the ones concept intelligence names.
   useEffect(() => {
     queueMicrotask(() => setSelectedConceptNames([]));
-  }, [presentationChapterId]);
+  }, [presentationChapterId, isTeacherDocument]);
 
   const toggleIntelligence = (key: IntelligenceKey) => {
     setSelectedIntelligence((current) =>
@@ -431,7 +466,7 @@ export function GeneratePresentationDrawer({
     setSelectedConceptNames((current) => {
       // '[] means all', so the first untick has to start from the full list and
       // remove one, otherwise unticking a concept would silently select it.
-      const base = current.length > 0 ? current : intelligenceConceptNames;
+      const base = current.length > 0 ? current : pickerConceptNames;
       if (!base.includes(name)) return [...base, name];
 
       const next = base.filter((value) => value !== name);
@@ -960,12 +995,12 @@ ${groundTruthContent}`;
     semanticResult: SemanticIntelligenceResult | null,
     identity: { sub_institute_id: number; user_id: number; user_profile_name: string },
     scope: GenerationScope
-  ): Promise<{ ok: boolean; message: string }> => {
+  ): Promise<{ ok: boolean; message: string; pending?: boolean }> => {
     const normalizedContentType = typeValue.trim().toLowerCase();
     // In a loop run the teacher deck is requested by name from the Classroom
     // tab, so the type itself has to be able to signal teacher training.
     const isTeacherTraining =
-      typeValue === TEACHER_TRAINING_CONTENT_CATEGORY || presentationMode === 'Teacher training';
+      typeValue === TEACHER_TRAINING_CONTENT_CATEGORY || isTeacherDeck;
     const isPresentation = isTeacherTraining || normalizedContentType === 'presentation';
     const exportFormat = isPresentation ? 'pptx' : 'pdf';
     // content_category is what splits the library into Classroom Resource vs
@@ -1047,7 +1082,16 @@ ${groundTruthContent}`;
       format: isPresentation ? 'presentation' : 'document',
       export_format: exportFormat,
       slide_count: slideCount,
+      // A study document covers just the concepts a teacher left ticked; omitted, it covers the whole chapter.
+      concept_names: scope.kind === 'classroom' && scope.conceptNames?.length ? scope.conceptNames : undefined,
     };
+
+    // The API guard (config/api_guard.php, `lms/gamma-content-master`) answers 401 to a request with no bearer token, so
+    // every generation from this drawer failed until it sent one.
+    const { token } = buildSessionContext();
+    if (!token) {
+      return { ok: false, message: 'Your session has expired. Please sign in again.' };
+    }
 
     // Per request, not per run: a single timer started at the top of a five-type
     // loop would abort the types still queued behind the first slow one.
@@ -1059,7 +1103,11 @@ ${groundTruthContent}`;
         try {
           return await fetch(`${API_BASE_URL}/api/lms/gamma-content-master`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
             signal: controller.signal,
             body: JSON.stringify(payload),
           });
@@ -1074,20 +1122,45 @@ ${groundTruthContent}`;
         : ({ message: await res.text() } as Record<string, unknown>);
       const isSuccess = raw.success === true || Number(raw.status_code) === 1;
 
-      if (!res.ok || !isSuccess) {
-        return { ok: false, message: readErrorMessage(raw) || `Couldn’t generate ${typeValue}` };
+      if (res.status === 401) {
+        return { ok: false, message: 'Your session has expired. Please sign in again.' };
       }
 
-      onSuccess?.(raw);
+      if (!res.ok || !isSuccess) {
+        // A document that failed its checks answers with a headline and the list of what failed; the first of those is the
+        // useful part, but on its own it reads as a fragment, so keep the headline in front of it.
+        const headline = typeof raw.message === 'string' ? raw.message.trim() : '';
+        const firstFinding = Array.isArray(raw.errors) ? raw.errors.find((item) => typeof item === 'string') : undefined;
+        return {
+          ok: false,
+          message:
+            headline && typeof firstFinding === 'string'
+              ? `${headline} ${firstFinding}`
+              : readErrorMessage(raw) || `Couldn’t generate ${typeValue}`,
+        };
+      }
+
+      // A document started from Teacher Workspace is read under Classroom Resource, so the page reloading in place
+      // (what onSuccess does) would show nothing new; the run ends by offering to open that library instead.
+      if (!isTeacherDocument) onSuccess?.(raw);
       return { ok: true, message: readErrorMessage(raw) || `${typeValue} generated` };
     } catch (err) {
       console.error(err);
-      const message =
-        err instanceof Error && err.name === 'AbortError'
-          ? `${typeValue} is taking longer than expected.`
-          : err instanceof Error
-            ? err.message
-            : 'Generation failed';
+      const stoppedWaiting = err instanceof Error && err.name === 'AbortError';
+      // The server keeps writing a study document after the browser stops waiting (ignore_user_abort), so for one that is
+      // not a failure: it is stored and listed when it finishes.
+      if (stoppedWaiting && isTeacherDocument) {
+        return {
+          ok: true,
+          pending: true,
+          message: `${typeValue} is still being written. It will appear in Classroom Resource when it is done.`,
+        };
+      }
+      const message = stoppedWaiting
+        ? `${typeValue} is taking longer than expected.`
+        : err instanceof Error
+          ? err.message
+          : 'Generation failed';
       return { ok: false, message };
     }
   };
@@ -1109,9 +1182,9 @@ ${groundTruthContent}`;
       }
 
       const normalizedContentType = contentType.trim().toLowerCase();
-      // The Teacher Workspace tab always produces a deck, whatever the Classroom
-      // tab's content type happens to be left on.
-      const isTeacherTraining = presentationMode === 'Teacher training';
+      // The Teacher Workspace tab produces a deck unless it was told to write one of the study documents, whatever the
+      // Classroom tab's content type happens to be left on.
+      const isTeacherTraining = isTeacherDeck;
       const isPresentation = isTeacherTraining || normalizedContentType === 'presentation';
       const exportFormat = isPresentation ? 'pptx' : 'pdf';
       // content_category is what splits the library into Classroom Resource vs
@@ -1158,7 +1231,22 @@ ${groundTruthContent}`;
       // want of a concept - it is always the full five.
       const sequence = isLoop
         ? ALL_CONTENT_TYPES_SEQUENCE
-        : [presentationMode === 'Teacher training' ? TEACHER_TRAINING_CONTENT_CATEGORY : contentType];
+        : [
+            isTeacherDeck
+              ? TEACHER_TRAINING_CONTENT_CATEGORY
+              : presentationMode === 'Teacher training'
+                ? teacherContentType
+                : contentType,
+          ];
+
+      // Only the concepts a teacher left ticked, and only when that is fewer than the chapter has: a full list is the same
+      // document as an unnarrowed one and must not be filed as a "some concepts" document of its own.
+      const narrowedConceptNames =
+        isTeacherDocument &&
+        selectedConceptNames.length > 0 &&
+        selectedConceptNames.length < chapterConceptNames.length
+          ? selectedConceptNames
+          : undefined;
 
       /**
        * What each type in the run is scoped to.
@@ -1166,18 +1254,19 @@ ${groundTruthContent}`;
        * Only a deck asked for from the Teacher Workspace tab follows that tab's
        * scope selector. The teacher deck inside an "All content types" run is
        * requested by name from the Classroom tab, where there is no selector,
-       * so it is always chapter-wide.
+       * so it is always chapter-wide. A study document started from the Teacher
+       * Workspace tab is scoped like a Classroom one, by the concepts ticked.
        */
       const scopeFor = (type: string): GenerationScope => {
-        if (type !== TEACHER_TRAINING_CONTENT_CATEGORY && presentationMode !== 'Teacher training') {
-          return { kind: 'classroom' };
+        if (type !== TEACHER_TRAINING_CONTENT_CATEGORY && !isTeacherDeck) {
+          return { kind: 'classroom', conceptNames: narrowedConceptNames };
         }
-        return presentationMode === 'Teacher training' && teacherScope === 'concept'
+        return isTeacherDeck && teacherScope === 'concept'
           ? { kind: 'teacher-concept', conceptId: presentationConcept }
           : { kind: 'teacher-chapter' };
       };
 
-      const results: { type: string; ok: boolean; message: string }[] = [];
+      const results: { type: string; ok: boolean; message: string; pending?: boolean }[] = [];
 
       for (let i = 0; i < sequence.length; i += 1) {
         const type = sequence[i];
@@ -1199,6 +1288,16 @@ ${groundTruthContent}`;
       if (succeeded === 0) {
         setGenerationError(
           failed.map((f) => `${f.type}: ${f.message}`).join(' | ') || 'Generation failed'
+        );
+        return;
+      }
+
+      if (isTeacherDocument && teacherDocument) {
+        // No reload: the document is not listed in this view. Say where it is and offer to go there.
+        setGenerationSuccess(
+          results[0]?.pending
+            ? results[0].message
+            : `${teacherDocument.value} written and added to Classroom Resource, under ${teacherDocument.tab}.`
         );
         return;
       }
@@ -1268,9 +1367,15 @@ ${groundTruthContent}`;
               <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#4f46e5] ring-1 ring-slate-200/80">
                 <Sparkles size={16} />
               </div>
-              <p className="text-[15px] leading-7">
-                Slides are drafted with <span className="font-semibold text-slate-900">AI</span> from concept intelligence, then added to your content library.
-              </p>
+              {isTeacherDocument ? (
+                <p className="text-[15px] leading-7">
+                  Written with <span className="font-semibold text-slate-900">AI</span> from the chapter&apos;s concept data and question bank, checked, then added to <span className="font-semibold text-slate-900">Classroom Resource</span>, where students open it too.
+                </p>
+              ) : (
+                <p className="text-[15px] leading-7">
+                  Slides are drafted with <span className="font-semibold text-slate-900">AI</span> from concept intelligence, then added to your content library.
+                </p>
+              )}
             </div>
           </div>
 
@@ -1373,6 +1478,9 @@ ${groundTruthContent}`;
                 </Select>
               </div>
 
+              {/* A study document always covers the chapter (narrowed by "Concepts to cover" below), so the deck's scope
+                  choice would be a control that does nothing. */}
+              {!isTeacherDocument ? (
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Deck covers <span className="text-rose-500">*</span>
@@ -1402,12 +1510,13 @@ ${groundTruthContent}`;
                     : 'One training deck for the single concept you choose.'}
                 </p>
               </div>
+              ) : null}
 
               {/* Concept is the scope under concept mode; a whole-chapter deck
                   is scoped by "Concepts to cover" below instead. Hidden rather
                   than disabled, so a required-marked control is never left
                   greyed out with nothing to do about it. */}
-              {teacherScope === 'concept' ? (
+              {isTeacherDeck && teacherScope === 'concept' ? (
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Concept <span className="text-rose-500">*</span>
@@ -1448,7 +1557,8 @@ ${groundTruthContent}`;
                 </Label>
                 <Select
                   value={teacherContentType}
-                  onValueChange={(value) => setTeacherContentType(value ?? 'Teacher Presentation')}
+                  onValueChange={(value) => setTeacherContentType(value ?? TEACHER_PRESENTATION_TYPE)}
+                  disabled={isGenerating}
                 >
                   <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
                     <SelectValue placeholder="Select content type">
@@ -1456,9 +1566,19 @@ ${groundTruthContent}`;
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Teacher Presentation">Teacher Presentation</SelectItem>
+                    <SelectItem value={TEACHER_PRESENTATION_TYPE}>{TEACHER_PRESENTATION_TYPE}</SelectItem>
+                    {TEACHER_DOCUMENT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.value}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {teacherDocument ? (
+                  <p className="text-[13px] leading-6 text-slate-500">
+                    Saved under Classroom Resource &rsaquo; {teacherDocument.tab}. A whole chapter can take several minutes.
+                  </p>
+                ) : null}
               </div>
             </div>
           )}
@@ -1469,10 +1589,12 @@ ${groundTruthContent}`;
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Intelligence options
+                  {isTeacherDocument ? 'Concepts' : 'Intelligence options'}
                 </Label>
                 <p className="mt-1 text-[13px] leading-6 text-slate-500">
-                  Choose which concept intelligence the AI is given. Everything is included by default.
+                  {isTeacherDocument
+                    ? 'Every concept is covered by default. Untick any you want left out.'
+                    : 'Choose which concept intelligence the AI is given. Everything is included by default.'}
                 </p>
               </div>
               <button
@@ -1488,8 +1610,10 @@ ${groundTruthContent}`;
             </div>
 
             {!presentationChapterId ? (
-              <p className="mt-3 text-[13px] text-slate-500">Select a chapter to see its intelligence.</p>
-            ) : isLoadingIntelligence ? (
+              <p className="mt-3 text-[13px] text-slate-500">
+                {isTeacherDocument ? 'Select a chapter to see its concepts.' : 'Select a chapter to see its intelligence.'}
+              </p>
+            ) : isLoadingIntelligence && !isTeacherDocument ? (
               <p className="mt-3 inline-flex items-center gap-2 text-[13px] text-slate-500">
                 <Loader2 size={14} className="animate-spin" />
                 Loading chapter intelligence...
@@ -1500,16 +1624,18 @@ ${groundTruthContent}`;
                     control that scopes one. Under concept scope the Concept
                     select above is the scope, and two concept pickers would
                     contradict each other. */}
-                {presentationMode === 'Classroom' || teacherScope === 'chapter' ? (
+                {presentationMode === 'Classroom' || isTeacherDocument || teacherScope === 'chapter' ? (
                   <div className="mt-4">
                     <p className="text-[13px] font-semibold text-slate-700">Concepts to cover</p>
-                    {intelligenceConceptNames.length === 0 ? (
+                    {pickerConceptNames.length === 0 ? (
                       <p className="mt-2 text-[13px] text-slate-500">
-                        This chapter has no extracted concept intelligence yet, so the whole chapter is used.
+                        {isTeacherDocument
+                          ? 'This chapter has no concepts listed yet, so the whole chapter is used.'
+                          : 'This chapter has no extracted concept intelligence yet, so the whole chapter is used.'}
                       </p>
                     ) : (
                       <div className="mt-2 grid max-h-[180px] gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
-                        {intelligenceConceptNames.map((name) => (
+                        {pickerConceptNames.map((name) => (
                           <label
                             key={name}
                             className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-[13px] text-slate-700 hover:bg-slate-50"
@@ -1528,6 +1654,9 @@ ${groundTruthContent}`;
                   </div>
                 ) : null}
 
+                {/* A study document is built from all of a concept's intelligence and the question bank by the server, so
+                    there is nothing to choose here for it. */}
+                {!isTeacherDocument ? (
                 <div className="mt-4">
                   <p className="text-[13px] font-semibold text-slate-700">Intelligence to include</p>
                   <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
@@ -1552,6 +1681,7 @@ ${groundTruthContent}`;
                     </p>
                   ) : null}
                 </div>
+                ) : null}
               </>
             )}
           </div>
@@ -1577,7 +1707,16 @@ ${groundTruthContent}`;
           )}
           {generationSuccess && (
             <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {generationSuccess}
+              <p>{generationSuccess}</p>
+              {isTeacherDocument && teacherDocument && onOpenClassroomResource ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenClassroomResource(presentationChapterId, teacherDocument.tab)}
+                  className="mt-2 font-semibold text-emerald-800 underline underline-offset-2 hover:text-emerald-900"
+                >
+                  Open Classroom Resource
+                </button>
+              ) : null}
             </div>
           )}
         </div>

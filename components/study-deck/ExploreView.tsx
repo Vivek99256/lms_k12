@@ -7,6 +7,7 @@ import { headingRepeatsText } from '@/lib/study-deck/cardTitle';
 import { INTERACTION_HEADING, itemsProgress, nextItem, selectItem, teaserOf } from '@/lib/study-deck/interactions';
 import type { DeckImage, ExploreItem, ItemsInteraction } from '@/lib/study-deck/types';
 import { BeforeAfter } from './BeforeAfter';
+import { ItemPictureBar, ItemPictureHint } from './ImageEditing';
 import { ImageMarks, MarkInsetView, MarkLegend } from './ImageMarks';
 import { CompletedSlot, GlyphIcon, motion, PANEL, PhotoCredit, Tag, TONES, useRememberedReducer, useStage, useTheme, VisualFigure } from './stage-ui';
 
@@ -58,12 +59,16 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
   const open = items.find((item) => item.id === state.open) ?? null;
   const Icon = ICON[kind as keyof typeof ICON] ?? Lightbulb;
   const withImage = Boolean(image);
+  // An item with a picture of its own shows it in place of the slide's while it is open; one without shows the slide's. Never another item's.
+  const ownPicture = open?.image ?? null;
+  const shown = ownPicture ?? image;
   // Cards that point at structures in the picture: the open card's marks are drawn on the picture at once, and the explanation
-  // sits beside or under the picture instead of over it, so nothing it explains is hidden.
+  // sits beside or under the picture instead of over it, so nothing it explains is hidden. Marks belong to the slide's picture, so
+  // they are not drawn over a picture of the item's own.
   const marked = withImage && items.some((item) => (item.marks?.length ?? 0) > 0 || item.inset);
-  const openMarks = open?.marks ?? [];
+  const openMarks = ownPicture ? [] : open?.marks ?? [];
   // On a slide where some cards point at the picture, a card that does not says so, instead of leaving the picture unchanged without a word.
-  const noMark = (item: ExploreItem) => marked && !(item.marks?.length ?? 0) && !item.inset;
+  const noMark = (item: ExploreItem) => marked && !item.image && !(item.marks?.length ?? 0) && !item.inset;
 
   useEffect(() => {
     if (progress.done && !reported.current) {
@@ -215,14 +220,16 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
 
   // A picture on a narrow screen: the picture right after the title, the items as a row of numbered names under it and the
   // explanation in its own panel under those (never over the picture).
-  if (withImage && image && portrait) {
+  if (withImage && shown && portrait) {
     return (
       <section aria-label={INTERACTION_HEADING[kind]} className="flex h-full min-h-0 flex-col gap-[0.6em] p-[1.1em]">
         {lead}
-        <div className="min-h-[9em] flex-1">
-          <VisualFigure image={image} assetBase={assetBase}>
+        <div className="relative min-h-[9em] flex-1">
+          <VisualFigure key={ownPicture ? open?.id : 'slide'} image={shown} assetBase={assetBase}>
             {openMarks.length > 0 ? <ImageMarks key={open?.id} marks={openMarks} /> : null}
           </VisualFigure>
+          {/* Over the picture's corner, not a strip of its own: a phone has no height to spare for one. */}
+          {open ? <ItemPictureBar overlay item={open.id} name={open.label} hasOwn={ownPicture !== null} /> : <ItemPictureHint overlay />}
         </div>
         <ul className="flex flex-wrap gap-[0.35em]" aria-label="Items to explore">
           {items.map((item, index) => (
@@ -259,7 +266,7 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
   }
 
   // A picture beside the items: the items are a list on the left, the explanation sits over the picture.
-  if (withImage && image) {
+  if (withImage && shown) {
     return (
       <section aria-label={INTERACTION_HEADING[kind]} className="grid h-full min-h-0 grid-cols-[minmax(0,4fr)_minmax(0,8fr)] gap-[1.2em] p-[1.4em]">
         <div className="flex min-h-0 min-w-0 flex-col justify-center-safe gap-[0.8em]">
@@ -288,10 +295,12 @@ export function ExploreView({ interaction, done, onDone, lead, image = null, ass
         {(
           <div className="flex min-h-0 min-w-0 flex-col gap-[0.6em]">
             <div className="relative min-h-0 flex-1">
-              <VisualFigure image={image} assetBase={assetBase}>
+              {/* Keyed by the open item, so each item's picture mounts fresh and none is carried over to the next. */}
+              <VisualFigure key={ownPicture ? open?.id : 'slide'} image={shown} assetBase={assetBase}>
                 {openMarks.length > 0 ? <ImageMarks key={open?.id} marks={openMarks} /> : null}
               </VisualFigure>
             </div>
+            {open ? <ItemPictureBar item={open.id} name={open.label} hasOwn={ownPicture !== null} /> : <ItemPictureHint />}
             <div role="region" aria-label="Explanation" aria-live="polite" className={`min-h-[10.5em] shrink-0 rounded-[0.9em] border-2 p-[0.8em] ${open ? 'border-sd-accent bg-white shadow-md' : 'border-dashed border-sd-line bg-white/60'}`}>
               {open ? (
                 <div key={open.id} className={`flex items-start gap-[1em] ${motion.fadeUp}`}>

@@ -7,8 +7,8 @@ import { Loader2 } from 'lucide-react';
 import { ImageEditDialog } from '@/components/study-deck/ImageEditDialog';
 import { StudyDeckPlayer } from '@/components/study-deck/StudyDeckPlayer';
 import { createDraftImageAdapter, fetchDraftImageAccess } from '@/lib/coursePresentation/draftImages';
-import { createStoredImageAdapter, loadStoredImageStates, refusingAdapter, unavailableStates, viewerKind } from '@/lib/coursePresentation/storedImages';
-import { actionSentence, stateFor, withEditedImage, withEditedState, type ImageEditStates, type ImageTarget } from '@/lib/study-deck/imageEditing';
+import { createStoredImageAdapter, loadStoredImageStates, refusingAdapter, unavailableStates, viewerKind, withItemFallbacks } from '@/lib/coursePresentation/storedImages';
+import { actionSentence, pictureItemsOf, stateFor, withEditedImage, withEditedState, type ImageEditStates, type ImageTarget } from '@/lib/study-deck/imageEditing';
 import { CHAPTER_DATA_PREVIEW_TITLE, readDraftRun, readPreviewRequest } from '@/lib/coursePresentation/previewAddress';
 import { startSlideOf } from '@/lib/study-deck/stage';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
@@ -73,7 +73,8 @@ export default function StudyDeckPage() {
         if (loaded.source === 'api' && contentId !== null && viewerKind() !== 'student') {
           const answer = await loadStoredImageStates(chapterId, contentId, signal);
           if (answer.ok) {
-            storedStates = answer.states;
+            // A server that answers for the slides only still gets a visible (disabled) control on every item, with the reason.
+            storedStates = withItemFallbacks(answer.states, loaded.deck);
             storedLive = true;
           } else if (viewerKind() === 'staff') {
             storedStates = unavailableStates(loaded.deck, answer.reason);
@@ -106,8 +107,10 @@ export default function StudyDeckPage() {
   const editedState = target ? stateFor(imageStates, target) : null;
   const editedSlide = state.phase === 'ready' && target ? state.loaded.deck.slides.find((s) => s.n === target.slide) ?? null : null;
   const editedNode = editedSlide && target?.node !== undefined && editedSlide.interaction?.kind === 'scenario' ? editedSlide.interaction.nodes.find((n) => n.id === target.node) ?? null : null;
-  const editedImage = target?.node !== undefined ? editedNode?.image ?? null : editedSlide?.image ?? null;
-  const editedTitle = editedSlide ? `Slide ${editedSlide.n}: ${editedNode?.title ?? editedSlide.title}` : '';
+  // An item of an items slide, read from the deck on screen like the others, so the window always shows the picture it has now.
+  const editedItem = editedSlide && target?.item !== undefined ? pictureItemsOf(editedSlide)?.find((i) => i.id === target.item) ?? null : null;
+  const editedImage = target?.item !== undefined ? editedItem?.image ?? null : target?.node !== undefined ? editedNode?.image ?? null : editedSlide?.image ?? null;
+  const editedTitle = editedSlide ? `Slide ${editedSlide.n}: ${editedItem?.label ?? editedNode?.title ?? editedSlide.title}` : '';
 
   if (invalid) {
     return (
@@ -216,7 +219,7 @@ export default function StudyDeckPage() {
             // Only this picture is put into the deck, and only its state is updated; nothing is reloaded, so the lesson stays where it was.
             setState((s) => (s.phase === 'ready' ? { ...s, loaded: { ...s.loaded, deck: withEditedImage(s.loaded.deck, result) } } : s));
             setImageStates((s) => withEditedState(s, result));
-            setEditNotice(actionSentence(result, storedContent !== null));
+            setEditNotice(actionSentence(result, storedContent !== null, editedItem?.label));
           }}
         />
       ) : null}

@@ -1,4 +1,4 @@
-import type { CpFormatChoice, CpOptions, CpWorkflowFormat } from './api';
+import type { CpChoice, CpFormatChoice, CpOptions, CpWorkflowFormat } from './api';
 
 /** A format as the screen draws it: whether it can be picked, and why not. */
 export interface FormatOption {
@@ -6,6 +6,26 @@ export interface FormatOption {
   label: string;
   selectable: boolean;
   note: string | null;
+}
+
+/**
+ * The teaching methods to list. When the server sent a compatibility map (the staged-workflow chapters) only the methods it offers for the
+ * chapter's subject are listed, in the order it gives them; for every other chapter the list is the unchanged one.
+ */
+export function methodOptions(options: CpOptions | null): CpChoice[] {
+  if (options === null) return [];
+  if (!options.workflow?.enabled) return options.pedagogies;
+  const byKey = new Map(options.pedagogies.map((p) => [p.key, p] as const));
+  return Object.keys(options.workflow.formats_by_method).flatMap((key) => {
+    const method = byKey.get(key);
+    return method ? [method] : [];
+  });
+}
+
+/** The method to keep once the options are known: a method restored from the address that the server does not offer here is dropped. */
+export function methodAfterOptions(options: CpOptions | null, method: string | null): string | null {
+  if (method === null || !options?.workflow?.enabled) return method;
+  return methodOptions(options).some((m) => m.key === method) ? method : null;
 }
 
 /**

@@ -46,6 +46,14 @@ test('a drawn diagram says it was drawn for the lesson', () => {
   assert.equal(webSource(drawn), null);
 });
 
+test('a picture a teacher added is not called a drawing: it is credited to them, or says it was added by the teacher', () => {
+  const upload: DeckImage = { ...base, source_kind: 'teacher_upload', licence: 'Teacher upload' };
+  assert.equal(creditText(upload), 'Added by the teacher');
+  assert.equal(creditText({ ...upload, creator: ' Ms Rao ' }), 'Ms Rao');
+  assert.equal(webSource(upload), null, 'it has no web page to link to');
+  assert.equal(creditText(drawn), 'Drawn for this lesson', 'a drawn diagram is unchanged');
+});
+
 test('a deck made before source_kind existed is read as it always was', () => {
   const { source_kind: _unused, ...old } = web;
   void _unused;

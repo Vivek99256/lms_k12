@@ -38,6 +38,8 @@ type Busy = '' | 'saving' | 'removing' | 'restoring';
 export function ImageEditDialog({ adapter, target, title, current, state, onClose, onChanged, saved = false }: ImageEditDialogProps) {
   const panel = useRef<HTMLDivElement>(null);
   const adding = !state.has_image;
+  // An item of an items slide has its own picture; the window says "item" where it would say "slide".
+  const forItem = target.item !== undefined;
   const mayPick = state.can_add || state.can_replace;
   const [tab, setTab] = useState<'search' | 'upload'>('search');
   const [query, setQuery] = useState('');
@@ -330,9 +332,9 @@ export function ImageEditDialog({ adapter, target, title, current, state, onClos
                 // eslint-disable-next-line @next/next/no-img-element -- the draft's own stored picture
                 <img src={current.url} alt={current.alt} className="aspect-video w-full rounded-lg border border-slate-200 bg-slate-100 object-contain" />
               ) : (
-                <div data-testid="no-current" className="flex aspect-video flex-col items-center justify-center gap-1 rounded-lg bg-slate-100 text-xs text-slate-600">
+                <div data-testid="no-current" className="flex aspect-video flex-col items-center justify-center gap-1 rounded-lg bg-slate-100 px-3 text-center text-xs text-slate-600">
                   <ImageIcon className="h-6 w-6" aria-hidden="true" />
-                  No picture yet
+                  {forItem ? 'No picture of its own yet. The slide’s picture is shown for it.' : 'No picture yet'}
                 </div>
               )}
               {state.kind === 'diagram' ? (
@@ -387,7 +389,15 @@ export function ImageEditDialog({ adapter, target, title, current, state, onClos
 
           {confirm !== '' ? (
             <div role="alertdialog" aria-label={confirm === 'remove' ? 'Remove the picture' : 'Restore the original'} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm">
-              <span className="flex-1">{confirm === 'remove' ? 'Remove this picture? The slide keeps its text and activities, and you can restore the original.' : state.has_image || current ? 'Put the original back on this slide?' : 'Take the added picture off again?'}</span>
+              <span className="flex-1">
+                {confirm === 'remove'
+                  ? 'Remove this picture? The slide keeps its text and activities, and you can restore the original.'
+                  : forItem
+                    ? 'Put the original back for this item? If it began without a picture of its own, the slide’s picture shows for it again.'
+                    : state.has_image || current
+                      ? 'Put the original back on this slide?'
+                      : 'Take the added picture off again?'}
+              </span>
               <button
                 type="button"
                 data-testid="confirm-change"
