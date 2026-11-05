@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { MemoryConversationalAdminStore } from './store';
+import { JsonFileConversationalAdminStore, MemoryConversationalAdminStore } from './store';
 import { defaultChannelSettings } from './types';
 import { listProjectAdapters } from '../project-resolver';
 
@@ -58,4 +58,27 @@ test('Channel settings are module-specific and do not automatically affect other
   // 5. Verify Enterprise Brain is unaffected
   const fetchedEb = await store.getSettings('enterprise_brain');
   assert.equal(fetchedEb, null, 'Enterprise Brain has not been configured and remains separate');
+});
+
+test('JsonFileConversationalAdminStore does not throw 500 when filesystem is read-only (/var/task)', async () => {
+  // Use a simulated read-only /var/task path
+  const simulatedPath = '/var/task/.data/conversational-ai.json';
+  const store = new JsonFileConversationalAdminStore(simulatedPath);
+
+  const lms = {
+    ...defaultChannelSettings('lms_k12'),
+    voice_enabled: false,
+    default_language: 'hi-IN',
+    updated_at: new Date().toISOString(),
+    updated_by: 'Kalpesh Sheth (7013)',
+  };
+
+  // Must not throw ENOENT: no such file or directory, mkdir '/var/task/.data'
+  const saved = await store.putSettings(lms);
+  assert.equal(saved.voice_enabled, false);
+  assert.equal(saved.default_language, 'hi-IN');
+
+  const loaded = await store.getSettings('lms_k12');
+  assert.ok(loaded);
+  assert.equal(loaded.default_language, 'hi-IN');
 });

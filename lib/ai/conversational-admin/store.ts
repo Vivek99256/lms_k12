@@ -1,4 +1,5 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 
 import type { ProjectChannelSettings, StoredServiceToken } from './types';
@@ -9,10 +10,11 @@ import type { ProjectChannelSettings, StoredServiceToken } from './types';
  * SERVER ONLY:
  * Persists each module's configuration independently to Laravel backend database
  * (`ai_live_chat_settings` table via `/api/ai/conversation/settings`)
- * with a resilient local JSON file cache (`.data/conversational-ai.json`).
+ * with a resilient local cache.
  *
- * Voice and Language settings are MODULE-SPECIFIC:
- * Changes to one module (e.g. LMS K-12) do NOT affect other modules (e.g. Enterprise Brain, G2G).
+ * Fully resilient to serverless/read-only environments (e.g. AWS Lambda / Vercel /var/task):
+ * If filesystem writes fail or the environment is read-only, it falls back to memory
+ * and does not crash, while remote database persistence continues to succeed.
  */
 
 export interface ConversationalAdminStore {
@@ -56,7 +58,7 @@ async function fetchSettingsFromBackend(projectId: string): Promise<ProjectChann
       }
     }
   } catch {
-    // Graceful fallback to local cache
+    // Graceful fallback to memory/local cache
   }
   return null;
 }
@@ -94,7 +96,6 @@ export class MemoryConversationalAdminStore implements ConversationalAdminStore 
   }
 
   async putSettings(settings: ProjectChannelSettings) {
-    // Module-specific: store only for the target project
     this.data.settings[settings.project_id] = settings;
     return settings;
   }
@@ -115,6 +116,7 @@ export class MemoryConversationalAdminStore implements ConversationalAdminStore 
 
 export class JsonFileConversationalAdminStore implements ConversationalAdminStore {
   private queue: Promise<unknown> = Promise.resolve();
+  private memoryCache: StoreShape = emptyStore();
 
   constructor(private readonly filePath: string) {}
 
@@ -130,29 +132,39 @@ export class JsonFileConversationalAdminStore implements ConversationalAdminStor
       delete tokens['brain'];
       delete tokens['enterprise'];
 
-      return { settings, tokens };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return emptyStore();
-      throw error;
+      this.memoryCache = {
+        settings: { ...this.memoryCache.settings, ...settings },
+        tokens: { ...this.memoryCache.tokens, ...tokens },
+      };
+      return this.memoryCache;
+    } catch {
+      // Missing file, unreadable or read-only filesystem (e.g. /var/task): return memory cache
+      return this.memoryCache;
     }
   }
 
   private async save(data: StoreShape) {
-    await mkdir(path.dirname(this.filePath), { recursive: true });
-    delete data.settings['brain'];
-    delete data.settings['enterprise'];
-    delete data.tokens['brain'];
-    delete data.tokens['enterprise'];
+    try {
+      delete data.settings['brain'];
+      delete data.settings['enterprise'];
+      delete data.tokens['brain'];
+      delete data.tokens['enterprise'];
 
-    const temp = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
-    await writeFile(temp, JSON.stringify(data, null, 2), 'utf8');
-    await rename(temp, this.filePath);
+      await mkdir(path.dirname(this.filePath), { recursive: true });
+      const temp = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+      await writeFile(temp, JSON.stringify(data, null, 2), 'utf8');
+      await rename(temp, this.filePath);
+    } catch (error) {
+      // In serverless / read-only environments (/var/task), local disk is not writable.
+      // Database persistence (ai_live_chat_settings via Laravel API) is the primary truth.
+    }
   }
 
   private mutate<T>(work: (data: StoreShape) => T): Promise<T> {
     const next = this.queue.then(async () => {
       const data = await this.load();
       const result = work(data);
+      this.memoryCache = data;
       await this.save(data);
       return result;
     });
@@ -171,7 +183,7 @@ export class JsonFileConversationalAdminStore implements ConversationalAdminStor
       return backendSettings;
     }
 
-    // 2. Fallback to local cache for this specific module
+    // 2. Fallback to cache for this specific module
     const local = await this.load();
     return local.settings[projectId] ?? null;
   }
@@ -205,12 +217,30 @@ export class JsonFileConversationalAdminStore implements ConversationalAdminStor
   }
 }
 
+function resolveStorePath(): string {
+  if (process.env.CONVERSATIONAL_AI_STORE_PATH) {
+    return process.env.CONVERSATIONAL_AI_STORE_PATH.trim();
+  }
+
+  const cwd = process.cwd();
+  // Serverless environments (AWS Lambda, Vercel, /var/task) have read-only root directories.
+  // os.tmpdir() (/tmp) is always writable in these environments.
+  if (
+    cwd.startsWith('/var/task') ||
+    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+    Boolean(process.env.VERCEL)
+  ) {
+    return path.join(os.tmpdir(), 'conversational-ai.json');
+  }
+
+  return path.join(cwd, '.data', 'conversational-ai.json');
+}
+
 /** Process-wide store, held on globalThis so dev reloads share one write queue. */
 export function getConversationalAdminStore(): ConversationalAdminStore {
   const holder = globalThis as typeof globalThis & { __conversationalAdminStore?: ConversationalAdminStore };
   if (!holder.__conversationalAdminStore) {
-    const filePath =
-      (process.env.CONVERSATIONAL_AI_STORE_PATH || '').trim() || path.join(process.cwd(), '.data', 'conversational-ai.json');
+    const filePath = resolveStorePath();
     holder.__conversationalAdminStore = new JsonFileConversationalAdminStore(filePath);
   }
   return holder.__conversationalAdminStore;
