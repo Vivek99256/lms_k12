@@ -13,12 +13,12 @@ Generated from commit: `8fe500dc` (frontend) / `86261072` (backend)
 
 | Slug | Product | What it covers | Modules |
 |---|---|---|---|
-| [core](core/README.md) | Scholar Core | Institute ERP | Admissions, Student, Attendance, Academic Setup, Timetable, Fees, Exam/Result, Library, Hostel, Transport, Inventory, Communication, Admin Services, SQAA, Alumni, Inward-Outward |
-| [learn](learn/README.md) | Scholar Learn | LMS + PAL | LMS, PAL, H5P Content, Curriculum, Assessment, Learning Outcomes |
-| [ccb](ccb/README.md) | Scholar CCB | People & Competency | HRIT (Attendance/Leave/Payroll), Talent Management, Capability Intelligence, Organization Management, G2G LMS |
-| [insight](insight/README.md) | Scholar Insight | Enterprise Brain | AI Administration, Enterprise Brain, Agentic AI, Dynamic Reports |
-| [compass](compass/README.md) | Scholar Compass | Career Counselling | Career Awareness, Career Explorer, Career Intelligence, O*NET Data |
-| [_shared](_shared/) | Shared Platform | Auth, RBAC, Settings, Notifications, AI Providers, Platform Services | Auth, Users, Roles/Permissions, Notifications, Document Templates, Form Builder, Bulk Upload, Platform Services |
+| [core](/docs/1.0.0/core) | Scholar Core | Institute ERP | Admissions, Student, Attendance, Academic Setup, Timetable, Fees, Exam/Result, Library, Hostel, Transport, Inventory, Communication, Admin Services, SQAA, Alumni, Inward-Outward |
+| [learn](/docs/1.0.0/learn) | Scholar Learn | LMS + PAL | LMS, PAL, H5P Content, Curriculum, Assessment, Learning Outcomes |
+| [ccb](/docs/1.0.0/ccb) | Scholar CCB | People & Competency | HRIT (Attendance/Leave/Payroll), Talent Management, Capability Intelligence, Organization Management, G2G LMS |
+| [insight](/docs/1.0.0/insight) | Scholar Insight | Enterprise Brain | AI Administration, Enterprise Brain, Agentic AI, Dynamic Reports |
+| [compass](/docs/1.0.0/compass) | Scholar Compass | Career Counselling | Career Awareness, Career Explorer, Career Intelligence, O*NET Data |
+| [_shared](/docs/1.0.0/_shared) | Shared Platform | Auth, RBAC, Settings, Notifications, AI Providers, Platform Services | Auth, Users, Roles/Permissions, Notifications, Document Templates, Form Builder, Bulk Upload, Platform Services |
 
 ---
 
@@ -341,25 +341,26 @@ Generated from commit: `8fe500dc` (frontend) / `86261072` (backend)
 
 | File | Status |
 |---|---|
-| `README.md` (this file) | ✅ Done |
-| `_unmapped.md` | ✅ Done |
-| `GLOSSARY.md` | ⬜ Pending |
-| `ROLES-PERMISSIONS.md` | ⬜ Pending |
-| `DATA-MODEL.md` | ⬜ Pending |
-| `API-REFERENCE.md` | ⬜ Pending |
-| `DECISIONS.md` | ⬜ Pending |
-| `core/README.md` | ⬜ Pending |
-| `core/REPORTS.md` | ✅ Skeleton done |
-| `learn/README.md` | ⬜ Pending |
-| `learn/REPORTS.md` | ✅ Skeleton done |
-| `ccb/README.md` | ⬜ Pending |
-| `ccb/REPORTS.md` | ✅ Skeleton done |
-| `insight/README.md` | ⬜ Pending |
-| `insight/REPORTS.md` | ✅ Skeleton done |
-| `compass/README.md` | ⬜ Pending |
-| `compass/REPORTS.md` | ✅ Skeleton done |
-| Per-menu `.md` files | ⬜ Starting with Scholar Core |
-| `views/` role summaries | ⬜ After each product |
+| `README.md` (this file) | Complete |
+| `_unmapped.md` | Complete |
+| `GLOSSARY.md` | Complete |
+| `ROLES-PERMISSIONS.md` | Complete |
+| `DATA-MODEL.md` | Complete |
+| `API-REFERENCE.md` | Complete |
+| `DECISIONS.md` | Complete |
+| [core/README.md](/docs/1.0.0/core) | Complete |
+| `core/REPORTS.md` | Complete |
+| [learn/README.md](/docs/1.0.0/learn) | Complete |
+| `learn/REPORTS.md` | Complete |
+| [ccb/README.md](/docs/1.0.0/ccb) | Complete |
+| `ccb/REPORTS.md` | Complete |
+| [insight/README.md](/docs/1.0.0/insight) | Complete |
+| `insight/REPORTS.md` | Complete |
+| [compass/README.md](/docs/1.0.0/compass) | Complete |
+| `compass/REPORTS.md` | Complete |
+| [_shared/README.md](/docs/1.0.0/_shared) | Complete |
+| Per-menu `.md` files | Complete (196+ markdown files) |
+| `views/` role summaries | Complete |
 
 ---
 
