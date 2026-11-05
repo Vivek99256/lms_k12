@@ -30,6 +30,7 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2, Maximize, Minimize, Network, ServerCrash, X } from 'lucide-react';
 
 import {
+  fetchErpModuleGraph,
   fetchErpSubmoduleGraph,
   fetchGraphNodeDetail,
   fetchOrganizationStaffGraph,
@@ -293,6 +294,19 @@ export default function CentralizedKnowledgeGraphExplorer({
     applyBase([], []);
 
     try {
+      // 1st attempt: Fetch the module's real connected data flow across its submodules
+      try {
+        const modGraph = await fetchErpModuleGraph(session, module.id);
+        const mapped = mapErpSubmoduleGraph(modGraph);
+        if (mapped.nodes.length > 0) {
+          applyBase(mapped.nodes, mapped.edges);
+          setGraphState('ready');
+          return;
+        }
+      } catch {
+        // Module graph endpoint not available or empty; fall through to first submodule
+      }
+
       const payload = await listErpSubmodules(session, module.id);
       const isOrg = isOrganizationManagement(module.label);
       const extra = isOrg ? [ORG_MANAGEMENT_STAFF_SUBMODULE] : [];
@@ -339,8 +353,8 @@ export default function CentralizedKnowledgeGraphExplorer({
             setGraphState('ready');
             return;
           }
-        } catch {
-          // Fall through to search attempt
+        } catch (subErr) {
+          console.warn('Submodule graph fetch failed, falling back to search:', subErr);
         }
       }
 
@@ -349,14 +363,20 @@ export default function CentralizedKnowledgeGraphExplorer({
         return;
       }
 
-      const result = await searchKnowledgeGraph(session, labels[0] || '', ROOT_SAMPLE_LIMIT, labels);
-      const safeNodes = Array.isArray(result?.nodes) ? result.nodes : [];
-      if (safeNodes.length === 0) {
-        setGraphState('not-mapped');
-        return;
+      // 2nd attempt: Fetch seed sample nodes matching submodule labels
+      try {
+        const result = await searchKnowledgeGraph(session, labels[0] || '', ROOT_SAMPLE_LIMIT, labels);
+        const safeNodes = Array.isArray(result?.nodes) ? result.nodes : [];
+        if (safeNodes.length > 0) {
+          applyBase(safeNodes, []);
+          setGraphState('ready');
+          return;
+        }
+      } catch (searchErr) {
+        console.warn('Search fallback failed:', searchErr);
       }
-      applyBase(safeNodes, []);
-      setGraphState('ready');
+
+      setGraphState('not-mapped');
     } catch (cause) {
       setGraphError(cause instanceof Error ? cause.message : 'The request failed.');
       setGraphState('error');
