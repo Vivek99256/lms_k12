@@ -74,6 +74,7 @@ const GROUP_EXPAND_LIMIT = 50;
 export interface ModuleKnowledgeGraphProps {
   moduleName: string;
   label: string;
+  moduleId?: number;
 }
 
 interface ScopedSubmodule extends ErpSubmodule {
@@ -131,64 +132,7 @@ function groupNodeDetailForExpansion(
   return groups;
 }
 
-/**
- * Maps a moduleName slug or label to known matching keywords/labels in ERP submodules
- */
-function isSubmoduleMatch(submoduleLabel: string, moduleName: string, moduleLabel: string): boolean {
-  const normSub = normalizeKey(submoduleLabel);
-  const normSlug = normalizeKey(moduleName);
-  const normLabel = normalizeKey(moduleLabel);
-
-  if (normSub === normSlug || normSub === normLabel) return true;
-  if (normSub.includes(normSlug) || normSlug.includes(normSub)) return true;
-  if (normSub.includes(normLabel) || normLabel.includes(normSub)) return true;
-
-  const ALIAS_MAP: Record<string, string[]> = {
-    student: ['student', 'studetail', 'studentmanagement', 'admission'],
-    admission: ['admission', 'student', 'admissions'],
-    admissions: ['admission', 'student', 'admissions'],
-    fees: ['fee', 'fees', 'feescollection', 'receipt'],
-    fee: ['fee', 'fees', 'feescollection'],
-    attendance: ['attendance', 'studentattendance', 'staffattendance'],
-    hostel: ['hostel', 'hostelbuilding', 'hostelroom'],
-    transport: ['transport', 'transportation', 'route', 'vehicle'],
-    transportation: ['transport', 'transportation', 'route', 'vehicle'],
-    library: ['library', 'book', 'bookcopy'],
-    exam: ['exam', 'examination', 'assesment', 'assessment', 'result', 'grade'],
-    examination: ['exam', 'examination', 'assesment', 'assessment'],
-    'exam-assessment': ['exam', 'assesment', 'assessment'],
-    lms: ['pal', 'teachlearn', 'lms', 'curriculum', 'engagement', 'standard', 'subject'],
-    'teach-learn': ['teachlearn', 'pal', 'lms', 'curriculum'],
-    'new-pal': ['pal', 'teachlearn', 'lms'],
-    pal: ['pal', 'teachlearn', 'lms'],
-    user: ['user', 'users', 'staff', 'role', 'hrms'],
-    users: ['user', 'users', 'staff', 'role', 'hrms'],
-    hrms: ['staff', 'department', 'role', 'users', 'user', 'hrit'],
-    inventory: ['inventory', 'inventoryitem', 'itemcategory'],
-    ptm: ['ptm', 'ptmbooking'],
-    circular: ['circular', 'announcement'],
-    sqaa: ['sqaa', 'sqaastandard'],
-    'petty-cash': ['pettycash', 'pettycashhead'],
-    'visitor-management': ['visitor', 'visitormanagement'],
-    consent: ['consent'],
-    complaint: ['complaint'],
-    'front-desk': ['frontdesk', 'frontdeskentry'],
-    'document-templates': ['documenttemplates', 'templates', 'certificate'],
-    'inward-outward': ['inward', 'outward', 'inwardoutward', 'inwarddocument'],
-    inward_outward: ['inward', 'outward', 'inwardoutward', 'inwarddocument'],
-    'mobile-apps': ['mobileapps', 'mobile'],
-    alumni: ['alumni', 'alumnimanagement'],
-    timetable: ['timetable', 'timeslot'],
-    'platform-services': ['platformservices'],
-    'organization-management': ['organization', 'institute', 'department', 'role', 'staff'],
-    organization: ['organization', 'institute', 'department', 'role', 'staff'],
-  };
-
-  const aliases = ALIAS_MAP[moduleName.toLowerCase()] || [];
-  return aliases.some((alias) => normSub.includes(alias) || alias.includes(normSub));
-}
-
-export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraphProps) {
+export function ModuleKnowledgeGraph({ moduleName, label, moduleId }: ModuleKnowledgeGraphProps) {
   const session = useMemo(() => readGraphSession(), []);
   const route = `/modules/${moduleName}/knowledge-graph`;
 
@@ -281,59 +225,61 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
         if (cancelled) return;
         setViews(loadedViews);
 
-        // Fetch ERP modules to find all submodules
+        // Fetch ERP modules to find the corresponding module
         const modulesPayload = await listErpModules(session);
         const erpModules: ErpModule[] = Array.isArray(modulesPayload?.modules) ? modulesPayload.modules : [];
 
-        // Fetch submodules for every module in parallel
-        const submodulesLists = await Promise.all(
-          erpModules.map(async (mod) => {
-            try {
-              const res = await listErpSubmodules(session, mod.id);
-              const subs: ErpSubmodule[] = Array.isArray(res?.submodules) ? res.submodules : [];
-              return subs.map((s) => ({
-                ...s,
-                parentModuleId: mod.id,
-                parentModuleLabel: mod.label,
-              }));
-            } catch {
-              return [];
-            }
-          })
-        );
+        const normSlug = normalizeKey(moduleName);
+        const normLabel = normalizeKey(label);
 
-        if (cancelled) return;
-        const flatSubmodules = submodulesLists.flat();
-        setAllSubmodules(flatSubmodules);
-
-        // Find submodules matching the current moduleName / label
-        const directMatches = flatSubmodules.filter((s) => isSubmoduleMatch(s.label, moduleName, label));
-
-        let moduleScoped: ScopedSubmodule[] = [];
-        if (directMatches.length > 0) {
-          // Collect matches and their sibling submodules in the same parent module
-          const parentModuleIds = new Set(directMatches.map((m) => m.parentModuleId));
-          moduleScoped = flatSubmodules.filter((s) => parentModuleIds.has(s.parentModuleId));
-          // Put direct matches at the top
-          moduleScoped.sort((a, b) => {
-            const aMatch = isSubmoduleMatch(a.label, moduleName, label) ? 1 : 0;
-            const bMatch = isSubmoduleMatch(b.label, moduleName, label) ? 1 : 0;
-            return bMatch - aMatch;
-          });
-        } else {
-          // Fallback: show all submodules
-          moduleScoped = flatSubmodules;
+        let matchedModule = moduleId ? erpModules.find((m) => m.id === moduleId) : null;
+        if (!matchedModule) {
+          matchedModule = erpModules.find((m) => {
+            const mNorm = normalizeKey(m.label);
+            return mNorm === normSlug || mNorm === normLabel || mNorm.includes(normSlug) || normSlug.includes(mNorm);
+          }) || null;
         }
 
+        let moduleScoped: ScopedSubmodule[] = [];
+
+        if (matchedModule) {
+          try {
+            const res = await listErpSubmodules(session, matchedModule.id);
+            const subs: ErpSubmodule[] = Array.isArray(res?.submodules) ? res.submodules : [];
+            moduleScoped = subs.map((s) => ({
+              ...s,
+              parentModuleId: matchedModule!.id,
+              parentModuleLabel: matchedModule!.label,
+            }));
+          } catch {
+            moduleScoped = [];
+          }
+        } else {
+          // If no single module matched, collect submodules from all modules
+          const submodulesLists = await Promise.all(
+            erpModules.map(async (mod) => {
+              try {
+                const res = await listErpSubmodules(session, mod.id);
+                const subs: ErpSubmodule[] = Array.isArray(res?.submodules) ? res.submodules : [];
+                return subs.map((s) => ({
+                  ...s,
+                  parentModuleId: mod.id,
+                  parentModuleLabel: mod.label,
+                }));
+              } catch {
+                return [];
+              }
+            })
+          );
+          moduleScoped = submodulesLists.flat();
+        }
+
+        if (cancelled) return;
+        setAllSubmodules(moduleScoped);
         setRelevantSubmodules(moduleScoped);
 
-        // Pick initial target: first direct match with mapped=true, or first mapped in scoped
-        const target =
-          directMatches.find((s) => s.mapped) ||
-          directMatches[0] ||
-          moduleScoped.find((s) => s.mapped) ||
-          moduleScoped[0] ||
-          null;
+        // Pick initial target: first submodule with mapped=true, or first submodule
+        const target = moduleScoped.find((s) => s.mapped) || moduleScoped[0] || null;
 
         if (target) {
           setSelectedSubmodule(target);

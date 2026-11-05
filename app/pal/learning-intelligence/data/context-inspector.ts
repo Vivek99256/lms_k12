@@ -124,3 +124,57 @@ export async function fetchContextInspector(learnerId: string, conceptId: number
     liveNextAction: data.live_next_action == null ? null : mapAction(data.live_next_action),
   };
 }
+
+export interface UnifiedLearnerContextGraph {
+  available: boolean;
+  learner_id: number;
+  user_context: {
+    learner_id: number;
+    name: string;
+    admission_no: string;
+    gender: string;
+    sub_institute_id: number;
+    institute_name: string;
+    standard_id: number | null;
+    standard_name: string;
+    division_id: number | null;
+    division_name: string;
+    roll_no: string | null;
+    syear: number | null;
+    enrolled_subjects: Array<{ id: number; name: string }>;
+    primary_subject_id: number | null;
+  };
+  learning_activities: {
+    recent_diagnostics: Array<{ id: number; chapter_id: number; score: number; total_questions: number; status: string; attempted_at: string }>;
+    recent_practice: Array<{ id: number; concept_id: number; accuracy: number; duration_seconds: number; practiced_at: string }>;
+    total_engagement_events: number;
+  };
+  knowledge_graph: {
+    available: boolean;
+    standard_id?: number;
+    subject_id?: number;
+    nodes: any[];
+    edges: any[];
+    chapters?: any[];
+    stats?: any;
+    root_blockers: Array<{ id: number; name: string; mastery: number; gate: number; depth: number }>;
+  };
+  historical_context: {
+    recent_competencies: Array<{ concept_id: number; mastery_score: number; confidence_score: number; attempts: number; last_updated: string }>;
+    recent_engine_decisions: Array<{ id: number; concept_id: number; rule_fired: string; action: string; decided_at: string }>;
+    recent_recommendations: Array<{ id: number; concept_id: number; pedagogy_type: string; rule: string; reason: string; recommended_at: string }>;
+  };
+  next_best_action: any | null;
+  assembled_at: string;
+}
+
+export async function fetchUnifiedContextGraph(
+  learnerId: string | number,
+  subjectId?: number,
+  signal?: AbortSignal
+): Promise<UnifiedLearnerContextGraph> {
+  const query = subjectId ? `?subject_id=${subjectId}` : '';
+  const res = await fetchJson(`api/pal/context-graph/${learnerId}${query}`, signal);
+  return toRecord(res) as unknown as UnifiedLearnerContextGraph;
+}
+

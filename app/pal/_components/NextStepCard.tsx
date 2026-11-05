@@ -1,29 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, CheckCircle2, Lightbulb } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Compass, GitFork, Lightbulb } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { BandChip } from '@/app/pal/_components/BandMeter';
 import type { DetectedMisconception, PracticeNext } from '@/app/pal/data/pal-diagnostic';
 
 /**
- * The one next step, as decided by PracticeOutcomeService.
- *
- * ---------------------------------------------------------------------------
- * WHY IT LIVES HERE AND NOT ON A PAGE
- * ---------------------------------------------------------------------------
- * Moved out of app/pal/adaptive/concept/[conceptId] UNCHANGED when the
- * Feedback stage was added. The learner now reads the synthesis of their
- * practice set before they press the engine's button, so the button moved one
- * screen along with them.
- *
- * Two screens can reach it, which is exactly why the table below cannot live
- * on either of them: the practice result and the Feedback page must never
- * offer different buttons for the same engine decision. Nothing in it is
- * computed - the reason string is the server's own words.
+ * The one next step, as decided by PracticeOutcomeService or CoherenceRecommender.
  */
 
 export interface NextStepPlan {
@@ -35,23 +23,19 @@ export interface NextStepPlan {
 
 /**
  * The action -> title/button/destination table, byte for byte as it was
- * written against PracticeOutcomeService's action vocabulary.
- *
- * An action with no `href` is one that repeats the practice set, which the
- * caller handles itself - the practice screen reloads in place, the Feedback
- * page navigates back to it.
+ * written against PracticeOutcomeService's and CoherenceRecommender's action vocabulary.
  */
 export function nextStepPlan(
   action: string,
   ids: { conceptId: string; chapterId: string }
 ): NextStepPlan {
   const esoHref = `/pal/eso?conceptId=${ids.conceptId}`;
-  // The lesson, served read-only, so a button labelled "Learn" always opens a
-  // lesson. Pointing it at the engine meant the engine chose the screen, and it
-  // legitimately chose practice - the button could not keep its promise.
   const learnHref = `/pal/learn/concept/${ids.conceptId}?chapterId=${ids.chapterId}`;
 
   const plan: Record<string, NextStepPlan> = {
+    unblock: { title: 'Prerequisite Blocker Detected', cta: 'Remediate Prerequisite', href: esoHref, tone: 'warn' },
+    consolidate: { title: 'Nearly at Mastery Gate', cta: 'Consolidate Concept', href: learnHref, tone: 'go' },
+    advance: { title: 'Ready to Move Forward', cta: 'Start Next Concept', href: learnHref, tone: 'go' },
     remediate: { title: 'Clear up a mix-up first', cta: 'Sort this out', href: esoHref, tone: 'warn' },
     reteach: { title: 'Worth going over this again', cta: 'Learn it again', href: learnHref, tone: 'warn' },
     review_content: { title: 'Worth going over this again', cta: 'See the material', href: learnHref, tone: 'warn' },
@@ -60,11 +44,6 @@ export function nextStepPlan(
     advance_band: { title: 'Level cleared', cta: 'Move up a level', tone: 'go' },
     mastery_check: { title: 'Ready for the mastery check', cta: 'Check my mastery', href: esoHref, tone: 'done' },
     mastered: { title: 'Concept mastered', cta: 'Back to the plan', href: `/pal/plan/chapter/${ids.chapterId}`, tone: 'done' },
-    // Reteach/remediate would otherwise repeat forever once the learner is
-    // genuinely stuck (see PracticeOutcomeService::decide()'s bounded-retry
-    // comments) - this is the terminal step instead of another lap. It still
-    // does not block: the learner can carry on with the rest of the chapter
-    // from the plan while their teacher is flagged.
     escalate: {
       title: 'Time to bring in your teacher',
       cta: 'See what happens next',
@@ -105,14 +84,41 @@ export function NextStepCard({
       <CardContent className="pt-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <div className="flex flex-wrap items-center gap-2">
               <Icon aria-hidden className="h-4 w-4" />
-              {step.title}
+              <p className="text-sm font-semibold text-slate-900">{step.title}</p>
               {next.band && <BandChip band={next.band} />}
-            </p>
+              {next.graphAware && (
+                <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-[10px] text-emerald-800">
+                  Prerequisite Graph Verified
+                </Badge>
+              )}
+            </div>
 
             {/* The server's own sentence. */}
             <p className="mt-1 text-sm text-slate-700">{next.reason}</p>
+
+            {/* Root Prerequisite Blocker Visual Walk */}
+            {next.roots && next.roots.length > 0 && (
+              <div className="mt-2.5 rounded-lg border border-amber-300/80 bg-white/80 p-2.5 text-xs text-amber-950 shadow-sm">
+                <div className="flex items-center gap-1.5 font-semibold text-amber-900">
+                  <GitFork className="h-3.5 w-3.5 text-amber-700" />
+                  Prerequisite Path Blocker:
+                </div>
+                <div className="mt-1 space-y-1">
+                  {next.roots.map((root) => (
+                    <div key={root.id} className="flex items-center justify-between">
+                      <span className="font-medium text-slate-800">
+                        {root.name} (Mastery: {Math.round(root.mastery * 100)}% vs Gate: {Math.round(root.gate * 100)}%)
+                      </span>
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                        {root.depth} step(s) back
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {misconception && (
               <p className="mt-2 rounded-lg border border-white/60 bg-white/70 px-3 py-2 text-xs text-slate-700">
