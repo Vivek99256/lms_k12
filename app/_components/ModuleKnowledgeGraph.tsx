@@ -6,17 +6,18 @@
  *
  * Automatically resolves the module's real submodules from Neo4j (via GraphModuleBrowser /
  * `erp-modules` and `erp-submodules`), loads actual nodes and relationships on mount,
- * and renders via React Flow (`GraphCanvas` browser variant) matching the master design of
- * `CentralizedKnowledgeGraphExplorer.tsx`.
+ * and renders via GraphBubbleCanvas matching the master design of
+ * `CentralizedKnowledgeGraphExplorer.tsx` and `org-knowledge-graph.tsx`.
  *
  * Features:
- * - Real Neo4j nodes & relationships loaded automatically on mount for the active module
- * - No manual searching required to see the initial graph
+ * - Glowing force-simulation orbs with initials, category colors, and relationship labels
+ * - Real Neo4j nodes & relationships loaded automatically on mount for every submodule
  * - Honest "Graph data not mapped" state for unmapped submodules (never fake data)
+ * - Click-to-expand node clusters radiating from clicked entity
+ * - Safe Expand All & Collapse All
+ * - In-canvas search ("Find on this canvas…")
+ * - Category filter drawer with counts at bottom-left ("Categories N")
  * - Node selection & right docked details panel with attributes & connected relationships
- * - Progressive node expansion
- * - Expand All (safely expands connected relationships for visible nodes)
- * - Collapse All (restores initial graph state)
  * - Light Theme by default with full Light / Dark theme toggle
  * - Fullscreen support
  */
@@ -52,10 +53,9 @@ import { expandGraphNode, fetchModuleViews, fetchOntologyView, type OntologyView
 import type { ErpModule, ErpSubmodule } from '@/lib/intelligence/types';
 
 import GraphBreadcrumbHeader from './graph/GraphBreadcrumbHeader';
-import GraphCanvas from './graph/GraphCanvas';
+import GraphBubbleCanvas from './graph/GraphBubbleCanvas';
 import GraphDetailPanel from './graph/GraphDetailPanel';
 import GraphSyncStatus from './graph/GraphSyncStatus';
-import TypeLegend from './graph/TypeLegend';
 import { readGraphSession } from './graph/graph-session';
 import {
   buildHopsFromNodeDetail,
@@ -67,6 +67,9 @@ import type { KgEdgeInput, KgHop, KgNodeInput } from './graph/graph-model';
 
 type GraphState = 'loading' | 'ready' | 'not-mapped' | 'error';
 type ThemeMode = 'light' | 'dark';
+
+const RELATIONSHIP_LIMIT = 25;
+const GROUP_EXPAND_LIMIT = 50;
 
 export interface ModuleKnowledgeGraphProps {
   moduleName: string;
@@ -80,6 +83,52 @@ interface ScopedSubmodule extends ErpSubmodule {
 
 function normalizeKey(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** Merges lists of objects with unique `id` fields into a single list preserving uniqueness. */
+function mergeById<T extends { id: string }>(...lists: (T[] | undefined)[]): T[] {
+  const merged = new Map<string, T>();
+  for (const list of lists) {
+    if (!list) continue;
+    for (const item of list) merged.set(item.id, item);
+  }
+  return Array.from(merged.values());
+}
+
+/** One relationship-group's identity: which node it hangs off, which relation, which direction. */
+function groupKey(nodeId: string, relation: string, direction: string): string {
+  return `${nodeId}::${relation}::${direction}`;
+}
+
+/**
+ * Groups a node-detail fetch's own nodes/edges by relation+direction for progressive expansion.
+ */
+function groupNodeDetailForExpansion(
+  centerId: string,
+  nodes: KgNodeInput[],
+  edges: KgEdgeInput[]
+): Map<string, { relation: string; direction: 'outgoing' | 'incoming'; nodes: KgNodeInput[]; edges: KgEdgeInput[] }> {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const groups = new Map<
+    string,
+    { relation: string; direction: 'outgoing' | 'incoming'; nodes: KgNodeInput[]; edges: KgEdgeInput[] }
+  >();
+
+  for (const edge of edges) {
+    const outgoing = edge.source === centerId;
+    const otherId = outgoing ? edge.target : edge.source;
+    const other = byId.get(otherId);
+    if (!other) continue;
+
+    const direction = outgoing ? 'outgoing' : 'incoming';
+    const key = `${edge.relation}::${direction}`;
+    const group = groups.get(key) ?? { relation: edge.relation, direction, nodes: [], edges: [] };
+    group.nodes.push(other);
+    group.edges.push(edge);
+    groups.set(key, group);
+  }
+
+  return groups;
 }
 
 /**
@@ -158,20 +207,31 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
   // Graph state
   const [graphState, setGraphState] = useState<GraphState>('loading');
   const [graphError, setGraphError] = useState('');
-  const [baseGraph, setBaseGraph] = useState<{ nodes: KgNodeInput[]; edges: KgEdgeInput[] }>({ nodes: [], edges: [] });
-  const [canvasNodes, setCanvasNodes] = useState<KgNodeInput[]>([]);
-  const [canvasEdges, setCanvasEdges] = useState<KgEdgeInput[]>([]);
 
-  // Selection & Details panel
+  // Progressive expansion state
+  const [baseRoots, setBaseRoots] = useState<{ nodes: KgNodeInput[]; edges: KgEdgeInput[] }>({ nodes: [], edges: [] });
+  const [rootNodes, setRootNodes] = useState<KgNodeInput[]>([]);
+  const [rootEdges, setRootEdges] = useState<KgEdgeInput[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Map<string, { nodes: KgNodeInput[]; edges: KgEdgeInput[] }>>(
+    new Map()
+  );
+
+  // Selection & Details panel state
   const [selectedNode, setSelectedNode] = useState<KgNodeInput | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<KgEdgeInput | null>(null);
-  const [hops, setHops] = useState<KgHop[]>([]);
+  const [nodeDetailNodes, setNodeDetailNodes] = useState<KgNodeInput[]>([]);
+  const [nodeDetailEdges, setNodeDetailEdges] = useState<KgEdgeInput[]>([]);
+  const [nodeDetailSkip, setNodeDetailSkip] = useState(0);
+  const [nodeDetailHasMore, setNodeDetailHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Probing & group cache
   const [expandingNodeId, setExpandingNodeId] = useState<string | null>(null);
   const [isExpandingAll, setIsExpandingAll] = useState(false);
-  const [loadingNodeDetail, setLoadingNodeDetail] = useState(false);
-
-  // Node cache for quick lookups
-  const nodesById = useMemo(() => new Map(canvasNodes.map((n) => [n.id, n])), [canvasNodes]);
+  const [nodeTotals, setNodeTotals] = useState<Map<string, number>>(new Map());
+  const nodeGroupsCache = useRef<
+    Map<string, Map<string, { relation: string; direction: 'outgoing' | 'incoming'; nodes: KgNodeInput[]; edges: KgEdgeInput[] }>>
+  >(new Map());
 
   const toggleFullscreen = () => {
     setIsFullscreen((prev) => !prev);
@@ -179,6 +239,24 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  };
+
+  /** Resets everything to a fresh base sample */
+  const applyBase = (nodes: KgNodeInput[] = [], edges: KgEdgeInput[] = []) => {
+    const safeNodes = Array.isArray(nodes) ? nodes : [];
+    const safeEdges = Array.isArray(edges) ? edges : [];
+    setBaseRoots({ nodes: safeNodes, edges: safeEdges });
+    setRootNodes(safeNodes);
+    setRootEdges(safeEdges);
+    setExpandedGroups(new Map());
+    setNodeTotals(new Map());
+    nodeGroupsCache.current = new Map();
+    setSelectedNode(null);
+    setSelectedEdge(null);
+    setNodeDetailNodes([]);
+    setNodeDetailEdges([]);
+    setNodeDetailSkip(0);
+    setNodeDetailHasMore(false);
   };
 
   // 1. Initial Load: Fetch ERP modules, submodules, and ontology views
@@ -285,31 +363,30 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
   const loadSubmoduleGraph = async (submodule: ScopedSubmodule) => {
     setSelectedSubmodule(submodule);
     setSelectedView(null);
-    setSelectedNode(null);
-    setSelectedEdge(null);
-    setHops([]);
     setGraphState('loading');
     setGraphError('');
+    applyBase([], []);
 
     if (!submodule.mapped || !submodule.labels || submodule.labels.length === 0) {
-      setBaseGraph({ nodes: [], edges: [] });
-      setCanvasNodes([]);
-      setCanvasEdges([]);
       setGraphState('not-mapped');
       return;
     }
 
     try {
       // 1st attempt: Fetch connected submodule subgraph directly from Neo4j
-      const result = await fetchErpSubmoduleGraph(session, submodule.id);
-      const mapped = mapErpSubmoduleGraph(result);
+      if (submodule.id) {
+        try {
+          const result = await fetchErpSubmoduleGraph(session, submodule.id);
+          const mapped = mapErpSubmoduleGraph(result);
 
-      if (mapped.nodes.length > 0) {
-        setBaseGraph(mapped);
-        setCanvasNodes(mapped.nodes);
-        setCanvasEdges(mapped.edges);
-        setGraphState('ready');
-        return;
+          if (mapped.nodes.length > 0) {
+            applyBase(mapped.nodes, mapped.edges);
+            setGraphState('ready');
+            return;
+          }
+        } catch {
+          // fall through to search
+        }
       }
 
       // 2nd attempt fallback: Label search for sample nodes
@@ -317,15 +394,10 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
       const searchNodes = Array.isArray(searchRes?.nodes) ? searchRes.nodes : [];
 
       if (searchNodes.length > 0) {
-        const fallbackGraph = { nodes: searchNodes, edges: [] };
-        setBaseGraph(fallbackGraph);
-        setCanvasNodes(fallbackGraph.nodes);
-        setCanvasEdges([]);
+        applyBase(searchNodes, []);
         setGraphState('ready');
       } else {
-        setBaseGraph({ nodes: [], edges: [] });
-        setCanvasNodes([]);
-        setCanvasEdges([]);
+        applyBase([], []);
         setGraphState('not-mapped');
       }
     } catch (cause) {
@@ -337,16 +409,11 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
   // 3. Load Graph for an Ontology View
   const loadViewGraph = async (view: OntologyViewSummary) => {
     setSelectedView(view);
-    setSelectedNode(null);
-    setSelectedEdge(null);
-    setHops([]);
     setGraphState('loading');
     setGraphError('');
+    applyBase([], []);
 
     if (!view.root_entity_key) {
-      setBaseGraph({ nodes: [], edges: [] });
-      setCanvasNodes([]);
-      setCanvasEdges([]);
       setGraphState('not-mapped');
       return;
     }
@@ -356,9 +423,6 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
       const rootNode = sample?.nodes?.[0];
 
       if (!rootNode) {
-        setBaseGraph({ nodes: [], edges: [] });
-        setCanvasNodes([]);
-        setCanvasEdges([]);
         setGraphState('not-mapped');
         return;
       }
@@ -371,15 +435,9 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
       const mapped = mapOntologyViewResult(walkResult);
 
       if (mapped.nodes.length > 0) {
-        setBaseGraph(mapped);
-        setCanvasNodes(mapped.nodes);
-        setCanvasEdges(mapped.edges);
-        setHops(mapped.hops);
+        applyBase(mapped.nodes, mapped.edges);
         setGraphState('ready');
       } else {
-        setBaseGraph({ nodes: [], edges: [] });
-        setCanvasNodes([]);
-        setCanvasEdges([]);
         setGraphState('not-mapped');
       }
     } catch (cause) {
@@ -388,55 +446,26 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
     }
   };
 
-  // 4. Node Selection & Detail Loading
-  const handleNodeSelect = async (node: KgNodeInput | null) => {
-    setSelectedNode(node);
-    setSelectedEdge(null);
-
-    if (!node || node.recordId === null || node.recordId === undefined) {
-      setHops([]);
-      return;
-    }
-
-    setLoadingNodeDetail(true);
+  // 4. Load Node Detail & count
+  const loadNodeDetail = async (node: KgNodeInput): Promise<{ nodes: KgNodeInput[]; edges: KgEdgeInput[] } | null> => {
+    if (node.recordId === null || node.recordId === undefined) return null;
     try {
-      const detail = await fetchGraphNodeDetail(session, node.entityKey, node.recordId, {
-        relationshipLimit: 25,
+      const detail = await fetchGraphNodeDetail(session, node.entityKey, node.recordId as string | number, {
+        relationshipLimit: RELATIONSHIP_LIMIT,
+        skip: 0,
       });
       const mapped = mapGraphNodeDetail(detail);
-      setHops(buildHopsFromNodeDetail(node.id, mapped.nodes, mapped.edges));
-    } catch {
-      setHops([]);
-    } finally {
-      setLoadingNodeDetail(false);
-    }
-  };
-
-  // 5. Expand individual node
-  const handleExpandNode = async (node: KgNodeInput) => {
-    if (expandingNodeId || node.recordId === null || node.recordId === undefined) return;
-    setExpandingNodeId(node.id);
-
-    try {
-      const detail = await fetchGraphNodeDetail(session, node.entityKey, node.recordId, {
-        relationshipLimit: 25,
-      });
-      const mapped = mapGraphNodeDetail(detail);
-
-      // Merge new nodes & edges into canvas
-      setCanvasNodes((prev) => {
-        const existing = new Set(prev.map((n) => n.id));
-        const added = mapped.nodes.filter((n) => !existing.has(n.id));
-        return [...prev, ...added];
-      });
-
-      setCanvasEdges((prev) => {
-        const existing = new Set(prev.map((e) => e.id));
-        const added = mapped.edges.filter((e) => !existing.has(e.id));
-        return [...prev, ...added];
-      });
-
-      setHops(buildHopsFromNodeDetail(node.id, mapped.nodes, mapped.edges));
+      setNodeDetailNodes(mapped.nodes);
+      setNodeDetailEdges(mapped.edges);
+      setNodeDetailHasMore(mapped.hasMore);
+      setNodeDetailSkip(RELATIONSHIP_LIMIT);
+      setNodeTotals((prev) => new Map(prev).set(node.id, mapped.totalIncoming + mapped.totalOutgoing));
+      if (mapped.node) {
+        setSelectedNode((prev) =>
+          prev && prev.id === node.id ? { ...prev, attributes: mapped.node!.attributes ?? prev.attributes } : prev
+        );
+      }
+      return { nodes: mapped.nodes, edges: mapped.edges };
     } catch {
       // Fallback: try workspace expandNode
       try {
@@ -466,59 +495,110 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
               });
             }
           }
-
-          setCanvasNodes((prev) => {
-            const existing = new Set(prev.map((n) => n.id));
-            return [...prev, ...newNodes.filter((n) => !existing.has(n.id))];
-          });
-          setCanvasEdges((prev) => {
-            const existing = new Set(prev.map((e) => e.id));
-            return [...prev, ...newEdges.filter((e) => !existing.has(e.id))];
-          });
+          setNodeDetailNodes(newNodes);
+          setNodeDetailEdges(newEdges);
+          setNodeTotals((prev) => new Map(prev).set(node.id, newNodes.length));
+          return { nodes: newNodes, edges: newEdges };
         }
       } catch {
-        // Silently preserve current canvas if expansion fails
+        // ignore
+      }
+      return null;
+    }
+  };
+
+  /** Selection without toggling branches */
+  const selectNode = async (node: KgNodeInput | null) => {
+    setSelectedEdge(null);
+    setSelectedNode(node);
+    setNodeDetailNodes([]);
+    setNodeDetailEdges([]);
+    setNodeDetailSkip(0);
+    setNodeDetailHasMore(false);
+    if (!node) return;
+    await loadNodeDetail(node);
+  };
+
+  // 5. Canvas Node Click: Select and toggle open/closed connected relationships
+  const handleCanvasNodeClick = async (node: KgNodeInput) => {
+    setSelectedEdge(null);
+    setSelectedNode(node);
+
+    const alreadyOpen = Array.from(expandedGroups.keys()).some((key) => key.startsWith(`${node.id}::`));
+    if (alreadyOpen) {
+      setExpandedGroups((prev) => {
+        const next = new Map(prev);
+        for (const key of Array.from(next.keys())) {
+          if (key.startsWith(`${node.id}::`)) next.delete(key);
+        }
+        return next;
+      });
+      return;
+    }
+
+    if (nodeTotals.get(node.id) === 0) {
+      return;
+    }
+
+    setNodeDetailNodes([]);
+    setNodeDetailEdges([]);
+    setNodeDetailSkip(0);
+    setNodeDetailHasMore(false);
+    setExpandingNodeId(node.id);
+    try {
+      const result = await loadNodeDetail(node);
+      const groups = result ? groupNodeDetailForExpansion(node.id, result.nodes, result.edges) : new Map();
+      nodeGroupsCache.current.set(node.id, groups);
+
+      if (groups.size > 0) {
+        setExpandedGroups((prev) => {
+          const next = new Map(prev);
+          for (const group of groups.values()) {
+            next.set(groupKey(node.id, group.relation, group.direction), { nodes: group.nodes, edges: group.edges });
+          }
+          return next;
+        });
       }
     } finally {
       setExpandingNodeId(null);
     }
   };
 
-  // 6. Expand All: Expand all currently visible nodes (safe batch)
+  // 6. Expand All: Safely expands connected relationships for visible nodes
   const handleExpandAll = async () => {
     if (isExpandingAll || canvasNodes.length === 0) return;
     setIsExpandingAll(true);
 
     try {
-      const batch = canvasNodes.slice(0, 10);
-      const allNewNodes: KgNodeInput[] = [];
-      const allNewEdges: KgEdgeInput[] = [];
-
-      for (const node of batch) {
-        if (node.recordId === null || node.recordId === undefined) continue;
-        try {
-          const detail = await fetchGraphNodeDetail(session, node.entityKey, node.recordId, {
-            relationshipLimit: 12,
-          });
-          const mapped = mapGraphNodeDetail(detail);
-          allNewNodes.push(...mapped.nodes);
-          allNewEdges.push(...mapped.edges);
-        } catch {
-          // continue with other nodes
+      // 1. Reopen already known groups
+      const reopened = new Map(expandedGroups);
+      for (const [nodeId, groups] of nodeGroupsCache.current) {
+        for (const group of groups.values()) {
+          reopened.set(groupKey(nodeId, group.relation, group.direction), { nodes: group.nodes, edges: group.edges });
         }
       }
+      setExpandedGroups(reopened);
 
-      setCanvasNodes((prevNodes) => {
-        const existing = new Set(prevNodes.map((n) => n.id));
-        const unique = allNewNodes.filter((n) => !existing.has(n.id));
-        return [...prevNodes, ...unique].slice(0, 150);
-      });
+      // 2. Identify candidate nodes on canvas not yet probed (up to 10 nodes)
+      const candidates = canvasNodes
+        .filter((n) => n.recordId !== null && n.recordId !== undefined && !nodeGroupsCache.current.has(n.id))
+        .slice(0, 10);
 
-      setCanvasEdges((prevEdges) => {
-        const existing = new Set(prevEdges.map((e) => e.id));
-        const unique = allNewEdges.filter((e) => !existing.has(e.id));
-        return [...prevEdges, ...unique].slice(0, 300);
-      });
+      for (const node of candidates) {
+        if (canvasNodes.length > 120) break;
+        const result = await loadNodeDetail(node);
+        if (result) {
+          const groups = groupNodeDetailForExpansion(node.id, result.nodes, result.edges);
+          nodeGroupsCache.current.set(node.id, groups);
+          setExpandedGroups((prev) => {
+            const next = new Map(prev);
+            for (const group of groups.values()) {
+              next.set(groupKey(node.id, group.relation, group.direction), { nodes: group.nodes, edges: group.edges });
+            }
+            return next;
+          });
+        }
+      }
     } finally {
       setIsExpandingAll(false);
     }
@@ -526,33 +606,110 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
 
   // 7. Collapse All: Restores initial base graph state
   const handleCollapseAll = () => {
-    setCanvasNodes(baseGraph.nodes);
-    setCanvasEdges(baseGraph.edges);
+    setExpandedGroups(new Map());
     setSelectedNode(null);
     setSelectedEdge(null);
-    setHops([]);
   };
 
-  // Edge Selection
-  const handleEdgeSelect = (edge: KgEdgeInput | null) => {
-    setSelectedEdge(edge);
-    setSelectedNode(null);
-    setHops([]);
+  // Expand or collapse a single group from the details panel accordion
+  const expandGroup = async (node: KgNodeInput, hop: KgHop) => {
+    if (!hop.direction) return;
+    const key = groupKey(node.id, hop.relation, hop.direction);
+
+    if (expandedGroups.has(key)) {
+      setExpandedGroups((prev) => {
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      });
+      return;
+    }
+
+    if (node.recordId === null || node.recordId === undefined) return;
+
+    try {
+      const detail = await fetchGraphNodeDetail(session, node.entityKey, node.recordId, {
+        relationshipLimit: GROUP_EXPAND_LIMIT,
+        skip: 0,
+        relation: hop.relation,
+        direction: hop.direction,
+      });
+      const mapped = mapGraphNodeDetail(detail);
+      setExpandedGroups((prev) => new Map(prev).set(key, { nodes: mapped.nodes, edges: mapped.edges }));
+    } catch {
+      // ignore
+    }
   };
+
+  const isGroupOpen = (hop: KgHop): boolean => {
+    if (!selectedNode || !hop.direction) return false;
+    return expandedGroups.has(groupKey(selectedNode.id, hop.relation, hop.direction));
+  };
+
+  const onToggleGroup = (hop: KgHop) => {
+    if (selectedNode) void expandGroup(selectedNode, hop);
+  };
+
+  const loadMoreForSelectedNode = async () => {
+    if (!selectedNode || selectedNode.recordId === null || selectedNode.recordId === undefined) return;
+    setLoadingMore(true);
+    try {
+      const detail = await fetchGraphNodeDetail(session, selectedNode.entityKey, selectedNode.recordId as string | number, {
+        relationshipLimit: RELATIONSHIP_LIMIT,
+        skip: nodeDetailSkip,
+      });
+      const mapped = mapGraphNodeDetail(detail);
+      setNodeDetailNodes((prev) => mergeById(prev, mapped.nodes));
+      setNodeDetailEdges((prev) => mergeById(prev, mapped.edges));
+      setNodeDetailHasMore(mapped.hasMore);
+      setNodeDetailSkip((prev) => prev + RELATIONSHIP_LIMIT);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Derived canvas content
+  const canvasNodes = useMemo(
+    () => mergeById(rootNodes, ...Array.from(expandedGroups.values(), (g) => g.nodes)),
+    [rootNodes, expandedGroups]
+  );
+  const canvasEdges = useMemo(
+    () => mergeById(rootEdges, ...Array.from(expandedGroups.values(), (g) => g.edges)),
+    [rootEdges, expandedGroups]
+  );
+
+  const nodesById = useMemo(() => {
+    const map = new Map<string, KgNodeInput>();
+    for (const n of canvasNodes) map.set(n.id, n);
+    for (const n of nodeDetailNodes) map.set(n.id, n);
+    return map;
+  }, [canvasNodes, nodeDetailNodes]);
+
+  const nodeMeta = useMemo(() => {
+    const map = new Map<string, { totalCount: number; open: boolean }>();
+    for (const [nodeId, total] of nodeTotals) {
+      const open = Array.from(expandedGroups.keys()).some((key) => key.startsWith(`${nodeId}::`));
+      map.set(nodeId, { totalCount: total, open });
+    }
+    return map;
+  }, [nodeTotals, expandedGroups]);
+
+  const hops = useMemo(
+    () => (selectedNode ? buildHopsFromNodeDetail(selectedNode.id, nodeDetailNodes, nodeDetailEdges) : []),
+    [selectedNode, nodeDetailNodes, nodeDetailEdges]
+  );
 
   const isDark = theme === 'dark';
 
   return (
     <div
-      className={`relative flex flex-col overflow-hidden transition-colors duration-200 ${
-        isFullscreen ? 'fixed inset-0 z-50 h-screen w-screen' : 'h-[750px] w-full rounded-xl border'
-      } ${isDark ? 'border-slate-800 bg-[#0a0e1a] text-slate-100' : 'border-slate-200 bg-white text-slate-800 shadow-sm'}`}
+      className={`relative flex flex-col overflow-hidden transition-colors duration-200 ${isFullscreen ? 'fixed inset-0 z-50 h-screen w-screen' : 'h-[750px] w-full rounded-xl border'
+        } ${isDark ? 'border-slate-800 bg-[#0a0e1a] text-slate-100' : 'border-slate-200 bg-white text-slate-800 shadow-sm'}`}
     >
       {/* Top Bar / Header */}
       <div
-        className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2.5 transition-colors ${
-          isDark ? 'border-slate-800 bg-[#0d1424]' : 'border-slate-200 bg-slate-50/80'
-        }`}
+        className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2.5 transition-colors ${isDark ? 'border-slate-800 bg-[#0d1424]' : 'border-slate-200 bg-slate-50/80'
+          }`}
       >
         <div className="flex items-center gap-3">
           <GraphBreadcrumbHeader
@@ -565,9 +722,8 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
           <GraphSyncStatus />
         </div>
 
-        {/* Action Controls: Submodule Selector, Theme Toggle, Expand All, Collapse All, Fullscreen */}
+        {/* Action Controls: Submodule Selector & Controls */}
         <div className="flex items-center gap-2">
-          {/* Submodule dropdown / view selector */}
           {relevantSubmodules.length > 0 && (
             <div className="relative inline-block">
               <select
@@ -578,11 +734,10 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
                   const sub = relevantSubmodules.find((s) => s.id === subId);
                   if (sub) void loadSubmoduleGraph(sub);
                 }}
-                className={`h-8 rounded-md border px-2.5 pr-8 text-xs font-medium transition-colors ${
-                  isDark
+                className={`h-8 rounded-md border px-2.5 pr-8 text-xs font-medium transition-colors ${isDark
                     ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-750'
                     : 'border-slate-300 bg-white text-slate-750 hover:bg-slate-50'
-                }`}
+                  }`}
               >
                 {relevantSubmodules.map((sub) => (
                   <option key={sub.id} value={sub.id}>
@@ -593,70 +748,18 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
             </div>
           )}
 
-          {/* Clear Focus Button */}
-          {(selectedNode || selectedEdge) && (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedNode(null);
-                setSelectedEdge(null);
-                setHops([]);
-              }}
-              title="Clear focus and restore normal graph appearance"
-              className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition-colors ${
-                isDark
-                  ? 'border-blue-500/40 bg-blue-900/30 text-blue-300 hover:bg-blue-800/40'
-                  : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 shadow-sm'
-              }`}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Clear focus</span>
-            </button>
-          )}
-
-          {/* Theme Toggle Button (Light by default) */}
+          {/* Theme Toggle Button */}
           <button
             type="button"
             onClick={toggleTheme}
             title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
             aria-label={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-            className={`flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors ${
-              isDark
+            className={`flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors ${isDark
                 ? 'border-slate-700 bg-slate-800 text-amber-400 hover:bg-slate-700'
                 : 'border-slate-300 bg-white text-slate-650 hover:bg-slate-100 hover:text-slate-900'
-            }`}
+              }`}
           >
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-
-          {/* Expand All Button */}
-          <button
-            type="button"
-            onClick={() => void handleExpandAll()}
-            disabled={isExpandingAll || graphState !== 'ready' || canvasNodes.length === 0}
-            className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors disabled:opacity-40 ${
-              isDark
-                ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
-                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 shadow-sm'
-            }`}
-          >
-            {isExpandingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronsUpDown className="h-3.5 w-3.5" />}
-            <span>Expand all</span>
-          </button>
-
-          {/* Collapse All Button */}
-          <button
-            type="button"
-            onClick={handleCollapseAll}
-            disabled={graphState !== 'ready' || (canvasNodes.length === baseGraph.nodes.length && canvasEdges.length === baseGraph.edges.length)}
-            className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors disabled:opacity-40 ${
-              isDark
-                ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
-                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 shadow-sm'
-            }`}
-          >
-            <ChevronsDownUp className="h-3.5 w-3.5" />
-            <span>Collapse all</span>
           </button>
 
           {/* Fullscreen Toggle */}
@@ -664,11 +767,10 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
             type="button"
             onClick={toggleFullscreen}
             aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
-            className={`flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors ${
-              isDark
+            className={`flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors ${isDark
                 ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
                 : 'border-slate-300 bg-white text-slate-650 hover:bg-slate-100'
-            }`}
+              }`}
           >
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
@@ -679,9 +781,8 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {/* Left Submodules / Views Rail */}
         <aside
-          className={`hidden w-60 shrink-0 border-r md:flex md:flex-col transition-colors ${
-            isDark ? 'border-slate-800 bg-[#0d1424]' : 'border-slate-200 bg-slate-50'
-          }`}
+          className={`hidden w-60 shrink-0 border-r md:flex md:flex-col transition-colors ${isDark ? 'border-slate-800 bg-[#0d1424]' : 'border-slate-200 bg-slate-50'
+            }`}
         >
           <div className="p-2 border-b border-inherit">
             <div className="relative">
@@ -691,11 +792,10 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
                 placeholder="Filter submodules…"
                 value={submoduleFilter}
                 onChange={(e) => setSubmoduleFilter(e.target.value)}
-                className={`w-full rounded-md border py-1 pl-8 pr-2 text-xs transition-colors ${
-                  isDark
+                className={`w-full rounded-md border py-1 pl-8 pr-2 text-xs transition-colors ${isDark
                     ? 'border-slate-700 bg-slate-900 text-slate-100 placeholder:text-slate-500'
                     : 'border-slate-300 bg-white text-slate-800 placeholder:text-slate-400'
-                }`}
+                  }`}
               />
             </div>
           </div>
@@ -710,22 +810,22 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
                     key={sub.id}
                     type="button"
                     onClick={() => void loadSubmoduleGraph(sub)}
-                    className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition-colors ${
-                      isSelected
+                    className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition-colors ${isSelected
                         ? isDark
                           ? 'bg-blue-600/20 font-medium text-blue-400 border border-blue-500/30'
                           : 'bg-blue-50 font-medium text-blue-700 border border-blue-200'
                         : isDark
                           ? 'text-slate-300 hover:bg-slate-800/60'
                           : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     <span className="truncate">{sub.label}</span>
                     {sub.mapped && (
                       <span
-                        className={`ml-1.5 rounded px-1.5 py-0.2 text-[10px] font-semibold ${
-                          isDark ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/40' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        }`}
+                        className={`ml-1.5 rounded px-1.5 py-0.2 text-[10px] font-semibold ${isDark
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/40'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}
                       >
                         Mapped
                       </span>
@@ -758,9 +858,8 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
           {graphState === 'not-mapped' && (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
               <div
-                className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${
-                  isDark ? 'border-slate-800 bg-slate-900/60 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-400'
-                }`}
+                className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${isDark ? 'border-slate-800 bg-slate-900/60 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-400'
+                  }`}
               >
                 <Network className="h-7 w-7" />
               </div>
@@ -775,35 +874,27 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
 
           {graphState === 'ready' && (
             <div className="relative h-full w-full">
-              <GraphCanvas
-                variant="browser"
-                theme={theme}
+              <GraphBubbleCanvas
                 nodes={canvasNodes}
                 edges={canvasEdges}
-                highlightedIds={selectedNode ? new Set([selectedNode.id]) : undefined}
                 selectedNodeId={selectedNode?.id ?? null}
                 selectedEdgeId={selectedEdge?.id ?? null}
-                onNodeSelect={handleNodeSelect}
-                onEdgeSelect={handleEdgeSelect}
-                onExpandNode={handleExpandNode}
-                onClearFocus={() => {
+                nodeMeta={nodeMeta}
+                loadingNodeId={expandingNodeId}
+                onNodeClick={handleCanvasNodeClick}
+                onEdgeClick={setSelectedEdge}
+                onBackgroundClick={() => {
                   setSelectedNode(null);
                   setSelectedEdge(null);
-                  setHops([]);
                 }}
+                onExpandAll={handleExpandAll}
+                onCollapseAll={handleCollapseAll}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={toggleFullscreen}
+                mode={theme}
+                onToggleMode={setTheme}
                 heightClassName="h-full"
               />
-
-              {/* Legend overlay at bottom left */}
-              <div className="pointer-events-none absolute bottom-4 left-4 z-10">
-                <div className="pointer-events-auto">
-                  <TypeLegend
-                    variant="category"
-                    entityKeys={canvasNodes.map((n) => n.entityKey)}
-                    theme={theme}
-                  />
-                </div>
-              </div>
             </div>
           )}
         </main>
@@ -811,9 +902,8 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
         {/* Right Details Panel */}
         {(selectedNode || selectedEdge) && (
           <aside
-            className={`w-80 shrink-0 border-l p-3 transition-colors ${
-              isDark ? 'border-slate-800 bg-[#0d1424]' : 'border-slate-200 bg-white'
-            }`}
+            className={`w-80 shrink-0 border-l p-3 transition-colors ${isDark ? 'border-slate-800 bg-[#0a1230]' : 'border-slate-200 bg-white'
+              }`}
           >
             <GraphDetailPanel
               variant={isDark ? 'docked' : 'docked-light'}
@@ -825,14 +915,18 @@ export function ModuleKnowledgeGraph({ moduleName, label }: ModuleKnowledgeGraph
               onClose={() => {
                 setSelectedNode(null);
                 setSelectedEdge(null);
-                setHops([]);
               }}
               onItemClick={(_entity, id) => {
                 const match = canvasNodes.find((n) => String(n.recordId) === String(id));
-                if (match) void handleNodeSelect(match);
+                if (match) void selectNode(match);
               }}
+              onLoadMore={loadMoreForSelectedNode}
+              loadingMore={loadingMore}
+              hasMore={nodeDetailHasMore}
+              isGroupOpen={isGroupOpen}
+              onToggleGroup={onToggleGroup}
               onExpand={() => {
-                if (selectedNode) void handleExpandNode(selectedNode);
+                if (selectedNode) void handleCanvasNodeClick(selectedNode);
               }}
               expanding={expandingNodeId !== null}
             />
