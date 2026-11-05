@@ -584,6 +584,17 @@ export function fetchErpSubmoduleGraph(
   });
 }
 
+export function fetchErpModuleGraph(
+  context: IntelligenceContext,
+  moduleId: number,
+  options: { sampleSize?: number; limit?: number } = {}
+) {
+  return get<ErpSubmoduleGraph>(context, `/knowledge-graph/browser/erp-modules/${moduleId}/graph`, {
+    sample_size: options.sampleSize,
+    limit: options.limit,
+  });
+}
+
 // ---- Global search, path-finder, full node drill-down, and Organization
 // Management's own staff/department/role graph — all additive to the six
 // browser endpoints above, same GraphModuleBrowser/Neo4j path, tenant scope
