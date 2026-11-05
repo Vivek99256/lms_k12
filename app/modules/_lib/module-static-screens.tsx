@@ -58,6 +58,7 @@ import { HOSTEL_COMMUNICATION_SCREENS } from '@/app/hostel/communication/_screen
 import { EXAM_COMMUNICATION_SCREENS } from '@/app/exam/communication/_screens/exam-communication-screens';
 import { MOBILE_APPS_COMMUNICATION_SCREENS } from '@/app/mobile-apps/communication/_screens/mobile-apps-communication-screens';
 import { TIMETABLE_COMMUNICATION_SCREENS } from '@/app/timetable/communication/_screens/timetable-communication-screens';
+import { HRIT_COMMUNICATION_SCREENS } from '@/app/hrit/communication/_screens/hrit-communication-screens';
 import { VISITOR_COMMUNICATION_SCREENS } from '@/app/admin-services/_components/visitor-communication-screens';
 import { ALUMNI_AI_STACK_SCREENS } from '@/app/alumni/ai-stack/_screens/ai-stack-screens';
 import { PTM_COMMUNICATION_SCREENS } from '@/app/admin-services/_components/ptm-communication-screens';
@@ -70,8 +71,12 @@ import { INWARD_AI_STACK_SCREENS } from '@/app/inward_outward/ai-stack/_screens/
 import { INVENTORY_AI_STACK_SCREENS } from '@/app/Inventory/ai-stack/_screens/ai-stack-screens';
 import { FRONT_DESK_AI_STACK_SCREENS } from '@/app/front_desk/ai-stack/_screens/ai-stack-screens';
 import { TASK_MANAGEMENT_AI_STACK_SCREENS } from '@/app/task-management/ai-stack/_screens/ai-stack-screens';
+import { TASK_MANAGEMENT_COMMUNICATION_SCREENS } from '@/app/task-management/communication/_screens/task-communication-screens';
+import { TALENT_MANAGEMENT_COMMUNICATION_SCREENS } from '@/app/talent-management/communication/_screens/talent-communication-screens';
 import { UTILITY_AI_STACK_SCREENS } from '@/app/Utility/ai-stack/_screens/ai-stack-screens';
 import { DOCUMENT_TEMPLATES_AI_STACK_SCREENS } from '@/app/document-templates/ai-stack/_screens/ai-stack-screens';
+import { CAPABILITY_INTELLIGENCE_REPORT_SCREENS } from '@/app/capability-intelligence/reports/_screens/capability-intelligence-report-screens';
+import { CAPABILITY_INTELLIGENCE_COMMUNICATION_SCREENS } from '@/app/capability-intelligence/communication/_screens/capability-communication-screens';
 
 /**
  * The built screens a module's category page renders inline, for the modules that have
@@ -156,6 +161,10 @@ const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   'attendance:ai-stack': ATTENDANCE_AI_STACK_SCREENS,
   'attendance:communication': ATTENDANCE_COMMUNICATION_SCREENS,
   'attendance:reports': ATTENDANCE_REPORT_SCREENS,
+  'capability-intelligence:reports': CAPABILITY_INTELLIGENCE_REPORT_SCREENS,
+  'capability_intelligence:reports': CAPABILITY_INTELLIGENCE_REPORT_SCREENS,
+  'capability-intelligence:communication': CAPABILITY_INTELLIGENCE_COMMUNICATION_SCREENS,
+  'capability_intelligence:communication': CAPABILITY_INTELLIGENCE_COMMUNICATION_SCREENS,
   'certificate:ai-stack': CERTIFICATE_AI_STACK_SCREENS,
   'circular:ai-stack': CIRCULAR_AI_STACK_SCREENS,
   // `communication:` renders the `easy_com` module — the key this estate has always used
@@ -181,6 +190,9 @@ const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   'exam-assessment:ai-stack': EXAM_ASSESSMENT_AI_STACK_SCREENS,
   'fees:communication': FEES_COMMUNICATION_SCREENS,
   'front-desk:ai-stack': FRONT_DESK_AI_STACK_SCREENS,
+  'hrit-management:communication': HRIT_COMMUNICATION_SCREENS,
+  'hrit_management:communication': HRIT_COMMUNICATION_SCREENS,
+  'hrit:communication': HRIT_COMMUNICATION_SCREENS,
   'hostel:ai-stack': HOSTEL_AI_STACK_SCREENS,
   'hostel:communication': HOSTEL_COMMUNICATION_SCREENS,
   'hostel-report:communication': HOSTEL_COMMUNICATION_SCREENS,
@@ -246,6 +258,10 @@ const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   'task-management:ai-stack': TASK_MANAGEMENT_AI_STACK_SCREENS,
   'task-management-253:ai-stack': TASK_MANAGEMENT_AI_STACK_SCREENS,
   'task-management-551:ai-stack': TASK_MANAGEMENT_AI_STACK_SCREENS,
+  'task-management:communication': TASK_MANAGEMENT_COMMUNICATION_SCREENS,
+  'task-management-253:communication': TASK_MANAGEMENT_COMMUNICATION_SCREENS,
+  'task-management-551:communication': TASK_MANAGEMENT_COMMUNICATION_SCREENS,
+  'talent-management:communication': TALENT_MANAGEMENT_COMMUNICATION_SCREENS,
   'teach-learn:communication': TEACH_LEARN_COMMUNICATION_SCREENS,
   'teach_learn:communication': TEACH_LEARN_COMMUNICATION_SCREENS,
   'timetable:ai-stack': TIMETABLE_AI_STACK_SCREENS,
@@ -294,7 +310,7 @@ export function ModuleCategoryRoute({
   const platformModuleKey =
     moduleKey === 'admission' || moduleKey === 'admissions'
       ? 'admissions'
-      : moduleKey === 'user' || moduleKey === 'users' || moduleKey === 'user-i-card'
+      : moduleKey === 'user' || moduleKey === 'users' || moduleKey === 'user-i-card' || moduleKey === 'hrit-management' || moduleKey === 'hrit_management' || moduleKey === 'hrit'
         ? 'hr'
         : moduleKey === 'fees'
           ? 'fees'
@@ -334,7 +350,15 @@ export function ModuleCategoryRoute({
                                             ? 'utility'
                                             : moduleKey === 'document-templates'
                                               ? 'document_templates'
-                                              : undefined;
+                                              : moduleKey === 'organization-management' || moduleKey === 'organization_managment'
+                                                ? 'organization_management'
+                                                : moduleKey.startsWith('task-management')
+                                                  ? 'task-management'
+                                                  : moduleKey === 'talent-management'
+                                                    ? 'talent'
+                                                    : moduleKey === 'capability-intelligence' || moduleKey === 'capability_intelligence'
+                                                      ? 'capability'
+                                                      : undefined;
 
   return (
     <ModuleCategoryPage

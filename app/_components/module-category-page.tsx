@@ -611,7 +611,7 @@ export function ModuleCategoryPage({
       platformModuleKey ||
       (moduleName === 'admission' || moduleName === 'admissions'
         ? 'admissions'
-        : moduleName === 'user' || moduleName === 'users' || moduleName === 'user-i-card'
+        : moduleName === 'user' || moduleName === 'users' || moduleName === 'user-i-card' || moduleName === 'hrit-management' || moduleName === 'hrit_management' || moduleName === 'hrit'
           ? 'hr'
           : moduleName === 'fees'
             ? 'fees'
@@ -750,7 +750,7 @@ export function ModuleCategoryPage({
       platformModuleKey ||
       (moduleName === 'admission' || moduleName === 'admissions'
         ? 'admissions'
-        : moduleName === 'user' || moduleName === 'users' || moduleName === 'user-i-card'
+        : moduleName === 'user' || moduleName === 'users' || moduleName === 'user-i-card' || moduleName === 'hrit-management' || moduleName === 'hrit_management' || moduleName === 'hrit'
           ? 'hr'
           : moduleName === 'fees'
             ? 'fees'

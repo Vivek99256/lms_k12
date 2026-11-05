@@ -364,6 +364,8 @@ export interface ErpSubmodule {
   label: string;
   /** False when ModuleGraphMapper found no real GraphSchema labels for it. */
   mapped: boolean;
+  /** The resolved GraphSchema labels themselves — lets the explorer ask search() for real starting points scoped to just this submodule. */
+  labels: string[];
 }
 
 export interface ErpSubmoduleGraph {

@@ -143,6 +143,17 @@ export interface WorkspacePayload {
   ontology_views: OntologyViewSummary[];
   /** Derived stage of the intelligence chain for the current record. */
   flow: FlowState;
+  /** Centralized channel configuration (voice & language synchronized across platforms). */
+  channel_settings?: {
+    project_id: string;
+    voice_enabled: boolean;
+    default_language: string;
+    show_ask_tab?: boolean;
+    show_create_tab?: boolean;
+    suggested_prompt_source?: string;
+    updated_at?: string | null;
+    updated_by?: string | null;
+  };
 }
 
 export interface PlannedStep {
@@ -462,6 +473,36 @@ export function fetchOntologyView(
   input: { route: string; entity_type?: string | null; entity_id?: string | number | null }
 ) {
   return post<OntologyViewResult>(session, `/ontology-views/${viewKey}`, input);
+}
+
+/**
+ * One node's real connections in every direction, from
+ * `POST /api/ai/workspace/nodes/{entity}/{id}/expand` — the click-to-expand
+ * backend for the decentralized canvas, as opposed to `fetchOntologyView`'s
+ * fixed, pre-authored hop path.
+ */
+export interface NodeExpansionResult {
+  found: boolean;
+  node: { entity: string; id: number | string | null; label: string; attributes: Record<string, unknown> } | null;
+  relations: Array<{
+    relation: string;
+    direction: 'outgoing' | 'incoming';
+    entity: string | null;
+    available: boolean;
+    reason: string | null;
+    source: 'sql' | 'graph' | null;
+    total: number;
+    items: Array<{ entity: string; id: number | string | null; label: string; attributes: Record<string, unknown> }>;
+  }>;
+}
+
+export function expandGraphNode(
+  session: WorkspaceSession,
+  entity: string,
+  id: string | number,
+  limit = 10
+) {
+  return post<NodeExpansionResult>(session, `/nodes/${entity}/${id}/expand`, { limit });
 }
 
 export function startWorkspaceWorkflow(

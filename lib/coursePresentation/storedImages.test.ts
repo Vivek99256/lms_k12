@@ -8,7 +8,7 @@ import { ImageEditDialog } from '../../components/study-deck/ImageEditDialog';
 import { actionSentence, withEditedImage, withEditedState, type ImageEditorAdapter, type ImageEditState } from '../study-deck/imageEditing';
 import type { DeckImage, StudyDeck } from '../study-deck/types';
 import { CoursePresentationApiError } from './api';
-import { createStoredImageAdapter, loadStoredImageStates, storedFailureReason, unavailableStates, viewerKind } from './storedImages';
+import { createStoredImageAdapter, ITEM_PICTURES_UNSUPPORTED, loadStoredImageStates, storedFailureReason, unavailableStates, viewerKind, withItemFallbacks } from './storedImages';
 
 // The session the client reads its bearer token from (a browser's storage).
 const store = { getItem: (key: string) => (key === 'userData' ? JSON.stringify({ token: 'tok' }) : null) };
@@ -49,7 +49,8 @@ test('the loader reports what the editor answered, and why when it could not', a
     [404, { message: 'The route api/lms/course-presentation/stored-image/states could not be found.' }, /not available on this server yet/],
     [404, {}, /not available on this server yet/],
     [401, { message: 'JWT token is required.' }, /session has expired/],
-    [403, { status_code: 0, message: 'You are not authorised to do this.' }, /does not have permission/],
+    [403, { status_code: 0, message: 'You are not authorised to do this.' }, /cannot change pictures/],
+    [403, { status_code: 0, message: 'You do not have permission to create this resource.', module: 'lms.content', action: 'create' }, /content "create" right.*Sign in as a teacher/],
     [403, { status_code: 0, message: 'Changing a picture in a stored presentation is available for the pilot chapter only.' }, /pilot chapter only/],
     [404, { status_code: 0, message: 'That presentation was not found.' }, /That presentation was not found/],
     [500, {}, /cannot be changed in this presentation right now|Request failed/],
@@ -82,6 +83,40 @@ test('when the editor cannot be used, every slide with a picture still gets a di
     assert.deepEqual([state.can_add, state.can_replace, state.can_remove, state.can_restore], [false, false, false, false]);
     assert.equal(state.reason, 'Picture editing is not available on this server yet.');
   }
+});
+
+const toolsSlide = (n: number) => ({
+  n,
+  image: image(n),
+  interaction: { kind: 'reveal', items: [{ id: 'i1', label: 'The magnifying glass', text: 'a' }, { id: 'i2', label: 'The compass', text: 'b', image: image(77) }] },
+});
+
+test('when the editor cannot be used, the items of a slide get disabled controls too, so they are never silently missing', () => {
+  const out = unavailableStates({ slides: [toolsSlide(2), { n: 3, image: image(3), interaction: null }] } as never, 'Picture editing is not available on this server yet.');
+
+  assert.deepEqual(Object.keys(out['2'].items ?? {}), ['i1', 'i2']);
+  assert.equal(out['2'].items?.i1.title, 'The magnifying glass');
+  assert.equal(out['2'].items?.i1.has_image, false, 'the magnifying glass has no picture of its own');
+  assert.equal(out['2'].items?.i2.has_image, true);
+  for (const state of Object.values(out['2'].items ?? {})) {
+    assert.deepEqual([state.can_add, state.can_replace, state.can_remove, state.can_restore], [false, false, false, false]);
+    assert.equal(state.reason, 'Picture editing is not available on this server yet.');
+  }
+  assert.equal(out['3'].items, undefined, 'a slide with no items to open has no item controls');
+});
+
+test('a server that answers for slides only still gets a disabled, explained control on every item', () => {
+  const answered = { '2': { has_image: true, can_add: false, can_replace: true, can_remove: false, can_restore: false, reason: null, kind: 'photo' as const }, '3': { has_image: true, can_add: false, can_replace: true, can_remove: false, can_restore: false, reason: null } };
+  const deck = { slides: [toolsSlide(2), { n: 3, image: image(3), interaction: null }] } as never;
+
+  const out = withItemFallbacks(answered, deck);
+
+  assert.equal(out['2'].can_replace, true, 'the slide\'s own picture keeps what the server said');
+  assert.equal(out['2'].items?.i1.reason, ITEM_PICTURES_UNSUPPORTED);
+  assert.equal(out['2'].items?.i1.can_add || out['2'].items?.i1.can_replace, false);
+  assert.equal(out['3'], answered['3'], 'a slide without items is the very same object');
+  assert.equal(withItemFallbacks({ ...answered, '2': { ...answered['2'], items: { i1: { ...answered['2'], title: 'x' } } } }, deck)['2'].items?.i1.title, 'x', 'what the server said for items is never replaced');
+  assert.equal(withItemFallbacks({}, deck)['2'], undefined, 'a slide the server named no state for is left alone');
 });
 
 test('the viewer is told apart from the session profile: students and parents get no editing UI', () => {
@@ -131,6 +166,63 @@ test('choosing a photograph sends its id only; restoring sends the slide only', 
     assert.deepEqual(Object.keys(JSON.parse(String(f.calls[1].init?.body))).sort(), ['chapter_id', 'content_id', 'slide']);
   } finally {
     f.restore();
+  }
+});
+
+test('every call for an item names the item as well as the slide, so one item\'s change cannot land on another', async () => {
+  const f = stubFetch((url) => answer(200, url.includes('/search') ? { status_code: 1, query: 'compass', candidates: [], note: null } : { ...result, slide: 6, item: 'i2' }));
+  try {
+    const adapter = createStoredImageAdapter(8592, 900);
+    await adapter.search({ slide: 6, item: 'i2' }, 'compass');
+    await adapter.setFromCandidate({ slide: 6, item: 'i2' }, 'abcdef0123456789');
+    await adapter.restore({ slide: 6, item: 'i2' });
+    await adapter.setFromCandidate({ slide: 6 }, 'abcdef0123456789');
+
+    assert.match(f.calls[0].url, /stored-image\/search\?/);
+    assert.match(f.calls[0].url, /slide=6/);
+    assert.match(f.calls[0].url, /item=i2/);
+    assert.deepEqual(Object.keys(JSON.parse(String(f.calls[1].init?.body))).sort(), ['candidate_id', 'chapter_id', 'content_id', 'item', 'slide']);
+    assert.equal(JSON.parse(String(f.calls[1].init?.body)).item, 'i2');
+    assert.deepEqual(Object.keys(JSON.parse(String(f.calls[2].init?.body))).sort(), ['chapter_id', 'content_id', 'item', 'slide']);
+    assert.deepEqual(Object.keys(JSON.parse(String(f.calls[3].init?.body))).sort(), ['candidate_id', 'chapter_id', 'content_id', 'slide'], 'the slide\'s own picture names no item');
+  } finally {
+    f.restore();
+  }
+});
+
+test('an item\'s uploaded picture is sent with its item', async () => {
+  // The upload reports progress, so it goes through XMLHttpRequest rather than fetch.
+  const sent: { url: string; body: FormData }[] = [];
+  class FakeXhr {
+    upload: Record<string, unknown> = {};
+    status = 200;
+    responseText = JSON.stringify({ ...result, slide: 6, item: 'i1' });
+    onload: () => void = () => {};
+    private url = '';
+    open(_method: string, url: string) {
+      this.url = url;
+    }
+    setRequestHeader() {}
+    addEventListener() {}
+    send(body: FormData) {
+      sent.push({ url: this.url, body });
+      this.onload();
+    }
+  }
+  const original = (globalThis as { XMLHttpRequest?: unknown }).XMLHttpRequest;
+  Object.assign(globalThis, { XMLHttpRequest: FakeXhr });
+  try {
+    const file = new File([new Uint8Array([137, 80, 78, 71])], 'compass.png', { type: 'image/png' });
+    const res = await createStoredImageAdapter(8592, 900).setFromUpload({ slide: 6, item: 'i1' }, file, { credit: 'Ms Rao', alt: 'A compass' });
+
+    assert.match(sent[0].url, /stored-image\/replace$/);
+    assert.equal(sent[0].body.get('item'), 'i1');
+    assert.equal(sent[0].body.get('slide'), '6');
+    assert.equal(sent[0].body.get('content_id'), '900');
+    assert.equal(sent[0].body.get('credit'), 'Ms Rao');
+    assert.equal((res as { item?: string }).item, 'i1');
+  } finally {
+    Object.assign(globalThis, { XMLHttpRequest: original });
   }
 });
 

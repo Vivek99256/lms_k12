@@ -9,8 +9,13 @@
  * `<Suspense>` needed — the component reads no `useSearchParams()`.
  */
 
-import { TmReports } from './components'
+import { TmReports } from './components'
+import { TaskTheme } from '../_lib/task-theme'
 
 export default function ReportsAnalysisPage() {
-  return <TmReports />
+  return (
+    <TaskTheme>
+      <TmReports />
+    </TaskTheme>
+  )
 }

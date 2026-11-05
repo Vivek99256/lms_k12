@@ -85,6 +85,10 @@ interface UseVoiceInteractionOptions {
    * question. `language` is the tag the recogniser was listening for.
    */
   onFinalTranscript?: (text: string, language: string) => void
+  /** Centralized default language (e.g. 'hi-IN'). */
+  defaultLanguage?: string
+  /** Whether voice functionality is enabled in the centralized settings. */
+  enabled?: boolean
 }
 
 /** Wait for the browser to list its voices; some load them a moment after the page. */
@@ -107,7 +111,7 @@ function loadVoices(): Promise<SpeechSynthesisVoice[]> {
 }
 
 export function useVoiceInteraction(options: UseVoiceInteractionOptions = {}) {
-  const [language, setLanguage] = useState('en-IN')
+  const [language, setLanguage] = useState(options.defaultLanguage || 'en-IN')
   const [transcript, setTranscript] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -123,6 +127,25 @@ export function useVoiceInteraction(options: UseVoiceInteractionOptions = {}) {
   const failedRef = useRef(false)
   const speakingRunRef = useRef(0)
   const onFinalRef = useRef(options.onFinalTranscript)
+
+  useEffect(() => {
+    if (options.defaultLanguage && options.defaultLanguage !== language) {
+      setLanguage(options.defaultLanguage)
+    }
+  }, [options.defaultLanguage, language])
+
+  useEffect(() => {
+    if (options.enabled === false) {
+      if (isRecording) {
+        recognitionRef.current?.abort()
+        setIsRecording(false)
+      }
+      if (isSpeaking) {
+        window.speechSynthesis?.cancel()
+        setIsSpeaking(false)
+      }
+    }
+  }, [options.enabled, isRecording, isSpeaking])
 
   useEffect(() => {
     onFinalRef.current = options.onFinalTranscript
@@ -152,6 +175,7 @@ export function useVoiceInteraction(options: UseVoiceInteractionOptions = {}) {
   }, [])
 
   const startRecording = useCallback(async () => {
+    if (options.enabled === false) return
     if (typeof window === 'undefined') return
 
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition

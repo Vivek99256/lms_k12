@@ -10,8 +10,17 @@
  * `mobility-and-succession/page.tsx`).
  */
 
-import { OffboardingCenter } from './components/offboarding-center'
+import { OffboardingCenter } from './components/offboarding-center'
+import { TalentTheme } from '../_lib/talent-theme'
+
+function OffboardingPageInner() {
+  return <OffboardingCenter />
+}
 
 export default function OffboardingPage() {
-  return <OffboardingCenter />
+  return (
+    <TalentTheme>
+      <OffboardingPageInner />
+    </TalentTheme>
+  )
 }

@@ -282,7 +282,7 @@ export function TimetableDeliveryLog() {
             <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Recipient & Mobile</th>
+                  <th className="px-4 py-3">Recipient & Contact</th>
                   <th className="px-4 py-3">Channel</th>
                   <th className="px-4 py-3">Subject & Notice</th>
                   <th className="px-4 py-3">Status</th>
@@ -299,8 +299,15 @@ export function TimetableDeliveryLog() {
                   </tr>
                 ) : (
                   filteredDispatches.map((item) => {
+                    const isEmail = item.channel.toLowerCase() === 'email';
                     const parsed = extractPhoneAndName(item.recipient);
-                    const displayPhone = item.mobile_number || parsed.phone || '—';
+                    let displayContact = '—';
+                    if (isEmail) {
+                      const emailMatch = item.recipient.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+                      displayContact = emailMatch ? emailMatch[1] : item.recipient.split(' ')[0] || '—';
+                    } else {
+                      displayContact = item.mobile_number || parsed.phone || '—';
+                    }
                     const displayName = item.recipient_name || parsed.name || 'Recipient';
 
                     return (
@@ -308,14 +315,18 @@ export function TimetableDeliveryLog() {
                         <td className="px-4 py-3">
                           <div className="font-semibold text-slate-900">{displayName}</div>
                           <div className="flex items-center gap-1.5 text-slate-500 mt-0.5 font-mono">
-                            <Phone className="h-3 w-3 text-slate-400" />
-                            <span>{displayPhone}</span>
-                            {displayPhone !== '—' && (
+                            {isEmail ? (
+                              <Mail className="h-3 w-3 text-blue-500" />
+                            ) : (
+                              <Phone className="h-3 w-3 text-slate-400" />
+                            )}
+                            <span>{displayContact}</span>
+                            {displayContact !== '—' && (
                               <button
                                 type="button"
-                                onClick={() => handleCopy(displayPhone, item.id)}
+                                onClick={() => handleCopy(displayContact, item.id)}
                                 className="text-slate-400 hover:text-indigo-600 transition"
-                                title="Copy mobile number"
+                                title={isEmail ? "Copy email" : "Copy mobile number"}
                               >
                                 {copiedId === item.id ? (
                                   <Check className="h-3 w-3 text-emerald-600" />
@@ -383,32 +394,48 @@ export function TimetableDeliveryLog() {
               <div>{getStatusBadge(activeModalItem.status)}</div>
             </div>
 
-            {/* Recipient Phone Banner */}
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
-                  Mobile Number
-                </span>
-                <p className="text-base font-bold font-mono text-emerald-950 mt-0.5">
-                  {activeModalItem.mobile_number ||
-                    extractPhoneAndName(activeModalItem.recipient).phone ||
-                    '—'}
-                </p>
-              </div>
-              {activeModalItem.mobile_number && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    handleCopy(activeModalItem.mobile_number!, activeModalItem.id)
-                  }
-                  className="h-8 border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-100"
-                >
-                  <Copy className="h-3.5 w-3.5 mr-1" />
-                  Copy
-                </Button>
-              )}
-            </div>
+            {/* Recipient Contact Banner */}
+            {(() => {
+              const isModalEmail = activeModalItem.channel.toLowerCase() === 'email';
+              const modalEmailMatch = activeModalItem.recipient.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+              const modalContact = isModalEmail
+                ? (modalEmailMatch ? modalEmailMatch[1] : activeModalItem.recipient.split(' ')[0] || '—')
+                : (activeModalItem.mobile_number || extractPhoneAndName(activeModalItem.recipient).phone || '—');
+
+              return (
+                <div className={`rounded-xl border p-3.5 flex items-center justify-between ${
+                  isModalEmail ? 'border-blue-200 bg-blue-50/60' : 'border-emerald-200 bg-emerald-50/60'
+                }`}>
+                  <div>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                      isModalEmail ? 'text-blue-800' : 'text-emerald-800'
+                    }`}>
+                      {isModalEmail ? 'Email Address' : 'Mobile Number'}
+                    </span>
+                    <p className={`text-base font-bold font-mono mt-0.5 ${
+                      isModalEmail ? 'text-blue-950' : 'text-emerald-950'
+                    }`}>
+                      {modalContact}
+                    </p>
+                  </div>
+                  {modalContact !== '—' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCopy(modalContact, activeModalItem.id)}
+                      className={`h-8 bg-white ${
+                        isModalEmail
+                          ? 'border-blue-300 text-blue-800 hover:bg-blue-100'
+                          : 'border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                      }`}
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1" />
+                      Copy
+                    </Button>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Metadata Rows */}
             <div className="space-y-2 text-xs">

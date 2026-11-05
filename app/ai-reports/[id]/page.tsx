@@ -8,6 +8,7 @@ import {
   Link2,
   Loader2,
   Pencil,
+  Download,
   Printer,
   RefreshCw,
   Save,
@@ -27,6 +28,7 @@ import { TemplateHtmlEditor } from '@/app/general/_components/TemplateHtmlEditor
 import { useAuth } from '@/contexts/AuthContext';
 import { readAiSession } from '@/lib/ai/session';
 import {
+  exportAiReport,
   getAiReport,
   getReportRecipients,
   regenerateAiReport,
@@ -356,6 +358,15 @@ export default function AiReportPage() {
           <Button type="button" variant="outline" onClick={print}>
             <Printer className="h-4 w-4" />
             Print
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => window.open(exportAiReport(context, report.id, 'csv'), '_blank')}
+            title="Download this report data as a CSV spreadsheet"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
           </Button>
           <Button
             type="button"

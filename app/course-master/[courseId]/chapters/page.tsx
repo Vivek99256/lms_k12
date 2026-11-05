@@ -3849,6 +3849,20 @@ export default function ChapterListPage() {
       window.location.reload();
     }, 2000);
   };
+
+  /**
+   * Revision notes, a classroom activity or a remedial class started from Teacher Workspace is filed under Classroom Resource
+   * (this lane lists teacher training only), so after generating, the drawer sends the teacher to the library tab it landed in.
+   */
+  const openClassroomResourceTab = (chapterId: string, tab: string) => {
+    const chapter = allChapters.find((item) => item.id === chapterId);
+    if (!chapter) return;
+
+    closeGeneratePresentationDrawer();
+    openChapterContentView(chapter, 'classroom');
+    // After openChapterContentView, which resets the tab to All content; the later call wins.
+    setContentLibraryTab(tab as ContentLibraryTab);
+  };
   useEffect(() => {
     if (!presentationChapterId) return;
 
@@ -6864,6 +6878,7 @@ export default function ChapterListPage() {
             initialChapterId={activeLibraryChapter?.id ?? contentChapter?.id ?? ''}
             initialConcept={activeLibraryChapterConcepts?.concepts[0]?.title ?? ''}
             onSuccess={handleGenerateSuccess}
+            onOpenClassroomResource={openClassroomResourceTab}
           />
           {documentViewer}
         </div>

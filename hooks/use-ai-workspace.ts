@@ -177,6 +177,7 @@ export function useAiWorkspace(options: UseAiWorkspaceOptions = {}) {
     flow,
     reloadFlow,
     suggestions: payload?.suggestions ?? {},
+    channelSettings: payload?.channel_settings,
     active: payload?.active ?? { workflow_runs: [], pending_recommendations: [] },
     ontologyViews: payload?.ontology_views ?? [],
     availableTabs,

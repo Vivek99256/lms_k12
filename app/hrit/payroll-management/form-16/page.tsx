@@ -14,6 +14,7 @@
  * `Select` -> `@/components/ui/g2g/select`).
  */
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { useEffect, useMemo, useState } from 'react'
 import { FileSpreadsheet, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -40,7 +41,7 @@ import {
   downloadCsv,
 } from '@/app/hrit/_components/payroll-shell'
 
-export default function Form16Page() {
+function Form16PageInner() {
   const { departments, loading: departmentsLoading } = usePayrollDepartments()
   const { payrollTypes, loading: payrollTypesLoading } = usePayrollTypes()
   const { loading, error, form16, generate } = useForm16()
@@ -357,5 +358,13 @@ function Form16Section({
         </TableBody>
       </Table>
     </div>
+  )
+}
+
+export default function Form16Page() {
+  return (
+    <HritTheme>
+      <Form16PageInner />
+    </HritTheme>
   )
 }

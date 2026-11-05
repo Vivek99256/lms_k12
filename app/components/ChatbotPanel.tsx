@@ -468,6 +468,39 @@ export default function ChatbotPanel({
   const spokenIdRef = useRef<string | null>(null);
   const sendingRef = useRef(false);
 
+  // Centralized Channel configuration (Voice & Language synchronized across platforms)
+  const [channelSettings, setChannelSettings] = useState<{
+    voice_enabled?: boolean;
+    default_language?: string;
+  } | null>(() => workspace.channelSettings ?? null);
+
+  useEffect(() => {
+    if (workspace.channelSettings) {
+      setChannelSettings(workspace.channelSettings);
+      return;
+    }
+
+    let isMounted = true;
+    fetch('/api/conversational-ai/projects/lms_k12/settings', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!isMounted || !data) return;
+        if (data.data && typeof data.data.voice_enabled === 'boolean') {
+          setChannelSettings(data.data);
+        } else if (typeof data.voice_enabled === 'boolean') {
+          setChannelSettings(data);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [workspace.channelSettings]);
+
+  const effectiveVoiceEnabled = channelSettings?.voice_enabled ?? workspace.channelSettings?.voice_enabled ?? true;
+  const effectiveDefaultLanguage = channelSettings?.default_language ?? workspace.channelSettings?.default_language ?? 'en-IN';
+
   const {
     supportedLanguages,
     isSupported,
@@ -487,8 +520,16 @@ export default function ChatbotPanel({
     error: voiceError,
     clearError,
   } = useVoiceInteraction({
+    defaultLanguage: effectiveDefaultLanguage,
+    enabled: effectiveVoiceEnabled,
     onFinalTranscript: (text, tag) => voiceAskRef.current?.(text, tag),
   });
+
+  useEffect(() => {
+    if (effectiveDefaultLanguage && effectiveDefaultLanguage !== language) {
+      setLanguage(effectiveDefaultLanguage);
+    }
+  }, [effectiveDefaultLanguage]);
 
   // The SDK messages are what gets persisted, not the rendered view of them: parts
   // rehydrate into the same panel message, and a stored view model would not.
@@ -1648,8 +1689,14 @@ export default function ChatbotPanel({
                   startRecording();
                 }
               }}
-              disabled={!isSupported}
-              title={isSupported ? 'Speak your question' : UNSUPPORTED_RECOGNITION_MESSAGE}
+              disabled={!isSupported || !effectiveVoiceEnabled}
+              title={
+                !effectiveVoiceEnabled
+                  ? 'Voice input is disabled for this module'
+                  : isSupported
+                    ? 'Speak your question'
+                    : UNSUPPORTED_RECOGNITION_MESSAGE
+              }
             >
               {isRecording ? <Square className="size-3.5" /> : <Mic className="size-3.5" />}
               {isRecording ? 'Stop' : 'Voice'}
@@ -1669,7 +1716,8 @@ export default function ChatbotPanel({
                   );
                 }
               }}
-              disabled={!latestAssistantMessage?.content}
+              disabled={!latestAssistantMessage?.content || !effectiveVoiceEnabled}
+              title={!effectiveVoiceEnabled ? 'Voice replay is disabled for this module' : 'Replay'}
             >
               {isSpeaking ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
               {isSpeaking ? 'Mute' : 'Replay'}
@@ -1677,16 +1725,19 @@ export default function ChatbotPanel({
           </div>
 
           <div className="mt-2 flex items-center justify-between gap-3">
-            <label className="flex items-center gap-2 text-xs text-gray-600">
+            <label className={cn('flex items-center gap-2 text-xs', effectiveVoiceEnabled ? 'text-gray-600' : 'text-gray-400')}>
               <input
                 type="checkbox"
-                checked={speakReplies}
-                disabled={!isSpeechSupported}
+                checked={speakReplies && effectiveVoiceEnabled}
+                disabled={!isSpeechSupported || !effectiveVoiceEnabled}
                 onChange={(event) => setSpeakReplies(event.target.checked)}
                 className="size-3.5 rounded border-gray-300"
               />
               Read replies aloud
             </label>
+            {!effectiveVoiceEnabled ? (
+              <span className="text-[11px] font-medium text-amber-700">Voice disabled</span>
+            ) : null}
           </div>
 
           {!isSupported ? (

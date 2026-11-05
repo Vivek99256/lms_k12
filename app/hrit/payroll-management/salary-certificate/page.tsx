@@ -15,6 +15,7 @@
  * `Select` -> `@/components/ui/g2g/select`).
  */
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, FileCheck2, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -29,7 +30,7 @@ import { usePayrollDepartments, useDepartmentEmployees } from '@/app/hrit/_lib/u
 import { useSalaryCertificate } from '@/app/hrit/_lib/use-salary-certificate'
 import { PayrollMessages, PayrollPageShell } from '@/app/hrit/_components/payroll-shell'
 
-export default function SalaryCertificatePage() {
+function SalaryCertificatePageInner() {
   const {
     optionsLoading,
     processing,
@@ -302,5 +303,13 @@ export default function SalaryCertificatePage() {
         </Card>
       </div>
     </PayrollPageShell>
+  )
+}
+
+export default function SalaryCertificatePage() {
+  return (
+    <HritTheme>
+      <SalaryCertificatePageInner />
+    </HritTheme>
   )
 }

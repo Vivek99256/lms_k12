@@ -279,6 +279,8 @@ const V1_DEFERRED_ROUTE_EXCEPTIONS = [
   '/career-awareness',
   '/career-counselling',
   '/career-intelligence',
+  '/hrit/leave-management',
+  '/hrit/attendance-management',
 ] as const;
 
 export function showDeferredModules(): boolean {

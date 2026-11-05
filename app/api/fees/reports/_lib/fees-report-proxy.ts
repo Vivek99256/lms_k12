@@ -35,7 +35,7 @@ function readSession(request: NextRequest): ProxySession {
     baseUrl,
     token: readHeader(request, 'x-laravel-token'),
     subInstituteId: readHeader(request, 'x-sub-institute-id'),
-    academicYearId: readHeader(request, 'x-academic-year-id'),
+    academicYearId: readHeader(request, 'x-academic-year') || readHeader(request, 'x-academic-year-id'),
     userId: readHeader(request, 'x-user-id'),
     termId: readHeader(request, 'x-term-id'),
     userProfileId: readHeader(request, 'x-user-profile-id'),
@@ -107,6 +107,13 @@ function buildLaravelHeaders(request: NextRequest, session: ProxySession, extraH
   headers.set('X-Requested-With', 'XMLHttpRequest');
   if (session.token) {
     headers.set('Authorization', `Bearer ${session.token}`);
+  }
+  if (session.subInstituteId) {
+    headers.set('x-sub-institute-id', session.subInstituteId);
+  }
+  if (session.academicYearId) {
+    headers.set('x-academic-year', session.academicYearId);
+    headers.set('x-academic-year-id', session.academicYearId);
   }
 
   const cookieHeader = request.headers.get('cookie');

@@ -9,8 +9,17 @@
  * `recruitment`'s page, this screen doesn't read `useSearchParams()`.
  */
 
-import { EmployeeProfilesCenter } from './components/employee-profiles-center'
+import { EmployeeProfilesCenter } from './components/employee-profiles-center'
+import { TalentTheme } from '../_lib/talent-theme'
+
+function EmployeeProfilesPageInner() {
+  return <EmployeeProfilesCenter />
+}
 
 export default function EmployeeProfilesPage() {
-  return <EmployeeProfilesCenter />
+  return (
+    <TalentTheme>
+      <EmployeeProfilesPageInner />
+    </TalentTheme>
+  )
 }

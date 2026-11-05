@@ -226,6 +226,16 @@ export async function fetchLaravelJson<T>(session: FeesSession, url: string, ini
   headers.set('Accept', 'application/json');
   if (session.token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${session.token}`);
   headers.set('X-Requested-With', 'XMLHttpRequest');
+  if (session.subInstituteId && !headers.has('x-sub-institute-id')) {
+    headers.set('x-sub-institute-id', session.subInstituteId);
+  }
+  if (session.academicYearId) {
+    if (!headers.has('x-academic-year')) headers.set('x-academic-year', session.academicYearId);
+    if (!headers.has('x-academic-year-id')) headers.set('x-academic-year-id', session.academicYearId);
+  }
+  if (session.userId && !headers.has('x-user-id')) {
+    headers.set('x-user-id', session.userId);
+  }
 
   const response = await fetch(url, {
     ...init,

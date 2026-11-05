@@ -14,12 +14,21 @@
  */
 
 import { Suspense } from 'react'
-import { DevelopmentCareerCenter } from './components/development-career-center'
+import { DevelopmentCareerCenter } from './components/development-career-center'
+import { TalentTheme } from '../_lib/talent-theme'
 
-export default function DevelopmentAndCareerPathsPage() {
+function DevelopmentAndCareerPathsPageInner() {
   return (
     <Suspense fallback={null}>
       <DevelopmentCareerCenter />
     </Suspense>
+  )
+}
+
+export default function DevelopmentAndCareerPathsPage() {
+  return (
+    <TalentTheme>
+      <DevelopmentAndCareerPathsPageInner />
+    </TalentTheme>
   )
 }

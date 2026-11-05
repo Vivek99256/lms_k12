@@ -1,5 +1,6 @@
 'use client'
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarPlus, ClipboardList, Clock } from 'lucide-react'
@@ -30,7 +31,7 @@ const tabs: { id: RequestKind; label: string }[] = [
   { id: 'regularization', label: 'Regularization & Corrections' },
 ]
 
-export default function RequestCenterPage() {
+function RequestCenterPageInner() {
   const router = useRouter()
   const { menuContext } = useAuth()
   const [tab, setTab] = React.useState<RequestKind>('all')
@@ -187,5 +188,13 @@ export default function RequestCenterPage() {
         </table>
       </div>
     </div>
+  )
+}
+
+export default function RequestCenterPage() {
+  return (
+    <HritTheme>
+      <RequestCenterPageInner />
+    </HritTheme>
   )
 }

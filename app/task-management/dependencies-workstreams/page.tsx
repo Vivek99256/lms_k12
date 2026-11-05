@@ -8,8 +8,13 @@
  * `<Suspense>` boundary is needed.
  */
 
-import { DependenciesCenter } from './components'
+import { DependenciesCenter } from './components'
+import { TaskTheme } from '../_lib/task-theme'
 
 export default function DependenciesWorkstreamsPage() {
-  return <DependenciesCenter />
+  return (
+    <TaskTheme>
+      <DependenciesCenter />
+    </TaskTheme>
+  )
 }

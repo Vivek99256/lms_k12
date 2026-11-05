@@ -1,18 +1,34 @@
-import type { DeckImage, ScenarioInteraction, StudyDeck } from './types';
+import type { DeckImage, DeckSlide, ExploreItem, ItemsInteraction, ScenarioInteraction, StudyDeck } from './types';
 
 /**
  * Editing the pictures of a slide-based lesson, independent of where the lesson is kept.
  *
  * Any player that can show a lesson for editing supplies an ADAPTER (the calls to its own storage: a draft waiting for review today); the
  * dialog, the buttons and the rules for what is shown are shared. A format keeps its pictures in its own place, so the thing being edited
- * is a TARGET: a slide's picture, or one scene of a story. The adapter's server decides what may be done; this file only carries the
- * answer to the screen.
+ * is a TARGET: a slide's picture, one scene of a story, or one item of a slide whose items are opened one at a time beside its picture. The
+ * adapter's server decides what may be done; this file only carries the answer to the screen.
  */
 
-/** One picture of a lesson: a slide's, or (with `node`) one scene of a story slide. */
+/** One picture of a lesson: a slide's, or (with `node`) one scene of a story slide, or (with `item`) one item of an items slide. */
 export interface ImageTarget {
   slide: number;
   node?: string;
+  item?: string;
+}
+
+/**
+ * The interactions whose items the player opens beside the slide's picture, where the open item's own picture is drawn. The server applies the
+ * same rule (StoredDeckImageEditor::hasItemPictures), so a slide offered here is one the server will accept item pictures for.
+ */
+const ITEM_KINDS: readonly string[] = ['reveal', 'steps', 'timeline', 'compare'];
+
+/** The items of a slide that can each carry a picture of their own, or null when the slide keeps one picture for all of it. */
+export function pictureItemsOf(slide: { interaction?: DeckSlide['interaction']; image?: unknown }): ExploreItem[] | null {
+  const interaction = slide.interaction;
+  if (!interaction || !ITEM_KINDS.includes(interaction.kind) || !slide.image) return null;
+  const items = (interaction as ItemsInteraction).items;
+
+  return Array.isArray(items) && items.length > 0 ? items : null;
 }
 
 /** What may be done with one picture, as the server decided. */
@@ -30,6 +46,8 @@ export interface ImageEditState {
   title?: string;
   /** For a story slide: the same, per scene. */
   nodes?: Record<string, ImageEditState>;
+  /** For a slide whose items open beside its picture: the same, per item. */
+  items?: Record<string, ImageEditState>;
 }
 
 export type ImageEditStates = Record<string, ImageEditState>;
@@ -39,11 +57,13 @@ export type ImageAction = 'add' | 'replace' | 'remove' | 'restore';
 export interface ImageEditResult {
   slide: number;
   node: string | null;
+  /** The item whose picture changed, when it was an item's. */
+  item?: string | null;
   action: ImageAction;
   /** The picture now (with an address the browser can load), or null when there is none. */
   image: DeckImage | null;
   can_restore: boolean;
-  state: Omit<ImageEditState, 'nodes' | 'title' | 'can_restore'> & { can_restore?: boolean };
+  state: Omit<ImageEditState, 'nodes' | 'items' | 'title' | 'can_restore'> & { can_restore?: boolean };
 }
 
 export interface ImageCandidate {
@@ -91,6 +111,7 @@ export interface ImageEditorAdapter {
 export function stateFor(states: ImageEditStates, target: ImageTarget): ImageEditState | null {
   const slide = states[String(target.slide)];
   if (!slide) return null;
+  if (target.item !== undefined) return slide.items?.[target.item] ?? null;
   return target.node === undefined ? slide : slide.nodes?.[target.node] ?? null;
 }
 
@@ -106,9 +127,20 @@ export function openLabel(state: ImageEditState | null, scene = false): string {
   return state.has_image ? `Change ${noun}` : `Add ${noun}`;
 }
 
-/** What to tell the teacher after a change. A stored presentation is saved at once; a draft is saved when it is approved. */
-export function actionSentence(result: Pick<ImageEditResult, 'action' | 'slide' | 'node'>, stored = false): string {
-  const where = result.node ? `Slide ${result.slide}, scene ${result.node}` : `Slide ${result.slide}`;
+/**
+ * The accessible name of an item's control. It names the item because the slide's own "Change image" is on screen too, and two buttons with the
+ * same name cannot be told apart by a screen reader. It starts with the visible words, as a name should.
+ */
+export function itemOpenLabel(state: ImageEditState | null, name: string): string {
+  return `${state?.has_image ? 'Change image' : 'Add image'} for ${name}`;
+}
+
+/**
+ * What to tell the teacher after a change. A stored presentation is saved at once; a draft is saved when it is approved. `subject` names an
+ * item or a scene in words a teacher knows (its label), instead of the id the server uses.
+ */
+export function actionSentence(result: Pick<ImageEditResult, 'action' | 'slide' | 'node'> & { item?: string | null }, stored = false, subject?: string): string {
+  const where = result.item ? `Slide ${result.slide}, “${subject ?? result.item}”` : result.node ? `Slide ${result.slide}, scene ${subject ?? result.node}` : `Slide ${result.slide}`;
   const kept = stored ? 'The change is saved with this presentation.' : 'It is part of this draft and is saved when you approve it.';
   switch (result.action) {
     case 'add':
@@ -123,14 +155,22 @@ export function actionSentence(result: Pick<ImageEditResult, 'action' | 'slide' 
 }
 
 /**
- * The deck with ONE picture changed: a slide's, or a scene's inside its story slide. Everything else (every other slide and scene, the
- * text, the choices and links, the interaction) is the very same object as before.
+ * The deck with ONE picture changed: a slide's, a scene's inside its story slide, or an item's inside its items slide. Everything else (every
+ * other slide, scene and item, the text, the choices and links, the interaction) is the very same object as before.
  */
-export function withEditedImage(deck: StudyDeck, result: Pick<ImageEditResult, 'slide' | 'node' | 'image'>): StudyDeck {
+export function withEditedImage(deck: StudyDeck, result: Pick<ImageEditResult, 'slide' | 'node' | 'image'> & { item?: string | null }): StudyDeck {
   return {
     ...deck,
     slides: deck.slides.map((s) => {
       if (s.n !== result.slide) return s;
+      if (result.item != null) {
+        const items = pictureItemsOf(s);
+        if (!items) return s;
+        // An item with no picture left (restored to how it began) carries none, and the slide's picture shows for it again.
+        const edited = items.map((item) => (item.id === result.item ? (result.image ? { ...item, image: result.image } : { ...item, image: null }) : item));
+
+        return { ...s, interaction: { ...(s.interaction as ItemsInteraction), items: edited } };
+      }
       if (result.node == null) return { ...s, image: result.image };
       const interaction = s.interaction;
       if (!interaction || interaction.kind !== 'scenario') return s;
@@ -144,11 +184,17 @@ export function withEditedImage(deck: StudyDeck, result: Pick<ImageEditResult, '
 }
 
 /** The states after a change: only the changed picture's entry is replaced. */
-export function withEditedState(states: ImageEditStates, result: Pick<ImageEditResult, 'slide' | 'node' | 'state' | 'can_restore'>): ImageEditStates {
+export function withEditedState(states: ImageEditStates, result: Pick<ImageEditResult, 'slide' | 'node' | 'state' | 'can_restore'> & { item?: string | null }): ImageEditStates {
   const key = String(result.slide);
   const slide = states[key];
   if (!slide) return states;
   const next = { has_image: result.state.has_image, can_add: result.state.can_add, can_replace: result.state.can_replace, can_remove: result.state.can_remove, reason: result.state.reason, can_restore: result.can_restore, ...(result.state.kind ? { kind: result.state.kind } : {}) };
+  if (result.item != null) {
+    const item = slide.items?.[result.item];
+    if (!item) return states;
+
+    return { ...states, [key]: { ...slide, items: { ...slide.items, [result.item]: { ...item, ...next } } } };
+  }
   if (result.node == null) return { ...states, [key]: { ...slide, ...next } };
   const node = slide.nodes?.[result.node];
   if (!node) return states;

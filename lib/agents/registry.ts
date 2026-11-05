@@ -1786,6 +1786,9 @@ export function toolsForModule(module: AgentModuleKey): AgentTool[] {
 }
 
 export function findTool(key: string): AgentTool | undefined {
+  if (key === 'exam_assessment.review_note_drafter') {
+    return AGENT_TOOLS.find((tool) => tool.key === 'exam_assessment.draft_review_note');
+  }
   return AGENT_TOOLS.find((tool) => tool.key === key);
 }
 

@@ -125,10 +125,22 @@ async function request<T>(
   const payload = (await readJson(response)) as unknown as AiEnvelope<T>;
 
   if (!response.ok || payload.success === false) {
+    const errorDetails = (payload as { errors?: Record<string, string[] | string> })?.errors;
+    let detail = "";
+    if (errorDetails && typeof errorDetails === "object") {
+      const firstVal = Object.values(errorDetails)[0];
+      if (Array.isArray(firstVal) && firstVal.length > 0) {
+        detail = String(firstVal[0]);
+      } else if (typeof firstVal === "string") {
+        detail = firstVal;
+      }
+    }
+
     throw new Error(
-      typeof payload.message === "string"
+      detail ||
+      (typeof payload.message === "string"
         ? payload.message
-        : `Intelligence request failed (${response.status}).`
+        : `Intelligence request failed (${response.status}).`)
     );
   }
 
@@ -139,6 +151,17 @@ function get<T>(context: IntelligenceContext, path: string, query?: Record<strin
   const params = new URLSearchParams();
 
   for (const [key, value] of Object.entries(query || {})) {
+    if (Array.isArray(value)) {
+      // PHP's query-string parsing only collects repeats into an array when
+      // the key carries the `[]` suffix — a bare repeated key keeps only the
+      // last value. Laravel's `labels` => "array" validation depends on this.
+      for (const item of value) {
+        if (item !== undefined && item !== null && `${item}` !== "") {
+          params.append(`${key}[]`, String(item));
+        }
+      }
+      continue;
+    }
     if (value !== undefined && value !== null && `${value}` !== "") {
       params.set(key, String(value));
     }
@@ -561,13 +584,32 @@ export function fetchErpSubmoduleGraph(
   });
 }
 
+export function fetchErpModuleGraph(
+  context: IntelligenceContext,
+  moduleId: number,
+  options: { sampleSize?: number; limit?: number } = {}
+) {
+  return get<ErpSubmoduleGraph>(context, `/knowledge-graph/browser/erp-modules/${moduleId}/graph`, {
+    sample_size: options.sampleSize,
+    limit: options.limit,
+  });
+}
+
 // ---- Global search, path-finder, full node drill-down, and Organization
 // Management's own staff/department/role graph — all additive to the six
 // browser endpoints above, same GraphModuleBrowser/Neo4j path, tenant scope
 // always derived server-side from the JWT (never sent from here).
 
-export function searchKnowledgeGraph(context: IntelligenceContext, term: string, limit?: number) {
-  return get<GraphSearchResult>(context, "/knowledge-graph/browser/search", { q: term, limit });
+/**
+ * Cross-label search. A non-empty `term` searches by name, optionally
+ * restricted to `labels`. An empty `term` with `labels` given instead
+ * returns a few real sample nodes of those labels, no text filter — the
+ * "pick a starting point for this submodule" case the contextual explorer
+ * uses in place of a flat cross-label sample.
+ */
+export function searchKnowledgeGraph(context: IntelligenceContext, term: string, limit?: number, labels?: string[]) {
+  const query = term.trim() || labels?.[0] || "*";
+  return get<GraphSearchResult>(context, "/knowledge-graph/browser/search", { q: query, limit, labels });
 }
 
 export function findKnowledgeGraphPath(
@@ -595,12 +637,17 @@ export function fetchGraphNodeDetail(
   context: IntelligenceContext,
   label: string,
   recordId: string | number,
-  options: { relationshipLimit?: number; skip?: number } = {}
+  options: { relationshipLimit?: number; skip?: number; relation?: string; direction?: 'incoming' | 'outgoing' } = {}
 ) {
   return get<GraphNodeDetail>(
     context,
     `/knowledge-graph/browser/node/${encodeURIComponent(label)}/${encodeURIComponent(String(recordId))}`,
-    { relationship_limit: options.relationshipLimit, skip: options.skip }
+    {
+      relationship_limit: options.relationshipLimit,
+      skip: options.skip,
+      relation: options.relation,
+      direction: options.direction,
+    }
   );
 }
 
@@ -672,6 +719,15 @@ export function saveAiReport(
  * refuses rather than blanking the table when the query now matches nothing, so an
  * empty result arrives here as an error with the reason.
  */
+
+/**
+ * Export URL for an AI report as HTML, PDF (printable format), or CSV.
+ */
+export function exportAiReport(context: IntelligenceContext, reportId: number, format: 'html' | 'pdf' | 'csv' = 'html'): string {
+  const baseUrl = normalizeBaseUrl(context.baseUrl);
+  return `${baseUrl}/api/ai/reports/${reportId}/export?format=${format}`;
+}
+
 export function regenerateAiReport(context: IntelligenceContext, reportId: number) {
   return post<{
     template_id: number;

@@ -159,11 +159,11 @@ export function EmployeeCell({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-full border bg-muted text-xs font-bold text-muted-foreground">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-bold text-primary">
         {initials}
       </div>
       <div className="flex min-w-0 flex-col">
-        <span className="truncate text-sm font-semibold text-foreground">{name}</span>
+        <span className="whitespace-nowrap text-sm font-semibold text-foreground">{name}</span>
         <span className="truncate text-xs text-muted-foreground">{secondary ?? employeeNo ?? '—'}</span>
       </div>
     </div>
@@ -255,7 +255,7 @@ export function SortableHead({
       type="button"
       onClick={() => onSort(column)}
       className={cn(
-        'flex items-center gap-1 text-left font-semibold transition-colors',
+        'flex items-center gap-1 whitespace-nowrap text-left font-semibold uppercase tracking-wider transition-colors',
         isActive ? 'text-primary' : 'text-foreground hover:text-primary',
       )}
     >
@@ -368,7 +368,7 @@ export function PaginationBar({
 /** The small counters each domain tab shows above its table. */
 export function SummaryStrip({ items }: { items: Array<{ label: string; value: string | number }> }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border bg-muted/20 px-4 py-3">
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
       {items.map((item) => (
         <div key={item.label} className="flex items-baseline gap-2">
           <span className="text-xs font-medium text-muted-foreground">{item.label}</span>

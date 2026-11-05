@@ -61,10 +61,13 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import {
   AdminService,
+  GovernanceService,
   buildSessionContext,
   isAdministrationSessionReady,
+  type AdminOverview,
   type AdminWorkflowsResponse,
 } from '../../_lib/administration-api'
+import { AuditTab, ConfigurationTab, IntegrationsTab, PermissionsTab, TemplatesTab } from './admin-tabs'
 
 import {
   adminKpiConfig,
@@ -151,13 +154,35 @@ export function AdminCenter() {
   // workflow-list pagination total already fetched above. The rest have no
   // endpoint in this module (see admin-data.ts), so they render "—" instead
   // of a fabricated count.
-  const kpis = useMemo(
-    () => adminKpiConfig.map((kpi) => ({
+  const [overview, setOverview] = useState<AdminOverview | null>(null)
+  const loadOverview = useCallback(async () => {
+    const session = buildSessionContext()
+    if (!isAdministrationSessionReady(session)) return
+    try {
+      const res = await GovernanceService.overview(session)
+      if (res.status === 1) setOverview(res.data)
+    } catch (error) {
+      console.error('Failed to load administration overview:', error)
+    }
+  }, [])
+  useEffect(() => {
+    void loadOverview()
+  }, [loadOverview])
+
+  const kpiTab: Record<string, string> = { 'kpi-1': 'workflows', 'kpi-2': 'templates', 'kpi-3': 'permissions', 'kpi-4': 'integrations', 'kpi-5': 'audit' }
+  const kpis = useMemo(() => {
+    const figures: Record<string, number | undefined> = {
+      'kpi-1': overview?.active_workflows ?? (isLoading ? undefined : totalItems),
+      'kpi-2': overview?.templates,
+      'kpi-3': overview?.user_roles,
+      'kpi-4': overview?.integrations,
+      'kpi-5': overview?.audit_events_30d,
+    }
+    return adminKpiConfig.map((kpi) => ({
       ...kpi,
-      value: kpi.id === 'kpi-1' ? (isLoading ? '—' : String(totalItems)) : '—',
-    })),
-    [isLoading, totalItems]
-  )
+      value: figures[kpi.id] === undefined ? '—' : String(figures[kpi.id]),
+    }))
+  }, [overview, isLoading, totalItems])
 
   const getStatusVariant = (status: Workflow['status']) => {
     switch (status) {
@@ -207,20 +232,20 @@ export function AdminCenter() {
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-2">
+        <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
           {kpis.map((kpi) => (
-            <Card key={kpi.id} className="p-4 flex flex-col justify-between border-border/60 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-muted-foreground">{kpi.title}</span>
-                <div className="p-1.5 rounded-md bg-muted/50 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+            <Card key={kpi.id} className="min-w-0 gap-0 py-0 p-3 flex flex-col justify-between border-border/60 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="text-xs font-semibold text-muted-foreground">{kpi.title}</span>
+                <div className="shrink-0 p-1.5 rounded-md bg-primary/10 text-primary border border-primary/20 [&_svg]:size-4 [&_svg]:text-primary">
                   {renderIcon(kpi.icon)}
                 </div>
               </div>
-              <div className="flex flex-col gap-2 mt-1">
-                <span className="text-3xl font-bold text-foreground">{kpi.value}</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-2xl font-bold leading-none text-foreground">{kpi.value}</span>
               <button
                 key={kpi.id}
-                onClick={() => setActiveTab('workflows')}
+                onClick={() => setActiveTab(kpiTab[kpi.id] ?? 'workflows')}
                 className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 w-fit text-left"
               >
                 {kpi.linkText} <ArrowRight className="size-3" />
@@ -273,8 +298,7 @@ export function AdminCenter() {
                   <div className="w-[150px]">
                     <Select
                       value={module}
-                      // @ts-expect-error — inert prop kept as-is, see docblock above
-                      onValueChange={(val) => { setModule(val); setPage(1); }}
+                      onChange={(val) => { setModule(val); setPage(1); }}
                       options={[
                         {label: 'All Modules', value: 'all'},
                         {label: 'Recruitment', value: 'Recruitment'},
@@ -301,8 +325,8 @@ export function AdminCenter() {
               </div>
 
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/30">
+                <Table className="w-full text-sm [&_td]:px-4 [&_td]:py-3 [&_th]:whitespace-nowrap [&_th]:px-4 [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_tr]:border-border/60">
+                  <TableHeader className="bg-primary/5">
                     <TableRow>
                       <TableHead className="font-semibold text-foreground">Workflow Name</TableHead>
                       <TableHead className="font-semibold text-foreground">Module</TableHead>
@@ -408,19 +432,16 @@ export function AdminCenter() {
               </div>
             </Card>
           </div>
+        ) : activeTab === 'templates' ? (
+          <TemplatesTab onChanged={loadOverview} />
+        ) : activeTab === 'permissions' ? (
+          <PermissionsTab />
+        ) : activeTab === 'integrations' ? (
+          <IntegrationsTab onChanged={loadOverview} />
+        ) : activeTab === 'configuration' ? (
+          <ConfigurationTab onChanged={loadOverview} />
         ) : (
-          <div className="flex flex-col items-center justify-center h-[500px] text-center max-w-[1400px] bg-surface rounded-xl border border-dashed border-border p-8">
-            <div className="p-4 bg-muted/50 rounded-full mb-4">
-              <Settings className="size-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">Module Under Construction</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mb-6">
-              This section is currently being built. It will provide advanced configuration capabilities in a future update.
-            </p>
-            <Button variant="outline" onClick={() => setActiveTab('workflows')}>
-              Return to Workflows
-            </Button>
-          </div>
+          <AuditTab />
         )}
       </div>
 

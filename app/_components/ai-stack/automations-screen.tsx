@@ -1291,7 +1291,22 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
       }
     };
     window.addEventListener('agents:runs-updated', handler);
-    return () => window.removeEventListener('agents:runs-updated', handler);
+    window.addEventListener('agents:changed', refreshAll);
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('agents_sync_channel');
+      channel.onmessage = (msg) => {
+        if (msg.data?.type === 'agents:changed') {
+          refreshAll();
+        }
+      };
+    } catch {}
+
+    return () => {
+      window.removeEventListener('agents:runs-updated', handler);
+      window.removeEventListener('agents:changed', refreshAll);
+      channel?.close();
+    };
   }, [refreshAll, module.key]);
 
   const enable = useCallback(
@@ -1435,13 +1450,7 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
           key={consoleKey}
           moduleFilter={module.key}
           embedded
-          hideCreate={
-            module.key === 'teach_learn' ||
-            module.key === 'exam_assessment' ||
-            module.key === 'engagement' ||
-            module.key === 'curriculum_planning' ||
-            module.key === 'new_pal'
-          }
+          hideCreate={false}
         />
       </div>
 

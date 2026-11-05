@@ -10,8 +10,17 @@
  * yet.
  */
 
-import { OnboardingCenter } from './components'
+import { OnboardingCenter } from './components'
+import { TalentTheme } from '../_lib/talent-theme'
+
+function OnboardingPageInner() {
+  return <OnboardingCenter />
+}
 
 export default function OnboardingPage() {
-  return <OnboardingCenter />
+  return (
+    <TalentTheme>
+      <OnboardingPageInner />
+    </TalentTheme>
+  )
 }

@@ -44,7 +44,10 @@ export function ConversationalAiAdmin() {
       projects.setData((current) =>
         (current ?? []).map((row) => (row.adapter.projectId === settings.project_id ? { ...row, settings } : row)),
       );
-      setNote({ tone: 'ok', text: `Settings saved for ${settings.project_id}.` });
+      setNote({
+        tone: 'ok',
+        text: `Settings saved for ${settings.project_id} (Voice: ${settings.voice_enabled ? 'Enabled' : 'Disabled'}, Language: ${settings.default_language}).`,
+      });
     },
     [projects],
   );

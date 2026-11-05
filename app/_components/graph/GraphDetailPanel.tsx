@@ -8,8 +8,22 @@
  * overlay) — every existing caller (`ModuleKnowledgeGraph.tsx`, the old
  * single-column `KnowledgeGraphExplorer.tsx`) keeps exactly this look.
  *
- * `variant: 'docked'` is a plain in-flow panel (no overlay, no centering)
- * for the rebuilt centralized explorer's persistent right-hand column.
+ * `variant: 'docked'` is a dark glass drawer (rounded-2xl, backdrop-blur,
+ * "Connected to (N)" list) matching `org-knowledge-graph.tsx`'s own details
+ * drawer — the centralized explorer's persistent right-hand column, next to
+ * `GraphBubbleCanvas`'s dark canvas. Only the skin changed here; every piece
+ * of existing behaviour (hop/group accordion, externally-controlled open
+ * state, load-more pagination, relationship detail body) is unchanged.
+ *
+ * `variant: 'docked-light'` is the SAME persistent right-hand-column layout
+ * and behaviour, styled light instead — for `ModuleKnowledgeGraph.tsx`'s
+ * decentralized canvas, which (per explicit, repeated user confirmation)
+ * matches `CentralizedKnowledgeGraphExplorer`'s React-Flow design — light
+ * chrome, dark canvas only — not `org-knowledge-graph.tsx`'s all-dark bubble
+ * design. Added as its own variant, rather than reusing `'docked'`, because
+ * that variant's own skin changed meaning once the centralized explorer
+ * moved to the bubble design: the two consumers now need genuinely
+ * different docked panel skins, not the same one.
  *
  * Shows either a node (labels, id, properties, one collapsible accordion
  * section per relation hop) or, when `edge` is given instead, a
@@ -25,6 +39,16 @@ import { coherenceTheme } from './coherence-theme';
 import { categoryColor } from './graph-category-color';
 import type { KgEdgeInput, KgHop, KgNodeInput } from './graph-model';
 
+/** The docked variant's dark-glass tokens — the same palette `GraphBubbleCanvas`'s dark surface uses. */
+const DOCKED = {
+  panel: 'rgba(10,18,48,0.78)',
+  border: 'rgba(255,255,255,0.16)',
+  text: '#f1f5f9',
+  sub: '#94a3b8',
+  divider: 'rgba(255,255,255,0.14)',
+  accent: '#60a5fa',
+};
+
 export default function GraphDetailPanel({
   node,
   edge,
@@ -37,6 +61,10 @@ export default function GraphDetailPanel({
   onLoadMore,
   loadingMore = false,
   hasMore = false,
+  isGroupOpen,
+  onToggleGroup,
+  onExpand,
+  expanding = false,
 }: {
   node?: KgNodeInput | null;
   /** When set (and `node` is not), the panel shows relationship detail instead of node detail. */
@@ -45,7 +73,7 @@ export default function GraphDetailPanel({
   edgeSourceLabel?: string;
   edgeTargetLabel?: string;
   hops?: KgHop[];
-  variant?: 'modal' | 'docked';
+  variant?: 'modal' | 'docked' | 'docked-light';
   onClose: () => void;
   /** Re-centre the canvas on a hop's item, when the caller supports it. */
   onItemClick?: (entity: string, id: number | string | null) => void;
@@ -53,9 +81,28 @@ export default function GraphDetailPanel({
   onLoadMore?: () => void;
   loadingMore?: boolean;
   hasMore?: boolean;
+  /**
+   * Node mode only, optional — when given, shows a button that fetches this
+   * node's own real connections (every direction) and adds them to the
+   * canvas in place, without switching canvas variant or visual design.
+   * Omitted (most callers): no button, panel behaves exactly as before.
+   */
+  onExpand?: () => void;
+  expanding?: boolean;
+  /**
+   * When given (the progressive centralized explorer), a hop section's
+   * open/closed state is driven externally — clicking its header expands
+   * or collapses that relationship-group *on the canvas*, not just the
+   * accordion list. Omitted (every other caller, e.g. `ModuleKnowledgeGraph`),
+   * each section manages its own open/closed state exactly as before —
+   * a plain accordion with no canvas effect.
+   */
+  isGroupOpen?: (hop: KgHop) => boolean;
+  onToggleGroup?: (hop: KgHop) => void;
 }) {
+  const dark = variant === 'docked';
   const body = edge && !node ? (
-    <RelationshipBody edge={edge} sourceLabel={edgeSourceLabel} targetLabel={edgeTargetLabel} />
+    <RelationshipBody edge={edge} sourceLabel={edgeSourceLabel} targetLabel={edgeTargetLabel} dark={dark} />
   ) : node ? (
     <NodeBody
       node={node}
@@ -64,6 +111,11 @@ export default function GraphDetailPanel({
       onLoadMore={onLoadMore}
       loadingMore={loadingMore}
       hasMore={hasMore}
+      isGroupOpen={isGroupOpen}
+      onToggleGroup={onToggleGroup}
+      onExpand={onExpand}
+      expanding={expanding}
+      dark={dark}
     />
   ) : null;
 
@@ -71,7 +123,30 @@ export default function GraphDetailPanel({
 
   if (variant === 'docked') {
     return (
-      <div className="flex h-full flex-col overflow-y-auto rounded-lg border p-5" style={{ borderColor: coherenceTheme.color.divider, fontFamily: coherenceTheme.font.body }}>
+      <div
+        className="flex h-full flex-col overflow-y-auto rounded-2xl border p-5 backdrop-blur-md"
+        style={{ background: DOCKED.panel, borderColor: DOCKED.border, color: DOCKED.text, fontFamily: coherenceTheme.font.body }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="mb-2 self-end rounded-lg p-1 transition-colors hover:bg-white/10"
+          style={{ color: DOCKED.sub }}
+          aria-label="Close"
+        >
+          <X size={16} />
+        </button>
+        {body}
+      </div>
+    );
+  }
+
+  if (variant === 'docked-light') {
+    return (
+      <div
+        className="flex h-full flex-col overflow-y-auto rounded-lg border p-5"
+        style={{ borderColor: coherenceTheme.color.divider, backgroundColor: '#fff', fontFamily: coherenceTheme.font.body }}
+      >
         <button
           type="button"
           onClick={onClose}
@@ -122,6 +197,11 @@ function NodeBody({
   onLoadMore,
   loadingMore,
   hasMore,
+  isGroupOpen,
+  onToggleGroup,
+  onExpand,
+  expanding,
+  dark = false,
 }: {
   node: KgNodeInput;
   hops: KgHop[];
@@ -129,8 +209,17 @@ function NodeBody({
   onLoadMore?: () => void;
   loadingMore: boolean;
   hasMore: boolean;
+  isGroupOpen?: (hop: KgHop) => boolean;
+  onToggleGroup?: (hop: KgHop) => void;
+  onExpand?: () => void;
+  expanding?: boolean;
+  dark?: boolean;
 }) {
   const color = categoryColor(node.entityKey);
+  const text = dark ? DOCKED.text : coherenceTheme.color.text;
+  const sub = dark ? DOCKED.sub : '#94a3b8';
+  const divider = dark ? DOCKED.divider : coherenceTheme.color.dividerAlt;
+  const accent = dark ? DOCKED.accent : coherenceTheme.color.accent;
   const attributeEntries = Object.entries(node.attributes ?? {}).filter(
     ([key, value]) =>
       value !== null &&
@@ -143,47 +232,82 @@ function NodeBody({
 
   return (
     <>
-      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: color.dot }}>
-        {node.entityKey}
-      </p>
-      <h2 className="mt-1 text-2xl font-normal" style={{ color: coherenceTheme.color.text }}>
-        {node.label}
-      </h2>
+      <div className="flex items-center gap-3">
+        {dark && (
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+            style={{ background: `linear-gradient(145deg, ${color.dot}, ${color.dot}b3)`, boxShadow: `0 0 16px ${color.dot}66` }}
+          >
+            {node.label.slice(0, 1).toUpperCase()}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: color.dot }}>
+            {node.entityKey}
+          </p>
+          <h2 className="mt-0.5 truncate text-xl font-normal" style={{ color: text }}>
+            {node.label}
+          </h2>
+        </div>
+      </div>
+
+      {onExpand && (
+        <button
+          type="button"
+          onClick={onExpand}
+          disabled={expanding}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium disabled:opacity-60"
+          style={{ borderColor: accent, color: accent }}
+        >
+          {expanding && <Loader2 className="h-3 w-3 animate-spin" />}
+          Expand this node&apos;s connections
+        </button>
+      )}
 
       {attributeEntries.length > 0 && (
         <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           {attributeEntries.map(([key, value]) => (
             <div key={key} className="contents">
-              <dt className="text-slate-400">{formatPropertyLabel(key)}</dt>
-              <dd style={{ color: coherenceTheme.color.text }}>{String(value)}</dd>
+              <dt style={{ color: sub }}>{formatPropertyLabel(key)}</dt>
+              <dd style={{ color: text }}>{String(value)}</dd>
             </div>
           ))}
         </dl>
       )}
 
       {hops.length > 0 && (
-        <div className="mt-6 border-t" style={{ borderColor: coherenceTheme.color.dividerAlt }}>
+        <div className="mt-6 border-t" style={{ borderColor: divider }}>
+          <p className="pt-3 text-xs font-semibold" style={{ color: sub }}>
+            Connected to
+          </p>
           {hops.map((hop) => (
-            <HopSection key={hop.relation + hop.label} hop={hop} onItemClick={onItemClick} />
+            <HopSection
+              key={hop.relation + hop.label}
+              hop={hop}
+              onItemClick={onItemClick}
+              isGroupOpen={isGroupOpen}
+              onToggleGroup={onToggleGroup}
+              dark={dark}
+            />
           ))}
         </div>
       )}
 
       {onLoadMore && (
-        <div className="mt-4 border-t pt-3" style={{ borderColor: coherenceTheme.color.dividerAlt }}>
+        <div className="mt-4 border-t pt-3" style={{ borderColor: divider }}>
           {hasMore ? (
             <button
               type="button"
               onClick={onLoadMore}
               disabled={loadingMore}
               className="inline-flex items-center gap-1.5 text-sm font-medium disabled:opacity-60"
-              style={{ color: coherenceTheme.color.accent }}
+              style={{ color: accent }}
             >
               {loadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Load more connections
             </button>
           ) : (
-            <p className="text-xs text-slate-400">All connections loaded.</p>
+            <p className="text-xs" style={{ color: sub }}>All connections loaded.</p>
           )}
         </div>
       )}
@@ -202,43 +326,49 @@ function RelationshipBody({
   edge,
   sourceLabel,
   targetLabel,
+  dark = false,
 }: {
   edge: KgEdgeInput;
   sourceLabel?: string;
   targetLabel?: string;
+  dark?: boolean;
 }) {
+  const text = dark ? DOCKED.text : coherenceTheme.color.text;
+  const sub = dark ? DOCKED.sub : '#94a3b8';
+  const divider = dark ? DOCKED.divider : coherenceTheme.color.dividerAlt;
+  const accent = dark ? DOCKED.accent : coherenceTheme.color.accent;
   const propertyEntries = Object.entries(edge.properties ?? {});
 
   return (
     <>
-      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: coherenceTheme.color.accent }}>
+      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: accent }}>
         Relationship
       </p>
-      <h2 className="mt-1 text-2xl font-normal" style={{ color: coherenceTheme.color.text }}>
+      <h2 className="mt-1 text-2xl font-normal" style={{ color: text }}>
         {edge.relation}
       </h2>
 
-      <div className="mt-5 flex items-center gap-2 text-sm" style={{ color: coherenceTheme.color.text }}>
-        <span className="truncate rounded-md border px-2.5 py-1" style={{ borderColor: coherenceTheme.color.divider }}>
+      <div className="mt-5 flex items-center gap-2 text-sm" style={{ color: text }}>
+        <span className="truncate rounded-md border px-2.5 py-1" style={{ borderColor: divider }}>
           {sourceLabel ?? edge.source}
         </span>
-        <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
-        <span className="truncate rounded-md border px-2.5 py-1" style={{ borderColor: coherenceTheme.color.divider }}>
+        <ArrowRight className="h-4 w-4 shrink-0" style={{ color: sub }} />
+        <span className="truncate rounded-md border px-2.5 py-1" style={{ borderColor: divider }}>
           {targetLabel ?? edge.target}
         </span>
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        <dt className="text-slate-400">Direction</dt>
-        <dd style={{ color: coherenceTheme.color.text }}>{edge.directed ? 'Directed' : 'Undirected'}</dd>
+        <dt style={{ color: sub }}>Direction</dt>
+        <dd style={{ color: text }}>{edge.directed ? 'Directed' : 'Undirected'}</dd>
       </dl>
 
       {propertyEntries.length > 0 && (
-        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-3 text-sm" style={{ borderColor: coherenceTheme.color.dividerAlt }}>
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-3 text-sm" style={{ borderColor: divider }}>
           {propertyEntries.map(([key, value]) => (
             <div key={key} className="contents">
-              <dt className="text-slate-400">{key}</dt>
-              <dd style={{ color: coherenceTheme.color.text }}>{String(value)}</dd>
+              <dt style={{ color: sub }}>{key}</dt>
+              <dd style={{ color: text }}>{String(value)}</dd>
             </div>
           ))}
         </dl>
@@ -250,20 +380,45 @@ function RelationshipBody({
 function HopSection({
   hop,
   onItemClick,
+  isGroupOpen,
+  onToggleGroup,
+  dark = false,
 }: {
   hop: KgHop;
   onItemClick?: (entity: string, id: number | string | null) => void;
+  isGroupOpen?: (hop: KgHop) => boolean;
+  onToggleGroup?: (hop: KgHop) => void;
+  dark?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  // Externally-driven (progressive explorer: open means "this relationship
+  // type is expanded onto the canvas") when isGroupOpen is given; otherwise
+  // a plain, self-contained accordion — unchanged for every other caller.
+  const externallyControlled = isGroupOpen !== undefined;
+  const open = externallyControlled ? isGroupOpen!(hop) : localOpen;
+  const text = dark ? DOCKED.text : coherenceTheme.color.text;
+  const sub = dark ? DOCKED.sub : '#94a3b8';
+  const divider = dark ? DOCKED.divider : coherenceTheme.color.dividerAlt;
+  const accent = dark ? DOCKED.accent : coherenceTheme.color.accent;
+  const itemHover = dark ? 'hover:bg-white/10' : 'hover:bg-slate-50';
+
+  const toggle = () => {
+    if (externallyControlled) {
+      onToggleGroup?.(hop);
+    } else {
+      setLocalOpen((v) => !v);
+    }
+  };
 
   return (
-    <div className="border-b" style={{ borderColor: coherenceTheme.color.dividerAlt }}>
+    <div className="border-b" style={{ borderColor: divider }}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         disabled={!hop.available}
         className="flex w-full items-center justify-between py-3 text-left text-sm font-semibold disabled:cursor-default"
-        style={{ color: hop.available ? coherenceTheme.color.accent : '#999791' }}
+        style={{ color: hop.available ? accent : sub }}
+        title={externallyControlled ? (open ? 'Click to collapse from the graph' : 'Click to expand onto the graph') : undefined}
       >
         <span>
           {hop.label}
@@ -273,7 +428,7 @@ function HopSection({
       </button>
 
       {!hop.available && (
-        <p className="pb-3 text-xs text-slate-400">{hop.reason ?? 'Not available.'}</p>
+        <p className="pb-3 text-xs" style={{ color: sub }}>{hop.reason ?? 'Not available.'}</p>
       )}
 
       {open && hop.available && (
@@ -283,14 +438,15 @@ function HopSection({
               <button
                 type="button"
                 onClick={() => onItemClick?.(item.entity, item.id)}
-                className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-slate-50"
-                style={{ color: coherenceTheme.color.text }}
+                className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors ${itemHover}`}
+                style={{ color: text }}
               >
-                {item.label}
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: categoryColor(item.entity).dot }} />
+                <span className="truncate">{item.label}</span>
               </button>
             </li>
           ))}
-          {hop.items.length === 0 && <li className="px-2 py-1.5 text-sm text-slate-400">None recorded.</li>}
+          {hop.items.length === 0 && <li className="px-2 py-1.5 text-sm" style={{ color: sub }}>None recorded.</li>}
         </ul>
       )}
     </div>

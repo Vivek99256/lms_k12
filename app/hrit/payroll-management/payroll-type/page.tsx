@@ -18,6 +18,7 @@
  * unchanged.
  */
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { useMemo, useState } from 'react'
 import { ArrowDownCircle, ArrowUpCircle, CheckCircle2, Plus, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -45,7 +46,7 @@ import { PayrollTypeDialog, PayrollTypeTable } from './components'
 
 type PayrollTab = 'all' | 'earnings' | 'deductions'
 
-export default function PayrollTypePage() {
+function PayrollTypePageInner() {
   const {
     loading,
     processing,
@@ -245,5 +246,13 @@ export default function PayrollTypePage() {
         </AlertDialogContent>
       </AlertDialog>
     </PayrollPageShell>
+  )
+}
+
+export default function PayrollTypePage() {
+  return (
+    <HritTheme>
+      <PayrollTypePageInner />
+    </HritTheme>
   )
 }

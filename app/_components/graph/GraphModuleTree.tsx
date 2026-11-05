@@ -26,15 +26,16 @@ import type { ErpModule, ErpSubmodule } from '@/lib/intelligence/types';
 
 export type TreeSubmodule = ErpSubmodule & { kind?: 'organization-staff' };
 
-const ORG_MANAGEMENT_STAFF_SUBMODULE: TreeSubmodule = {
+export const ORG_MANAGEMENT_STAFF_SUBMODULE: TreeSubmodule = {
   id: -1,
   label: 'Staff, Department & Role',
   mapped: true,
+  labels: ['Institute', 'Department', 'Role', 'Staff'],
   kind: 'organization-staff',
 };
 
-function isOrganizationManagement(label: string): boolean {
-  return label.toLowerCase().includes('organization management');
+export function isOrganizationManagement(label?: string | null): boolean {
+  return typeof label === 'string' && label.toLowerCase().includes('organization management');
 }
 
 export default function GraphModuleTree({
@@ -45,6 +46,7 @@ export default function GraphModuleTree({
   initialFocusModuleLabel,
   onSelectModule,
   onSelectSubmodule,
+  dark = false,
 }: {
   session: IntelligenceContext;
   modules: ErpModule[];
@@ -54,6 +56,7 @@ export default function GraphModuleTree({
   initialFocusModuleLabel?: string;
   onSelectModule: (module: ErpModule) => void;
   onSelectSubmodule: (module: ErpModule, submodule: TreeSubmodule) => void;
+  dark?: boolean;
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -67,7 +70,8 @@ export default function GraphModuleTree({
       const payload = await listErpSubmodules(session, moduleId);
       const module = modules.find((m) => m.id === moduleId);
       const extra = module && isOrganizationManagement(module.label) ? [ORG_MANAGEMENT_STAFF_SUBMODULE] : [];
-      setSubmodulesByModule((prev) => ({ ...prev, [moduleId]: [...extra, ...payload.submodules] }));
+      const submodules = Array.isArray(payload?.submodules) ? payload.submodules : [];
+      setSubmodulesByModule((prev) => ({ ...prev, [moduleId]: [...extra, ...submodules] }));
     } catch {
       setSubmodulesByModule((prev) => ({ ...prev, [moduleId]: 'error' }));
     }
@@ -108,19 +112,27 @@ export default function GraphModuleTree({
     : modules;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className={`flex h-full flex-col ${dark ? 'bg-[#0a1230]' : 'bg-slate-50'}`}>
       <div className="relative px-2 pb-2 pt-1">
-        <Search className="absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+        <Search className={`absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 ${dark ? 'text-slate-500' : 'text-slate-400'}`} />
         <input
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
           placeholder="Filter modules…"
-          className="w-full rounded-md border border-slate-200 py-1.5 pl-8 pr-2 text-sm"
+          className={`w-full rounded-md border py-1.5 pl-8 pr-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+            dark
+              ? 'border-white/15 bg-white/5 text-slate-100 placeholder:text-slate-500'
+              : 'border-slate-300 bg-white text-slate-800'
+          }`}
         />
       </div>
 
       <div className="flex-1 overflow-y-auto px-1">
-        {visibleModules.length === 0 && <p className="px-3 py-6 text-center text-sm text-slate-400">No modules match &ldquo;{searchTerm}&rdquo;.</p>}
+        {visibleModules.length === 0 && (
+          <p className={`px-3 py-6 text-center text-sm ${dark ? 'text-slate-500' : 'text-slate-500'}`}>
+            No modules match &ldquo;{searchTerm}&rdquo;.
+          </p>
+        )}
 
         {visibleModules.map((module) => {
           const isExpanded = term.length > 0 || expanded.has(module.id);
@@ -135,25 +147,37 @@ export default function GraphModuleTree({
               <button
                 type="button"
                 onClick={() => toggleModule(module)}
-                className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm font-medium hover:bg-slate-50 ${
-                  selectedModuleId === module.id && selectedSubmoduleId === null ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors ${
+                  dark ? 'hover:bg-white/10' : 'hover:bg-slate-200/60'
+                } ${
+                  selectedModuleId === module.id && selectedSubmoduleId === null
+                    ? dark
+                      ? 'bg-blue-500/20 text-blue-300'
+                      : 'bg-blue-100 font-semibold text-blue-800'
+                    : dark
+                    ? 'text-slate-200'
+                    : 'text-slate-700'
                 }`}
               >
                 {isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
                 <span className="truncate">{module.label}</span>
                 {module.submodule_count > 0 && (
-                  <span className="ml-auto shrink-0 text-xs text-slate-400">{module.submodule_count}</span>
+                  <span className={`ml-auto shrink-0 text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {module.submodule_count}
+                  </span>
                 )}
               </button>
 
               {isExpanded && (
-                <div className="ml-5 border-l border-slate-100 pl-2">
+                <div className={`ml-5 border-l pl-2 ${dark ? 'border-white/10' : 'border-slate-300'}`}>
                   {submodules === 'loading' && (
-                    <p className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-slate-400">
+                    <p className={`flex items-center gap-1.5 px-2 py-1.5 text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
                       <Loader2 className="h-3 w-3 animate-spin" /> Loading…
                     </p>
                   )}
-                  {submodules === 'error' && <p className="px-2 py-1.5 text-xs text-slate-400">Couldn&apos;t load submodules.</p>}
+                  {submodules === 'error' && (
+                    <p className={`px-2 py-1.5 text-xs ${dark ? 'text-slate-500' : 'text-rose-500'}`}>Couldn&apos;t load submodules.</p>
+                  )}
                   {Array.isArray(visibleSubmodules) &&
                     visibleSubmodules.map((submodule) => (
                       <button
@@ -161,13 +185,23 @@ export default function GraphModuleTree({
                         type="button"
                         onClick={() => onSelectSubmodule(module, submodule)}
                         disabled={!submodule.mapped}
-                        className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm disabled:cursor-not-allowed disabled:text-slate-300 ${
-                          selectedSubmoduleId === submodule.id ? 'bg-blue-50 font-medium text-blue-700' : 'text-slate-600 hover:bg-slate-50'
-                        }`}
+                        className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm disabled:cursor-not-allowed transition-colors ${
+                          selectedSubmoduleId === submodule.id
+                            ? dark
+                              ? 'bg-blue-500/20 font-medium text-blue-300'
+                              : 'bg-blue-100 font-semibold text-blue-800'
+                            : dark
+                            ? 'text-slate-300 hover:bg-white/10'
+                            : 'text-slate-600 hover:bg-slate-200/60'
+                        } ${!submodule.mapped ? (dark ? 'text-slate-600' : 'text-slate-400 opacity-60') : ''}`}
                         title={submodule.mapped ? undefined : 'Not mapped to the graph yet'}
                       >
                         <span className="truncate">{submodule.label}</span>
-                        {!submodule.mapped && <span className="ml-auto shrink-0 text-[10px] text-slate-300">unmapped</span>}
+                        {!submodule.mapped && (
+                          <span className={`ml-auto shrink-0 text-[10px] ${dark ? 'text-slate-600' : 'text-slate-400'}`}>
+                            unmapped
+                          </span>
+                        )}
                       </button>
                     ))}
                 </div>

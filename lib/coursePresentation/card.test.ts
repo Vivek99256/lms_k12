@@ -8,11 +8,19 @@ import { readCpState, withCpState, withoutCpState } from './urlState';
 const courseCard = { id: COURSE_PRESENTATION_CARD_ID, type: 'Classroom presentation', chapterId: '8592', coursePresentationPilot: true, prayogshala: null };
 const lab = { id: '68', type: 'Prayogshala', chapterId: '8592', prayogshala: { id: 68, status: 'review' } };
 
-test('chapter 8592 (Std 9 Science chapter 1) and the four Std 4 EVS Water chapters are enabled, and nothing else', () => {
+test('chapter 1 of all Std 8 subjects, selected Std 9 subjects and the four Std 4 EVS Water chapters are enabled, and nothing else', () => {
+  for (const id of [25837, 25850, 25900, 25863, 25879, 25871, 25884, 25892]) {
+    assert.equal(coursePresentationEnabledFor(id), true, `Std 8 chapter 1: ${id}`);
+  }
+  for (const id of [25838, 25851, 25901, 25864, 25880, 25872, 25885, 25893]) {
+    assert.equal(coursePresentationEnabledFor(id), false, `Std 8 chapter 2: ${id}`);
+  }
   assert.equal(coursePresentationEnabledFor(8592), true);
   assert.equal(coursePresentationEnabledFor('8592'), true);
+  for (const id of [8594, 8622, 8608]) assert.equal(coursePresentationEnabledFor(id), true, String(id)); // Maths, English, Social Science
   for (const id of [41675, 41676, 41677, 41678]) assert.equal(coursePresentationEnabledFor(id), true, String(id));
   for (const id of [41674, 41679]) assert.equal(coursePresentationEnabledFor(id), false, String(id)); // the chapters next to them
+  for (const id of [8595, 8623, 8609]) assert.equal(coursePresentationEnabledFor(id), false, String(id)); // chapter 2 of the same three subjects
   for (const id of [8614, 8593, 8613, 8615, 0, '', null, undefined, 'abc', '8592.5']) assert.equal(coursePresentationEnabledFor(id as never), false, String(id));
 });
 
@@ -41,6 +49,9 @@ test('other card types and other chapters keep the default route', () => {
     assert.equal(routeCardOpen({ id: '3', type: 'Interactive', chapterId, deepLink: `/student/study-deck/${chapterId}?content=61550` }, 'classroom'), 'default', `story lesson in ${chapterId}`);
     assert.equal(routeCardOpen({ ...courseCard, chapterId }, 'classroom'), 'course-presentation', `entry card in ${chapterId}`);
   }
+  for (const chapterId of ['25837', '25850', '25900', '25863', '25879', '25871', '25884', '25892']) {
+    assert.equal(routeCardOpen({ ...courseCard, chapterId }, 'classroom'), 'course-presentation', `Std 8 entry card in ${chapterId}`);
+  }
   assert.equal(routeCardOpen({ ...courseCard, chapterId: '8614' }, 'classroom'), 'default'); // chapter 8 (the former pilot)
   assert.equal(routeCardOpen({ ...courseCard, chapterId: undefined }, 'classroom'), 'default');
 });
@@ -48,6 +59,9 @@ test('other card types and other chapters keep the default route', () => {
 test('the card is added only for a chapter in scope, in the Classroom lane, once loaded, whatever is already stored, and never twice', () => {
   const base = { chapterId: '8592', lane: 'classroom' as const, loaded: true, items: [{ type: 'Prayogshala' }] };
   assert.equal(shouldShowCoursePresentationCard(base), true);
+  for (const chapterId of ['25837', '25850', '25900', '25863', '25879', '25871', '25884', '25892']) {
+    assert.equal(shouldShowCoursePresentationCard({ ...base, chapterId }), true, `Std 8 entry card in ${chapterId}`);
+  }
   assert.equal(shouldShowCoursePresentationCard({ ...base, chapterId: '8615' }), false);
   assert.equal(shouldShowCoursePresentationCard({ ...base, chapterId: '8614' }), false); // chapter 8, the former pilot
   assert.equal(shouldShowCoursePresentationCard({ ...base, lane: 'teacher' }), false);

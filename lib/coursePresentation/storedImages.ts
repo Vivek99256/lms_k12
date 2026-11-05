@@ -1,4 +1,5 @@
-import type { ImageEditorAdapter, ImageEditResult, ImageEditStates, ImageSearch, ImageTarget } from '@/lib/study-deck/imageEditing';
+import { pictureItemsOf, type ImageEditorAdapter, type ImageEditResult, type ImageEditState, type ImageEditStates, type ImageSearch, type ImageTarget } from '@/lib/study-deck/imageEditing';
+import type { DeckSlide } from '@/lib/study-deck/types';
 
 import { CoursePresentationApiError, request } from './api';
 import { sendPicture } from './draftImages';
@@ -13,10 +14,12 @@ import { sendPicture } from './draftImages';
  * address is ever sent back.
  */
 
+// An item's picture is named by its slide and its own id; every call, search to restore, carries both, so one item's change can never land on another.
 const where = (chapterId: number, contentId: number, target: ImageTarget): Record<string, string> => ({
   chapter_id: String(chapterId),
   content_id: String(contentId),
   slide: String(target.slide),
+  ...(target.item !== undefined ? { item: target.item } : {}),
 });
 
 /**
@@ -56,8 +59,9 @@ export function storedFailureReason(status: number, message: string): string {
   if (status === 404 && (message === '' || /route|not be found|^not found.?$/i.test(message) || /^request failed/i.test(message))) {
     return 'Picture editing is not available on this server yet. The presentation is unchanged.';
   }
-  if (status === 403 && (message === '' || /not authori[sz]ed/i.test(message))) {
-    return 'Your account does not have permission to change pictures in this presentation.';
+  // "You do not have permission to create this resource." is the server's content-create gate speaking in its own terms; say what it means here.
+  if (status === 403 && (message === '' || /not authori[sz]ed|do not have permission/i.test(message))) {
+    return 'Your account cannot change pictures in this presentation. Changing pictures needs the content "create" right (held by the Teacher profiles). Sign in as a teacher, or ask an administrator to grant it.';
   }
   return message !== '' ? message : 'Pictures cannot be changed in this presentation right now.';
 }
@@ -78,11 +82,47 @@ export async function loadStoredImageStates(chapterId: number, contentId: number
   }
 }
 
-/** A disabled state for every slide that has a picture, all carrying the same reason: what a teacher sees when the editor cannot be used. */
-export function unavailableStates(deck: { slides: { n: number; image: unknown }[] }, reason: string): ImageEditStates {
+const disabled = (reason: string, has_image: boolean): ImageEditState => ({ has_image, can_add: false, can_replace: false, can_remove: false, can_restore: false, reason, kind: has_image ? 'photo' : 'none' });
+
+/** The part of a slide these helpers read. */
+type SlideLike = { n: number; image: unknown; interaction?: DeckSlide['interaction'] };
+
+/** Disabled states for the items of a slide that can carry item pictures, all with the same reason. */
+function disabledItems(slide: SlideLike, reason: string): Record<string, ImageEditState> | null {
+  const items = pictureItemsOf(slide);
+  if (!items) return null;
+
+  return Object.fromEntries(items.map((item) => [item.id, { ...disabled(reason, Boolean(item.image)), title: item.label }]));
+}
+
+/**
+ * A disabled state for every slide that has a picture (and for each item that can carry one), all carrying the same reason: what a teacher sees
+ * when the editor cannot be used.
+ */
+export function unavailableStates(deck: { slides: SlideLike[] }, reason: string): ImageEditStates {
   const out: ImageEditStates = {};
   for (const slide of deck.slides) {
-    if (slide.image) out[String(slide.n)] = { has_image: true, can_add: false, can_replace: false, can_remove: false, can_restore: false, reason, kind: 'photo' };
+    if (!slide.image) continue;
+    const items = disabledItems(slide, reason);
+    out[String(slide.n)] = { ...disabled(reason, true), ...(items ? { items } : {}) };
+  }
+
+  return out;
+}
+
+export const ITEM_PICTURES_UNSUPPORTED = 'This server cannot change the pictures of individual items yet. The slide’s own picture can still be changed.';
+
+/**
+ * The server's answer, completed for the slides it did not say item pictures for. A server that predates item pictures answers for the slide only;
+ * the items of such a slide would then have no control at all, which hides the feature without a word. Each gets a disabled control that says why.
+ */
+export function withItemFallbacks(states: ImageEditStates, deck: { slides: SlideLike[] }): ImageEditStates {
+  let out = states;
+  for (const slide of deck.slides) {
+    const known = states[String(slide.n)];
+    if (!known || known.items) continue;
+    const items = disabledItems(slide, ITEM_PICTURES_UNSUPPORTED);
+    if (items) out = { ...out, [String(slide.n)]: { ...known, items } };
   }
 
   return out;

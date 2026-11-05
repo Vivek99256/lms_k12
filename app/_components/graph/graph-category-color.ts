@@ -114,7 +114,11 @@ const KEYWORD_CATEGORY: Array<[string, keyof typeof CATEGORY_COLOR]> = [
   ['shift', 'amber'],
 ];
 
-export function categoryColor(entityKey: string): CategoryColor {
+export function categoryColor(entityKey?: string | null): CategoryColor {
+  if (!entityKey || typeof entityKey !== 'string') {
+    return CATEGORY_COLOR.slate;
+  }
+
   const haystack = entityKey.toLowerCase();
 
   if (ACADEMIC_ENTITY_COLOR[haystack]) {
@@ -131,10 +135,11 @@ export function categoryColor(entityKey: string): CategoryColor {
 }
 
 /** The distinct categories actually present, for the legend — never the full dictionary. */
-export function categoriesPresent(entityKeys: Iterable<string>): Array<{ key: string; color: CategoryColor }> {
+export function categoriesPresent(entityKeys: Iterable<string | undefined | null>): Array<{ key: string; color: CategoryColor }> {
   const seen = new Map<string, CategoryColor>();
 
   for (const entityKey of entityKeys) {
+    if (!entityKey || typeof entityKey !== 'string') continue;
     const color = categoryColor(entityKey);
     if (!seen.has(color.key)) seen.set(color.key, color);
   }

@@ -33,12 +33,23 @@ export interface KgEdgeInput {
   directed: boolean;
   /** Real Neo4j relationship properties, when the backend captured any — shown in the relationship detail panel. Absent (not empty) for shapes that never collect them. */
   properties?: Record<string, unknown>;
+  /**
+   * Which store this specific edge actually came from — distinct from
+   * `directed`, which is about arrow style, not provenance. Undefined for
+   * shapes that are always one store (e.g. mapGraphBrowserResult, already
+   * Neo4j-only) and don't need to say so per edge. When present, the canvas
+   * renders a 'sql' edge visibly differently (muted, dashed) so a SQL join
+   * is never mistaken for a real Neo4j relationship.
+   */
+  sourceKind?: 'sql' | 'graph';
 }
 
 export interface KgHop {
   label: string;
   entity: string | null;
   relation: string;
+  /** Which side of the relationship the centred node is on — drives the progressive explorer's "expand this group" fetch (nodeDetail's relation+direction filter). Undefined for hop shapes that don't carry a single direction (the decentralized ontology-view walk). */
+  direction?: 'incoming' | 'outgoing';
   available: boolean;
   reason?: string;
   total: number;
