@@ -30,6 +30,7 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2, Maximize, Minimize, Network, ServerCrash, X } from 'lucide-react';
 
 import {
+  fetchErpSubmoduleGraph,
   fetchGraphNodeDetail,
   fetchOrganizationStaffGraph,
   listErpModules,
@@ -52,6 +53,7 @@ import GraphSyncStatus from '@/app/_components/graph/GraphSyncStatus';
 import { readGraphSession } from '@/app/_components/graph/graph-session';
 import {
   buildHopsFromNodeDetail,
+  mapErpSubmoduleGraph,
   mapGraphNodeDetail,
   mapGraphPathResult,
   mapOrganizationStaffGraph,
@@ -169,6 +171,8 @@ export default function CentralizedKnowledgeGraphExplorer({
   const [pathFinderOpen, setPathFinderOpen] = useState(false);
   const [expandNotice, setExpandNotice] = useState<string>('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mode, setMode] = useState<'light' | 'dark'>('light');
+  const dark = mode === 'dark';
 
   const toggleFullscreen = () => {
     if (!isFullscreen) {
@@ -324,18 +328,28 @@ export default function CentralizedKnowledgeGraphExplorer({
       }
 
       const labels = Array.isArray(submodule?.labels) ? submodule.labels : [];
+
+      // 1st attempt: Fetch connected submodule graph directly from Neo4j
+      if (submodule.id) {
+        try {
+          const subGraph = await fetchErpSubmoduleGraph(session, submodule.id);
+          const mapped = mapErpSubmoduleGraph(subGraph);
+          if (mapped.nodes.length > 0) {
+            applyBase(mapped.nodes, mapped.edges);
+            setGraphState('ready');
+            return;
+          }
+        } catch {
+          // Fall through to search attempt
+        }
+      }
+
       if (labels.length === 0) {
         setGraphState('not-mapped');
         return;
       }
 
-      // Not a flat sample of everything, and not an off-canvas pick-list —
-      // a short, real, tenant-scoped sample across this submodule's own
-      // labels, spread across them rather than dominated by whichever
-      // label comes first, rendered directly as the initial canvas nodes.
-      // Nothing is pre-expanded: clicking one shows what it's actually
-      // connected to, and the user chooses which relationship to reveal.
-      const result = await searchKnowledgeGraph(session, '', ROOT_SAMPLE_LIMIT, labels);
+      const result = await searchKnowledgeGraph(session, labels[0] || '', ROOT_SAMPLE_LIMIT, labels);
       const safeNodes = Array.isArray(result?.nodes) ? result.nodes : [];
       if (safeNodes.length === 0) {
         setGraphState('not-mapped');
@@ -472,21 +486,60 @@ export default function CentralizedKnowledgeGraphExplorer({
     }
   };
 
-  /** Re-opens every node whose children are already known (fetched before) but currently collapsed — never probes an unknown node, so this can't fan out into a burst of parallel requests. */
-  const expandAllKnown = () => {
-    setExpandedGroups((prev) => {
-      const next = new Map(prev);
-      for (const [nodeId, groups] of nodeGroupsCache.current) {
-        for (const group of groups.values()) {
-          next.set(groupKey(nodeId, group.relation, group.direction), { nodes: group.nodes, edges: group.edges });
+  /**
+   * Expand All:
+   * 1. Re-opens every node whose children are already cached.
+   * 2. Probes unexpanded canvas nodes in a controlled batch (up to 10 nodes, total canvas nodes <= 120).
+   * 3. Fetches real connected relationships progressively and renders them on canvas.
+   */
+  const handleExpandAll = async () => {
+    // 1. Reopen already known groups
+    const reopened = new Map(expandedGroups);
+    for (const [nodeId, groups] of nodeGroupsCache.current) {
+      for (const group of groups.values()) {
+        reopened.set(groupKey(nodeId, group.relation, group.direction), { nodes: group.nodes, edges: group.edges });
+      }
+    }
+    setExpandedGroups(reopened);
+
+    // 2. Identify candidate nodes on canvas not yet probed
+    const candidates = canvasNodes
+      .filter((n) => n.recordId !== null && n.recordId !== undefined && !nodeGroupsCache.current.has(n.id))
+      .slice(0, 10);
+
+    if (candidates.length === 0) return;
+
+    setExpandNotice(`Expanding connected relationships for ${candidates.length} nodes…`);
+    try {
+      for (const node of candidates) {
+        if (canvasNodes.length > 120) break;
+        const result = await loadNodeDetail(node);
+        if (result) {
+          const groups = groupNodeDetailForExpansion(node.id, result.nodes, result.edges);
+          nodeGroupsCache.current.set(node.id, groups);
+          setExpandedGroups((prev) => {
+            const next = new Map(prev);
+            for (const group of groups.values()) {
+              next.set(groupKey(node.id, group.relation, group.direction), { nodes: group.nodes, edges: group.edges });
+            }
+            return next;
+          });
         }
       }
-      return next;
-    });
+      setExpandNotice('Expanded connected relationships.');
+      setTimeout(() => setExpandNotice(''), 3000);
+    } catch {
+      setExpandNotice('Some node expansions failed.');
+      setTimeout(() => setExpandNotice(''), 3000);
+    }
   };
 
-  /** Collapses every currently-expanded node's children, keeping the current root sample (and the cache, so "Expand all" still works afterward). */
-  const collapseAllGroups = () => setExpandedGroups(new Map());
+  /** Collapses every currently-expanded node's children, returning to the starting view. */
+  const collapseAllGroups = () => {
+    setExpandedGroups(new Map());
+    setSelectedNode(null);
+    setSelectedEdge(null);
+  };
 
   const loadMoreForSelectedNode = async () => {
     if (!selectedNode || selectedNode.recordId === null || selectedNode.recordId === undefined) return;
@@ -631,8 +684,14 @@ export default function CentralizedKnowledgeGraphExplorer({
     <div
       className={
         isFullscreen
-          ? 'fixed inset-0 z-[9999] flex h-screen w-screen flex-col overflow-hidden bg-[#0a1230] text-slate-100 shadow-2xl'
-          : 'flex h-full min-h-[580px] w-full flex-col overflow-hidden rounded-xl border border-white/15 bg-[#0a1230] text-slate-100 shadow-sm'
+          ? `fixed inset-0 z-[9999] flex h-screen w-screen flex-col overflow-hidden shadow-2xl ${
+              dark ? 'bg-[#0a1230] text-slate-100' : 'bg-slate-50 text-slate-900'
+            }`
+          : `flex h-full min-h-[580px] w-full flex-col overflow-hidden rounded-xl border shadow-sm ${
+              dark
+                ? 'border-white/15 bg-[#0a1230] text-slate-100'
+                : 'border-slate-200 bg-slate-50 text-slate-900'
+            }`
       }
     >
       <GraphSearchBar
@@ -646,15 +705,24 @@ export default function CentralizedKnowledgeGraphExplorer({
         onNodeTypesChange={setSelectedNodeTypes}
         selectedRelationshipTypes={selectedRelationshipTypes}
         onRelationshipTypesChange={setSelectedRelationshipTypes}
+        dark={dark}
       />
 
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-[#0a1230] px-3 py-1.5">
-        <GraphBreadcrumbHeader crumbs={crumbs} dark={true} />
+      <div
+        className={`flex items-center justify-between gap-3 border-b px-3 py-1.5 transition-colors ${
+          dark ? 'border-white/10 bg-[#0a1230]' : 'border-slate-200 bg-slate-50'
+        }`}
+      >
+        <GraphBreadcrumbHeader crumbs={crumbs} dark={dark} />
         <div className="flex shrink-0 items-center gap-2">
           {!isFullscreen && (
             <Link
               href="/ai"
-              className="hidden sm:inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-300 hover:bg-white/10 hover:text-white"
+              className={`hidden sm:inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
+                dark
+                  ? 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+              }`}
               title="Back to AI & Intelligence"
             >
               <ArrowLeft className="h-3 w-3" />
@@ -662,7 +730,7 @@ export default function CentralizedKnowledgeGraphExplorer({
             </Link>
           )}
           {expandingNodeId && (
-            <span className="flex items-center gap-1.5 text-xs text-slate-400">
+            <span className={`flex items-center gap-1.5 text-xs ${dark ? 'text-slate-400' : 'text-slate-600'}`}>
               <Loader2 className="h-3 w-3 animate-spin" /> Expanding {nodesById.get(expandingNodeId)?.label ?? 'node'}…
             </span>
           )}
@@ -672,7 +740,11 @@ export default function CentralizedKnowledgeGraphExplorer({
               type="button"
               onClick={resetView}
               title="Collapse every expanded relationship and return to this submodule's starting view"
-              className="rounded-md border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-white/10"
+              className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                dark
+                  ? 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+              }`}
             >
               Reset graph
             </button>
@@ -680,14 +752,22 @@ export default function CentralizedKnowledgeGraphExplorer({
           <button
             type="button"
             onClick={() => setPathFinderOpen((v) => !v)}
-            className="rounded-md border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-white/10"
+            className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+              dark
+                ? 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+            }`}
           >
             {pathFinderOpen ? 'Hide path finder' : 'Path finder'}
           </button>
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-white/10"
+            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+              dark
+                ? 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+            }`}
             title={isFullscreen ? 'Exit full screen' : 'Full screen'}
           >
             {isFullscreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
@@ -699,15 +779,26 @@ export default function CentralizedKnowledgeGraphExplorer({
       {pathFinderOpen && <GraphPathFinder session={session} onResult={setPathResult} />}
 
       {searchResults && (
-        <div className="border-b border-white/10 bg-[#0f1b40] px-3 py-2 text-slate-300">
-          <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-slate-400">
-            <span>{searchResults.length} result{searchResults.length === 1 ? '' : 's'}</span>
-            <button type="button" onClick={() => setSearchResults(null)} aria-label="Close search results" className="text-slate-400 hover:text-slate-200">
+        <div
+          className={`border-b px-3 py-2 transition-colors ${
+            dark ? 'border-white/10 bg-[#0f1b40] text-slate-300' : 'border-slate-200 bg-blue-50/60 text-slate-800'
+          }`}
+        >
+          <div className="mb-1.5 flex items-center justify-between text-xs font-medium">
+            <span className={dark ? 'text-slate-400' : 'text-slate-600'}>
+              {searchResults.length} result{searchResults.length === 1 ? '' : 's'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSearchResults(null)}
+              aria-label="Close search results"
+              className={dark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}
+            >
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
           {searchResults.length === 0 ? (
-            <p className="text-sm text-slate-400">No matching nodes.</p>
+            <p className={`text-sm ${dark ? 'text-slate-400' : 'text-slate-500'}`}>No matching nodes.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {searchResults.map((node) => (
@@ -715,9 +806,13 @@ export default function CentralizedKnowledgeGraphExplorer({
                   key={node.id}
                   type="button"
                   onClick={() => focusOnNode(node)}
-                  className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-slate-200 hover:bg-white/15"
+                  className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                    dark
+                      ? 'border-white/15 bg-white/10 text-slate-200 hover:bg-white/15'
+                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 shadow-sm'
+                  }`}
                 >
-                  {node.label} <span className="text-slate-400">· {node.entityKey}</span>
+                  {node.label} <span className={dark ? 'text-slate-400' : 'text-slate-500'}>· {node.entityKey}</span>
                 </button>
               ))}
             </div>
@@ -726,26 +821,28 @@ export default function CentralizedKnowledgeGraphExplorer({
       )}
 
       {pathResult && !pathResult.found && (
-        <div className="border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">No path exists between these two nodes.</div>
+        <div className="border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          No path exists between these two nodes.
+        </div>
       )}
 
       {expandNotice && (
-        <div className="flex items-center justify-between border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+        <div className="flex items-center justify-between border-b border-blue-500/20 bg-blue-500/10 px-3 py-2 text-sm text-blue-500 font-medium">
           <span>{expandNotice}</span>
-          <button type="button" onClick={() => setExpandNotice('')} aria-label="Dismiss" className="text-amber-200 hover:text-white">
+          <button type="button" onClick={() => setExpandNotice('')} aria-label="Dismiss" className="text-blue-500 hover:opacity-75">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-64 shrink-0 border-r border-white/10 bg-[#0a1230]">
+        <aside className={`w-64 shrink-0 border-r transition-colors ${dark ? 'border-white/10 bg-[#0a1230]' : 'border-slate-200 bg-slate-50'}`}>
           {modulesState === 'loading' && (
-            <p className="flex items-center gap-2 px-3 py-6 text-sm text-slate-400">
+            <p className={`flex items-center gap-2 px-3 py-6 text-sm ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
               <Loader2 className="h-4 w-4 animate-spin" /> Loading modules…
             </p>
           )}
-          {modulesState === 'error' && <p className="px-3 py-6 text-sm text-rose-400">{modulesError}</p>}
+          {modulesState === 'error' && <p className="px-3 py-6 text-sm text-rose-500">{modulesError}</p>}
           {modulesState === 'ready' && (
             <GraphModuleTree
               session={session}
@@ -755,29 +852,32 @@ export default function CentralizedKnowledgeGraphExplorer({
               initialFocusModuleLabel={initialFocusLabel}
               onSelectModule={openModule}
               onSelectSubmodule={openSubmodule}
+              dark={dark}
             />
           )}
         </aside>
 
-        <main className="flex min-w-0 flex-1 flex-col p-3 bg-[#0a1230]">
+        <main className={`flex min-w-0 flex-1 flex-col p-3 transition-colors ${dark ? 'bg-[#0a1230]' : 'bg-slate-100'}`}>
           {graphState === 'idle' && (
-            <p className="flex flex-1 items-center justify-center text-sm text-slate-400">Pick a submodule on the left to explore its real graph.</p>
+            <p className={`flex flex-1 items-center justify-center text-sm ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Pick a submodule on the left to explore its real graph.
+            </p>
           )}
           {graphState === 'loading' && (
-            <p className="flex flex-1 items-center justify-center gap-2 text-sm text-slate-400">
+            <p className={`flex flex-1 items-center justify-center gap-2 text-sm ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
               <Loader2 className="h-4 w-4 animate-spin" /> Loading…
             </p>
           )}
           {graphState === 'error' && (
-            <div className="flex flex-1 items-center justify-center gap-3 px-6 text-center text-sm text-rose-400">
+            <div className="flex flex-1 items-center justify-center gap-3 px-6 text-center text-sm text-rose-500">
               <ServerCrash className="h-4 w-4 shrink-0" /> {graphError}
             </div>
           )}
           {graphState === 'not-mapped' && (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-              <Network className="h-8 w-8 text-slate-400" />
-              <p className="text-sm font-medium text-slate-200">Not mapped to the graph yet</p>
-              <p className="text-sm text-slate-400">
+              <Network className={`h-8 w-8 ${dark ? 'text-slate-400' : 'text-slate-400'}`} />
+              <p className={`text-sm font-medium ${dark ? 'text-slate-200' : 'text-slate-800'}`}>Not mapped to the graph yet</p>
+              <p className={`text-sm ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
                 This submodule has no real GraphSchema label mapping — a data-coverage gap, reported honestly rather than shown with
                 invented data.
               </p>
@@ -797,19 +897,21 @@ export default function CentralizedKnowledgeGraphExplorer({
                 setSelectedNode(null);
                 setSelectedEdge(null);
               }}
-              onExpandAll={expandAllKnown}
+              onExpandAll={handleExpandAll}
               onCollapseAll={collapseAllGroups}
               isFullscreen={isFullscreen}
               onToggleFullscreen={toggleFullscreen}
+              mode={mode}
+              onToggleMode={setMode}
               heightClassName="h-full"
             />
           )}
         </main>
 
         {(selectedNode || selectedEdge) && (
-          <div className="w-80 shrink-0 border-l border-white/10 bg-[#0a1230] p-3">
+          <div className={`w-80 shrink-0 border-l p-3 transition-colors ${dark ? 'border-white/10 bg-[#0a1230]' : 'border-slate-200 bg-white'}`}>
             <GraphDetailPanel
-              variant="docked"
+              variant={dark ? 'docked' : 'docked-light'}
               node={selectedNode}
               edge={selectedEdge}
               edgeSourceLabel={selectedEdge ? nodesById.get(selectedEdge.source)?.label : undefined}
@@ -820,10 +922,6 @@ export default function CentralizedKnowledgeGraphExplorer({
                 setSelectedEdge(null);
               }}
               onItemClick={(entity, id) => {
-                // An item inside an OPEN hop section is already on the
-                // canvas (expanding the group put it there) — clicking it
-                // is the same as clicking it on the canvas directly: just
-                // select it so the panel shows its own relationships next.
                 const match = Array.from(nodesById.values()).find((n) => n.entityKey === entity && String(n.recordId) === String(id));
                 if (match) void selectNode(match);
               }}

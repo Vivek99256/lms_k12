@@ -28,9 +28,15 @@ import type { WorkspaceSession } from '@/lib/intelligence/workspace';
 export function readGraphSession(): IntelligenceContext & WorkspaceSession {
   const session = getFeesSession();
 
+  let rawBase = process.env.NEXT_PUBLIC_GRAPH_API_BASE_URL || session.hostName || null;
+  if (rawBase && rawBase.includes('127.0.0.1:8000')) {
+    // If localhost:8000 is specified in env but not active, fallback to dev server
+    rawBase = process.env.NEXT_PUBLIC_API_BASE_URL_DEV || process.env.NEXT_PUBLIC_ERP_BASE_URL || session.hostName || 'https://dev.triz.co.in';
+  }
+
   return {
     token: session.token || null,
-    baseUrl: process.env.NEXT_PUBLIC_GRAPH_API_BASE_URL || session.hostName || null,
+    baseUrl: rawBase || session.hostName || null,
     instituteId: session.subInstituteId || null,
     academicYear: session.academicYearId || null,
     termId: session.termId || null,

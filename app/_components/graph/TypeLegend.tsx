@@ -21,10 +21,12 @@ const SOURCE_LABEL: Record<SourceDotKind, string> = {
 export default function TypeLegend({
   variant = 'source',
   entityKeys,
+  theme = 'light',
 }: {
   variant?: 'source' | 'category';
   /** Category mode only — the entity keys currently on the canvas, so the legend shows only what's present. */
   entityKeys?: Iterable<string>;
+  theme?: 'light' | 'dark';
 }) {
   if (variant === 'category') {
     const present = categoriesPresent(entityKeys ?? []);
@@ -32,10 +34,10 @@ export default function TypeLegend({
     if (present.length === 0) return null;
 
     return (
-      <div className="flex flex-wrap items-center gap-4 px-1 text-xs text-slate-300">
+      <div className={`flex flex-wrap items-center gap-4 px-1 text-xs ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
         {present.map(({ color }) => (
-          <span key={color.key} className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color.dot }} aria-hidden="true" />
+          <span key={color.key} className="inline-flex items-center gap-1.5 font-medium">
+            <span className="inline-block h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: color.dot }} aria-hidden="true" />
             {color.label}
           </span>
         ))}

@@ -35,7 +35,6 @@ import {
   Maximize2,
   Minimize2,
   Moon,
-  RefreshCw,
   Scan,
   Search,
   Shuffle,
@@ -65,13 +64,13 @@ const SURFACE: Record<Mode, { canvas: string; bg: string; panel: string; panelBo
     edge: 0.6,
   },
   light: {
-    canvas: 'radial-gradient(ellipse at 50% 45%, #ffffff 0%, #eef4ff 55%, #dfe9fb 100%)',
-    bg: '#eef4ff',
-    panel: 'rgba(255,255,255,0.86)',
-    panelBorder: 'rgba(15,23,42,0.10)',
+    canvas: 'radial-gradient(ellipse at 50% 45%, #ffffff 0%, #f8fafc 55%, #e2e8f0 100%)',
+    bg: '#f8fafc',
+    panel: 'rgba(255,255,255,0.92)',
+    panelBorder: 'rgba(15,23,42,0.12)',
     text: '#0f172a',
-    sub: '#64748b',
-    grid: 'rgba(100,116,139,0.22)',
+    sub: '#475569',
+    grid: 'rgba(148,163,184,0.22)',
     edge: 0.75,
   },
 };
@@ -87,6 +86,23 @@ interface View {
   x: number;
   y: number;
   k: number;
+}
+
+type HoverTooltip =
+  | { kind: 'node'; x: number; y: number; node: KgNodeInput }
+  | { kind: 'edge'; x: number; y: number; edge: KgEdgeInput; source: KgNodeInput | undefined; target: KgNodeInput | undefined };
+
+function propertyValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value === null) return 'null';
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value) ?? String(value);
+    } catch {
+      return '[Unserializable value]';
+    }
+  }
+  return String(value);
 }
 
 export interface GraphBubbleCanvasProps {
@@ -114,6 +130,8 @@ export interface GraphBubbleCanvasProps {
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
   heightClassName?: string;
+  mode?: Mode;
+  onToggleMode?: (mode: Mode) => void;
 }
 
 export default function GraphBubbleCanvas({
@@ -131,12 +149,22 @@ export default function GraphBubbleCanvas({
   isFullscreen,
   onToggleFullscreen,
   heightClassName = 'h-full',
+  mode: propMode,
+  onToggleMode,
 }: GraphBubbleCanvasProps) {
-  const [mode, setMode] = useState<Mode>('dark');
+  const [internalMode, setInternalMode] = useState<Mode>('light');
+  const mode = propMode ?? internalMode;
+  const setMode = (next: Mode) => {
+    if (onToggleMode) {
+      onToggleMode(next);
+    } else {
+      setInternalMode(next);
+    }
+  };
   const [hiddenCategories, setHiddenCategories] = useState<string[]>([]);
   const [showCategories, setShowCategories] = useState(false);
   const [term, setTerm] = useState('');
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [tooltip, setTooltip] = useState<HoverTooltip | null>(null);
   const [positions, setPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 0.8 });
   const [gliding, setGliding] = useState(false);
@@ -150,6 +178,7 @@ export default function GraphBubbleCanvas({
   const raf = useRef<number | null>(null);
   const viewRef = useRef<View>(view);
   const glideTimer = useRef<number | null>(null);
+  const previousFocusId = useRef<string | null>(null);
 
   useEffect(() => {
     viewRef.current = view;
@@ -317,17 +346,40 @@ export default function GraphBubbleCanvas({
   }, []);
 
   const needle = term.trim().toLowerCase();
-  const focus = selectedNodeId ?? hovered;
-  const neighbours = useMemo(() => {
+  const focusedNodeId = selectedNodeId;
+  const connectedNodeIds = useMemo(() => {
     const set = new Set<string>();
-    if (!focus) return set;
-    set.add(focus);
+    if (!focusedNodeId) return set;
+    set.add(focusedNodeId);
     visibleEdges.forEach((e) => {
-      if (e.source === focus) set.add(e.target);
-      if (e.target === focus) set.add(e.source);
+      if (e.source === focusedNodeId) set.add(e.target);
+      if (e.target === focusedNodeId) set.add(e.source);
     });
     return set;
-  }, [focus, visibleEdges]);
+  }, [focusedNodeId, visibleEdges]);
+
+  // Focus only changes the viewport; the complete loaded graph remains on the canvas.
+  useEffect(() => {
+    if (!focusedNodeId || focusedNodeId === previousFocusId.current) {
+      previousFocusId.current = focusedNodeId;
+      return;
+    }
+
+    const timer = window.requestAnimationFrame(() => {
+      const node = sim.current.get(focusedNodeId);
+      const box = stage.current?.getBoundingClientRect();
+      if (!node || !box) return;
+
+      const k = Math.max(0.8, Math.min(1.35, viewRef.current.k < 0.8 ? 1.05 : viewRef.current.k));
+      setGliding(true);
+      setView({ x: box.width / 2 - node.x * k, y: box.height / 2 - node.y * k, k });
+      if (glideTimer.current !== null) window.clearTimeout(glideTimer.current);
+      glideTimer.current = window.setTimeout(() => setGliding(false), 750);
+    });
+
+    previousFocusId.current = focusedNodeId;
+    return () => window.cancelAnimationFrame(timer);
+  }, [focusedNodeId]);
 
   const worldPoint = (clientX: number, clientY: number) => {
     const box = stage.current?.getBoundingClientRect();
@@ -459,10 +511,11 @@ export default function GraphBubbleCanvas({
             const source = byId.get(e.source);
             if (!a || !b || !target || !source) return null;
             const color = categoryColor(target.entityKey).dot;
-            const lit = focus === null || (neighbours.has(e.source) && neighbours.has(e.target));
+            const isConnectedRelationship = focusedNodeId !== null && (e.source === focusedNodeId || e.target === focusedNodeId);
             const core = source.current === true;
             const isSelectedEdge = e.id === selectedEdgeId;
-            const hot = (focus !== null && lit) || isSelectedEdge;
+            const hot = isConnectedRelationship || isSelectedEdge;
+            const dimmed = (focusedNodeId !== null || selectedEdgeId !== null) && !hot;
             const width = (core ? 3.4 : 2.6) + (hot ? 1.2 : 0);
             const mx = (a.x + b.x) / 2;
             const my = (a.y + b.y) / 2;
@@ -480,13 +533,23 @@ export default function GraphBubbleCanvas({
                 strokeWidth={width}
                 strokeLinecap="round"
                 strokeDasharray={e.sourceKind === 'sql' ? `${(width * 0.6).toFixed(1)} ${(width * 1.6).toFixed(1)}` : `${(width * 1.3).toFixed(1)} ${(width * 2.4).toFixed(1)}`}
-                opacity={Math.max(s.edge, core || hot ? 0.95 : 0.8)}
+                opacity={dimmed ? 0.16 : Math.max(s.edge, core || hot ? 0.98 : 0.8)}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   onEdgeClick?.(e);
                 }}
+                onPointerEnter={(event) =>
+                  setTooltip({ kind: 'edge', x: event.clientX, y: event.clientY, edge: e, source, target })
+                }
+                onPointerMove={(event) =>
+                  setTooltip((current) =>
+                    current?.kind === 'edge' && current.edge.id === e.id ? { ...current, x: event.clientX, y: event.clientY } : current
+                  )
+                }
+                onPointerLeave={() => setTooltip((current) => (current?.kind === 'edge' ? null : current))}
                 style={{
                   cursor: 'pointer',
+                  transition: 'opacity 220ms ease, stroke-width 220ms ease',
                   ...({ '--period': `${(width * 3.7).toFixed(1)}px` } as React.CSSProperties),
                   animation: `kgb-flow ${hot ? 0.6 : core ? 0.9 : 1.2}s linear infinite`,
                   filter: hot || core ? `drop-shadow(0 0 4px ${color})` : undefined,
@@ -501,8 +564,12 @@ export default function GraphBubbleCanvas({
             const kind = kindOf(n);
             const r = SIZE[kind] / 2;
             const color = categoryColor(n.entityKey).dot;
-            const dim = needle !== '' && !matches(n) && kind === 'leaf';
-            const lit = focus === n.id || matches(n) || n.id === selectedNodeId;
+            const searchDimmed = needle !== '' && !matches(n) && kind === 'leaf';
+            const isSelected = n.id === selectedNodeId;
+            const isConnected = focusedNodeId !== null && !isSelected && connectedNodeIds.has(n.id);
+            const focusDimmed = focusedNodeId !== null && !connectedNodeIds.has(n.id);
+            const dim = searchDimmed || focusDimmed;
+            const lit = isSelected || isConnected || matches(n);
             const meta = nodeMeta?.get(n.id);
             const open = meta?.open ?? false;
             const loading = loadingNodeId === n.id;
@@ -515,24 +582,35 @@ export default function GraphBubbleCanvas({
                 key={n.id}
                 transform={`translate(${at.x.toFixed(1)},${at.y.toFixed(1)})`}
                 opacity={dim ? 0.3 : 1}
-                style={{ cursor: 'grab' }}
                 onPointerDown={(event) => onNodePointerDown(event, n)}
                 onDoubleClick={() => release(n.id)}
-                onPointerEnter={() => setHovered(n.id)}
-                onPointerLeave={() => setHovered(null)}
+                onPointerEnter={(event) => setTooltip({ kind: 'node', x: event.clientX, y: event.clientY, node: n })}
+                onPointerMove={(event) =>
+                  setTooltip((current) =>
+                    current?.kind === 'node' && current.node.id === n.id ? { ...current, x: event.clientX, y: event.clientY } : current
+                  )
+                }
+                onPointerLeave={() => setTooltip((current) => (current?.kind === 'node' ? null : current))}
+                style={{ cursor: 'grab', transition: 'opacity 220ms ease, transform 220ms ease' }}
               >
                 {kind === 'center' || kind === 'hub' ? (
                   <circle
                     r={r + 12}
                     fill={color}
-                    opacity={lit ? 0.55 : 0.3}
+                    opacity={isSelected ? 0.7 : lit ? 0.5 : 0.3}
                     filter="url(#kgb-glow)"
                     style={kind === 'center' ? { animation: 'kgb-pulse 3.4s ease-in-out infinite', transformBox: 'fill-box', transformOrigin: 'center' } : undefined}
                   />
                 ) : (
                   <circle r={r + (lit ? 9 : 5)} fill={color} opacity={lit ? 0.5 : 0.2} />
                 )}
-                <circle r={r} fill={`url(#${gradientId(color)})`} stroke={n.id === selectedNodeId ? '#ffffff' : lit ? '#ffffff' : 'rgba(255,255,255,0.55)'} strokeWidth={n.id === selectedNodeId ? 2.8 : lit ? 2.6 : 1.6} />
+                <circle
+                  r={r}
+                  fill={`url(#${gradientId(color)})`}
+                  stroke={isSelected ? '#ffffff' : lit ? '#ffffff' : 'rgba(255,255,255,0.55)'}
+                  strokeWidth={isSelected ? 4 : lit ? 2.6 : 1.6}
+                  style={{ transition: 'stroke-width 220ms ease' }}
+                />
                 <ellipse cx={-r * 0.28} cy={-r * 0.42} rx={r * 0.5} ry={r * 0.26} fill="#fff" opacity={0.22} />
 
                 {kind === 'center' ? (
@@ -604,6 +682,16 @@ export default function GraphBubbleCanvas({
             style={{ background: s.panel, borderColor: s.panelBorder, color: s.text }}
           />
         </div>
+        {selectedNodeId && onBackgroundClick && (
+          <button
+            type="button"
+            onClick={onBackgroundClick}
+            className={pill}
+            style={{ background: s.panel, borderColor: s.panelBorder, color: s.text }}
+          >
+            <X className="h-4 w-4" /> Clear focus
+          </button>
+        )}
         {onExpandAll && (
           <button type="button" onClick={onExpandAll} className={pill} style={{ background: s.panel, borderColor: s.panelBorder, color: s.text }}>
             <ChevronsUpDown className="h-4 w-4" /> Expand all
@@ -611,7 +699,7 @@ export default function GraphBubbleCanvas({
         )}
         {onCollapseAll && (
           <button type="button" onClick={onCollapseAll} className={pill} style={{ background: s.panel, borderColor: s.panelBorder, color: s.text }}>
-            <ChevronsDownUp className="h-4 w-4" /> Collapse
+            <ChevronsDownUp className="h-4 w-4" /> Collapse all
           </button>
         )}
 
@@ -645,6 +733,54 @@ export default function GraphBubbleCanvas({
           </button>
         </div>
       </div>
+
+      {tooltip && (
+        <div
+          className="pointer-events-none fixed z-[9999] max-w-sm rounded-xl border p-3 text-left text-xs shadow-2xl"
+          style={{
+            left: Math.min(typeof window === 'undefined' ? 800 : window.innerWidth - 300, Math.max(16, tooltip.x + 14)),
+            top: Math.min(typeof window === 'undefined' ? 600 : window.innerHeight - 240, Math.max(16, tooltip.y + 14)),
+            background: s.panel,
+            borderColor: s.panelBorder,
+            color: s.text,
+          }}
+        >
+          {tooltip.kind === 'node' ? (
+            <div className="space-y-1.5">
+              <p className="font-semibold">{tooltip.node.label}</p>
+              <p style={{ color: s.sub }}>
+                Type: <span style={{ color: s.text }}>{tooltip.node.entityKey}</span>
+              </p>
+              {tooltip.node.recordId !== null && tooltip.node.recordId !== undefined && (
+                <p style={{ color: s.sub }}>
+                  ID: <span className="font-mono" style={{ color: s.text }}>{String(tooltip.node.recordId)}</span>
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <p className="font-semibold">{tooltip.edge.relation}</p>
+              <p style={{ color: s.sub }}>
+                Source: <span style={{ color: s.text }}>{tooltip.source?.label ?? tooltip.edge.source}</span>
+              </p>
+              <p style={{ color: s.sub }}>
+                Target: <span style={{ color: s.text }}>{tooltip.target?.label ?? tooltip.edge.target}</span>
+              </p>
+              {tooltip.edge.properties && Object.keys(tooltip.edge.properties).length > 0 && (
+                <div className="border-t pt-1.5" style={{ borderColor: s.panelBorder }}>
+                  <p className="mb-1 font-medium" style={{ color: s.sub }}>Properties</p>
+                  {Object.entries(tooltip.edge.properties).map(([key, value]) => (
+                    <p key={key} className="flex gap-2">
+                      <span style={{ color: s.sub }}>{key}:</span>
+                      <span className="truncate font-mono">{propertyValue(value)}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Legend / Category Drawer (single toggle button at bottom-left: click opens, click closes) */}
       {categories.length > 0 && (
