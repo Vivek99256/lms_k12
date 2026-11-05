@@ -20,6 +20,7 @@
  * still set by `className="w-24 tabular-nums"`, unchanged from G2G.
  */
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, RefreshCw, Save, Search, Users, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -77,7 +78,7 @@ const yearOptions = Array.from({ length: 7 }, (_, index) => {
   return { label: year, value: year }
 })
 
-export default function SalaryStructurePage() {
+function SalaryStructurePageInner() {
   const {
     loading,
     processing,
@@ -509,5 +510,13 @@ export default function SalaryStructurePage() {
         </AlertDialogContent>
       </AlertDialog>
     </PayrollPageShell>
+  )
+}
+
+export default function SalaryStructurePage() {
+  return (
+    <HritTheme>
+      <SalaryStructurePageInner />
+    </HritTheme>
   )
 }

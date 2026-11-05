@@ -15,12 +15,21 @@
  */
 
 import { Suspense } from 'react'
-import { RecruitmentCenter } from './components/recruitment-center'
+import { RecruitmentCenter } from './components/recruitment-center'
+import { TalentTheme } from '../_lib/talent-theme'
 
-export default function RecruitmentPage() {
+function RecruitmentPageInner() {
   return (
     <Suspense fallback={null}>
       <RecruitmentCenter />
     </Suspense>
+  )
+}
+
+export default function RecruitmentPage() {
+  return (
+    <TalentTheme>
+      <RecruitmentPageInner />
+    </TalentTheme>
   )
 }

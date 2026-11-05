@@ -142,7 +142,7 @@ function TabFilters({
   action?: React.ReactNode
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3 [&_button:not([class*=bg-primary])]:border-border [&_button:not([class*=bg-primary])]:bg-card [&_input]:border-border [&_input]:bg-card [&_input]:shadow-sm">
       {selects.map((select) => (
         <div key={select.label} className="w-[170px]">
           <Select value={select.value} options={select.options} onChange={select.onChange} aria-label={select.label} />
@@ -274,8 +274,8 @@ export function GoalsTab({
 
       <Card className="overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/30">
+          <Table className="w-full text-sm [&_td]:px-4 [&_td]:py-3 [&_td]:align-middle [&_th]:h-11 [&_th]:whitespace-nowrap [&_th]:px-4 [&_th]:py-0 [&_th]:align-middle [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_tr]:border-border/60">
+            <TableHeader className="bg-primary/5">
               <TableRow>
                 <TableHead>Employee</TableHead>
                 <TableHead>
@@ -779,8 +779,8 @@ export function AppraisalsTab({
 
       <Card className="overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/30">
+          <Table className="w-full text-sm [&_td]:px-4 [&_td]:py-3 [&_td]:align-middle [&_th]:h-11 [&_th]:whitespace-nowrap [&_th]:px-4 [&_th]:py-0 [&_th]:align-middle [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_tr]:border-border/60">
+            <TableHeader className="bg-primary/5">
               <TableRow>
                 <TableHead className="w-[40px] pl-4">
                   <Checkbox
@@ -1270,8 +1270,8 @@ export function CompensationTab({
 
       <Card className="overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/30">
+          <Table className="w-full text-sm [&_td]:px-4 [&_td]:py-3 [&_td]:align-middle [&_th]:h-11 [&_th]:whitespace-nowrap [&_th]:px-4 [&_th]:py-0 [&_th]:align-middle [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_tr]:border-border/60">
+            <TableHeader className="bg-primary/5">
               <TableRow>
                 <TableHead className="w-[40px] pl-4">
                   <Checkbox
@@ -1758,8 +1758,8 @@ export function BonusTab({
 
       <Card className="overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/30">
+          <Table className="w-full text-sm [&_td]:px-4 [&_td]:py-3 [&_td]:align-middle [&_th]:h-11 [&_th]:whitespace-nowrap [&_th]:px-4 [&_th]:py-0 [&_th]:align-middle [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_tr]:border-border/60">
+            <TableHeader className="bg-primary/5">
               <TableRow>
                 <TableHead className="w-[40px] pl-4">
                   <Checkbox
@@ -2221,8 +2221,8 @@ export function CalibrationTab({
 
       <Card className="overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/30">
+          <Table className="w-full text-sm [&_td]:px-4 [&_td]:py-3 [&_td]:align-middle [&_th]:h-11 [&_th]:whitespace-nowrap [&_th]:px-4 [&_th]:py-0 [&_th]:align-middle [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_tr]:border-border/60">
+            <TableHeader className="bg-primary/5">
               <TableRow>
                 <TableHead>
                   <SortableHead label="Session" column="name" activeColumn={filters.sort_by} direction={filters.sort_dir} onSort={sort} />
@@ -2604,7 +2604,7 @@ function CalibrationGridSheet({
 
         {!loading && !error && grid && (
           <div className="flex flex-col gap-5 py-4">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border bg-muted/20 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
               <Stat label="Participants" value={grid.total_count} />
               <Stat label="Rated" value={grid.rated_count} />
               <Stat label="Calibrated" value={`${grid.session.calibrated_count} (${grid.session.calibrated_pct}%)`} />
@@ -2649,8 +2649,8 @@ function CalibrationGridSheet({
             {/* Participants */}
             <div className="overflow-hidden rounded-lg border">
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/30">
+                <Table className="w-full text-sm [&_td]:px-4 [&_td]:py-3 [&_td]:align-middle [&_th]:h-11 [&_th]:whitespace-nowrap [&_th]:px-4 [&_th]:py-0 [&_th]:align-middle [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_tr]:border-border/60">
+                  <TableHeader className="bg-primary/5">
                     <TableRow>
                       <TableHead className="font-semibold text-foreground">Employee</TableHead>
                       <TableHead className="font-semibold text-foreground">Stage</TableHead>
@@ -2781,7 +2781,7 @@ function CalibrationGridSheet({
             )}
 
             {grid.session.is_locked && (
-              <p className="rounded-lg border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+              <p className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm text-xs text-muted-foreground">
                 This session was locked on {grid.session.locked_label}. Ratings can no longer be changed.
               </p>
             )}

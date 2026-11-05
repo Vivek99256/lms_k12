@@ -83,10 +83,10 @@ const SUMMARY_ICONS: Record<string, LucideIcon> = {
 }
 
 const PROGRESS_COLORS: Record<string, string> = {
-  role_mapping: 'text-primary',
-  assessment: 'text-emerald-500',
-  certification: 'text-primary',
-  development: 'text-orange-500',
+  role_mapping: 'text-[#4F46E5]',
+  assessment: 'text-[#4F46E5]',
+  certification: 'text-[#4F46E5]',
+  development: 'text-[#4F46E5]',
 }
 
 const QUEUE_ICONS: Record<string, LucideIcon> = {
@@ -363,8 +363,8 @@ function QuickCreateForm({ initialKind, departments, jobroles, creating, onSubmi
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="lg" onClick={onCancel} disabled={creating}>Cancel</Button>
-          <Button size="lg" onClick={handleSubmit} disabled={creating}>
+          <Button variant="outline" size="lg" onClick={onCancel} disabled={creating} className="rounded-xl">Cancel</Button>
+          <Button size="lg" onClick={handleSubmit} disabled={creating} className="bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-xl font-bold">
             {creating ? 'Creating…' : 'Create'}
           </Button>
         </DialogFooter>
@@ -442,17 +442,23 @@ export function CommandCenter() {
   ]
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6 overflow-y-auto g2g-scrollbar">
+    <div
+      className="flex h-full flex-col gap-6 p-6 overflow-y-auto g2g-scrollbar"
+      style={{
+        ['--primary' as string]: '#4F46E5',
+        ['--primary-foreground' as string]: '#FFFFFF',
+      }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
         <div className="flex items-center gap-2">
           {prefs.ready && (
-            <CustomizeDashboard widgets={widgets} {...prefs.customizeProps} size="lg" className="h-10 rounded-xl" />
+            <CustomizeDashboard widgets={widgets} {...prefs.customizeProps} size="lg" className="h-10 rounded-xl font-semibold border-border bg-background hover:bg-indigo-50 hover:text-[#4F46E5] hover:border-indigo-200 transition-colors shadow-xs" />
           )}
           <Button
             onClick={() => openCreate('competency')}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-xl h-10 px-4 shadow-md shadow-primary/20 flex items-center gap-2"
+            className="bg-[#4F46E5] text-white hover:bg-[#4338CA] font-bold rounded-xl h-10 px-4 shadow-md shadow-indigo-500/20 flex items-center gap-2 transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[3]" /> Create New
           </Button>
@@ -492,7 +498,7 @@ export function CommandCenter() {
           variant="outline"
           onClick={resetFilters}
           disabled={!hasActiveFilters}
-          className="h-9 rounded-lg px-4 gap-2 text-xs font-bold border-border bg-background/50"
+          className="h-9 rounded-xl px-4 gap-2 text-xs font-semibold border-border bg-background hover:bg-indigo-50 hover:text-[#4F46E5] hover:border-indigo-200 transition-colors shadow-xs"
         >
           {hasActiveFilters ? <RotateCcw className="w-3.5 h-3.5" /> : <Filter className="w-3.5 h-3.5" />}
           {hasActiveFilters ? 'Reset' : 'Filters'}
@@ -520,18 +526,18 @@ export function CommandCenter() {
               {data.summary.filter((metric) => show(toWidgetId('kpi', metric.key))).map((metric) => {
                 const Icon = SUMMARY_ICONS[metric.key] ?? BookOpen
                 return (
-                  <div key={metric.key} className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-2xl p-4 shadow-sm flex flex-col items-center justify-center text-center gap-2 group hover:shadow-md transition-all">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-1">
-                      <Icon className="w-5 h-5" />
+                  <div key={metric.key} className="bg-card border border-indigo-100 hover:border-indigo-300 rounded-2xl p-4.5 shadow-xs flex flex-col items-center justify-center text-center gap-2 group hover:shadow-md transition-all">
+                    <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-[#4F46E5] mb-1 group-hover:scale-105 transition-transform shadow-xs">
+                      <Icon className="w-6 h-6 text-[#4F46E5]" />
                     </div>
                     <div className="text-2xl font-bold text-foreground leading-none">{nf(metric.value)}</div>
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{metric.label}</div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{metric.label}</div>
                     <div className="text-xs text-muted-foreground">{metric.desc}</div>
                     <button
                       onClick={() => go(SUMMARY_TARGET[metric.key] ?? 'cm-competency-library')}
-                      className="text-[10px] text-primary font-bold hover:underline mt-1 opacity-70 group-hover:opacity-100 transition-opacity"
+                      className="text-xs text-[#4F46E5] font-semibold hover:underline mt-1 opacity-80 group-hover:opacity-100 transition-opacity"
                     >
-                      View all
+                      View all →
                     </button>
                   </div>
                 )
@@ -543,25 +549,25 @@ export function CommandCenter() {
           {prefs.hasVisible('chart') && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {data.progress.filter((prog) => show(toWidgetId('chart', prog.key))).map((prog) => (
-                <div key={prog.key} className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-2xl p-5 shadow-sm flex items-center gap-5">
+                <div key={prog.key} className="bg-card border border-indigo-100/80 hover:border-indigo-200 rounded-2xl p-5 shadow-xs flex items-center gap-5 transition-colors">
                   <div className="relative w-16 h-16 flex-shrink-0">
                     <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                      <path className="text-muted/30" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      <path className={PROGRESS_COLORS[prog.key] ?? 'text-primary'} strokeWidth="3" strokeDasharray={`${prog.percent}, 100`} strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                      <path className="text-indigo-100/70" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                      <path className={PROGRESS_COLORS[prog.key] ?? 'text-[#4F46E5]'} strokeWidth="3.5" strokeDasharray={`${prog.percent}, 100`} strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                     </svg>
-                    <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-foreground">
+                    <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[#4F46E5]">
                       {prog.percent}%
                     </div>
                   </div>
                   <div className="flex flex-col flex-1">
-                    <div className="text-xs font-bold text-muted-foreground mb-1">{prog.title}</div>
+                    <div className="text-xs font-semibold text-muted-foreground mb-1">{prog.title}</div>
                     <div className="text-lg font-bold text-foreground leading-tight">{nf(prog.current)} / {nf(prog.total)}</div>
                     <div className="text-xs text-muted-foreground">{prog.sub}</div>
                     <button
                       onClick={() => go(PROGRESS_TARGET[prog.key] ?? 'cm-assessments')}
-                      className="text-[10px] text-primary font-bold hover:underline mt-2 self-start"
+                      className="text-xs text-[#4F46E5] font-semibold hover:underline mt-2 self-start"
                     >
-                      View details
+                      View details →
                     </button>
                   </div>
                 </div>
@@ -574,9 +580,9 @@ export function CommandCenter() {
             <div className={cn('grid grid-cols-1 gap-6', LOWER_GRID_COLUMNS[lowerPanelCount])}>
               {/* Work Queues */}
               {show('panel.work_queues') && (
-                <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-[24px] shadow-sm flex flex-col overflow-hidden">
-                  <div className="px-5 py-4 border-b border-primary/5 bg-primary/5">
-                    <h3 className="font-bold text-sm text-foreground">Work Queues</h3>
+                <div className="bg-card border border-indigo-100/80 rounded-[24px] shadow-xs flex flex-col overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-indigo-100/80 bg-indigo-50/50">
+                    <h3 className="font-bold text-sm text-[#4F46E5]">Work Queues</h3>
                   </div>
                   <div className="flex flex-col p-2">
                     {data.work_queues.map((wq) => {
@@ -585,43 +591,43 @@ export function CommandCenter() {
                         <button
                           key={wq.key}
                           onClick={() => go(QUEUE_TARGET[wq.key] ?? 'cm-assessments')}
-                          className="flex items-center justify-between p-3 rounded-xl hover:bg-primary/5 transition-colors group text-left"
+                          className="flex items-center justify-between p-3 rounded-xl hover:bg-indigo-50/50 transition-colors group text-left"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#4F46E5] group-hover:scale-105 transition-transform">
                               <Icon className="w-4 h-4" />
                             </div>
-                            <span className="text-sm font-medium text-foreground">{wq.label}</span>
+                            <span className="text-sm font-medium text-foreground group-hover:text-[#4F46E5] transition-colors">{wq.label}</span>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className={cn('font-bold text-sm', wq.count > 0 ? 'text-foreground' : 'text-muted-foreground')}>{nf(wq.count)}</span>
-                            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                            <span className={cn('font-bold text-sm', wq.count > 0 ? 'text-[#4F46E5]' : 'text-muted-foreground')}>{nf(wq.count)}</span>
+                            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-[#4F46E5] transition-colors" />
                           </div>
                         </button>
                       )
                     })}
                   </div>
-                  <div className="px-5 py-3 border-t border-primary/5 mt-auto">
-                    <button onClick={() => go('cm-assessments')} className="text-xs text-primary font-bold hover:underline">View all work queues</button>
+                  <div className="px-5 py-3 border-t border-indigo-100/80 mt-auto bg-muted/20">
+                    <button onClick={() => go('cm-assessments')} className="text-xs text-[#4F46E5] font-bold hover:underline">View all work queues →</button>
                   </div>
                 </div>
               )}
 
               {/* Recent Activity */}
               {show('panel.recent_activity') && (
-                <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-[24px] shadow-sm flex flex-col overflow-hidden">
-                  <div className="px-5 py-4 border-b border-primary/5 bg-primary/5">
-                    <h3 className="font-bold text-sm text-foreground">Recent Activity</h3>
+                <div className="bg-card border border-indigo-100/80 rounded-[24px] shadow-xs flex flex-col overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-indigo-100/80 bg-indigo-50/50">
+                    <h3 className="font-bold text-sm text-[#4F46E5]">Recent Activity</h3>
                   </div>
                   {data.recent_activity.length === 0 ? (
                     <div className="flex-1 flex items-center justify-center p-8">
-                      <EmptyState icon={<Clock className="w-6 h-6" />} title="No recent activity" className="border-0 py-8" />
+                      <EmptyState icon={<Clock className="w-6 h-6 text-[#4F46E5]" />} title="No recent activity" className="border-0 py-8" />
                     </div>
                   ) : (
                     <div className="flex flex-col p-5 gap-5">
                       {data.recent_activity.map((activity) => (
                         <div key={activity.id} className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0 mt-0.5">
+                          <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#4F46E5] font-bold text-xs shrink-0 mt-0.5">
                             {(activity.user || '?').charAt(0).toUpperCase()}
                           </div>
                           <div className="flex flex-col flex-1 gap-0.5">
@@ -635,27 +641,29 @@ export function CommandCenter() {
                       ))}
                     </div>
                   )}
-                  <div className="px-5 py-3 border-t border-primary/5 mt-auto">
-                    <button onClick={() => go('cm-audit')} className="text-xs text-primary font-bold hover:underline">View all activity</button>
+                  <div className="px-5 py-3 border-t border-indigo-100/80 mt-auto bg-muted/20">
+                    <button onClick={() => go('cm-audit')} className="text-xs text-[#4F46E5] font-bold hover:underline">View all activity →</button>
                   </div>
                 </div>
               )}
 
               {/* Quick Actions */}
               {show('panel.quick_actions') && (
-                <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-[24px] shadow-sm flex flex-col overflow-hidden">
-                  <div className="px-5 py-4 border-b border-primary/5 bg-primary/5">
-                    <h3 className="font-bold text-sm text-foreground">Quick Actions</h3>
+                <div className="bg-card border border-indigo-100/80 rounded-[24px] shadow-xs flex flex-col overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-indigo-100/80 bg-indigo-50/50">
+                    <h3 className="font-bold text-sm text-[#4F46E5]">Quick Actions</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-3 p-5">
                     {QUICK_ACTIONS.map((qa) => (
                       <button
                         key={qa.label}
                         onClick={() => openCreate(qa.kind)}
-                        className="flex flex-col items-center justify-center gap-3 p-4 h-auto rounded-lg border border-primary/10 bg-background/50 hover:bg-primary/5 hover:border-primary/30 transition-all group text-center"
+                        className="flex flex-col items-center justify-center gap-2.5 p-4 h-auto rounded-xl border border-indigo-100 bg-card hover:bg-indigo-50/50 hover:border-indigo-300 transition-all group text-center shadow-xs cursor-pointer"
                       >
-                        <qa.icon className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                        <span className="text-xs font-bold text-foreground">{qa.label}</span>
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100/60 flex items-center justify-center text-[#4F46E5] group-hover:scale-105 transition-transform">
+                          <qa.icon className="w-5 h-5 text-[#4F46E5]" />
+                        </div>
+                        <span className="text-xs font-semibold text-foreground group-hover:text-[#4F46E5] transition-colors">{qa.label}</span>
                       </button>
                     ))}
                   </div>
@@ -666,21 +674,21 @@ export function CommandCenter() {
 
           {/* Assessment Calendar Bottom Bar */}
           {show('panel.assessment_calendar') && (
-            <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-2xl shadow-sm p-4 flex items-center justify-between mt-2">
+            <div className="bg-card border border-indigo-100/80 rounded-2xl shadow-xs p-4.5 flex items-center justify-between mt-2">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#4F46E5]">
                   <CalendarDays className="w-5 h-5" />
                 </div>
                 <div className="flex flex-col">
                   <span className="text-sm font-bold text-foreground">
                     Assessment Calendar (Next 60 Days)
                     {data.assessment_calendar.upcoming_count > 0 && (
-                      <span className="ml-2 text-xs font-medium text-muted-foreground">· {nf(data.assessment_calendar.upcoming_count)} upcoming</span>
+                      <span className="ml-2 text-xs font-semibold text-[#4F46E5] bg-indigo-50 px-2 py-0.5 rounded-md">· {nf(data.assessment_calendar.upcoming_count)} upcoming</span>
                     )}
                   </span>
                   {data.assessment_calendar.cycle ? (
                     <div className="flex items-center gap-2 mt-0.5">
-                      <div className="w-2 h-2 rounded-full bg-primary" />
+                      <div className="w-2 h-2 rounded-full bg-[#4F46E5]" />
                       <span className="text-xs font-medium text-muted-foreground">{data.assessment_calendar.cycle.name}</span>
                       {data.assessment_calendar.cycle.range_label && (
                         <span className="text-xs text-muted-foreground ml-2">{data.assessment_calendar.cycle.range_label}</span>
@@ -694,7 +702,7 @@ export function CommandCenter() {
               <Button
                 variant="outline"
                 onClick={() => go('cm-assessments')}
-                className="h-9 rounded-lg font-bold text-xs bg-background"
+                className="h-9 rounded-xl font-semibold text-xs border-border bg-background hover:bg-indigo-50 hover:text-[#4F46E5] hover:border-indigo-200"
               >
                 <CalendarDays className="w-3.5 h-3.5 mr-2" /> View Calendar
               </Button>

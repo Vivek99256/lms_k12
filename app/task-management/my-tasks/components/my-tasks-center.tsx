@@ -100,8 +100,8 @@ export function MyTasksCenter() {
             variant="ghost"
             onClick={() => setGroup(item.value)}
             className={cn(
-              'h-auto shrink-0 rounded-none border-b-2 px-1 pb-3',
-              group === item.value ? 'border-primary text-primary' : 'border-transparent text-muted-foreground',
+              'h-auto shrink-0 rounded-none border-x-0 border-t-0 border-b-2 px-1 pb-3 outline-none ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0',
+              group === item.value ? 'border-blue-600 text-blue-600 hover:text-blue-600' : 'border-transparent text-muted-foreground',
             )}
           >
             {item.label}
@@ -193,29 +193,36 @@ export function MyTasksCenter() {
 }
 
 function MyTaskTable({ tasks, onSelect }: { tasks: MyTask[]; onSelect: (id: string) => void }) {
+  const head = 'h-11 whitespace-nowrap px-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground'
+  const cell = 'px-4 py-3 align-middle'
   return (
-    <div className="overflow-hidden rounded-xl border">
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Task</TableHead>
-              <TableHead>Assigned By</TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>Due Date</TableHead>
-              <TableHead>Priority</TableHead>
-              <TableHead>Status</TableHead>
+            <TableRow className="border-b bg-muted/50 hover:bg-muted/50">
+              <TableHead className={`${head} min-w-72`}>Task</TableHead>
+              <TableHead className={head}>Assigned By</TableHead>
+              <TableHead className={head}>Department</TableHead>
+              <TableHead className={head}>Due Date</TableHead>
+              <TableHead className={head}>Priority</TableHead>
+              <TableHead className={head}>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {tasks.map((task) => (
-              <TableRow key={task.id} className="cursor-pointer" onClick={() => onSelect(task.id)}>
-                <TableCell><p className="font-medium">{task.title}</p><p className="max-w-sm truncate text-xs text-muted-foreground">{task.description || 'No description'}</p></TableCell>
-                <TableCell>{task.owner}</TableCell>
-                <TableCell>{task.department || '—'}</TableCell>
-                <TableCell><span className="flex items-center gap-2"><CalendarDays className="size-4 text-muted-foreground" />{formatDate(task.due_date)}</span></TableCell>
-                <TableCell><PriorityBadge priority={task.priority ?? task.task_type} /></TableCell>
-                <TableCell><StatusBadge status={task.status} label={task.status_label || undefined} /></TableCell>
+              <TableRow key={task.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/40" onClick={() => onSelect(task.id)}>
+                <TableCell className={cell}>
+                  <p className="font-medium leading-snug text-foreground">{task.title}</p>
+                  <p className="mt-0.5 max-w-md truncate text-xs text-muted-foreground">{task.description || 'No description'}</p>
+                </TableCell>
+                <TableCell className={`${cell} whitespace-nowrap text-sm`}>{task.owner}</TableCell>
+                <TableCell className={`${cell} max-w-56 truncate text-sm`} title={task.department || undefined}>{task.department || '—'}</TableCell>
+                <TableCell className={`${cell} whitespace-nowrap text-sm`}>
+                  <span className="flex items-center gap-2"><CalendarDays className="size-4 shrink-0 text-muted-foreground" />{formatDate(task.due_date)}</span>
+                </TableCell>
+                <TableCell className={cell}><div className="w-20"><PriorityBadge priority={task.priority ?? task.task_type} /></div></TableCell>
+                <TableCell className={cell}><div className="w-32"><StatusBadge status={task.status} label={task.status_label || undefined} /></div></TableCell>
               </TableRow>
             ))}
             {tasks.length === 0 && (

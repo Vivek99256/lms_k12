@@ -1,5 +1,6 @@
 'use client'
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import * as React from 'react'
 import { EnhancedAttendanceFilters } from '@/app/hrit/attendance-management/_shared/enhanced-attendance-filters'
 import { AttendanceReportTable } from './components/AttendanceReportTable'
@@ -1217,4 +1218,10 @@ function AttendanceReportsPage() {
   )
 }
 
-export default AttendanceReportsPage
+export default function AttendanceReportsPagePage() {
+  return (
+    <HritTheme>
+      <AttendanceReportsPage />
+    </HritTheme>
+  )
+}

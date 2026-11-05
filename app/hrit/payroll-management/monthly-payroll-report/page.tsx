@@ -23,6 +23,7 @@
  * from G2G.
  */
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, Download, FileText, Search, Trash2, Users, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -61,7 +62,7 @@ import {
   downloadCsv,
 } from '@/app/hrit/_components/payroll-shell'
 
-export default function MonthlyPayrollPage() {
+function MonthlyPayrollPageInner() {
   const {
     loading,
     processing,
@@ -490,4 +491,12 @@ export default function MonthlyPayrollPage() {
 /** Laravel's month lists use three-letter abbreviations ('Apr', 'May', ...). */
 function currentMonthAbbr() {
   return new Date().toLocaleString('en-US', { month: 'short' })
+}
+
+export default function MonthlyPayrollPage() {
+  return (
+    <HritTheme>
+      <MonthlyPayrollPageInner />
+    </HritTheme>
+  )
 }

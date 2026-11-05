@@ -46,7 +46,7 @@ export function CandidateCard({ candidate, onClick, onShortlist, onReject, onSch
         event.dataTransfer.setData('text/recruitment-candidate-id', candidate.id)
       }}
       onClick={() => onClick(candidate)}
-      className="group flex flex-col gap-2 rounded-lg border border-border/60 bg-card p-3 shadow-sm cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5"
+      className="group flex flex-col gap-2.5 rounded-xl border border-border/60 bg-card p-3.5 shadow-sm cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col gap-0.5 min-w-0">
@@ -88,8 +88,8 @@ export function CandidateCard({ candidate, onClick, onShortlist, onReject, onSch
           </DropdownMenu>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-muted-foreground">{candidate.appliedOn}</span>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 border-t border-border/50 pt-2.5">
+        <span className="whitespace-nowrap text-[11px] font-medium text-muted-foreground">{candidate.appliedOn}</span>
         {/* The Applied column holds both screened and not-yet-screened
             candidates (see candidatesByStage in recruitment-center.tsx): a
             completed screening shows its score right here instead of a
@@ -97,9 +97,9 @@ export function CandidateCard({ candidate, onClick, onShortlist, onReject, onSch
             endpoint already returns - no extra screening call. Any other
             stage has already moved past screening and gets no tag. */}
         {candidate.screeningCompleted ? (
-          <StatusBadge variant="active" size="sm">{formatScore(candidate.screeningScore)}</StatusBadge>
+          <StatusBadge variant="active" size="sm" className="whitespace-nowrap">{formatScore(candidate.screeningScore)}</StatusBadge>
         ) : candidate.stage === 'Applied' ? (
-          <StatusBadge variant="pending" size="sm">Screening pending</StatusBadge>
+          <StatusBadge variant="pending" size="sm" className="whitespace-nowrap">Screening pending</StatusBadge>
         ) : null}
       </div>
     </div>
@@ -124,7 +124,7 @@ interface KanbanColumnProps {
 export function KanbanColumn({ stage, candidates, count, onCandidateClick, onCandidateApply, onCandidateMove, onShortlist, onReject, onScheduleInterview, onInterviewFeedback, onReschedule, onCreateOffer }: KanbanColumnProps) {
   return (
     <div
-      className="flex flex-col min-w-[200px] w-[200px] shrink-0"
+      className="flex min-w-[250px] flex-1 flex-col rounded-xl border border-border/60 bg-primary/[0.03] p-3"
       onDragOver={(event) => {
         event.preventDefault()
         event.dataTransfer.dropEffect = 'move'
@@ -136,13 +136,13 @@ export function KanbanColumn({ stage, candidates, count, onCandidateClick, onCan
       }}
     >
       {/* Column header */}
-      <div className="flex items-center gap-2 mb-3 px-1">
+      <div className="mb-3 flex items-center gap-2 px-1">
         <div className={cn('size-2 rounded-full', stage.color.replace('/20', '').replace('/30', ''))} />
         <span className="text-sm font-semibold text-foreground">{stage.label}</span>
-        <span className="text-xs font-bold text-muted-foreground ml-auto tabular-nums">{count}</span>
+        <span className="ml-auto min-w-6 rounded-full bg-primary/10 px-2 py-0.5 text-center text-xs font-bold tabular-nums text-primary">{count}</span>
       </div>
       {/* Column body */}
-      <div className="flex flex-col gap-2 flex-1 overflow-y-auto max-h-[400px] pr-1 scrollbar-thin">
+      <div className="flex flex-col gap-2 flex-1 overflow-y-auto max-h-[520px] pr-0.5 scrollbar-thin">
         {candidates.map((candidate) => (
           <CandidateCard
             key={candidate.id}
@@ -157,7 +157,7 @@ export function KanbanColumn({ stage, candidates, count, onCandidateClick, onCan
           />
         ))}
         {candidates.length === 0 && (
-          <div className="flex items-center justify-center h-20 rounded-lg border border-dashed border-border/60 text-xs text-muted-foreground">
+          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-primary/25 bg-card/60 text-xs text-muted-foreground">
             No candidates
           </div>
         )}

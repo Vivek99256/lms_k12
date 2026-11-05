@@ -1,5 +1,6 @@
 'use client'
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Search } from 'lucide-react'
@@ -76,7 +77,7 @@ function toInput(date: Date) {
   return `${year}-${month}-${day}`
 }
 
-export default function LeaveReportsPage() {
+function LeaveReportsPageInner() {
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<'catalog' | 'saved'>('catalog')
   const [query, setQuery] = useState('')
@@ -369,5 +370,13 @@ export default function LeaveReportsPage() {
         />
       </div>
     </div>
+  )
+}
+
+export default function LeaveReportsPage() {
+  return (
+    <HritTheme>
+      <LeaveReportsPageInner />
+    </HritTheme>
   )
 }

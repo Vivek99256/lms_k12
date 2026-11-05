@@ -66,8 +66,10 @@ export function TmReports() {
             variant="ghost"
             onClick={() => setTab(entry.id)}
             className={cn(
-              'rounded-none border-b-2',
-              tab === entry.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground',
+              '-mb-px h-10 rounded-none border-x-0 border-t-0 border-b-2 px-4 shadow-none outline-none hover:bg-primary/5 focus-visible:ring-0',
+              tab === entry.id
+                ? 'border-primary bg-transparent font-semibold text-primary hover:text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             <entry.icon className="mr-2 size-4" /> {entry.label}

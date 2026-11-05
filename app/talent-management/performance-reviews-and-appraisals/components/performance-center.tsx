@@ -621,10 +621,10 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
         )}
 
         {/* =============================== KPIs =============================== */}
-        <div className="mb-6 flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
+        <div className="mb-6 grid grid-flow-col auto-cols-fr gap-3">
           {kpisLoading &&
             Array.from({ length: 7 }).map((_, index) => (
-              <Card key={index} className="min-w-[200px] flex-1 shadow-sm">
+              <Card key={index} className="min-w-0 shadow-sm">
                 <CardContent className="flex flex-col gap-3 p-4">
                   <Skeleton className="h-9 w-9 rounded-xl" />
                   <Skeleton className="h-3 w-24" />
@@ -649,27 +649,27 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
               const Icon = KPI_ICONS[kpi.icon] ?? Calendar
 
               return (
-                <Card key={kpi.id} className="min-w-[210px] flex-1 shadow-sm">
-                  <CardContent className="relative flex h-full flex-col gap-2 p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-xl border bg-muted/50 p-2 text-muted-foreground">
-                        <Icon className="size-5" />
+                <Card key={kpi.id} className="min-w-0 shadow-sm">
+                  <CardContent className="relative flex h-full flex-col gap-2 p-3">
+                    <div className="flex items-start gap-2">
+                      <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-1.5 text-primary">
+                        <Icon className="size-4" />
                       </div>
-                      <span className="text-sm font-semibold leading-tight text-foreground/80">{kpi.title}</span>
+                      <span className="text-xs font-semibold leading-tight text-foreground/80">{kpi.title}</span>
                     </div>
-                    <div className="mt-2 flex flex-col gap-1 pl-[48px]">
-                      <span className="text-3xl font-bold leading-none text-foreground">{kpi.value}</span>
-                      <span className="text-[10px] text-muted-foreground">{kpi.subtitle}</span>
+                    <div className="mt-1 flex flex-col gap-1">
+                      <span className="text-2xl font-bold leading-none text-foreground">{kpi.value}</span>
+                      <span className="text-[11px] leading-tight text-muted-foreground">{kpi.subtitle}</span>
                     </div>
                     {kpi.progress !== undefined && (
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      <div className="absolute bottom-3 right-3">
                         <div
-                          className="flex size-12 items-center justify-center rounded-full"
+                          className="flex size-10 items-center justify-center rounded-full"
                           style={{
-                            background: `conic-gradient(var(--color-primary, currentColor) ${kpi.progress}%, transparent 0)`,
+                            background: `conic-gradient(var(--primary) ${kpi.progress}%, hsl(221 83% 53% / 0.12) 0)`,
                           }}
                         >
-                          <span className="flex size-9 items-center justify-center rounded-full bg-card text-xs font-bold text-foreground">
+                          <span className="flex size-7 items-center justify-center rounded-full bg-card text-[10px] font-bold text-foreground">
                             {kpi.progress}%
                           </span>
                         </div>
@@ -707,7 +707,7 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
             {activeTab === 'reviews' && (
               <>
                 {/* Filters */}
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 [&_button]:border-border [&_button]:bg-card [&_input]:border-border [&_input]:bg-card [&_input]:shadow-sm">
                   <div className="w-[170px]">
                     <Select
                       value={shared.department_id}
@@ -824,7 +824,7 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
                 {/* View toggle + bulk actions */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex rounded-lg border bg-muted/50 p-1">
+                    <div className="flex rounded-xl border border-border bg-card p-1 shadow-sm">
                       {VIEW_MODES.map((mode) => {
                         const Icon = mode.icon
                         return (
@@ -834,7 +834,7 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
                             variant={viewMode === mode.id ? 'default' : 'ghost'}
                             className={cn(
                               'gap-2 px-3 py-1.5 text-sm',
-                              viewMode === mode.id ? 'font-semibold' : 'font-medium text-muted-foreground',
+                              viewMode === mode.id ? 'font-semibold' : 'font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary',
                             )}
                             onClick={() => setViewMode(mode.id)}
                           >
@@ -873,12 +873,12 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
 
                 {/* View body */}
                 {viewMode === 'list' && (
-                  <Card className="overflow-hidden shadow-sm">
+                  <Card className="overflow-hidden rounded-xl shadow-sm">
                     <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader className="bg-muted/30">
-                          <TableRow>
-                            <TableHead className="w-[40px] pl-4">
+                      <Table className="w-full text-sm [&_td]:px-4 [&_td]:py-3 [&_td]:align-middle [&_th]:h-11 [&_th]:whitespace-nowrap [&_th]:px-4 [&_th]:py-0 [&_th]:align-middle [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_tr]:border-border/60">
+                        <TableHeader className="bg-primary/5">
+                          <TableRow className="hover:bg-transparent">
+                            <TableHead className="w-[48px]">
                               <Checkbox
                                 checked={allRowsSelected}
                                 onCheckedChange={() =>
@@ -951,7 +951,7 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
                                 onSort={sortReviews}
                               />
                             </TableHead>
-                            <TableHead className="w-[60px] text-center font-semibold text-foreground">Actions</TableHead>
+                            <TableHead className="w-[72px] text-center font-semibold text-foreground">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1359,10 +1359,10 @@ function ReviewRow({
 
   return (
     <TableRow
-      className={cn('cursor-pointer hover:bg-muted/10', isActive && 'bg-primary/5')}
+      className={cn('cursor-pointer transition-colors hover:bg-primary/5', isActive && 'bg-primary/10')}
       onClick={onOpen}
     >
-      <TableCell className="pl-4" onClick={(event) => event.stopPropagation()}>
+      <TableCell onClick={(event) => event.stopPropagation()}>
         <Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Select ${review.employee.name}`} />
       </TableCell>
       <TableCell>
@@ -1372,8 +1372,8 @@ function ReviewRow({
           employeeNo={review.employee.employee_no}
         />
       </TableCell>
-      <TableCell className="text-sm text-foreground/80">{review.department ?? '—'}</TableCell>
-      <TableCell className="text-sm text-foreground/80">{review.manager ?? 'Not assigned'}</TableCell>
+      <TableCell className="whitespace-nowrap text-sm text-foreground/80">{review.department ?? '—'}</TableCell>
+      <TableCell className={cn('whitespace-nowrap text-sm', review.manager ? 'text-foreground/80' : 'text-muted-foreground')}>{review.manager ?? 'Not assigned'}</TableCell>
       <TableCell>
         <div className="flex flex-col">
           <span className="text-sm text-foreground/80">{review.cycle ?? '—'}</span>
@@ -1383,7 +1383,7 @@ function ReviewRow({
         </div>
       </TableCell>
       <TableCell>
-        <StatusBadge variant={stageVariant(review.stage)} className="border shadow-sm">
+        <StatusBadge variant={stageVariant(review.stage)} size="sm" className="whitespace-nowrap border shadow-sm">
           {review.stage_label}
         </StatusBadge>
       </TableCell>
@@ -1391,13 +1391,13 @@ function ReviewRow({
         <RatingCell rating={review.overall_rating} label={review.overall_rating_label} />
       </TableCell>
       <TableCell>
-        <StatusBadge variant={reviewStatusVariant(review.status)} size="sm">
+        <StatusBadge variant={reviewStatusVariant(review.status)} size="sm" className="whitespace-nowrap border">
           {review.status_label}
         </StatusBadge>
       </TableCell>
-      <TableCell className={cn('text-sm', review.is_overdue ? 'font-semibold text-destructive' : 'text-foreground/80')}>
-        {review.due_label ?? '—'}
-        {review.is_overdue && <span className="block text-[10px]">Overdue</span>}
+      <TableCell className={cn('whitespace-nowrap text-sm', review.is_overdue ? 'text-destructive' : 'text-foreground/80')}>
+        <span className="font-medium">{review.due_label ?? '—'}</span>
+        {review.is_overdue && <span className="block text-[10px] font-semibold uppercase tracking-wide">Overdue</span>}
       </TableCell>
       <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
         <div className="relative flex justify-center">

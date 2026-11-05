@@ -1,5 +1,6 @@
 'use client'
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -142,7 +143,7 @@ function DashboardSkeleton() {
   )
 }
 
-export default function DashboardPage() {
+function DashboardPageInner() {
   const router = useRouter()
   const { user } = useAuth()
   const currentDate = useMemo(() => getCurrentDate(), [])
@@ -335,5 +336,13 @@ export default function DashboardPage() {
         />
       </Suspense>
     </div>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <HritTheme>
+      <DashboardPageInner />
+    </HritTheme>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { lazy, Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Lock } from 'lucide-react'
@@ -34,7 +35,7 @@ const configTabs = [
   { id: 'roles-access', label: 'Roles & Access' },
 ]
 
-export default function LeaveConfigurationPage() {
+function LeaveConfigurationPageInner() {
   const searchParams = useSearchParams()
   const { isAuthenticated, menuContext } = useAuth()
   const isLoading = false
@@ -80,5 +81,13 @@ export default function LeaveConfigurationPage() {
         </Suspense>
       </div>
     </div>
+  )
+}
+
+export default function LeaveConfigurationPage() {
+  return (
+    <HritTheme>
+      <LeaveConfigurationPageInner />
+    </HritTheme>
   )
 }

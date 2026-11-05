@@ -3,30 +3,33 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const statusBadgeVariants = cva(
-  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium',
+  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide transition-colors',
   {
     variants: {
       variant: {
         default:
-          'border border-border bg-background text-foreground',
-        active: 'border border-success/30 bg-success/10 text-success',
-        success: 'border border-success/30 bg-success/10 text-success',
+          'border border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
+        active:
+          'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400',
+        success:
+          'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400',
         inactive:
-          'border border-muted-foreground/30 bg-muted text-muted-foreground',
+          'border border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400',
         pending:
-          'border border-warning/30 bg-warning/10 text-warning',
+          'border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-400',
         warning:
-          'border border-warning/30 bg-warning/10 text-warning',
+          'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-950/40 dark:text-orange-400',
         error:
-          'border border-destructive/30 bg-destructive/10 text-destructive',
+          'border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-400',
         processing:
-          'border border-primary/30 bg-primary/10 text-primary',
-        primary: 'border border-primary/30 bg-primary/10 text-primary',
+          'border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400',
+        primary:
+          'border border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-400',
       },
       size: {
-        sm: 'text-xs px-2 py-0.5',
-        default: 'text-xs px-2.5 py-1',
-        lg: 'text-sm px-3 py-1.5',
+        sm: 'text-[11px] px-2 py-0.5',
+        default: 'text-xs px-2.5 py-0.5',
+        lg: 'text-sm px-3 py-1',
       },
     },
     defaultVariants: {
@@ -35,6 +38,18 @@ const statusBadgeVariants = cva(
     },
   },
 )
+
+const dotColors: Record<string, string> = {
+  active: 'bg-emerald-500',
+  success: 'bg-emerald-500',
+  pending: 'bg-amber-500',
+  warning: 'bg-orange-500',
+  error: 'bg-rose-500',
+  processing: 'bg-blue-500',
+  primary: 'bg-indigo-500',
+  inactive: 'bg-slate-400',
+  default: 'bg-slate-400',
+}
 
 interface StatusBadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
@@ -73,9 +88,9 @@ const statusVariantMap: Record<string, VariantProps<typeof statusBadgeVariants>[
   archived: 'inactive',
   Deleted: 'inactive',
   deleted: 'inactive',
-  Pending: 'inactive',
-  pending: 'inactive',
-  PENDING: 'inactive',
+  Pending: 'pending',
+  pending: 'pending',
+  PENDING: 'pending',
   Draft: 'pending',
   draft: 'pending',
   'On Leave': 'pending',
@@ -84,8 +99,8 @@ const statusVariantMap: Record<string, VariantProps<typeof statusBadgeVariants>[
   'on-hold': 'warning',
   'On Hold': 'warning',
   'ON HOLD': 'warning',
-  Processing: 'pending',
-  processing: 'pending',
+  Processing: 'processing',
+  processing: 'processing',
   Submitted: 'pending',
   submitted: 'pending',
   AwaitingReview: 'pending',
@@ -128,12 +143,8 @@ const statusVariantMap: Record<string, VariantProps<typeof statusBadgeVariants>[
   'Early Going': 'warning',
   Live: 'active',
   live: 'active',
-  // Roadmap lifecycle, to match the shared ComingSoon component. Mapped to
-  // 'inactive'/'processing' rather than 'pending' because the warning and
-  // success colour tokens are not registered in the Tailwind theme
-  // (app/globals.css) and render unstyled.
-  'Coming Soon': 'inactive',
-  'coming-soon': 'inactive',
+  'Coming Soon': 'processing',
+  'coming-soon': 'processing',
   Planned: 'inactive',
   planned: 'inactive',
   Pilot: 'processing',
@@ -145,7 +156,6 @@ const statusVariantMap: Record<string, VariantProps<typeof statusBadgeVariants>[
   'Training Assigned': 'processing',
   'Final Warning': 'error',
   'Escalated to HR': 'error',
-  // Compliance Management (org_compliance_library.status / derived_status).
   Upcoming: 'processing',
   'Due Soon': 'warning',
   Overdue: 'error',
@@ -155,15 +165,16 @@ const statusVariantMap: Record<string, VariantProps<typeof statusBadgeVariants>[
 
 const StatusBadge = React.forwardRef<HTMLDivElement, StatusBadgeProps>(
   ({ className, variant, status, label, size, icon, children, ...props }, ref) => {
-    const activeVariant = status ? (statusVariantMap[status] || variant || 'default') : variant;
-    
+    const activeVariant = status ? (statusVariantMap[status] || variant || 'default') : (variant || 'default')
+    const dot = dotColors[activeVariant as string] || 'bg-slate-400'
+
     return (
       <div
         ref={ref}
         className={cn(statusBadgeVariants({ variant: activeVariant, size, className }))}
         {...props}
       >
-        {icon && <span>{icon}</span>}
+        {icon ? <span>{icon}</span> : <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', dot)} />}
         {children || label || (status ? status.replace(/-/g, ' ') : null)}
       </div>
     )

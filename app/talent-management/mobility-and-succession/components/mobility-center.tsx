@@ -800,7 +800,7 @@ export function MobilityCenter() {
 
         {/* Global KPIs Row */}
         {overview && activeTab === 'Overview' && (
-          <div className="flex overflow-x-auto gap-4 mb-6 pb-2 custom-scrollbar">
+          <div className="mb-6 grid grid-flow-col auto-cols-fr gap-3">
             {[
               { title: 'Open Internal Jobs', value: overview.kpis.open_jobs, trend: '3 vs last month', isPositive: true },
               { title: 'Applications Received', value: overview.kpis.applications, trend: '12 vs last month', isPositive: true },
@@ -809,20 +809,20 @@ export function MobilityCenter() {
               { title: 'Promotions in Progress', value: overview.kpis.promotions_in_progress, trend: '2 vs last month', isPositive: true },
               { title: 'Critical Roles Coverage', value: overview.kpis.critical_roles, trend: '', isAction: true },
             ].map((kpi, idx) => (
-              <Card key={idx} className="shadow-sm min-w-[200px] flex-1">
-                <CardContent className="p-4 flex flex-col h-full gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-muted/50 text-muted-foreground border">
+              <Card key={idx} className="min-w-0 shadow-sm">
+                <CardContent className="p-3 flex flex-col h-full gap-2">
+                  <div className="flex items-start gap-2">
+                    <div className="shrink-0 p-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 [&_svg]:size-4">
                       {getKpiIcon(kpi.title)}
                     </div>
-                    <span className="text-sm font-semibold text-foreground/80 leading-tight">{kpi.title}</span>
+                    <span className="text-xs font-semibold text-foreground/80 leading-tight">{kpi.title}</span>
                   </div>
 
-                  <div className="flex items-end justify-between pl-[52px]">
-                    <span className="text-3xl font-bold text-foreground leading-none">{kpi.value}</span>
+                  <div className="flex items-end justify-between">
+                    <span className="text-2xl font-bold text-foreground leading-none">{kpi.value}</span>
                   </div>
 
-                  <div className="pl-[52px] mt-auto">
+                  <div className="mt-auto">
                     {kpi.isAction ? (
                       <button
                         className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 mt-1"
@@ -833,7 +833,7 @@ export function MobilityCenter() {
                     ) : kpi.isNeutral ? (
                       <div className="flex items-center gap-1.5 mt-1 text-muted-foreground">
                         <Minus className="size-3.5" />
-                        <span className="text-xs font-medium">{kpi.trend}</span>
+                        <span className="text-[11px] font-medium leading-tight">{kpi.trend}</span>
                       </div>
                     ) : (
                       <div className={cn(
@@ -841,7 +841,7 @@ export function MobilityCenter() {
                         kpi.isPositive ? "text-success" : "text-warning"
                       )}>
                         {kpi.isPositive ? <ArrowUpCircle className="size-3.5" /> : <ArrowRight className="size-3.5" />}
-                        <span className="text-xs font-medium">{kpi.trend}</span>
+                        <span className="text-[11px] font-medium leading-tight">{kpi.trend}</span>
                       </div>
                     )}
                   </div>
@@ -875,7 +875,7 @@ export function MobilityCenter() {
                   aria-label="Business Unit (not available in this workspace)"
                   options={[{ label: 'Business Unit: not configured', value: 'All' }]}
                   size="sm"
-                  className="border-none bg-transparent hover:bg-muted/50 h-9 font-semibold text-xs text-foreground/90"
+                  className="h-9 border border-border bg-card font-semibold text-xs text-foreground/90 shadow-sm hover:bg-primary/5"
                 />
               </div>
 
@@ -889,7 +889,7 @@ export function MobilityCenter() {
                     ...(filters?.departments.map(d => ({ label: `Department: ${d.label}`, value: d.value })) || [])
                   ]}
                   size="sm"
-                  className="border-none bg-transparent hover:bg-muted/50 h-9 font-semibold text-xs text-foreground/90"
+                  className="h-9 border border-border bg-card font-semibold text-xs text-foreground/90 shadow-sm hover:bg-primary/5"
                 />
               </div>
 
@@ -907,7 +907,7 @@ export function MobilityCenter() {
                     { label: 'Loc: Pune', value: 'Pune' },
                   ]}
                   size="sm"
-                  className="border-none bg-transparent hover:bg-muted/50 h-9 font-semibold text-xs text-foreground/90"
+                  className="h-9 border border-border bg-card font-semibold text-xs text-foreground/90 shadow-sm hover:bg-primary/5"
                 />
               </div>
 
@@ -925,7 +925,7 @@ export function MobilityCenter() {
                     { label: 'Grade: G8', value: 'G8' }
                   ]}
                   size="sm"
-                  className="border-none bg-transparent hover:bg-muted/50 h-9 font-semibold text-xs text-foreground/90"
+                  className="h-9 border border-border bg-card font-semibold text-xs text-foreground/90 shadow-sm hover:bg-primary/5"
                 />
               </div>
 
@@ -941,7 +941,7 @@ export function MobilityCenter() {
                     { label: 'Type: Temporary', value: 'Temporary' }
                   ]}
                   size="sm"
-                  className="border-none bg-transparent hover:bg-muted/50 h-9 font-semibold text-xs text-foreground/90"
+                  className="h-9 border border-border bg-card font-semibold text-xs text-foreground/90 shadow-sm hover:bg-primary/5"
                 />
               </div>
 
@@ -984,14 +984,14 @@ export function MobilityCenter() {
                       className="border-none bg-transparent p-0 w-[140px] focus-visible:ring-0 focus-visible:ring-offset-0 h-full text-xs"
                     />
                   </div>
-                  <div className="flex p-1 bg-muted/30 rounded-lg border ml-2">
-                    <Button size="sm" className="flex items-center gap-2 px-3 py-1 text-xs font-semibold text-primary">
+                  <div className="flex p-1 bg-card rounded-lg border border-border shadow-sm ml-2">
+                    <Button size="sm" className="flex items-center gap-2 px-3 py-1 text-xs font-semibold text-primary-foreground">
                       Table
                     </Button>
-                    <Button size="sm" variant="ghost" className="flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground">
+                    <Button size="sm" variant="ghost" className="flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary">
                       Board
                     </Button>
-                    <Button size="sm" variant="ghost" className="flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground">
+                    <Button size="sm" variant="ghost" className="flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary">
                       Timeline
                     </Button>
                   </div>
