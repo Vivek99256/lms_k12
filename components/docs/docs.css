@@ -1,0 +1,252 @@
+/* Scholar Documentation Styles */
+
+.doc-prose {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+/* Headings */
+.doc-prose h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  color: #0f172a;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+.dark .doc-prose h1 {
+  color: #f8fafc;
+}
+
+.doc-prose h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-top: 2.25rem;
+  margin-bottom: 0.75rem;
+  color: #1e293b;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.5rem;
+}
+.dark .doc-prose h2 {
+  color: #f1f5f9;
+  border-bottom-color: #334155;
+}
+
+.doc-prose h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #334155;
+}
+.dark .doc-prose h3 {
+  color: #e2e8f0;
+}
+
+/* Paragraphs & Lists */
+.doc-prose p {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.doc-prose ul {
+  list-style-type: disc;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.doc-prose ol {
+  list-style-type: decimal;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.doc-prose li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Links */
+.doc-prose a {
+  color: #4f46e5;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+.doc-prose a:hover {
+  color: #4338ca;
+}
+.dark .doc-prose a {
+  color: #818cf8;
+}
+.dark .doc-prose a:hover {
+  color: #a5b4fc;
+}
+
+/* Heading anchor link icon */
+.doc-prose .heading-anchor {
+  margin-left: 0.5rem;
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 0.85em;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.doc-prose h1:hover .heading-anchor,
+.doc-prose h2:hover .heading-anchor,
+.doc-prose h3:hover .heading-anchor {
+  opacity: 1;
+}
+
+/* Code Blocks & Inline Code */
+.doc-prose code {
+  background-color: #f1f5f9;
+  color: #0f172a;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.375rem;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  border: 1px solid #e2e8f0;
+}
+.dark .doc-prose code {
+  background-color: #1e293b;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+.doc-prose pre {
+  position: relative;
+  background-color: #0f172a;
+  color: #f8fafc;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  border: 1px solid #1e293b;
+}
+.doc-prose pre code {
+  background-color: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  border: none !important;
+  font-size: inherit !important;
+}
+
+/* Tables - Modern, responsive styling with smooth horizontal scroll */
+.doc-table-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.doc-prose table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+  margin: 0 !important;
+  font-size: 0.875rem;
+  box-shadow: none;
+}
+
+.doc-prose th,
+.doc-prose td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  text-align: left;
+  line-height: 1.5;
+  vertical-align: top;
+  word-break: normal;
+}
+
+.doc-prose th:last-child,
+.doc-prose td:last-child {
+  border-right: none;
+}
+
+.doc-prose tr:last-child td {
+  border-bottom: none;
+}
+
+.dark .doc-prose th,
+.dark .doc-prose td {
+  border-bottom-color: #334155;
+  border-right-color: #334155;
+}
+
+.doc-prose th {
+  background-color: #f1f5f9;
+  font-weight: 700;
+  color: #0f172a;
+  text-transform: capitalize;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.dark .doc-prose th {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
+.doc-prose tr:nth-child(even) td {
+  background-color: #f8fafc;
+}
+
+.dark .doc-prose tr:nth-child(even) td {
+  background-color: #0f172a/40;
+}
+
+.doc-prose tr:hover td {
+  background-color: #eef2ff;
+}
+
+.dark .doc-prose tr:hover td {
+  background-color: #1e1b4b/30;
+}
+
+/* Blockquotes & Callouts */
+.doc-prose blockquote {
+  border-left: 4px solid #6366f1;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  background-color: #f8faff;
+  color: #334155;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+.dark .doc-prose blockquote {
+  background-color: #1e1b4b/30;
+  border-left-color: #818cf8;
+  color: #cbd5e1;
+}
+
+/* Images */
+.doc-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 1rem auto;
+  border: 1px solid #e2e8f0;
+}
+.dark .doc-prose img {
+  border-color: #334155;
+}
+
+/* Horizontal Rule */
+.doc-prose hr {
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  margin: 2rem 0;
+}
+.dark .doc-prose hr {
+  border-top-color: #334155;
+}
+

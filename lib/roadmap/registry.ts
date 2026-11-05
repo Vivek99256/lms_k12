@@ -831,6 +831,17 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     href: '/platform-services/event-bus',
     evidence: ['app/platform-services/event-bus/page.tsx'],
   },
+  {
+    id: 'platform.version-docs',
+    module: 'Platform services',
+    title: 'Version Docs',
+    blurb: 'Multi-version product documentation portal reading Markdown specifications directly from the local docs repository.',
+    phase: 'Phase 2',
+    status: 'live',
+    audience: 'customer',
+    href: '/docs/1.0.0',
+    evidence: ['app/docs/[version]/page.tsx', 'lib/docs/docs-service.ts'],
+  },
 
   // ── AI and intelligence ───────────────────────────────────────────────────
   {

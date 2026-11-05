@@ -31,6 +31,7 @@ const platformServicesItems = [
   'Integration',
   'Audit',
   'Event Bus',
+  'Version Docs',
 ] as const;
 
 /**
@@ -53,6 +54,7 @@ const platformServicesIcons: Record<string, LucideIcon> = {
   'Integration': Plug,
   'Audit': ClipboardCheck,
   'Event Bus': Waypoints,
+  'Version Docs': BookOpen,
 };
 
 /**
@@ -110,6 +112,7 @@ const menuDisplayLabels: Record<string, string> = {
   'Integration': 'Integrations',
   'Audit': 'Audit log',
   'Event Bus': 'Activity feed',
+  'Version Docs': 'Version docs',
   'Add Process': 'Add process',
   'Fields Configuration': 'Field settings',
   'Mobile App Rights': 'Mobile app rights',
@@ -279,6 +282,7 @@ export default function Header({
     // an event bus: this product has none, and the standing decision is not to
     // build a second one beside the working outbox.
     'Event Bus': '/platform-services/event-bus',
+    'Version Docs': '/docs/1.0.0',
   };
 
   // A capability with a working screen keeps its own route; the rest resolve to
