@@ -125,10 +125,22 @@ async function request<T>(
   const payload = (await readJson(response)) as unknown as AiEnvelope<T>;
 
   if (!response.ok || payload.success === false) {
+    const errorDetails = (payload as { errors?: Record<string, string[] | string> })?.errors;
+    let detail = "";
+    if (errorDetails && typeof errorDetails === "object") {
+      const firstVal = Object.values(errorDetails)[0];
+      if (Array.isArray(firstVal) && firstVal.length > 0) {
+        detail = String(firstVal[0]);
+      } else if (typeof firstVal === "string") {
+        detail = firstVal;
+      }
+    }
+
     throw new Error(
-      typeof payload.message === "string"
+      detail ||
+      (typeof payload.message === "string"
         ? payload.message
-        : `Intelligence request failed (${response.status}).`
+        : `Intelligence request failed (${response.status}).`)
     );
   }
 
@@ -585,7 +597,8 @@ export function fetchErpSubmoduleGraph(
  * uses in place of a flat cross-label sample.
  */
 export function searchKnowledgeGraph(context: IntelligenceContext, term: string, limit?: number, labels?: string[]) {
-  return get<GraphSearchResult>(context, "/knowledge-graph/browser/search", { q: term, limit, labels });
+  const query = term.trim() || labels?.[0] || "*";
+  return get<GraphSearchResult>(context, "/knowledge-graph/browser/search", { q: query, limit, labels });
 }
 
 export function findKnowledgeGraphPath(
