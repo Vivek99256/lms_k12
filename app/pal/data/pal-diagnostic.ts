@@ -780,6 +780,10 @@ export interface MasteryLadderState {
   nextBand: string | null;
   progressPct: number;
   reason: string;
+  roots?: Array<{ id: number; name: string; mastery: number; gate: number; depth: number }>;
+  stuckOn?: { id: number; name: string } | null;
+  rule?: string;
+  graphAware?: boolean;
 }
 
 /**
@@ -809,6 +813,10 @@ export interface PracticeNext {
   /** Whether the engine can take this concept from here. */
   eso: boolean;
   reason: string;
+  roots?: Array<{ id: number; name: string; mastery: number; gate: number; depth: number }>;
+  stuckOn?: { id: number; name: string } | null;
+  rule?: string;
+  graphAware?: boolean;
 }
 
 export interface DetectedMisconception {
@@ -991,6 +999,10 @@ export interface PlanContentGap {
   conceptId: string;
   name: string;
   reason: string;
+  roots?: Array<{ id: number; name: string; mastery: number; gate: number; depth: number }>;
+  stuckOn?: { id: number; name: string } | null;
+  rule?: string;
+  graphAware?: boolean;
   detail: string;
 }
 
