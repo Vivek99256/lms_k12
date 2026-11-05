@@ -143,6 +143,17 @@ export interface WorkspacePayload {
   ontology_views: OntologyViewSummary[];
   /** Derived stage of the intelligence chain for the current record. */
   flow: FlowState;
+  /** Centralized channel configuration (voice & language synchronized across platforms). */
+  channel_settings?: {
+    project_id: string;
+    voice_enabled: boolean;
+    default_language: string;
+    show_ask_tab?: boolean;
+    show_create_tab?: boolean;
+    suggested_prompt_source?: string;
+    updated_at?: string | null;
+    updated_by?: string | null;
+  };
 }
 
 export interface PlannedStep {

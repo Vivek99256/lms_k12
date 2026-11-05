@@ -719,6 +719,15 @@ export function saveAiReport(
  * refuses rather than blanking the table when the query now matches nothing, so an
  * empty result arrives here as an error with the reason.
  */
+
+/**
+ * Export URL for an AI report as HTML, PDF (printable format), or CSV.
+ */
+export function exportAiReport(context: IntelligenceContext, reportId: number, format: 'html' | 'pdf' | 'csv' = 'html'): string {
+  const baseUrl = normalizeBaseUrl(context.baseUrl);
+  return `${baseUrl}/api/ai/reports/${reportId}/export?format=${format}`;
+}
+
 export function regenerateAiReport(context: IntelligenceContext, reportId: number) {
   return post<{
     template_id: number;
