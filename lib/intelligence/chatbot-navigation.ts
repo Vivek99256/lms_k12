@@ -75,11 +75,12 @@ const MODULE_ALIASES: Record<string, string[]> = {
   curriculum_planning: ['curriculum', 'curriculum planning', 'lesson plan', 'lesson planning', 'syllabus', 'syllabus plan', 'teacher diary', 'monthly plan'],
   engagement: ['engagement', 'leaderboard', 'leader board', 'portfolio', 'virtual classroom'],
   interactions: ['interactions', 'interaction', 'activity stream'],
-  new_pal: ['new pal', 'personalised learning', 'personalized learning', 'coherence map', 'content model'],
+  new_pal: ['pal', 'new pal', 'personalised learning', 'personalized learning', 'coherence map', 'content model', 'learning journey', 'learning pathways', 'diagnostic assessment', 'concept mastery', 'eso', 'expert system overview', 'pedagogy engine', 'adaptive practice'],
   hr: ['hr', 'human resources', 'staff', 'staff management', 'employee', 'employees', 'payroll'],
   exam: ['exam', 'exams', 'examination', 'examinations', 'test', 'tests', 'assessment', 'assessments', 'result', 'results'],
   inventory: ['inventory', 'stock', 'items', 'assets', 'asset management'],
   task_management: ['task', 'tasks', 'task management'],
+  enterprise_brain: ['agent', 'agents', 'agent management', 'agent library', 'agent dashboard', 'agent run log', 'agent analysis', 'enterprise brain', 'execution history', 'agent execution history'],
 };
 
 /**
@@ -114,7 +115,8 @@ const MODULE_DEFAULT_ROUTES: Record<string, string> = {
   curriculum_planning: '/lms/curriculum-planning',
   engagement: '/engagement',
   interactions: '/interactions',
-  new_pal: '/new_pal',
+  new_pal: '/pal',
+  enterprise_brain: '/enterprise-brain/automation/agents',
   hr: '/hr',
   exam: '/exam',
   inventory: '/inventory',
@@ -134,7 +136,8 @@ const MODULE_DISPLAY_NAMES: Record<string, string> = {
   curriculum_planning: 'Curriculum Planning',
   engagement: 'Engagement',
   interactions: 'Interactions',
-  new_pal: 'New PAL',
+  new_pal: 'PAL',
+  enterprise_brain: 'AI Stack',
   hr: 'HR',
   exam: 'Exam',
   inventory: 'Inventory',
@@ -148,13 +151,13 @@ const CATEGORY_ALIASES: Record<string, string[]> = {
   operations: ['operations', 'operation', 'daily operations'],
   reports: ['reports', 'report', 'reporting', 'analytics', 'statistics', 'stats', 'generate report', 'view reports'],
   intelligence: ['intelligence', 'insights', 'recommendations'],
-  'help-guide-support': ['help guide support', 'help guide', 'help', 'support', 'guide', 'documentation', 'docs', 'faq', 'tutorial'],
+  'help-guide-support': ['help guide support', 'help guide', 'help', 'help documentation', 'help center', 'user guide', 'documentation', 'docs', 'faq', 'tutorial'],
   communication: ['communication', 'communications', 'notices', 'announcements'],
   'ai-stack': ['ai stack', 'ai tools'],
   workflow: ['workflow', 'workflows', 'approval', 'approvals'],
   // `schedular` is the key as the menu data spells it.
   schedular: ['scheduler', 'schedular', 'schedule', 'scheduling', 'scheduled', 'cron'],
-  'audit-trail': ['audit trail', 'audit', 'audit log', 'activity log'],
+  'audit-trail': ['audit trail', 'audit', 'audit log', 'audit activity log'],
   'sop-task': ['sop', 'sop task'],
 };
 
@@ -440,7 +443,8 @@ const EXAM_ASSESSMENT_PATH = /\/(lms\/(homework|lmsassignment|lmsannotate_assign
 const CURRICULUM_PATH = /\/(lms\/(curriculum-planning|monthly-plan|lesson-plan|teacher-diary|book-list|syllabus-plan)|curriculum-planning)/;
 const ENGAGEMENT_PATH = /\/(engagement|lmsleaderboard|lmssocialcollabrotive|lmsportfolio|lmsvirtualclassroom)/;
 const INTERACTIONS_PATH = /\/(interactions|lmsactivitystream|lmscommunication|lb_master|lms\/student-analysis|lms\/dashboard)/;
-const NEW_PAL_PATH = /\/(new_pal|new-pal|coherence)/;
+const NEW_PAL_PATH = /\/(pal|new_pal|new-pal|coherence)/;
+const BRAIN_PATH = /\/(enterprise-brain|automation\/agents|intelligence-loop)/;
 
 export function getCurrentModule(
   pathnameOrName?: string | null,
@@ -465,8 +469,11 @@ export function getCurrentModule(
   if (INTERACTIONS_PATH.test(path) || path === 'interactions') {
     return { name: 'interactions', label: 'Interactions' };
   }
-  if (NEW_PAL_PATH.test(path) || path === 'new_pal') {
-    return { name: 'new_pal', label: 'New PAL' };
+  if (BRAIN_PATH.test(path) || path === 'enterprise_brain' || path === 'agents') {
+    return { name: 'enterprise_brain', label: 'AI Stack' };
+  }
+  if (NEW_PAL_PATH.test(path) || path === 'new_pal' || path === 'pal') {
+    return { name: 'new_pal', label: 'PAL' };
   }
   if (path.includes('/students') || path.includes('/student') || path === 'students' || path === 'student') {
     return { name: 'students', label: 'Student' };
@@ -801,6 +808,165 @@ export function detectNavigationIntent(
   };
 }
 
+interface SpecialScreenRoute {
+  phrases: string[];
+  route: string;
+  moduleName: string;
+  moduleLabel: string;
+  categoryLabel: string;
+  headline: string;
+  actionLabel: string;
+}
+
+const SPECIAL_SCREEN_ROUTES: SpecialScreenRoute[] = [
+  {
+    phrases: ['fee collection page', 'fee collection screen', 'open fee collection', 'open fee collect', 'go to fee collection', 'take me to fees collection', 'open the fee collection page', 'collect fees page'],
+    route: '/fees/collect',
+    moduleName: 'fees',
+    moduleLabel: 'Fees',
+    categoryLabel: 'Operations',
+    headline: 'Fee Collection',
+    actionLabel: 'Open Fee Collection',
+  },
+  {
+    phrases: ['register a new student', 'register student', 'admission registration', 'new admission registration', 'student registration'],
+    route: '/admissions/admission_registration',
+    moduleName: 'admissions',
+    moduleLabel: 'Admissions',
+    categoryLabel: 'Registration',
+    headline: 'Admission Registration',
+    actionLabel: 'Open Admission Registration',
+  },
+  {
+    phrases: ['admission enquiry', 'admission inquiry', 'new enquiry'],
+    route: '/admissions/admission_enquiry',
+    moduleName: 'admissions',
+    moduleLabel: 'Admissions',
+    categoryLabel: 'Enquiry',
+    headline: 'Admission Enquiry',
+    actionLabel: 'Open Admission Enquiry',
+  },
+  {
+    phrases: ['pal learning journey', 'pal journey', 'learning journey', 'student learning journey', "student's pal learning journey"],
+    route: '/pal/journey',
+    moduleName: 'new_pal',
+    moduleLabel: 'PAL',
+    categoryLabel: 'Learning Journey',
+    headline: 'PAL Learning Journey',
+    actionLabel: 'Open PAL Learning Journey',
+  },
+  {
+    phrases: ['open learning pathways', 'go to learning pathways', 'take me to learning pathways', 'learning pathways page'],
+    route: '/pal/eso/learning-path',
+    moduleName: 'new_pal',
+    moduleLabel: 'PAL',
+    categoryLabel: 'Learning Pathways',
+    headline: 'PAL Learning Pathways',
+    actionLabel: 'Open Learning Pathways',
+  },
+  {
+    phrases: ['open coherence map', 'go to coherence map', 'take me to coherence map', 'coherence map page'],
+    route: '/pal/new/coherence-map',
+    moduleName: 'new_pal',
+    moduleLabel: 'PAL',
+    categoryLabel: 'Coherence Map',
+    headline: 'PAL Coherence Map',
+    actionLabel: 'Open Coherence Map',
+  },
+  {
+    phrases: ['open adaptive intervention', 'open pal interventions', 'go to interventions', 'interventions page'],
+    route: '/pal/intervention',
+    moduleName: 'new_pal',
+    moduleLabel: 'PAL',
+    categoryLabel: 'Interventions',
+    headline: 'PAL Interventions',
+    actionLabel: 'Open PAL Interventions',
+  },
+  {
+    phrases: ['show agent execution history', 'open agent execution history', 'open agent run log', 'agent run log page', 'agent executions page'],
+    route: '/enterprise-brain/intelligence-loop/executions',
+    moduleName: 'enterprise_brain',
+    moduleLabel: 'AI Stack',
+    categoryLabel: 'Executions',
+    headline: 'Agent Run Log',
+    actionLabel: 'Open Agent Run Log',
+  },
+  {
+    phrases: ['open agent dashboard', 'open agent library', 'pal agent management', 'open agent management', 'agent dashboard page'],
+    route: '/enterprise-brain/automation/agents',
+    moduleName: 'enterprise_brain',
+    moduleLabel: 'AI Stack',
+    categoryLabel: 'Agents',
+    headline: 'Agent Management',
+    actionLabel: 'Open Agent Management',
+  },
+  {
+    phrases: ['open agent deliberation', 'open agent analysis', 'agent analysis page'],
+    route: '/enterprise-brain/intelligence-loop/deliberation',
+    moduleName: 'enterprise_brain',
+    moduleLabel: 'AI Stack',
+    categoryLabel: 'Analysis',
+    headline: 'Agent Analysis',
+    actionLabel: 'Open Agent Analysis',
+  },
+  {
+    phrases: ['create a new assignment', 'create assignment', 'new assignment', 'create homework'],
+    route: '/lms/homework',
+    moduleName: 'exam_assessment',
+    moduleLabel: 'Exam & Assessment',
+    categoryLabel: 'Homework',
+    headline: 'Homework & Assignments',
+    actionLabel: 'Open Assignment Creation',
+  },
+  {
+    phrases: ['generate an exam report', 'generate exam report', 'open exam report', 'exam progress report page'],
+    route: '/exam/progress-report',
+    moduleName: 'exam_assessment',
+    moduleLabel: 'Exam & Assessment',
+    categoryLabel: 'Reports',
+    headline: 'Exam Progress Report',
+    actionLabel: 'Open Exam Report',
+  },
+  {
+    phrases: ['open student profile', 'search student profile'],
+    route: '/students/search_student',
+    moduleName: 'students',
+    moduleLabel: 'Student',
+    categoryLabel: 'Profiles',
+    headline: 'Student Profiles',
+    actionLabel: 'Open Student Profiles',
+  },
+  {
+    phrases: ['open expert system overview', 'open eso', 'go to eso', 'expert system overview page'],
+    route: '/pal/eso',
+    moduleName: 'new_pal',
+    moduleLabel: 'PAL',
+    categoryLabel: 'ESO',
+    headline: 'Expert System Overview',
+    actionLabel: 'Open ESO',
+  },
+  {
+    phrases: ['open student attainment report', 'open pal progress report'],
+    route: '/pal/reports/attainment',
+    moduleName: 'new_pal',
+    moduleLabel: 'PAL',
+    categoryLabel: 'Attainment',
+    headline: 'PAL Attainment Reports',
+    actionLabel: 'Open PAL Reports',
+  },
+];
+
+function matchSpecialScreen(lowerText: string): SpecialScreenRoute | null {
+  for (const item of SPECIAL_SCREEN_ROUTES) {
+    for (const phrase of item.phrases) {
+      if (containsPhrase(lowerText, phrase)) {
+        return item;
+      }
+    }
+  }
+  return null;
+}
+
 export function evaluateChatbotIntent(
   userMessage: string,
   currentModulePathOrName?: string | null,
@@ -815,6 +981,27 @@ export function evaluateChatbotIntent(
   }
 
   const lower = text.toLowerCase();
+
+  // 0. Special direct screen matches
+  const specialScreen = matchSpecialScreen(lower);
+  if (specialScreen && (hasNavigationIntent(lower) || specialScreen.phrases.some((p) => lower.includes(p)))) {
+    return {
+      type: 'navigation',
+      currentModule,
+      targetModule: { name: specialScreen.moduleName, label: specialScreen.moduleLabel },
+      headline: specialScreen.headline,
+      message: `Open the ${specialScreen.headline}.`,
+      route: specialScreen.route,
+      actionLabel: specialScreen.actionLabel,
+      navigationMatch: {
+        route: specialScreen.route,
+        moduleLabel: specialScreen.moduleLabel,
+        categoryLabel: specialScreen.categoryLabel,
+        confidence: 'exact',
+        moduleName: specialScreen.moduleName,
+      },
+    };
+  }
 
   // 0. Approvals: open the screen where staff decide. The chatbot never approves or
   // rejects itself — that decision stays with the staff member, on the existing screen.

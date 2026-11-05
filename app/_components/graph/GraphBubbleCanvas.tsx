@@ -411,6 +411,8 @@ export default function GraphBubbleCanvas({
     [categories]
   );
   const showNames = view.k > 0.75;
+  const pill = 'inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-sm backdrop-blur-md transition-colors hover:opacity-90';
+  const iconButton = 'flex h-9 w-9 items-center justify-center rounded-xl border backdrop-blur-md transition-colors hover:opacity-90';
   return (
     <div className={`relative ${heightClassName} w-full touch-none select-none overflow-hidden rounded-xl border shadow-lg`} style={{ background: s.canvas, borderColor: s.panelBorder }} ref={stage}>
       <style>{`@keyframes kgb-flow { to { stroke-dashoffset: calc(var(--period) * -1); } } @keyframes kgb-pulse { 0%,100% { opacity .22; transform: scale(1); } 50% { opacity: .08; transform: scale(1.12); } }`}</style>
