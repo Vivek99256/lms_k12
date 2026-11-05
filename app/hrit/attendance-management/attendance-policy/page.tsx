@@ -1,5 +1,6 @@
 'use client'
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { CalendarClock, Clock, Info, ShieldCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -20,7 +21,7 @@ const policyPoints = [
   'Leave applied after a month locks is still recorded, but does not retroactively change that month\'s already-locked attendance totals.',
 ]
 
-export default function AttendancePolicyPage() {
+function AttendancePolicyPageInner() {
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -81,5 +82,13 @@ export default function AttendancePolicyPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function AttendancePolicyPage() {
+  return (
+    <HritTheme>
+      <AttendancePolicyPageInner />
+    </HritTheme>
   )
 }

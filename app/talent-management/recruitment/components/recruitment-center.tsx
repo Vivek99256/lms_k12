@@ -554,8 +554,8 @@ export function RecruitmentCenter() {
 
             {/* Kanban View */}
             {candidateView === 'kanban' && (
-              <div className="overflow-x-auto pb-4">
-                <div className="flex gap-4 min-w-max">
+              <div className="mt-4 overflow-x-auto pb-4">
+                <div className="flex min-w-max gap-3 xl:min-w-0">
                   {PIPELINE_STAGES.map((stage) => (
                     <KanbanColumn
                       key={stage.id}
@@ -636,9 +636,9 @@ export function RecruitmentCenter() {
               </div>
 
               {/* Table */}
-              <div className="rounded-lg border border-border overflow-hidden">
-                <Table className="w-full [&_td]:p-3 [&_th]:p-3">
-                  <TableHeader className="bg-surface-muted">
+              <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+                <Table className="w-full text-sm [&_td]:px-4 [&_td]:py-3.5 [&_th]:px-4 [&_th]:py-3 [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_th]:whitespace-nowrap">
+                  <TableHeader className="bg-primary/5">
                     <TableRow>
                       <TableHead className="w-10">
                         <Checkbox
@@ -662,7 +662,7 @@ export function RecruitmentCenter() {
                       <TableRow
                         key={candidate.id}
                         onClick={() => setSelectedCandidate(candidate)}
-                        className="cursor-pointer hover:bg-muted/30 transition-colors"
+                        className="cursor-pointer border-t border-border/60 transition-colors hover:bg-primary/5"
                       >
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
@@ -672,20 +672,20 @@ export function RecruitmentCenter() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className="size-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground border border-border/60 shrink-0">
-                              {candidate.name.split(' ').map((n) => n[0]).join('')}
+                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-bold text-primary">
+                              {candidate.name.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).slice(0, 2).map((w) => w.replace(/[^A-Za-z0-9]/g, '')[0]?.toUpperCase()).join('')}
                             </div>
                             <div className="flex flex-col gap-0.5 min-w-0">
-                              <span className="text-sm font-semibold text-foreground truncate">{candidate.name}</span>
+                              <span className="whitespace-nowrap text-sm font-semibold text-foreground">{candidate.name}</span>
                             </div>
                             {candidate.starred && <Star className="size-3.5 text-warning fill-warning shrink-0" />}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm text-foreground">{candidate.jobOpening}</span>
+                          <span className="block max-w-[320px] truncate text-sm text-foreground" title={candidate.jobOpening}>{candidate.jobOpening}</span>
                         </TableCell>
                         <TableCell>
-                          <StatusBadge variant={getStageVariant(candidate.stage)} size="sm">
+                          <StatusBadge variant={getStageVariant(candidate.stage)} size="sm" className="whitespace-nowrap">
                             {candidate.stage}
                           </StatusBadge>
                         </TableCell>
@@ -697,14 +697,14 @@ export function RecruitmentCenter() {
                             <div className="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
                               {candidate.recruiterInitials}
                             </div>
-                            <span className="text-sm text-foreground">{candidate.recruiter}</span>
+                            <span className="whitespace-nowrap text-sm text-foreground">{candidate.recruiter}</span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm text-muted-foreground">{candidate.appliedOn}</span>
+                          <span className="whitespace-nowrap text-sm text-muted-foreground">{candidate.appliedOn}</span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm text-muted-foreground">{candidate.lastUpdated}</span>
+                          <span className="whitespace-nowrap text-sm text-muted-foreground">{candidate.lastUpdated}</span>
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu modal={false}>

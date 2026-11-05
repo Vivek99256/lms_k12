@@ -4,10 +4,11 @@ import type { ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Label } from '@/components/ui/label';
+import { BLUE_THEME } from '@/app/task-management/_lib/task-theme';
 
 /** Content height, like the other modules' frames — the shell owns the viewport. */
 export function PageFrame({ children }: { children: ReactNode }) {
-  return <div className="mx-auto space-y-4 p-3 sm:p-4 lg:p-5">{children}</div>;
+  return <div style={BLUE_THEME} className="mx-auto space-y-4 p-3 sm:p-4 lg:p-5">{children}</div>;
 }
 
 export function PageHeader({

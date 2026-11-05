@@ -1,5 +1,6 @@
 'use client'
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import * as React from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Plus, Clock } from 'lucide-react'
@@ -35,7 +36,7 @@ function isReasonCode(value: string | null): value is RegularizationReasonCode {
   return !!value && value in reasonLabels
 }
 
-export default function AttendanceRegularizationPage() {
+function AttendanceRegularizationPageInner() {
   const searchParams = useSearchParams()
   const alertReason = searchParams.get('alert')
   const highlightId = searchParams.get('highlight')
@@ -354,5 +355,13 @@ function RegularizationApplyDrawer({
         </form>
       </SheetContent>
     </Sheet>
+  )
+}
+
+export default function AttendanceRegularizationPage() {
+  return (
+    <HritTheme>
+      <AttendanceRegularizationPageInner />
+    </HritTheme>
   )
 }

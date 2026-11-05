@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 import {
   Info, Copy, Download, Upload, Plus, ChevronDown, ChevronRight,
   LayoutGrid, Users, Calendar, Search, Layers, Edit2, Trash2, ListChecks, Send,
@@ -76,15 +77,15 @@ const FRAMEWORK_STATUS_OPTIONS = [
 ]
 
 function levelColor(level: number | null): string {
-  switch (level) {
-    case 1: return 'bg-destructive'
-    case 2: return 'bg-warning'
-    case 3: return 'bg-warning'
-    case 4: return 'bg-success'
-    case 5: return 'bg-primary'
-    case 6: return 'bg-primary'
-    default: return 'bg-muted'
+  if (level == null) return 'bg-muted-foreground/30'
+  return 'bg-primary'
+}
+
+function levelPill(level: number | null): { bg: string; text: string; border: string; dot: string } {
+  if (level == null) {
+    return { bg: 'bg-background', text: 'text-muted-foreground', border: 'border-border', dot: 'bg-muted-foreground/30' }
   }
+  return { bg: 'bg-primary/10', text: 'text-primary font-bold', border: 'border-primary/25', dot: 'bg-primary' }
 }
 
 function frameworkStatusVariant(status: string) {
@@ -418,7 +419,7 @@ export function FrameworkMapping() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 min-h-max">
+    <div className="flex flex-col gap-6 p-6 min-h-max" style={{ ['--primary' as string]: '#4F46E5' }}>
       {/* Action message banner */}
       {(actionMessage || actionError) && (
         <div className={`fixed top-4 right-4 z-[60] rounded-xl px-4 py-3 text-sm font-semibold shadow-lg ${actionError ? 'bg-destructive text-white' : 'bg-success text-white'}`}>
@@ -427,23 +428,23 @@ export function FrameworkMapping() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            Competency Framework Studio <Info className="w-5 h-5 text-muted-foreground" />
+            Competency Framework Studio <Info className="w-4 h-4 text-muted-foreground hover:text-primary cursor-pointer transition-colors" />
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-0.5">
             Design competency frameworks, set proficiency requirements and map them to job roles.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <Button
             variant="outline"
             disabled={!summary?.active_framework || saving}
             onClick={() => summary?.active_framework && cloneFramework(summary.active_framework.id)}
-            className="h-10 px-4 rounded-xl font-semibold border-border bg-background gap-2"
+            className="h-10 px-3.5 rounded-xl font-semibold border-border bg-background gap-2"
           >
-            <Copy className="w-4 h-4" /> Clone Framework
+            <Copy className="w-4 h-4 text-primary" /> Clone Framework
           </Button>
           <input
             ref={fileInputRef}
@@ -456,23 +457,26 @@ export function FrameworkMapping() {
             variant="outline"
             disabled={importing}
             onClick={() => fileInputRef.current?.click()}
-            className="h-10 px-4 rounded-xl font-semibold border-border bg-background gap-2"
+            className="h-10 px-3.5 rounded-xl font-semibold border-border bg-background gap-2"
           >
-            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Import
+            {importing ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <Upload className="w-4 h-4 text-primary" />} Import
           </Button>
           <Button
             variant="outline"
             disabled={!matrix}
             onClick={exportMatrix}
-            className="h-10 px-4 rounded-xl font-semibold border-border bg-background gap-2"
+            className="h-10 px-3.5 rounded-xl font-semibold border-border bg-background gap-2"
           >
-            <Download className="w-4 h-4" /> Export
+            <Download className="w-4 h-4 text-primary" /> Export
           </Button>
-          <Button onClick={() => openFrameworkDialog(null)} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-xl h-10 px-4 shadow-md shadow-primary/20 flex items-center gap-2">
+          <Button
+            onClick={() => openFrameworkDialog(null)}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl h-10 px-4 shadow-sm flex items-center gap-2 transition-all"
+          >
             <Plus className="w-4 h-4 stroke-[3]" /> Create Framework
           </Button>
           <DropdownMenu>
-            <DropdownMenuTrigger className="w-10 h-10 p-0 rounded-xl bg-background border border-border flex items-center justify-center hover:bg-accent hover:text-accent-foreground outline-none transition-colors">
+            <DropdownMenuTrigger className="w-10 h-10 p-0 rounded-xl bg-background border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted shadow-xs outline-none transition-colors">
               <ChevronDown className="w-4 h-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -491,12 +495,11 @@ export function FrameworkMapping() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* Active Framework */}
-        <div className="bg-card border border-primary/10 rounded-2xl p-4 flex flex-col gap-2 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Framework</p>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+        <div className="bg-card border border-border hover:border-primary/40 rounded-2xl p-4 flex flex-col justify-between shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Active Framework</p>
+          <div className="flex items-center justify-between mt-1">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 shadow-xs">
                 <Layers className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -507,7 +510,7 @@ export function FrameworkMapping() {
                       onClick={() => openFrameworkDetail(summary.active_framework!.id)}
                       aria-label={`View ${summary.active_framework.name}'s competencies`}
                       title="View competencies"
-                      className="text-muted-foreground hover:text-primary shrink-0"
+                      className="text-muted-foreground hover:text-primary shrink-0 transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" />
                     </button>
@@ -519,16 +522,14 @@ export function FrameworkMapping() {
                   )}
                   <DropdownMenu>
                     <DropdownMenuTrigger className="outline-none">
-                      <ChevronDown className="w-3.5 h-3.5 text-muted-foreground cursor-pointer hover:text-foreground" />
+                      <ChevronDown className="w-3.5 h-3.5 text-muted-foreground cursor-pointer hover:text-primary" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="w-72 max-h-80 overflow-auto">
                       {frameworks.length === 0 && <DropdownMenuItem disabled>No frameworks</DropdownMenuItem>}
                       {frameworks.map(fw => (
                         <div key={fw.id} className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-muted rounded-md">
-                          <span className="text-sm truncate flex-1">{fw.name}</span>
+                          <span className="text-sm truncate flex-1 font-medium">{fw.name}</span>
                           <StatusBadge status={fw.status} label={fw.status} size="sm" />
-                          {/* Only a draft has anywhere to go: publishing is what
-                              the approval queue decides. */}
                           {fw.status === 'draft' && (
                             <button
                               onClick={() => submitFrameworkForPublish(fw)}
@@ -554,43 +555,56 @@ export function FrameworkMapping() {
         </div>
 
         <StatCard label="Total Competencies" value={summary?.total_competencies ?? 0} icon={<LayoutGrid className="w-4 h-4" />} />
-        <div className="bg-card border border-primary/10 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Job Roles Mapped</p>
+
+        {/* Job Roles Mapped */}
+        <div className="bg-card border border-border hover:border-primary/40 rounded-2xl p-4 flex flex-col justify-between shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Job Roles Mapped</p>
           <div className="flex items-center justify-between mt-2">
             <p className="text-2xl font-bold text-foreground">{summary?.roles_mapped ?? 0} <span className="text-sm font-semibold text-muted-foreground">/ {summary?.total_roles ?? 0}</span></p>
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground"><Users className="w-4 h-4" /></div>
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs"><Users className="w-4 h-4" /></div>
           </div>
         </div>
-        <div className="bg-card border border-primary/10 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Mapping Coverage</p>
+
+        {/* Mapping Coverage */}
+        <div className="bg-card border border-border hover:border-primary/40 rounded-2xl p-4 flex flex-col justify-between shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Mapping Coverage</p>
           <div className="mt-2">
-            <p className="text-2xl font-bold text-foreground">{summary?.coverage_percent ?? 0}%</p>
-            <div className="w-full h-1.5 bg-muted rounded-full mt-2 overflow-hidden">
-              <div className="h-full bg-primary rounded-full" style={{ width: `${summary?.coverage_percent ?? 0}%` }} />
+            <div className="flex items-center justify-between">
+              <p className="text-2xl font-bold text-foreground">{summary?.coverage_percent ?? 0}%</p>
+              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs"><MapIcon className="w-4 h-4" /></div>
+            </div>
+            <div className="w-full h-2 bg-muted rounded-full mt-2.5 overflow-hidden">
+              <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${summary?.coverage_percent ?? 0}%` }} />
             </div>
           </div>
         </div>
-        <div className="bg-card border border-primary/10 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Published</p>
+
+        {/* Last Published */}
+        <div className="bg-card border border-border hover:border-primary/40 rounded-2xl p-4 flex flex-col justify-between shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Last Published</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-lg font-bold text-foreground">{summary?.last_published ?? '—'}</p>
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground"><Calendar className="w-4 h-4" /></div>
+            <p className="text-base font-bold text-foreground">{summary?.last_published ?? '—'}</p>
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs"><Calendar className="w-4 h-4" /></div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-8 border-b border-border px-2 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-border pb-1 px-1 overflow-x-auto">
         {TABS.map(tab => {
           const isActive = tab.id === activeTab
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`pb-3 text-sm font-semibold transition-colors relative whitespace-nowrap ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-all whitespace-nowrap',
+                isActive
+                  ? 'bg-primary text-primary-foreground font-bold shadow-sm'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              )}
             >
               {tab.label}
-              {isActive && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full" />}
             </button>
           )
         })}
@@ -677,34 +691,34 @@ export function FrameworkMapping() {
 
       {/* ---- Role Mapping Matrix ---- */}
       {activeTab === 'matrix' && (
-        <div className="w-full flex-1 flex flex-col bg-card/90 border border-primary/10 rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-primary/10 flex items-center justify-between gap-3 flex-wrap bg-card">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground font-medium">Selected Category:</span>
+        <div className="w-full flex-1 flex flex-col bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-border flex items-center justify-between gap-3 flex-wrap bg-muted/20">
+            <div className="flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-3 py-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Selected Category:</span>
               <span className="text-sm font-bold text-primary">{effectiveCategory ?? '—'}</span>
             </div>
             <div className="flex items-center gap-3">
               {/* All Roles quick filter */}
-              <div className="w-44">
+              <div className="w-48">
                 <Select
                   value={roleFilter}
                   onChange={applyRoleFilter}
                   options={[{ label: 'All Roles', value: 'all' }, ...roles.map(r => ({ label: r.jobrole_name, value: r.jobrole }))]}
                   placeholder="All Roles"
-                  className="h-9 bg-background"
+                  className="h-9 bg-background border-border"
                 />
               </div>
               {/* Filters: multi-select which roles are columns */}
               <DropdownMenu>
-                <DropdownMenuTrigger className="h-9 px-3 gap-2 bg-background border border-border rounded-lg text-sm flex items-center hover:bg-muted outline-none">
-                  <Filter className="w-3.5 h-3.5" /> Filters ({effectiveRoles.length})
+                <DropdownMenuTrigger className="h-9 px-3 gap-2 bg-background border border-border rounded-lg text-sm font-semibold text-muted-foreground flex items-center hover:bg-muted hover:text-foreground shadow-xs outline-none transition-colors">
+                  <Filter className="w-3.5 h-3.5 text-primary" /> Filters ({effectiveRoles.length})
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-72 max-h-80 overflow-auto">
                   <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Top roles by mapping count</p>
                   <DropdownMenuSeparator />
                   {roles.map(r => (
                     <div key={r.jobrole} onClick={() => toggleRole(r.jobrole)} className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-muted rounded-md cursor-pointer">
-                      <span className="text-sm truncate flex-1">{r.jobrole_name}</span>
+                      <span className="text-sm truncate flex-1 font-medium">{r.jobrole_name}</span>
                       <span className="text-xs text-muted-foreground">{r.mapped_count}</span>
                       {effectiveRoles.includes(r.jobrole) && <Check className="w-4 h-4 text-primary" />}
                     </div>
@@ -713,8 +727,8 @@ export function FrameworkMapping() {
               </DropdownMenu>
               {/* View settings */}
               <DropdownMenu>
-                <DropdownMenuTrigger className="h-9 px-3 gap-2 bg-background border border-border rounded-lg text-sm flex items-center hover:bg-muted outline-none">
-                  <Settings className="w-3.5 h-3.5" /> View Settings
+                <DropdownMenuTrigger className="h-9 px-3 gap-2 bg-background border border-border rounded-lg text-sm font-semibold text-muted-foreground flex items-center hover:bg-muted hover:text-foreground shadow-xs outline-none transition-colors">
+                  <Settings className="w-3.5 h-3.5 text-primary" /> View Settings
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <div className="flex items-center justify-between px-2 py-1.5">
@@ -737,40 +751,46 @@ export function FrameworkMapping() {
               <EmptyState className="m-6" icon={<LayoutGrid className="w-10 h-10" />} title="No competencies" description="No competencies in this category, or no roles selected." />
             ) : (
               <Table className="w-full text-sm">
-                <TableHeader className="bg-muted/30 border-b border-primary/10 sticky top-0 z-20">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-64 px-4 py-3 font-bold text-foreground">Competency</TableHead>
+                <TableHeader className="bg-muted/40 border-b border-border sticky top-0 z-20">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="w-64 px-4 py-3.5 font-bold text-foreground uppercase text-xs tracking-wider">Competency</TableHead>
                     {matrix.roles.map(role => (
-                      <TableHead key={role} className="px-4 py-3 text-center min-w-[120px]">
+                      <TableHead key={role} className="px-4 py-3.5 text-center min-w-[130px] border-l border-border/60">
                         <div className="flex flex-col items-center">
-                          <span className="font-bold text-foreground text-xs">{matrix.role_names?.[role] ?? role}</span>
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Required Level</span>
+                          <span className="font-bold text-foreground text-xs tracking-wide">{matrix.role_names?.[role] ?? role}</span>
+                          <span className="text-[10px] uppercase font-semibold tracking-wider text-primary mt-1">Required Level</span>
                         </div>
                       </TableHead>
                     ))}
-                    <TableHead className="w-16 px-4 py-3 text-center font-bold text-foreground">Actions</TableHead>
+                    <TableHead className="w-20 px-4 py-3.5 text-center font-bold text-foreground uppercase text-xs tracking-wider border-l border-border/60">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody className="divide-y divide-primary/5">
+                <TableBody className="divide-y divide-border/40">
                   {matrix.competencies.map(comp => (
-                    <TableRow key={comp.id} className="hover:bg-muted/30">
-                      <TableCell className="px-4 py-3 font-medium text-foreground">
-                        <button onClick={() => setSelectedCompetency(comp)} className="text-left hover:text-primary truncate max-w-[220px] block">{comp.title}</button>
+                    <TableRow key={comp.id} className="group hover:bg-primary/5 transition-colors">
+                      <TableCell className="px-4 py-3.5 font-medium text-foreground">
+                        <button onClick={() => setSelectedCompetency(comp)} className="text-left font-semibold text-foreground hover:text-primary truncate max-w-[220px] block transition-colors">{comp.title}</button>
                       </TableCell>
                       {matrix.roles.map(role => {
                         const cell = matrix.cells[role]?.[comp.title]
+                        const isMapped = cell?.level != null
                         return (
-                          <TableCell key={role} className="px-4 py-3">
+                          <TableCell key={role} className="px-4 py-3 border-l border-border/40">
                             <div className="flex items-center justify-center">
                               <DropdownMenu>
-                                <DropdownMenuTrigger className="flex items-center gap-2 bg-background border border-border px-3 py-1.5 rounded-lg w-16 justify-between cursor-pointer hover:bg-muted transition-colors outline-none">
-                                  <span className="font-bold text-foreground">{cell?.level != null && showRequired ? cell.level : '—'}</span>
-                                  <div className={`w-2 h-2 rounded-full ${levelColor(cell?.level ?? null)}`} />
+                                <DropdownMenuTrigger className={cn(
+                                  'flex items-center gap-2 border px-3 py-1 rounded-lg w-16 justify-between cursor-pointer transition-all outline-none font-bold text-xs',
+                                  isMapped
+                                    ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
+                                    : 'bg-background border-border text-muted-foreground hover:bg-muted'
+                                )}>
+                                  <span>{isMapped && showRequired ? `Lvl ${cell.level}` : '—'}</span>
+                                  <div className={cn('w-2 h-2 rounded-full shrink-0', isMapped ? 'bg-primary' : 'bg-muted-foreground/30')} />
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="center">
                                   {levels.map(lvl => (
                                     <DropdownMenuItem key={lvl.level} onClick={() => handleSetCell(role, comp.title, lvl.level)}>
-                                      <span className={`w-2 h-2 rounded-full mr-2 ${levelColor(lvl.level)}`} /> {lvl.level} - {lvl.name ?? lvl.label}
+                                      <span className="w-2 h-2 rounded-full mr-2 shrink-0 bg-primary" /> Level {lvl.level} - {lvl.name ?? lvl.label}
                                     </DropdownMenuItem>
                                   ))}
                                   {cell && <DropdownMenuSeparator />}
@@ -781,9 +801,9 @@ export function FrameworkMapping() {
                           </TableCell>
                         )
                       })}
-                      <TableCell className="px-4 py-3 text-center">
+                      <TableCell className="px-4 py-3 text-center border-l border-border/40">
                         <DropdownMenu>
-                          <DropdownMenuTrigger className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground outline-none mx-auto">
+                          <DropdownMenuTrigger className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground hover:text-primary outline-none mx-auto transition-colors">
                             <MoreVertical className="w-4 h-4" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -800,24 +820,36 @@ export function FrameworkMapping() {
           </div>
 
           {/* Legend + footer */}
-          <div className="p-4 border-t border-primary/10 bg-card flex items-center justify-between gap-4 flex-wrap">
+          <div className="p-4 border-t border-border bg-muted/20 flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4 flex-wrap">
               {showLegend && (
                 <>
-                  <span className="text-xs font-semibold text-muted-foreground uppercase">Proficiency</span>
-                  <div className="flex items-center gap-3 text-xs font-medium text-foreground flex-wrap">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Proficiency:</span>
+                  <div className="flex items-center gap-2 text-xs font-medium text-foreground flex-wrap">
                     {levels.map(lvl => (
-                      <div key={lvl.level} className="flex items-center gap-1.5"><div className={`w-2 h-2 rounded-full ${levelColor(lvl.level)}`} /> {lvl.level}-{lvl.name ?? lvl.label}</div>
+                      <div key={lvl.level} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border bg-background font-semibold">
+                        <div className="w-2 h-2 rounded-full shrink-0 bg-primary" />
+                        Lvl {lvl.level} – {lvl.name ?? lvl.label}
+                      </div>
                     ))}
                   </div>
                 </>
               )}
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" disabled={saving || !effectiveRoles.length} onClick={() => { setBulkForm({ role: effectiveRoles[0] ?? '', level: '' }); setBulkDialog(true) }} className="gap-2">
-                <Copy className="w-4 h-4" /> Bulk Update Levels
+              <Button
+                variant="outline"
+                disabled={saving || !effectiveRoles.length}
+                onClick={() => { setBulkForm({ role: effectiveRoles[0] ?? '', level: '' }); setBulkDialog(true) }}
+                className="gap-2 border-border bg-background font-semibold hover:bg-muted"
+              >
+                <Copy className="w-4 h-4 text-primary" /> Bulk Update Levels
               </Button>
-              <Button variant="outline" disabled={saving || !effectiveRoles.length} onClick={handleSubmitForReview} className="gap-2">
+              <Button
+                disabled={saving || !effectiveRoles.length}
+                onClick={handleSubmitForReview}
+                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm"
+              >
                 <ListChecks className="w-4 h-4" /> Submit for Review
               </Button>
             </div>
@@ -876,14 +908,14 @@ export function FrameworkMapping() {
                   total={summary?.mapping_summary.total_roles ?? 0}
                   segments={[
                     { pct: summary?.mapping_summary.fully_pct ?? 0, cls: 'stroke-primary' },
-                    { pct: summary?.mapping_summary.partial_pct ?? 0, cls: 'stroke-warning' },
-                    { pct: summary?.mapping_summary.not_pct ?? 0, cls: 'stroke-destructive' },
+                    { pct: summary?.mapping_summary.partial_pct ?? 0, cls: 'stroke-primary/50' },
+                    { pct: summary?.mapping_summary.not_pct ?? 0, cls: 'stroke-muted' },
                   ]}
                 />
                 <div className="flex flex-col gap-2">
                   <LegendRow color="bg-primary" label="Fully Mapped" count={summary?.mapping_summary.fully_mapped ?? 0} pct={summary?.mapping_summary.fully_pct ?? 0} />
-                  <LegendRow color="bg-warning" label="Partially Mapped" count={summary?.mapping_summary.partially_mapped ?? 0} pct={summary?.mapping_summary.partial_pct ?? 0} />
-                  <LegendRow color="bg-destructive" label="Not Mapped" count={summary?.mapping_summary.not_mapped ?? 0} pct={summary?.mapping_summary.not_pct ?? 0} />
+                  <LegendRow color="bg-primary/50" label="Partially Mapped" count={summary?.mapping_summary.partially_mapped ?? 0} pct={summary?.mapping_summary.partial_pct ?? 0} />
+                  <LegendRow color="bg-muted" label="Not Mapped" count={summary?.mapping_summary.not_mapped ?? 0} pct={summary?.mapping_summary.not_pct ?? 0} />
                 </div>
               </div>
             </div>
@@ -1252,13 +1284,21 @@ export function FrameworkMapping() {
  * Small presentational helpers
  * ------------------------------------------------------------------ */
 
-function StatCard({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
+function StatCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string
+  value: number | string
+  icon: ReactNode
+}) {
   return (
-    <div className="bg-card border border-primary/10 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+    <div className="bg-card border border-border hover:border-primary/40 rounded-2xl p-4 flex flex-col justify-between shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{label}</p>
       <div className="flex items-center justify-between mt-2">
-        <p className="text-2xl font-bold text-foreground">{value.toLocaleString()}</p>
-        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">{icon}</div>
+        <p className="text-2xl font-bold text-foreground">{typeof value === 'number' ? value.toLocaleString() : value}</p>
+        <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">{icon}</div>
       </div>
     </div>
   )

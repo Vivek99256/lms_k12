@@ -8,8 +8,17 @@
  * full port notes.
  */
 
-import { AdminCenter } from './components'
+import { AdminCenter } from './components'
+import { TalentTheme } from '../_lib/talent-theme'
+
+function AdministrationPageInner() {
+  return <AdminCenter />
+}
 
 export default function AdministrationPage() {
-  return <AdminCenter />
+  return (
+    <TalentTheme>
+      <AdministrationPageInner />
+    </TalentTheme>
+  )
 }

@@ -10,12 +10,21 @@
  */
 
 import { Suspense } from 'react'
-import { CertificationsCenter } from './components/certifications-center'
+import { CertificationsCenter } from './components/certifications-center'
+import { TalentTheme } from '../_lib/talent-theme'
 
-export default function CertificationsPage() {
+function CertificationsPageInner() {
   return (
     <Suspense fallback={null}>
       <CertificationsCenter />
     </Suspense>
+  )
+}
+
+export default function CertificationsPage() {
+  return (
+    <TalentTheme>
+      <CertificationsPageInner />
+    </TalentTheme>
   )
 }

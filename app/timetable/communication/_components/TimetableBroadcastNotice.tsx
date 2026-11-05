@@ -43,6 +43,7 @@ interface AudienceRecipient {
   name: string;
   role: string;
   contact: string;
+  email: string;
   classOrSubject?: string;
 }
 
@@ -82,10 +83,10 @@ const TEMPLATES: Template[] = [
 ];
 
 const PRESET_AUDIENCE: AudienceRecipient[] = [
-  { id: '1', name: 'Ramesh Sharma', role: 'Faculty / Mathematics', contact: '+91 98250 12345', classOrSubject: 'Grade 10 Mathematics' },
-  { id: '2', name: 'Sunita Verma', role: 'Faculty / Science', contact: '+91 98251 12345', classOrSubject: 'Grade 9 Physics' },
-  { id: '3', name: 'Kavita Dave', role: 'Class Teacher / Grade 10-A', contact: '+91 98795 67890', classOrSubject: 'Class 10-A' },
-  { id: '4', name: 'Anil Joshi', role: 'Faculty / English', contact: '+91 97243 54321', classOrSubject: 'Grade 8-10 English' },
+  { id: '1', name: 'Ramesh Sharma', role: 'Faculty / Mathematics', contact: '+91 98250 12345', email: 'ramesh.sharma@school.edu', classOrSubject: 'Grade 10 Mathematics' },
+  { id: '2', name: 'Sunita Verma', role: 'Faculty / Science', contact: '+91 98251 12345', email: 'sunita.verma@school.edu', classOrSubject: 'Grade 9 Physics' },
+  { id: '3', name: 'Kavita Dave', role: 'Class Teacher / Grade 10-A', contact: '+91 98795 67890', email: 'kavita.dave@school.edu', classOrSubject: 'Class 10-A' },
+  { id: '4', name: 'Anil Joshi', role: 'Faculty / English', contact: '+91 97243 54321', email: 'anil.joshi@school.edu', classOrSubject: 'Grade 8-10 English' },
 ];
 
 export function TimetableBroadcastNotice() {
@@ -94,14 +95,18 @@ export function TimetableBroadcastNotice() {
   const [selectedChannel, setSelectedChannel] = useState<Channel>('whatsapp');
   const [targetAudience, setTargetAudience] = useState<'all' | 'unregistered' | 'custom'>('custom');
   const [customMobile, setCustomMobile] = useState('');
+  const [customEmail, setCustomEmail] = useState('');
   const [customRecipientName, setCustomRecipientName] = useState('');
   const [subject, setSubject] = useState(TEMPLATES[0].subject);
   const [message, setMessage] = useState(TEMPLATES[0].body);
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
 
+  const isEmail = selectedChannel === 'email';
+
+  // Parse 10-digit mobile numbers for WhatsApp / SMS
   const parsedCustomNumbers = useMemo(() => {
-    if (targetAudience !== 'custom') return [];
+    if (targetAudience !== 'custom' || isEmail) return [];
     const rawTokens = customMobile.split(/[\n,; ]+/).map((t) => t.trim()).filter(Boolean);
     const valid: string[] = [];
     for (const token of rawTokens) {
@@ -115,23 +120,50 @@ export function TimetableBroadcastNotice() {
       }
     }
     return valid;
-  }, [customMobile, targetAudience]);
+  }, [customMobile, targetAudience, isEmail]);
+
+  // Parse email addresses for Email Digest
+  const parsedCustomEmails = useMemo(() => {
+    if (targetAudience !== 'custom' || !isEmail) return [];
+    const rawTokens = customEmail.split(/[\n,; ]+/).map((t) => t.trim()).filter(Boolean);
+    const valid: string[] = [];
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    for (const token of rawTokens) {
+      const lower = token.toLowerCase();
+      if (emailRegex.test(lower) && !valid.includes(lower)) {
+        valid.push(lower);
+      }
+    }
+    return valid;
+  }, [customEmail, targetAudience, isEmail]);
 
   const activeRecipients: AudienceRecipient[] = useMemo(() => {
     if (targetAudience === 'custom') {
-      if (parsedCustomNumbers.length === 0) return [];
-      return parsedCustomNumbers.map((num, idx) => ({
-        id: `custom-${idx}`,
-        name: customRecipientName.trim() || `Recipient ${idx + 1}`,
-        role: 'Faculty / Parent Recipient',
-        contact: `+91 ${num}`,
-      }));
+      if (isEmail) {
+        if (parsedCustomEmails.length === 0) return [];
+        return parsedCustomEmails.map((em, idx) => ({
+          id: `custom-email-${idx}`,
+          name: customRecipientName.trim() || `Recipient ${idx + 1}`,
+          role: 'Faculty / Parent Recipient',
+          contact: em,
+          email: em,
+        }));
+      } else {
+        if (parsedCustomNumbers.length === 0) return [];
+        return parsedCustomNumbers.map((num, idx) => ({
+          id: `custom-${idx}`,
+          name: customRecipientName.trim() || `Recipient ${idx + 1}`,
+          role: 'Faculty / Parent Recipient',
+          contact: `+91 ${num}`,
+          email: '',
+        }));
+      }
     }
     if (targetAudience === 'unregistered') {
       return PRESET_AUDIENCE.slice(0, 2);
     }
     return PRESET_AUDIENCE;
-  }, [targetAudience, parsedCustomNumbers, customRecipientName]);
+  }, [targetAudience, isEmail, parsedCustomEmails, parsedCustomNumbers, customRecipientName]);
 
   const previewText = useMemo(() => {
     const first = activeRecipients[0];
@@ -152,9 +184,15 @@ export function TimetableBroadcastNotice() {
   };
 
   const handleSend = async () => {
-    if (targetAudience === 'custom' && parsedCustomNumbers.length === 0) {
-      toast.error('Recipient Required', 'Please enter at least one valid 10-digit Indian mobile number.');
-      return;
+    if (targetAudience === 'custom') {
+      if (isEmail && parsedCustomEmails.length === 0) {
+        toast.error('Recipient Email Required', 'Please enter at least one valid email address.');
+        return;
+      }
+      if (!isEmail && parsedCustomNumbers.length === 0) {
+        toast.error('Recipient Required', 'Please enter at least one valid 10-digit Indian mobile number.');
+        return;
+      }
     }
 
     if (!message.trim()) {
@@ -168,20 +206,37 @@ export function TimetableBroadcastNotice() {
       await new Promise((r) => setTimeout(r, 650));
 
       if (targetAudience === 'custom') {
-        recordBatchDispatches(
-          'timetable',
-          selectedChannel,
-          parsedCustomNumbers.map((num, idx) => ({
-            recipientName: customRecipientName.trim() || `Recipient ${idx + 1}`,
-            mobileNumber: num,
-          })),
-          {
-            event_key: 'timetable.broadcast_notice',
-            subject: subject.trim() || 'Timetable Schedule Notice',
-            messageBody: previewText,
-            status: 'sent',
-          },
-        );
+        if (isEmail) {
+          recordBatchDispatches(
+            'timetable',
+            'email',
+            parsedCustomEmails.map((em, idx) => ({
+              recipientName: customRecipientName.trim() || `Recipient ${idx + 1}`,
+              recipientString: `${em}${customRecipientName.trim() ? ` (${customRecipientName.trim()})` : ''}`,
+            })),
+            {
+              event_key: 'timetable.broadcast_notice',
+              subject: subject.trim() || 'Timetable Schedule Notice',
+              messageBody: previewText,
+              status: 'sent',
+            },
+          );
+        } else {
+          recordBatchDispatches(
+            'timetable',
+            selectedChannel,
+            parsedCustomNumbers.map((num, idx) => ({
+              recipientName: customRecipientName.trim() || `Recipient ${idx + 1}`,
+              mobileNumber: num,
+            })),
+            {
+              event_key: 'timetable.broadcast_notice',
+              subject: subject.trim() || 'Timetable Schedule Notice',
+              messageBody: previewText,
+              status: 'sent',
+            },
+          );
+        }
       } else {
         activeRecipients.forEach((rec) => {
           recordDispatch({
@@ -189,7 +244,9 @@ export function TimetableBroadcastNotice() {
             channel: selectedChannel,
             event_key: 'timetable.broadcast_notice',
             recipientName: rec.name,
-            recipientString: `${rec.contact} (${rec.name} - ${rec.role})`,
+            recipientString: isEmail
+              ? `${rec.email} (${rec.name} - ${rec.role})`
+              : `${rec.contact} (${rec.name} - ${rec.role})`,
             subject: subject.trim() || 'Timetable Schedule Notice',
             messageBody: message
               .replace(/\{recipient_name\}/g, rec.name)
@@ -220,6 +277,10 @@ export function TimetableBroadcastNotice() {
       setIsSending(false);
     }
   };
+
+  const isDispatchDisabled =
+    isSending ||
+    (targetAudience === 'custom' && (isEmail ? parsedCustomEmails.length === 0 : parsedCustomNumbers.length === 0));
 
   return (
     <div className="space-y-6">
@@ -280,7 +341,9 @@ export function TimetableBroadcastNotice() {
                     onClick={() => setSelectedChannel(ch.id)}
                     className={`flex items-center justify-center gap-2 rounded-xl border p-3.5 text-sm font-semibold transition ${
                       isSelected
-                        ? 'border-emerald-500 bg-emerald-50/50 text-emerald-900 shadow-sm ring-1 ring-emerald-400'
+                        ? ch.id === 'email'
+                          ? 'border-blue-500 bg-blue-50/50 text-blue-900 shadow-sm ring-1 ring-blue-400'
+                          : 'border-emerald-500 bg-emerald-50/50 text-emerald-900 shadow-sm ring-1 ring-emerald-400'
                         : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
@@ -307,7 +370,7 @@ export function TimetableBroadcastNotice() {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                Enter Custom Mobile Number
+                {isEmail ? 'Enter Custom Email Address' : 'Enter Custom Mobile Number'}
               </button>
               <button
                 type="button"
@@ -335,26 +398,50 @@ export function TimetableBroadcastNotice() {
 
             {targetAudience === 'custom' ? (
               <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3.5">
-                <div>
-                  <div className="flex items-center justify-between text-xs font-medium text-slate-700 mb-1.5">
-                    <span>Recipient Mobile Number(s)</span>
-                    <span className="text-indigo-600 font-semibold">
-                      {parsedCustomNumbers.length} valid number(s) detected
-                    </span>
+                {isEmail ? (
+                  <div>
+                    <div className="flex items-center justify-between text-xs font-medium text-slate-700 mb-1.5">
+                      <span>Recipient Email Address(es)</span>
+                      <span className="text-blue-600 font-semibold">
+                        {parsedCustomEmails.length} valid email(s) detected
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-2.5 h-4 w-4 text-blue-500" />
+                      <Input
+                        type="email"
+                        value={customEmail}
+                        onChange={(e) => setCustomEmail(e.target.value)}
+                        placeholder="Enter email address(es)..."
+                        className="pl-9 bg-white font-mono text-sm"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Enter valid email addresses. Multiple emails can be separated by comma or space.
+                    </p>
                   </div>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-2.5 h-4 w-4 text-indigo-500" />
-                    <Input
-                      value={customMobile}
-                      onChange={(e) => setCustomMobile(e.target.value)}
-                      placeholder="Enter 10-digit mobile number(s)..."
-                      className="pl-9 bg-white font-mono text-sm"
-                    />
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between text-xs font-medium text-slate-700 mb-1.5">
+                      <span>Recipient Mobile Number(s)</span>
+                      <span className="text-indigo-600 font-semibold">
+                        {parsedCustomNumbers.length} valid number(s) detected
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-2.5 h-4 w-4 text-indigo-500" />
+                      <Input
+                        value={customMobile}
+                        onChange={(e) => setCustomMobile(e.target.value)}
+                        placeholder="Enter 10-digit mobile number(s)..."
+                        className="pl-9 bg-white font-mono text-sm"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Enter 10-digit Indian numbers. Multi-numbers can be separated by comma or space.
+                    </p>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Enter 10-digit Indian numbers. Multi-numbers can be separated by comma or space.
-                  </p>
-                </div>
+                )}
 
                 <div>
                   <label className="text-xs font-medium text-slate-700 mb-1.5 block">
@@ -377,7 +464,7 @@ export function TimetableBroadcastNotice() {
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {activeRecipients.map((r) => (
                     <span key={r.id} className="inline-flex items-center gap-1 rounded-md bg-white border px-2 py-0.5 text-xs text-slate-700">
-                      {r.name} ({r.contact})
+                      {r.name} ({isEmail ? r.email : r.contact})
                     </span>
                   ))}
                 </div>
@@ -422,7 +509,7 @@ export function TimetableBroadcastNotice() {
           <div className="pt-2">
             <Button
               onClick={handleSend}
-              disabled={isSending || (targetAudience === 'custom' && parsedCustomNumbers.length === 0)}
+              disabled={isDispatchDisabled}
               className="w-full h-11 bg-[#5846EA] hover:bg-[#4736d4] text-white font-semibold text-sm shadow-md"
             >
               {isSending ? (
@@ -482,7 +569,7 @@ export function TimetableBroadcastNotice() {
                     <CalendarCheck2 className="h-4 w-4 text-indigo-600" />
                     <span className="text-xs font-bold text-slate-700">Timetable Broadcast</span>
                   </div>
-                  <span className="text-[11px] font-medium text-emerald-600 uppercase">
+                  <span className={`text-[11px] font-medium uppercase ${isEmail ? 'text-blue-600' : 'text-emerald-600'}`}>
                     {selectedChannel}
                   </span>
                 </div>
@@ -492,7 +579,9 @@ export function TimetableBroadcastNotice() {
                   <p className="text-xs font-bold text-slate-900 mt-0.5">{subject || '(No subject)'}</p>
                 </div>
 
-                <div className="rounded-lg bg-emerald-50/70 border border-emerald-100 p-3 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-wrap">
+                <div className={`rounded-lg border p-3 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-wrap ${
+                  isEmail ? 'bg-blue-50/70 border-blue-100' : 'bg-emerald-50/70 border-emerald-100'
+                }`}>
                   {previewText || '(Notice text preview will appear here)'}
                 </div>
 
@@ -502,7 +591,13 @@ export function TimetableBroadcastNotice() {
                     <span>Instant dispatch</span>
                   </div>
                   <span className="font-mono text-slate-500">
-                    {activeRecipients.length > 0 ? activeRecipients[0].contact : 'No number'}
+                    {activeRecipients.length > 0
+                      ? isEmail
+                        ? activeRecipients[0].email
+                        : activeRecipients[0].contact
+                      : isEmail
+                        ? 'No email'
+                        : 'No number'}
                   </span>
                 </div>
               </CardContent>

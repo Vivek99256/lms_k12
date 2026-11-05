@@ -9,8 +9,17 @@
  * route). See `components/performance-center.tsx` for the actual screen.
  */
 
-import { PerformanceCenter } from './components'
+import { PerformanceCenter } from './components'
+import { TalentTheme } from '../_lib/talent-theme'
+
+function PerformanceReviewsAndAppraisalsPageInner() {
+  return <PerformanceCenter />
+}
 
 export default function PerformanceReviewsAndAppraisalsPage() {
-  return <PerformanceCenter />
+  return (
+    <TalentTheme>
+      <PerformanceReviewsAndAppraisalsPageInner />
+    </TalentTheme>
+  )
 }

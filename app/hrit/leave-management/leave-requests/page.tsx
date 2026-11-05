@@ -1,5 +1,6 @@
 'use client'
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Download, Plus, ChevronDown, Search, ListFilter, Columns3, MoreHorizontal } from 'lucide-react'
@@ -60,7 +61,7 @@ function toCsvValue(value: string | number | null | undefined) {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
-export default function LeaveRequestsPage() {
+function LeaveRequestsPageInner() {
   const searchParams = useSearchParams()
   // Target's useAuth() user has no `id` field (unlike G2G's); menuContext.user_id
   // is the closest equivalent already flowing through the target's session plumbing.
@@ -531,5 +532,13 @@ export default function LeaveRequestsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function LeaveRequestsPage() {
+  return (
+    <HritTheme>
+      <LeaveRequestsPageInner />
+    </HritTheme>
   )
 }

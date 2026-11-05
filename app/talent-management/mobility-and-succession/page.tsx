@@ -10,8 +10,17 @@
  * this project wraps its ported G2G component.
  */
 
-import { MobilityCenter } from './components'
+import { MobilityCenter } from './components'
+import { TalentTheme } from '../_lib/talent-theme'
+
+function MobilityAndSuccessionPageInner() {
+  return <MobilityCenter />
+}
 
 export default function MobilityAndSuccessionPage() {
-  return <MobilityCenter />
+  return (
+    <TalentTheme>
+      <MobilityAndSuccessionPageInner />
+    </TalentTheme>
+  )
 }

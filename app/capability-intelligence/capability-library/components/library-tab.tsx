@@ -547,27 +547,29 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar */}
-      <div className="relative z-20 flex flex-col gap-4 rounded-2xl border border-primary/10 bg-card/50 p-4 shadow-sm backdrop-blur-xl">
+      <div className="relative z-20 flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm backdrop-blur-xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="relative min-w-[240px] flex-1 max-w-lg">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
               placeholder={`Search ${config.plural.toLowerCase()}…`}
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              className="h-10 w-full rounded-xl border-input bg-background/50 pl-9 pr-4 text-sm focus-visible:ring-primary/50"
+              className="h-10 w-full rounded-xl border-slate-200 bg-slate-50/60 pl-9 pr-4 text-sm transition-colors focus:bg-white focus-visible:ring-indigo-500"
               aria-label={`Search ${config.plural}`}
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex overflow-hidden rounded-xl border border-border">
+            <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60 p-0.5">
               <button
                 type="button"
                 onClick={() => setView('table')}
                 className={cn(
-                  'flex h-10 w-10 items-center justify-center transition-colors',
-                  view === 'table' ? 'bg-primary/10 text-primary' : 'bg-background text-muted-foreground hover:bg-accent',
+                  'flex h-9 w-9 items-center justify-center rounded-lg transition-all',
+                  view === 'table'
+                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
                 title="Table view"
                 aria-label="Table view"
@@ -579,8 +581,10 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
                 type="button"
                 onClick={() => setView('shape')}
                 className={cn(
-                  'flex h-10 w-10 items-center justify-center border-l border-border transition-colors',
-                  view === 'shape' ? 'bg-primary/10 text-primary' : 'bg-background text-muted-foreground hover:bg-accent',
+                  'flex h-9 w-9 items-center justify-center rounded-lg transition-all',
+                  view === 'shape'
+                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
                 title={`${config.plural} as ${config.shape}s`}
                 aria-label={`${config.shape} view`}
@@ -592,8 +596,10 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
                 type="button"
                 onClick={() => setView('grid')}
                 className={cn(
-                  'flex h-10 w-10 items-center justify-center border-l border-border transition-colors',
-                  view === 'grid' ? 'bg-primary/10 text-primary' : 'bg-background text-muted-foreground hover:bg-accent',
+                  'flex h-9 w-9 items-center justify-center rounded-lg transition-all',
+                  view === 'grid'
+                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
                 title="Card view"
                 aria-label="Card view"
@@ -607,7 +613,7 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
               variant="outline"
               onClick={handleExport}
               disabled={items.length === 0 || exporting}
-              className="h-10 gap-2 rounded-xl font-semibold"
+              className="h-10 gap-2 rounded-xl border-slate-200 bg-white font-semibold text-slate-700 shadow-xs hover:bg-slate-50 hover:text-indigo-600"
               title="Download every row matching the current filters"
             >
               <Download className="h-4 w-4" /> {exporting ? 'Exporting…' : 'Export'}
@@ -617,15 +623,15 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
               <Button
                 variant="outline"
                 onClick={() => setTaxonomyOpen(true)}
-                className="h-10 gap-2 rounded-xl font-semibold"
+                className="h-10 gap-2 rounded-xl border-indigo-200 bg-indigo-50/70 font-semibold text-indigo-700 shadow-xs hover:bg-indigo-100"
               >
-                <FolderTree className="h-4 w-4" /> Taxonomy
+                <FolderTree className="h-4 w-4 text-indigo-600" /> Taxonomy
               </Button>
             )}
 
             <Button
               onClick={openCreate}
-              className="h-10 gap-2 rounded-xl bg-primary px-4 font-bold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90"
+              className="h-10 gap-2 rounded-xl bg-primary hover:bg-primary/90 px-4 font-bold text-primary-foreground shadow-sm transition-all"
             >
               <Plus className="h-4 w-4 stroke-[3]" /> Add {config.singular}
             </Button>
@@ -789,7 +795,7 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
       )}
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col rounded-2xl border border-primary/10 bg-card/90 shadow-sm backdrop-blur-2xl">
+      <div className="relative z-10 flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
         {error ? (
           <ErrorState title={`Couldn't load ${config.plural.toLowerCase()}`} description={error} retry={retry} className="m-6" />
         ) : loading ? (
@@ -823,44 +829,61 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
         ) : view === 'table' ? (
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
+              <TableHeader className="bg-slate-50/90 border-b border-slate-200">
+                <TableRow className="border-slate-200 hover:bg-transparent">
                   {columns.map((field) => (
-                    <TableHead key={field.key} className={cn('px-4 py-3 text-xs', field.width)}>
+                    <TableHead key={field.key} className={cn('px-4 py-3.5 text-xs font-semibold text-slate-600', field.width)}>
                       <button
                         type="button"
                         onClick={() => toggleSort(field.key)}
-                        className="inline-flex items-center gap-1 uppercase tracking-wider transition-colors hover:text-foreground"
+                        className="inline-flex items-center gap-1 uppercase tracking-wider transition-colors hover:text-indigo-600"
                       >
                         {field.label}
                         {sort === field.key &&
-                          (direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                          (direction === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />)}
                       </button>
                     </TableHead>
                   ))}
-                  <TableHead className="w-28 px-4 py-3 text-right text-xs uppercase tracking-wider">Actions</TableHead>
+                  <TableHead className="w-28 px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="divide-y divide-slate-100">
                 {items.map((row) => (
                   <TableRow
                     key={row.id}
                     onClick={() => openRow(row)}
-                    className="cursor-pointer border-border transition-colors hover:bg-accent/40"
+                    className="group cursor-pointer border-slate-100 transition-colors hover:bg-indigo-50/30"
                   >
                     {columns.map((field) => {
                       const value = row[field.key]
                       const isTitle = field.key === config.titleKey
                       const isStatus = field.key === 'approve_status' || field.key === 'status'
+                      const isCategory = field.key === 'category' || field.key === 'jobrole_category' || field.key === 'task_category'
+                      const isSubCategory = field.key === 'sub_category'
+                      const isDepartment = field.key === 'department'
 
                       return (
-                        <TableCell key={field.key} className={cn('px-4 py-3 align-top text-sm', field.width)}>
+                        <TableCell key={field.key} className={cn('px-4 py-3.5 align-middle text-sm', field.width)}>
                           {isStatus && value ? (
                             <StatusBadge status={String(value)} label={String(value)} />
+                          ) : isCategory && value ? (
+                            <span className="inline-flex items-center rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary shadow-xs">
+                              {String(value)}
+                            </span>
+                          ) : isSubCategory && value ? (
+                            <span className="inline-flex items-center rounded-lg border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground shadow-xs">
+                              {String(value)}
+                            </span>
+                          ) : isDepartment && value ? (
+                            <span className="inline-flex items-center rounded-lg border border-border bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                              {String(value)}
+                            </span>
                           ) : (
                             <span
                               className={cn(
-                                isTitle ? 'font-semibold text-foreground' : 'text-muted-foreground',
+                                isTitle
+                                  ? 'font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors'
+                                  : 'text-slate-600',
                                 'line-clamp-2 break-words',
                               )}
                             >
@@ -870,7 +893,7 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
                         </TableCell>
                       )
                     })}
-                    <TableCell className="px-4 py-3 text-right">
+                    <TableCell className="px-4 py-3.5 text-right align-middle">
                       <div className="flex items-center justify-end gap-1">
                         {canEditRow(row) ? (
                           <>
@@ -880,7 +903,7 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
                                 event.stopPropagation()
                                 openEdit(row)
                               }}
-                              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                               aria-label={`Edit ${String(row[config.titleKey] ?? '')}`}
                             >
                               <Edit2 className="h-4 w-4" />
@@ -891,7 +914,7 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
                                 event.stopPropagation()
                                 setDeleteTarget(row)
                               }}
-                              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
                               aria-label={`Delete ${String(row[config.titleKey] ?? '')}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -905,7 +928,7 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
                               handleClone(row)
                             }}
                             disabled={cloning}
-                            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+                            className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-amber-50 hover:text-amber-600 disabled:opacity-40"
                             title="Shared entry — duplicate it to edit your own copy"
                             aria-label={`Duplicate ${String(row[config.titleKey] ?? '')}`}
                           >
@@ -933,34 +956,51 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
         ) : (
           <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 xl:grid-cols-3">
             {items.map((row) => {
-              const status = (row.approve_status ?? row.status) as string | undefined
+              const status = row.status as string | undefined
+              const approveStatus = row.approve_status as string | undefined
+              const dept = (row as Record<string, unknown>).department
               return (
                 <button
                   key={row.id}
                   type="button"
                   onClick={() => openRow(row)}
-                  className="flex h-full flex-col gap-2 rounded-2xl border border-border bg-background/60 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                  className="group relative flex h-full flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 text-left shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-md"
                 >
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <config.icon className="h-4 w-4" />
-                    </span>
-                    <p className="line-clamp-2 flex-1 text-sm font-bold text-foreground">
-                      {dash(row[config.titleKey])}
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-xs transition-all duration-200">
+                        <config.icon className="h-5 w-5" />
+                      </span>
+                      <p className="line-clamp-2 flex-1 text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                        {dash(row[config.titleKey])}
+                      </p>
+                    </div>
+
+                    <p className="line-clamp-3 text-xs leading-relaxed text-slate-500">
+                      {dash(row[summaryKey])}
                     </p>
                   </div>
 
-                  <p className="line-clamp-3 flex-1 text-xs text-muted-foreground">
-                    {dash(row[summaryKey])}
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <div className="flex flex-wrap items-center gap-1.5 pt-3 border-t border-slate-100 mt-3">
                     {config.categoryKey && row[config.categoryKey] ? (
-                      <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      <span className="inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
                         {String(row[config.categoryKey])}
                       </span>
                     ) : null}
+                    {config.subCategoryKey && row[config.subCategoryKey] ? (
+                      <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        {String(row[config.subCategoryKey])}
+                      </span>
+                    ) : null}
+                    {dept ? (
+                      <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                        {String(dept)}
+                      </span>
+                    ) : null}
                     {status ? <StatusBadge status={status} label={status} size="sm" /> : null}
+                    {approveStatus && approveStatus !== status ? (
+                      <StatusBadge status={approveStatus} label={approveStatus} size="sm" />
+                    ) : null}
                   </div>
                 </button>
               )
@@ -1015,8 +1055,8 @@ export function LibraryTab({ config, meta, active }: LibraryTabProps) {
                     className={cn(
                       'h-9 min-w-9 rounded-lg border px-2 text-sm font-semibold transition-colors',
                       entry === page
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-background text-muted-foreground hover:bg-accent',
+                        ? 'border-primary bg-primary text-primary-foreground shadow-xs font-semibold'
+                        : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
                     )}
                   >
                     {entry}

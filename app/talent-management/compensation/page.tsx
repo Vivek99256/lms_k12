@@ -28,13 +28,22 @@
  * routed behaviour.
  */
 
-import { PerformanceCenter } from '../performance-reviews-and-appraisals/components'
+import { PerformanceCenter } from '../performance-reviews-and-appraisals/components'
+import { TalentTheme } from '../_lib/talent-theme'
 
 const COMPENSATION_COMING_SOON = {
   title: 'Compensation',
   description: 'Manage salaries, bonuses, and equity grants. Coming soon.',
 }
 
-export default function CompensationPage() {
+function CompensationPageInner() {
   return <PerformanceCenter comingSoon={COMPENSATION_COMING_SOON} />
+}
+
+export default function CompensationPage() {
+  return (
+    <TalentTheme>
+      <CompensationPageInner />
+    </TalentTheme>
+  )
 }

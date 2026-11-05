@@ -8,8 +8,13 @@
  * boundary is needed.
  */
 
-import { ProjectsCenter } from './components'
+import { ProjectsCenter } from './components'
+import { TaskTheme } from '../_lib/task-theme'
 
 export default function ProjectsWorkstreamsPage() {
-  return <ProjectsCenter />
+  return (
+    <TaskTheme>
+      <ProjectsCenter />
+    </TaskTheme>
+  )
 }

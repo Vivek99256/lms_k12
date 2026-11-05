@@ -17,6 +17,7 @@
  * tabular-nums"`, unchanged from G2G.
  */
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Save, Search, SlidersHorizontal, Users } from 'lucide-react'
 
@@ -74,7 +75,7 @@ const categoryTabs = [
   { id: '2', label: DEDUCTION_CATEGORY_LABELS['2'] },
 ]
 
-export default function PayrollDeductionPage() {
+function PayrollDeductionPageInner() {
   const {
     loading,
     optionsLoading,
@@ -642,5 +643,13 @@ function currentMonthAbbr() {
   return new Date().toLocaleString(
     'en-US',
     { month: 'short' },
+  )
+}
+
+export default function PayrollDeductionPage() {
+  return (
+    <HritTheme>
+      <PayrollDeductionPageInner />
+    </HritTheme>
   )
 }

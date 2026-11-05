@@ -1,5 +1,6 @@
 'use client'
 
+import { HritTheme } from '@/app/hrit/_lib/hrit-theme'
 import * as React from 'react'
 import { lazy, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
@@ -310,7 +311,6 @@ function AttendanceDashboard() {
   )
 }
 
-export default AttendanceDashboard
 
 interface TodayAttendancePanelProps {
   record: AttendanceRecord | null
@@ -696,4 +696,12 @@ function getShortMonth(dateValue: string) {
   const date = new Date(`${dateValue}T00:00:00`)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleDateString('en-US', { month: 'short' })
+}
+
+export default function AttendanceDashboardPage() {
+  return (
+    <HritTheme>
+      <AttendanceDashboard />
+    </HritTheme>
+  )
 }

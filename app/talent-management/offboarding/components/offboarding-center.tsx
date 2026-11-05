@@ -568,7 +568,7 @@ export function OffboardingCenter() {
         </div>
 
         {/* KPIs Row */}
-        <div className="flex overflow-x-auto gap-4 mb-6 pb-2 custom-scrollbar">
+        <div className="mb-6 grid grid-flow-col auto-cols-fr gap-3">
           {overview?.kpis.map((kpi) => {
             // Determine filter matching
             let isSelected = false
@@ -582,7 +582,7 @@ export function OffboardingCenter() {
               <Card
                 key={kpi.id}
                 className={cn(
-                  "shadow-sm min-w-[180px] flex-1 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/50",
+                  "min-w-0 gap-0 py-0 shadow-sm cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/50",
                   isSelected && "border-2 border-primary bg-primary/5"
                 )}
                 onClick={() => {
@@ -594,18 +594,18 @@ export function OffboardingCenter() {
                   else setStatusFilter('All')
                 }}
               >
-                <CardContent className="p-4 flex flex-col h-full gap-2 relative">
+                <CardContent className="relative flex flex-col gap-2 p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">{kpi.title}</span>
+                    <span className="text-xs font-semibold text-muted-foreground">{kpi.title}</span>
                     <Info className="size-3.5 text-muted-foreground/50" />
                   </div>
-                  <div className="flex items-center gap-4 mt-1">
-                    <div className="p-2 rounded-xl bg-muted/50 text-muted-foreground border">
+                  <div className="flex items-center gap-3">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-1.5 text-primary [&_svg]:size-4">
                       {getKpiIcon(kpi.icon)}
                     </div>
                     <div className="flex flex-col">
                       <span className="text-2xl font-bold text-foreground leading-none">{kpi.value}</span>
-                      <span className="text-[10px] text-muted-foreground mt-1">{kpi.subtitle}</span>
+                      <span className="mt-1 text-[11px] leading-tight text-muted-foreground">{kpi.subtitle}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -778,8 +778,8 @@ export function OffboardingCenter() {
           <div className="grid grid-cols-1 gap-6">
             <Card className="shadow-sm overflow-hidden border-border/60">
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/10">
+                <Table className="w-full text-sm [&_td]:px-4 [&_td]:py-3 [&_td]:align-middle [&_th]:whitespace-nowrap [&_th]:px-4 [&_th]:uppercase [&_th]:tracking-wider [&_tr]:border-border/60">
+                  <TableHeader className="bg-primary/5">
                     <TableRow>
                       <TableHead className="w-[40px] pl-4">
                         <Checkbox

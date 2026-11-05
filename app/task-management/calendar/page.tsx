@@ -9,8 +9,13 @@
  * `<Suspense>` needed — the component reads no `useSearchParams()`.
  */
 
-import { TaskCalendarView } from './components'
+import { TaskCalendarView } from './components'
+import { TaskTheme } from '../_lib/task-theme'
 
 export default function TaskCalendarPage() {
-  return <TaskCalendarView />
+  return (
+    <TaskTheme>
+      <TaskCalendarView />
+    </TaskTheme>
+  )
 }
