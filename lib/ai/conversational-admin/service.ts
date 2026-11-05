@@ -60,11 +60,17 @@ function requireAdapter(projectId: string) {
   return adapter;
 }
 
-/** One row per registered adapter: descriptor, effective settings, token summary. */
+/** One row per registered adapter: descriptor, effective settings, token summary. Exactly 3 original platforms. */
 export async function listProjects(context: AdminContext): Promise<ProjectAdminRow[]> {
-  const tokens = new Map((await context.store.listTokens()).map((token) => [token.project_id, token]));
+  const allowed = new Set(['lms_k12', 'enterprise_brain', 'g2g']);
+  const tokens = new Map(
+    (await context.store.listTokens())
+      .filter((token) => allowed.has(token.project_id))
+      .map((token) => [token.project_id, token])
+  );
+  const adapters = listProjectAdapters().filter((adapter) => allowed.has(adapter.projectId));
   return Promise.all(
-    listProjectAdapters().map(async (adapter) => {
+    adapters.map(async (adapter) => {
       const stored = await context.store.getSettings(adapter.projectId);
       const token = adapter.kind === 'external' ? tokens.get(adapter.projectId) : undefined;
       return {

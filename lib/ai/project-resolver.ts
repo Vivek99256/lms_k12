@@ -50,6 +50,8 @@ const PROJECT_ID_PATTERN = /^[a-z][a-z0-9_]{1,63}$/;
 function registry(): Map<string, ProjectAdapter> {
   const holder = globalThis as typeof globalThis & { __projectAdapters?: Map<string, ProjectAdapter> };
   if (!holder.__projectAdapters) holder.__projectAdapters = new Map();
+  holder.__projectAdapters.delete('brain');
+  holder.__projectAdapters.delete('enterprise');
   return holder.__projectAdapters;
 }
 
@@ -61,28 +63,38 @@ export function isValidProjectId(value: string): boolean {
   return PROJECT_ID_PATTERN.test(value);
 }
 
-/** Add or replace registrations. Re-registering the same id replaces its descriptor. */
+/** Add or replace registrations. Re-registering replaces the registry. */
 export function registerProjectAdapters(adapters: ProjectAdapter[]): void {
   const map = registry();
+  map.clear();
   for (const adapter of adapters) {
     const projectId = normaliseProjectId(adapter.projectId);
     if (!isValidProjectId(projectId)) {
       throw new Error(`"${adapter.projectId}" is not a valid project id (lowercase letters, digits and underscores).`);
     }
+    if (projectId === 'brain' || projectId === 'enterprise') continue;
     map.set(projectId, { ...adapter, projectId });
   }
 }
 
-/** Every registered project, host first, then alphabetical. */
+/** Every registered project, host first, then alphabetical. Exactly the 3 original platforms. */
 export function listProjectAdapters(): ProjectAdapter[] {
-  return [...registry().values()].sort((a, b) => {
-    if (a.kind !== b.kind) return a.kind === 'host' ? -1 : 1;
-    return a.projectId.localeCompare(b.projectId);
-  });
+  const map = registry();
+  map.delete('brain');
+  map.delete('enterprise');
+  const allowed = new Set(['lms_k12', 'enterprise_brain', 'g2g']);
+  return [...map.values()]
+    .filter((a) => allowed.has(a.projectId))
+    .sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'host' ? -1 : 1;
+      return a.projectId.localeCompare(b.projectId);
+    });
 }
 
 export function getProjectAdapter(projectId: string): ProjectAdapter | null {
-  return registry().get(normaliseProjectId(projectId)) ?? null;
+  const id = normaliseProjectId(projectId);
+  if (id === 'brain' || id === 'enterprise') return null;
+  return registry().get(id) ?? null;
 }
 
 export class UnknownProjectError extends Error {
@@ -128,6 +140,15 @@ export function resolveProjectAdapter(source?: Pick<Request, 'headers'> | string
 // unimplemented until their adapter modules exist on this branch.
 // ---------------------------------------------------------------------------
 
+if (typeof globalThis !== 'undefined') {
+  const holder = globalThis as typeof globalThis & { __projectAdapters?: Map<string, ProjectAdapter> };
+  if (holder.__projectAdapters) {
+    holder.__projectAdapters.delete('brain');
+    holder.__projectAdapters.delete('enterprise');
+    holder.__projectAdapters.clear();
+  }
+}
+
 registerProjectAdapters([
   {
     projectId: 'lms_k12',
@@ -137,16 +158,16 @@ registerProjectAdapters([
     implemented: true,
   },
   {
-    projectId: 'g2g',
-    label: 'G2G',
-    description: 'Good-to-great learning and growth workflows. Calls the shared endpoint with a service token.',
+    projectId: 'enterprise_brain',
+    label: 'Enterprise Brain',
+    description: 'Institution intelligence and automation. Calls the shared endpoint with a service token.',
     kind: 'external',
     implemented: false,
   },
   {
-    projectId: 'enterprise_brain',
-    label: 'Enterprise Brain',
-    description: 'Institution intelligence and automation. Calls the shared endpoint with a service token.',
+    projectId: 'g2g',
+    label: 'G2G',
+    description: 'Good-to-great learning and growth workflows. Calls the shared endpoint with a service token.',
     kind: 'external',
     implemented: false,
   },

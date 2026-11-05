@@ -36,7 +36,8 @@ export function ConversationalAiAdmin() {
   const projects = useBrainResource(fetchProjects, []);
   const [note, setNote] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
-  const rows = projects.data ?? [];
+  const allowedProjectIds = new Set(['lms_k12', 'enterprise_brain', 'g2g']);
+  const rows = (projects.data ?? []).filter((row) => allowedProjectIds.has(row.adapter.projectId));
   const externalRows = rows.filter((row) => row.adapter.kind === 'external');
 
   const onSaved = useCallback(
