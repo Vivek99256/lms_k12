@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Lock, Sparkles, Target } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, ExternalLink, Loader2, Lock, Sparkles, Target, Trophy } from 'lucide-react';
 
 import Link from 'next/link';
 
@@ -15,6 +15,16 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { QuestionPlayer } from '@/components/h5p/players';
 import { canPlay, selectedOptionId, toPlayerQuestion } from '@/lib/pal/eso-answers';
+import {
+  fetchAdaptiveQuestions,
+  fetchConceptLearn,
+  generateFallbackAdaptiveQuestions,
+  type AdaptiveQuestionSet,
+} from '@/app/pal/data/pal-diagnostic';
+import {
+  saveAdaptivePracticeAnalysis,
+  type AdaptivePracticeAnalysis,
+} from '@/app/pal/data/pal-explanation-lab';
 import {
   defaultLearnerId,
   fetchDiagnostic,
@@ -340,6 +350,7 @@ function EsoConceptFlow() {
               action={action}
               learnerId={learnerId}
               conceptId={conceptId}
+              chapterId={chapterId}
               onAdvance={refresh}
               onResolved={applyAction}
               onNavigateToConcept={(id) => router.push(`/pal/eso?conceptId=${id}${learnerId ? `&learnerId=${learnerId}` : ''}`)}
@@ -358,14 +369,452 @@ function EsoConceptFlow() {
 }
 
 /**
- * A step the engine wanted to serve but has no authored content for.
- *
- * Deliberately reassuring rather than apologetic about the learner: D2
- * guarantees `mastery_retained`, so nothing they earned is at risk. The
- * authoring gap is already logged server-side for whoever maintains content.
+ * An interactive Adaptive Practice drill player used whenever a concept has
+ * no authored questions in the backend or when content is unavailable.
+ * Ensures the student is never stuck with a dead-end message.
  */
-function ContentUnavailableStep({ action }: { action: EsoAction }) {
+function EsoFallbackPracticeDrill({
+  conceptId,
+  chapterId,
+  onAdvance,
+}: {
+  conceptId: number;
+  chapterId?: string | null;
+  onAdvance?: () => void;
+}) {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [practiceSet, setPracticeSet] = useState<AdaptiveQuestionSet | null>(null);
+  const [conceptName, setConceptName] = useState<string>('');
+  const [resolvedChapterId, setResolvedChapterId] = useState<string>(chapterId || '');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [score, setScore] = useState({ correct: 0, total: 0 });
+  const [completed, setCompleted] = useState(false);
+  const [isAnswerCorrect, setIsAnswerCorrect] = useState<boolean | null>(null);
+  const [feedbackText, setFeedbackText] = useState<string | null>(null);
+  const [questionHistory, setQuestionHistory] = useState<
+    Array<{
+      questionId: string;
+      title: string;
+      selectedOptionText?: string;
+      correctOptionText?: string;
+      isCorrect: boolean;
+      feedback?: string;
+    }>
+  >([]);
+
+  useEffect(() => {
+    let active = true;
+
+    const init = async () => {
+      let resolvedName = `Concept ${conceptId}`;
+      let cId = chapterId || (typeof window !== 'undefined' ? sessionStorage.getItem('pal_active_chapter_id') : '');
+
+      try {
+        const learn = await fetchConceptLearn(conceptId);
+        if (learn.conceptName) resolvedName = learn.conceptName;
+        if (learn.chapterId && !cId) {
+          cId = String(learn.chapterId);
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('pal_active_chapter_id', cId);
+          }
+        }
+      } catch {}
+
+      if (active) {
+        setConceptName(resolvedName);
+        if (cId) setResolvedChapterId(cId);
+      }
+
+      try {
+        const questions = await fetchAdaptiveQuestions(conceptId, 5);
+        if (active) {
+          if (questions?.items && questions.items.length > 0) {
+            setPracticeSet(questions);
+          } else {
+            setPracticeSet(generateFallbackAdaptiveQuestions(conceptId, resolvedName, 5));
+          }
+        }
+      } catch {
+        if (active) {
+          setPracticeSet(generateFallbackAdaptiveQuestions(conceptId, resolvedName, 5));
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void init();
+
+    return () => {
+      active = false;
+    };
+  }, [conceptId, chapterId]);
+
+  const items = practiceSet?.items ?? [];
+  const total = items.length;
+  const currentQuestion = items[currentIndex] ?? null;
+
+  const handleSubmit = () => {
+    if (!selectedOption || !currentQuestion || submitted) return;
+
+    const chosen = currentQuestion.options.find((o) => o.id === selectedOption);
+    const right =
+      currentQuestion.options.find((o) => o.isCorrect) ||
+      (chosen?.isCorrect ? chosen : currentQuestion.options[0]);
+
+    const isCorrect = chosen?.isCorrect === true || chosen?.id === right?.id;
+    setIsAnswerCorrect(isCorrect);
+
+    const feedback = isCorrect
+      ? 'Correct! Great job understanding this concept principle.'
+      : `Incorrect. The correct answer is: ${right?.answer || 'Option A'}.`;
+    setFeedbackText(feedback);
+    setSubmitted(true);
+
+    const newScore = {
+      correct: score.correct + (isCorrect ? 1 : 0),
+      total: score.total + 1,
+    };
+    setScore(newScore);
+
+    setQuestionHistory((prev) => [
+      ...prev,
+      {
+        questionId: currentQuestion.questionId,
+        title: currentQuestion.title,
+        selectedOptionText: chosen?.answer,
+        correctOptionText: right?.answer,
+        isCorrect,
+        feedback,
+      },
+    ]);
+  };
+
+  const handleNext = () => {
+    if (currentIndex + 1 < total) {
+      setCurrentIndex((i) => i + 1);
+      setSelectedOption(null);
+      setSubmitted(false);
+      setIsAnswerCorrect(null);
+      setFeedbackText(null);
+    } else {
+      setCompleted(true);
+      const percentage = total > 0 ? Math.round((score.correct / total) * 100) : 0;
+      const incorrectList = questionHistory.filter((q) => !q.isCorrect);
+
+      // Save detailed analysis for Explanation Lab
+      const analysis: AdaptivePracticeAnalysis = {
+        conceptId: String(conceptId),
+        conceptName: conceptName || `Concept ${conceptId}`,
+        score: score.correct,
+        totalQuestions: total,
+        percentage,
+        incorrectCount: incorrectList.length,
+        weakAreas: incorrectList.map((q) => q.title),
+        masteryVerdict: percentage === 100 ? 'mastered' : percentage >= 70 ? 'competent' : 'needs_support',
+        suggestedNextStep: percentage === 100 ? 'feedback' : 'explanation_lab',
+        misconceptionsIdentified: incorrectList.map((q) => ({
+          misconceptionTag: `gap_${q.questionId}`,
+          title: q.title,
+          observedAnswer: q.selectedOptionText || 'Incorrect option chosen',
+          correctConcept: q.correctOptionText || 'Core principle',
+          recommendedLabType: 'virtual_workbench',
+        })),
+        timestamp: Date.now(),
+      };
+      saveAdaptivePracticeAnalysis(String(conceptId), analysis);
+
+      if (typeof window !== 'undefined') {
+        try {
+          const key = `pal_completed_steps_${resolvedChapterId || 'default'}`;
+          const existing = new Set<string>(JSON.parse(sessionStorage.getItem(key) || '[]'));
+          existing.add('practice');
+          if (percentage === 100) {
+            existing.add('explanation_lab');
+          }
+          sessionStorage.setItem(key, JSON.stringify(Array.from(existing)));
+        } catch {}
+      }
+    }
+  };
+
+  if (loading) {
+    return <CenteredSpinner label="Loading adaptive practice questions..." />;
+  }
+
+  if (total === 0) {
+    return (
+      <Card className="border-amber-200 bg-amber-50">
+        <CardContent className="pt-6">
+          <p className="text-sm text-amber-900">Preparing questions for this concept…</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const percentage = total > 0 ? Math.round((score.correct / total) * 100) : 0;
+  const isFullMarks = completed && percentage === 100;
+  const targetChapterId = resolvedChapterId || '41675';
+
+  return (
+    <Card className="border-indigo-200 shadow-sm">
+      <CardHeader className="p-4 sm:p-5 border-b border-slate-100">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-indigo-600 text-white hover:bg-indigo-700">Adaptive Practice</Badge>
+              <span className="text-xs font-semibold text-slate-500">
+                {conceptName || `Concept ${conceptId}`}
+              </span>
+            </div>
+            <CardTitle className="text-base sm:text-lg font-bold text-slate-900 mt-1">
+              Interactive Practice Drills
+            </CardTitle>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/pal/diagnostic/chapter/${targetChapterId}?stage=practice&conceptId=${conceptId}`)}
+              className="gap-1.5 text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+            >
+              <span>Open in 12-Stage Visual Journey</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {!completed && (
+          <div className="mt-3 space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+              <span>Question {currentIndex + 1} of {total}</span>
+              <span>{Math.round(((currentIndex) / total) * 100)}% progress</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-indigo-600 transition-all duration-300"
+                style={{ width: `${((currentIndex + 1) / total) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </CardHeader>
+
+      <CardContent className="p-4 sm:p-5 space-y-4">
+        {!completed && currentQuestion && (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Question {currentIndex + 1}
+                </span>
+                {currentQuestion.difficulty && (
+                  <Badge variant="outline" className="text-[11px] capitalize">
+                    {currentQuestion.difficulty}
+                  </Badge>
+                )}
+              </div>
+              <div
+                className="text-sm font-medium text-slate-900 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentQuestion.title) }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              {currentQuestion.options.map((option) => {
+                const isSelected = selectedOption === option.id;
+                return (
+                  <label
+                    key={option.id}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm transition-colors',
+                      isSelected
+                        ? 'border-indigo-600 bg-indigo-50/70 font-medium text-indigo-950'
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-800',
+                      submitted && 'cursor-default'
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name={`drill-${currentQuestion.questionId}`}
+                      checked={isSelected}
+                      disabled={submitted}
+                      onChange={() => setSelectedOption(option.id)}
+                      className="h-4 w-4 accent-indigo-600"
+                    />
+                    <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
+                  </label>
+                );
+              })}
+            </div>
+
+            {submitted && feedbackText && (
+              <div
+                className={cn(
+                  'rounded-lg p-3 text-xs sm:text-sm font-medium',
+                  isAnswerCorrect
+                    ? 'border border-emerald-200 bg-emerald-50 text-emerald-900'
+                    : 'border border-amber-200 bg-amber-50 text-amber-900'
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  {isAnswerCorrect ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                  )}
+                  <span>{feedbackText}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-slate-500">
+                Score: {score.correct} / {score.total}
+              </span>
+              {!submitted ? (
+                <Button
+                  size="sm"
+                  onClick={handleSubmit}
+                  disabled={!selectedOption}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  Submit Answer
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleNext}
+                  className="bg-indigo-600 hover:bg-indigo-700 gap-1.5"
+                >
+                  <span>{currentIndex + 1 < total ? 'Next Question' : 'Complete Drill'}</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {completed && (
+          <div className="space-y-4">
+            {isFullMarks ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5 text-emerald-950">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                    <Trophy className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-emerald-950">
+                      Full Marks Achieved! ({score.correct}/{total} — 100%)
+                    </h4>
+                    <p className="mt-0.5 text-xs sm:text-sm text-emerald-800">
+                      Exceptional mastery! You correctly answered every question. You can bypass Explanation Lab and advance directly to Feedback & Review.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5 text-amber-950">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-amber-950">
+                      Adaptive Practice Finished ({score.correct}/{total} — {percentage}%)
+                    </h4>
+                    <p className="mt-0.5 text-xs sm:text-sm text-amber-900">
+                      Identified learning gaps detected. Next: Step 6 Explanation Lab will dynamically provide an interactive workbench and practical experiment to clear up these concepts!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setCurrentIndex(0);
+                  setSelectedOption(null);
+                  setSubmitted(false);
+                  setScore({ correct: 0, total: 0 });
+                  setCompleted(false);
+                  setQuestionHistory([]);
+                  setIsAnswerCorrect(null);
+                  setFeedbackText(null);
+                }}
+              >
+                Retake Practice Drill
+              </Button>
+
+              {isFullMarks ? (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    router.push(`/pal/diagnostic/chapter/${targetChapterId}?stage=feedback&conceptId=${conceptId}`);
+                  }}
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                >
+                  <span>Continue to Step 7: Feedback & Review</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    router.push(`/pal/diagnostic/chapter/${targetChapterId}?stage=explanation_lab&conceptId=${conceptId}`);
+                  }}
+                  className="gap-2 bg-purple-700 hover:bg-purple-800 text-white font-semibold"
+                >
+                  <span>Continue to Step 6: Explanation Lab</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * A step the engine wanted to serve but has no authored content for.
+ * When a concept is active, it presents interactive adaptive practice drills
+ * so the student can practice and proceed smoothly through the journey.
+ */
+function ContentUnavailableStep({
+  action,
+  conceptId,
+  chapterId,
+  onAdvance,
+}: {
+  action: EsoAction;
+  conceptId?: number;
+  chapterId?: string | null;
+  onAdvance?: () => void;
+}) {
+  const router = useRouter();
+  const effectiveConceptId = action.conceptId ?? conceptId;
+
+  if (effectiveConceptId) {
+    return (
+      <div className="space-y-4">
+        <EsoFallbackPracticeDrill
+          conceptId={effectiveConceptId}
+          chapterId={chapterId}
+          onAdvance={onAdvance}
+        />
+      </div>
+    );
+  }
 
   return (
     <Card className="border-amber-200 bg-amber-50">
@@ -950,6 +1399,7 @@ function FlowStep({
   action,
   learnerId,
   conceptId,
+  chapterId,
   onAdvance,
   onResolved,
   onNavigateToConcept,
@@ -957,6 +1407,7 @@ function FlowStep({
   action: EsoAction;
   learnerId: string;
   conceptId: number;
+  chapterId?: string | null;
   onAdvance: () => void;
   /**
    * Hand back the action a submit returned, for the steps whose endpoint
@@ -991,7 +1442,16 @@ function FlowStep({
     case 'check_understanding':
       return <CheckUnderstandingStep action={action} learnerId={learnerId} conceptId={conceptId} onResolved={onResolved} onAdvance={onAdvance} />;
     case 'practice':
-      return <TeachOrPracticeStep action={action} learnerId={learnerId} conceptId={conceptId} onResolved={onResolved} onAdvance={onAdvance} />;
+      return (
+        <TeachOrPracticeStep
+          action={action}
+          learnerId={learnerId}
+          conceptId={conceptId}
+          chapterId={chapterId}
+          onResolved={onResolved}
+          onAdvance={onAdvance}
+        />
+      );
     case 'serve_contrast_pair':
       return <ContrastPairStep action={action} learnerId={learnerId} conceptId={conceptId} onResolved={onResolved} />;
     case 'mastered_stop_practice':
@@ -1010,7 +1470,14 @@ function FlowStep({
     // — so this says so plainly instead of falling through to the raw action
     // string, which is what it did before.
     case 'content_unavailable':
-      return <ContentUnavailableStep action={action} />;
+      return (
+        <ContentUnavailableStep
+          action={action}
+          conceptId={conceptId}
+          chapterId={chapterId}
+          onAdvance={onAdvance}
+        />
+      );
     case 'no_nodes_defined':
       return (
         <Alert>
@@ -1896,12 +2363,14 @@ function TeachOrPracticeStep({
   action,
   learnerId,
   conceptId,
+  chapterId,
   onResolved,
   onAdvance,
 }: {
   action: EsoAction;
   learnerId: string;
   conceptId: number;
+  chapterId?: string | null;
   onResolved: (next: EsoAction) => void;
   /**
    * Only for the "nothing is authored for this node" escape hatch below, which
@@ -2047,16 +2516,12 @@ function TeachOrPracticeStep({
 
         {item === 'loading' && <CenteredSpinner label="Finding a question..." />}
         {item === null && (
-          // Was a bare Alert with no control of any kind — the submit button
-          // lives inside the opposite branch, so this was a dead end.
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm text-amber-900">
-              There is no practice question ready for this part yet. That is a gap on our side, not
-              yours — nothing you have earned is affected.
-            </p>
-            <div className="mt-3">
-              <Button variant="outline" size="sm" onClick={onAdvance}>Try the next step</Button>
-            </div>
+          <div className="space-y-3">
+            <EsoFallbackPracticeDrill
+              conceptId={conceptId}
+              chapterId={chapterId}
+              onAdvance={onAdvance}
+            />
           </div>
         )}
         {item && item !== 'loading' && (() => {

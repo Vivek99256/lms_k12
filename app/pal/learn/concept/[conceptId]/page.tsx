@@ -153,7 +153,9 @@ function ConceptLearnView() {
           ? planChapterId
             ? `/pal/plan/chapter/${planChapterId}`
             : '/pal'
-          : `/pal/eso?conceptId=${conceptId}`,
+          : planChapterId
+            ? `/pal/diagnostic/chapter/${planChapterId}?stage=practice&conceptId=${conceptId}`
+            : `/pal/eso?conceptId=${conceptId}`,
       );
     } catch (reason: unknown) {
       // Left on the page with the reason, rather than pushed into a screen that
