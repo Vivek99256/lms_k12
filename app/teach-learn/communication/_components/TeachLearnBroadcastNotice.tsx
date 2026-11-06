@@ -42,6 +42,7 @@ interface AudienceRecipient {
   name: string;
   role: string;
   contact: string;
+  email?: string;
   parentName?: string;
   subject?: string;
 }
@@ -72,6 +73,14 @@ const TEMPLATES: Template[] = [
     tag: 'Feedback',
   },
   {
+    id: 'weekly-digest',
+    name: 'Weekly Academic Digest & Performance Summary',
+    channel: 'email',
+    subject: 'Weekly Academic Digest for {student_name} - {class_division}',
+    body: 'Dear {parent_name},\n\nPlease review the weekly learning progress summary for {student_name} in {class_division}.\n\n- Completed Topics: Chapter 5 Quadratic Equations & Practical Labs\n- Syllabus Attainment: 88%\n- Teacher Remarks: Consistent submission of homework and active in class discussions.\n\nWarm regards,\nTeach/Learn Academic Department',
+    tag: 'Digest',
+  },
+  {
     id: 'project-submission',
     name: 'Term Project / Practical Submission Due',
     channel: 'sms',
@@ -82,10 +91,42 @@ const TEMPLATES: Template[] = [
 ];
 
 const PRESET_AUDIENCE: AudienceRecipient[] = [
-  { id: '1', name: 'Aarav Patel', role: 'Student (Grade 10-A)', contact: '+91 98250 12345', parentName: 'Rajesh Patel', subject: 'Mathematics' },
-  { id: '2', name: 'Diya Shah', role: 'Student (Grade 10-A)', contact: '+91 98251 12345', parentName: 'Nitin Shah', subject: 'Science' },
-  { id: '3', name: 'Rohan Mehta', role: 'Student (Grade 10-B)', contact: '+91 98795 67890', parentName: 'Ramesh Mehta', subject: 'English' },
-  { id: '4', name: 'Priya Joshi', role: 'Student (Grade 9-A)', contact: '+91 97243 54321', parentName: 'Bhavin Joshi', subject: 'Social Science' },
+  {
+    id: '1',
+    name: 'Aarav Patel',
+    role: 'Student (Grade 10-A)',
+    contact: '+91 98250 12345',
+    email: 'aarav.patel@student.edu',
+    parentName: 'Rajesh Patel',
+    subject: 'Mathematics',
+  },
+  {
+    id: '2',
+    name: 'Diya Shah',
+    role: 'Student (Grade 10-A)',
+    contact: '+91 98251 12345',
+    email: 'diya.shah@student.edu',
+    parentName: 'Nitin Shah',
+    subject: 'Science',
+  },
+  {
+    id: '3',
+    name: 'Rohan Mehta',
+    role: 'Student (Grade 10-B)',
+    contact: '+91 98795 67890',
+    email: 'rohan.mehta@student.edu',
+    parentName: 'Ramesh Mehta',
+    subject: 'English',
+  },
+  {
+    id: '4',
+    name: 'Priya Joshi',
+    role: 'Student (Grade 9-A)',
+    contact: '+91 97243 54321',
+    email: 'priya.joshi@student.edu',
+    parentName: 'Bhavin Joshi',
+    subject: 'Social Science',
+  },
 ];
 
 export function TeachLearnBroadcastNotice() {
@@ -95,14 +136,18 @@ export function TeachLearnBroadcastNotice() {
   const [targetAudience, setTargetAudience] = useState<'all' | 'class' | 'custom'>('custom');
   const [selectedClass, setSelectedClass] = useState('Grade 10-A');
   const [customMobile, setCustomMobile] = useState('');
+  const [customEmail, setCustomEmail] = useState('');
   const [customRecipientName, setCustomRecipientName] = useState('');
   const [subject, setSubject] = useState(TEMPLATES[0].subject);
   const [message, setMessage] = useState(TEMPLATES[0].body);
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
 
+  const isEmail = selectedChannel === 'email';
+
+  // Parse 10-digit Indian mobile numbers for WhatsApp / SMS
   const parsedCustomNumbers = useMemo(() => {
-    if (targetAudience !== 'custom') return [];
+    if (targetAudience !== 'custom' || isEmail) return [];
     const rawTokens = customMobile.split(/[\n,; ]+/).map((t) => t.trim()).filter(Boolean);
     const valid: string[] = [];
     for (const token of rawTokens) {
@@ -116,25 +161,63 @@ export function TeachLearnBroadcastNotice() {
       }
     }
     return valid;
-  }, [customMobile, targetAudience]);
+  }, [customMobile, targetAudience, isEmail]);
+
+  // Parse email addresses for Email Digest
+  const parsedCustomEmails = useMemo(() => {
+    if (targetAudience !== 'custom' || !isEmail) return [];
+    const rawTokens = customEmail.split(/[\n,; ]+/).map((t) => t.trim()).filter(Boolean);
+    const valid: string[] = [];
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    for (const token of rawTokens) {
+      const lower = token.toLowerCase();
+      if (emailRegex.test(lower) && !valid.includes(lower)) {
+        valid.push(lower);
+      }
+    }
+    return valid;
+  }, [customEmail, targetAudience, isEmail]);
 
   const activeRecipients: AudienceRecipient[] = useMemo(() => {
     if (targetAudience === 'custom') {
-      if (parsedCustomNumbers.length === 0) return [];
-      return parsedCustomNumbers.map((num, idx) => ({
-        id: `custom-${idx}`,
-        name: customRecipientName.trim() || `Recipient ${idx + 1}`,
-        role: 'Direct Custom Recipient',
-        contact: `+91 ${num}`,
-        parentName: customRecipientName.trim() || undefined,
-        subject: 'Academics',
+      if (isEmail) {
+        if (parsedCustomEmails.length === 0) return [];
+        return parsedCustomEmails.map((email, idx) => ({
+          id: `custom-email-${idx}`,
+          name: customRecipientName.trim() || `Recipient ${idx + 1}`,
+          role: 'Direct Custom Email',
+          contact: email,
+          email: email,
+          parentName: customRecipientName.trim() || undefined,
+          subject: 'Academics',
+        }));
+      } else {
+        if (parsedCustomNumbers.length === 0) return [];
+        return parsedCustomNumbers.map((num, idx) => ({
+          id: `custom-num-${idx}`,
+          name: customRecipientName.trim() || `Recipient ${idx + 1}`,
+          role: 'Direct Custom Recipient',
+          contact: `+91 ${num}`,
+          email: '',
+          parentName: customRecipientName.trim() || undefined,
+          subject: 'Academics',
+        }));
+      }
+    }
+
+    const baseList =
+      targetAudience === 'class'
+        ? PRESET_AUDIENCE.filter((r) => r.role.includes(selectedClass.split(' ')[1] || '10'))
+        : PRESET_AUDIENCE;
+
+    if (isEmail) {
+      return baseList.map((r) => ({
+        ...r,
+        contact: r.email || `${r.name.toLowerCase().replace(/\s+/g, '.')}@student.edu`,
       }));
     }
-    if (targetAudience === 'class') {
-      return PRESET_AUDIENCE.filter((r) => r.role.includes(selectedClass.split(' ')[1] || '10'));
-    }
-    return PRESET_AUDIENCE;
-  }, [targetAudience, selectedClass, parsedCustomNumbers, customRecipientName]);
+    return baseList;
+  }, [targetAudience, isEmail, selectedClass, parsedCustomEmails, parsedCustomNumbers, customRecipientName]);
 
   const handleApplyTemplate = (tmpl: Template) => {
     setSelectedChannel(tmpl.channel);
@@ -163,9 +246,15 @@ export function TeachLearnBroadcastNotice() {
   };
 
   const handleSendNotice = async () => {
-    if (targetAudience === 'custom' && parsedCustomNumbers.length === 0) {
-      toast.error('Valid Mobile Number Required', 'Please enter at least one valid 10-digit Indian mobile number.');
-      return;
+    if (targetAudience === 'custom') {
+      if (isEmail && parsedCustomEmails.length === 0) {
+        toast.error('Valid Email Address Required', 'Please enter at least one valid email address.');
+        return;
+      }
+      if (!isEmail && parsedCustomNumbers.length === 0) {
+        toast.error('Valid Mobile Number Required', 'Please enter at least one valid 10-digit Indian mobile number.');
+        return;
+      }
     }
 
     if (!message.trim()) {
@@ -178,6 +267,14 @@ export function TeachLearnBroadcastNotice() {
 
     try {
       const recipientList = activeRecipients.map((r) => {
+        if (isEmail) {
+          return {
+            id: r.id,
+            name: r.name,
+            phone: r.contact,
+            contact: r.contact,
+          };
+        }
         const rawDigits = r.contact.replace(/\D/g, '');
         const phone10 = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
         return {
@@ -223,7 +320,7 @@ export function TeachLearnBroadcastNotice() {
             Send Teach/Learn Academic Notices & Updates
           </h1>
           <p className="text-sm text-slate-500">
-            Broadcast daily homework assignments, syllabus updates, unit test advisories, and teacher feedback via SMS & WhatsApp.
+            Broadcast daily homework assignments, syllabus updates, unit test advisories, and teacher feedback via WhatsApp, SMS & Email.
           </p>
         </div>
       </div>
@@ -251,7 +348,7 @@ export function TeachLearnBroadcastNotice() {
           </label>
           <span className="text-xs text-slate-400">Click any template to auto-populate</span>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {TEMPLATES.map((tmpl) => (
             <button
               key={tmpl.id}
@@ -348,7 +445,7 @@ export function TeachLearnBroadcastNotice() {
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    Enter Custom Mobile Number
+                    {isEmail ? 'Enter Custom Email Address' : 'Enter Custom Mobile Number'}
                   </button>
                   <button
                     type="button"
@@ -376,28 +473,54 @@ export function TeachLearnBroadcastNotice() {
 
                 {targetAudience === 'custom' ? (
                   <div className="mt-3 space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3.5">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold text-indigo-950">
-                          Recipient Mobile Number(s)
-                        </label>
-                        <span className="text-[11px] text-indigo-600">
-                          {parsedCustomNumbers.length} valid number(s) detected
-                        </span>
+                    {isEmail ? (
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-indigo-950">
+                            Recipient Email Address(es)
+                          </label>
+                          <span className="text-[11px] font-semibold text-blue-600">
+                            {parsedCustomEmails.length} valid email(s) detected
+                          </span>
+                        </div>
+                        <div className="relative mt-1.5">
+                          <Mail className="absolute left-3 top-2.5 h-4 w-4 text-blue-500" />
+                          <Input
+                            type="email"
+                            value={customEmail}
+                            onChange={(e) => setCustomEmail(e.target.value)}
+                            placeholder="Enter recipient email address (e.g. parent@example.com)..."
+                            className="pl-9 font-mono text-sm bg-white"
+                          />
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          Enter valid email address. Multiple emails can be separated by comma or space.
+                        </p>
                       </div>
-                      <div className="relative mt-1.5">
-                        <Phone className="absolute left-3 top-2.5 h-4 w-4 text-indigo-400" />
-                        <Input
-                          value={customMobile}
-                          onChange={(e) => setCustomMobile(e.target.value)}
-                          placeholder="Enter 10-digit mobile number(s)..."
-                          className="pl-9 font-mono text-sm bg-white"
-                        />
+                    ) : (
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-indigo-950">
+                            Recipient Mobile Number(s)
+                          </label>
+                          <span className="text-[11px] text-indigo-600 font-semibold">
+                            {parsedCustomNumbers.length} valid number(s) detected
+                          </span>
+                        </div>
+                        <div className="relative mt-1.5">
+                          <Phone className="absolute left-3 top-2.5 h-4 w-4 text-indigo-400" />
+                          <Input
+                            value={customMobile}
+                            onChange={(e) => setCustomMobile(e.target.value)}
+                            placeholder="Enter 10-digit mobile number(s)..."
+                            className="pl-9 font-mono text-sm bg-white"
+                          />
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          Enter 10-digit Indian numbers. Multi-numbers can be separated by comma or space.
+                        </p>
                       </div>
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        Enter 10-digit Indian numbers. Multi-numbers can be separated by comma or space.
-                      </p>
-                    </div>
+                    )}
 
                     <div>
                       <label className="text-xs font-semibold text-indigo-950">
@@ -450,7 +573,7 @@ export function TeachLearnBroadcastNotice() {
                 <Textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  rows={5}
+                  rows={isEmail ? 7 : 5}
                   placeholder="Type your academic notice or assignment instructions here..."
                   className="mt-1.5 text-sm leading-relaxed"
                 />
@@ -510,22 +633,48 @@ export function TeachLearnBroadcastNotice() {
                   <Eye className="h-4 w-4 text-[#5846EA]" />
                   <h3 className="text-sm font-semibold text-slate-800">Live Recipient Preview</h3>
                 </div>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">
-                  {selectedChannel}
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
+                    selectedChannel === 'email'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : selectedChannel === 'whatsapp'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                  }`}
+                >
+                  {selectedChannel === 'email' ? 'Email' : selectedChannel}
                 </span>
               </div>
 
               <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-100 font-bold text-purple-700 text-sm">
-                    {customRecipientName ? customRecipientName.charAt(0) : 'T'}
+                    {customRecipientName ? customRecipientName.charAt(0).toUpperCase() : isEmail ? 'P' : 'T'}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-bold text-slate-900">
                       {customRecipientName || 'Parent / Student Guardian'}
                     </p>
-                    <p className="font-mono text-[11px] text-emerald-600">
-                      {activeRecipients[0]?.contact || '+91 98250 12345'}
+                    <p
+                      className={`font-mono text-[11px] flex items-center gap-1 ${
+                        isEmail ? 'text-blue-600' : 'text-emerald-600'
+                      }`}
+                    >
+                      {isEmail ? (
+                        <>
+                          <Mail className="h-3 w-3 inline shrink-0" />
+                          <span className="truncate">
+                            {activeRecipients[0]?.contact || 'parent@example.com'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Phone className="h-3 w-3 inline shrink-0" />
+                          <span>
+                            {activeRecipients[0]?.contact || '+91 98250 12345'}
+                          </span>
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -551,11 +700,15 @@ export function TeachLearnBroadcastNotice() {
                       key={rec.id}
                       className="flex items-center justify-between rounded-lg bg-white px-2.5 py-1.5 text-xs border border-slate-100"
                     >
-                      <div className="truncate">
+                      <div className="truncate mr-2">
                         <span className="font-medium text-slate-800">{rec.name}</span>
                         <span className="ml-1 text-[11px] text-slate-400">({rec.role})</span>
                       </div>
-                      <span className="font-mono text-[11px] text-emerald-600 font-medium">
+                      <span
+                        className={`font-mono text-[11px] font-medium truncate shrink-0 ${
+                          isEmail ? 'text-blue-600' : 'text-emerald-600'
+                        }`}
+                      >
                         {rec.contact}
                       </span>
                     </div>
@@ -569,4 +722,3 @@ export function TeachLearnBroadcastNotice() {
     </div>
   );
 }
-

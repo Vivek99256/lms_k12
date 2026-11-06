@@ -1,11 +1,20 @@
 'use client';
 
 import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { TEACH_LEARN_REPORT_SCREENS } from './_screens/teach-learn-report-screens';
 
 /**
- * Teach/Learn → reports. One of the ten Teach/Learn category pages; all ten
- * share ModuleCategoryPage and differ only by which category they render.
+ * Teach/Learn → reports.
+ * Renders the comprehensive Teach/Learn reporting suite including instructional delivery,
+ * curriculum attainment, exam progress, question analysis, and student learning trends.
  */
-export default function Page() {
-  return <ModuleCategoryPage moduleName="teach_learn" categoryKey="reports" />;
+export default function TeachLearnReportsPage() {
+  return (
+    <ModuleCategoryPage
+      moduleName="teach_learn"
+      categoryKey="reports"
+      staticScreens={TEACH_LEARN_REPORT_SCREENS}
+      platformModuleKey="teach_learn"
+    />
+  );
 }

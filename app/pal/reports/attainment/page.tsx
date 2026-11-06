@@ -148,7 +148,7 @@ function AttainmentReportView() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
+    <div className="mx-auto w-full space-y-6 px-4 py-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold text-slate-900">Coverage and attainment</h1>
         <p className="text-sm text-slate-600">

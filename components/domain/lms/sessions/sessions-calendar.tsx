@@ -170,26 +170,48 @@ function KpiCard({
   value,
   sub,
   icon: Icon,
+  variant = 'indigo',
   loading,
 }: {
   label: string
   value: number
   sub: string
   icon: React.ElementType
+  variant?: 'indigo' | 'emerald' | 'amber' | 'slate' | 'rose'
   loading: boolean
 }) {
+  const iconVariants = {
+    indigo: 'bg-indigo-50 text-[#5846EA] border-indigo-100',
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100',
+    slate: 'bg-indigo-50/70 text-[#5846EA] border-indigo-100',
+    rose: 'bg-rose-50 text-rose-600 border-rose-100',
+  }
+  const hoverVariants = {
+    indigo: 'hover:border-[#5846EA]/40',
+    emerald: 'hover:border-emerald-400/50',
+    amber: 'hover:border-amber-400/50',
+    slate: 'hover:border-[#5846EA]/40',
+    rose: 'hover:border-rose-400/50',
+  }
+
   return (
-    <Card className="rounded-xl border-border/80 shadow-sm">
-      <CardContent className="p-4">
-        <p className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-          <Icon className="size-4" /> {label}
-        </p>
-        {loading ? (
-          <Skeleton className="mt-1.5 h-7 w-12" />
-        ) : (
-          <h3 className="mt-1 text-2xl font-black tracking-tight text-foreground">{value}</h3>
-        )}
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>
+    <Card className={cn("rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:shadow-sm", hoverVariants[variant])}>
+      <CardContent className="p-0 flex items-center gap-4">
+        <div className={cn("size-11 rounded-xl flex items-center justify-center shrink-0 border shadow-2xs", iconVariants[variant])}>
+          <Icon className="size-5" />
+        </div>
+        <div className="flex flex-col min-w-0">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider truncate">
+            {label}
+          </p>
+          {loading ? (
+            <Skeleton className="mt-1 h-7 w-12" />
+          ) : (
+            <h3 className="text-2xl font-black tracking-tight text-slate-900">{value}</h3>
+          )}
+          <p className="mt-0.5 text-[11px] text-muted-foreground font-medium">{sub}</p>
+        </div>
       </CardContent>
     </Card>
   )
@@ -266,7 +288,7 @@ export function SessionsCalendar() {
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-6" style={{ ['--primary' as string]: '#5846EA' }}>
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Sessions &amp; Calendar</h1>
@@ -277,15 +299,15 @@ export function SessionsCalendar() {
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
-            className="gap-2"
+            className="gap-2 border-slate-200 text-slate-700 hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/50 font-semibold shadow-xs transition-colors"
             onClick={() => exportCsv(sessions)}
             disabled={sessions.length === 0}
           >
-            <Download className="size-4" /> Export
+            <Download className="size-4 text-[#5846EA]" /> Export
           </Button>
           {canManage && (
             <Button
-              className="gap-2"
+              className="gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
               onClick={() => {
                 setEditing(null)
                 setFormOpen(true)
@@ -311,11 +333,11 @@ export function SessionsCalendar() {
       )}
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
-        <KpiCard label="Upcoming Sessions" value={stats?.upcoming_sessions ?? 0} sub="Next 30 days" icon={CalendarIcon} loading={loading} />
-        <KpiCard label="Total Registrations" value={stats?.total_registrations ?? 0} sub="Across all sessions" icon={Users} loading={loading} />
-        <KpiCard label="Open Sessions" value={stats?.open_sessions ?? 0} sub="Seats available" icon={CheckSquare} loading={loading} />
-        <KpiCard label="Full Sessions" value={stats?.full_sessions ?? 0} sub="No seats left" icon={Users} loading={loading} />
-        <KpiCard label="Sessions This Month" value={stats?.sessions_this_month ?? 0} sub="In this month" icon={Clock} loading={loading} />
+        <KpiCard label="Upcoming Sessions" value={stats?.upcoming_sessions ?? 0} sub="Next 30 days" icon={CalendarIcon} variant="indigo" loading={loading} />
+        <KpiCard label="Total Registrations" value={stats?.total_registrations ?? 0} sub="Across all sessions" icon={Users} variant="indigo" loading={loading} />
+        <KpiCard label="Open Sessions" value={stats?.open_sessions ?? 0} sub="Seats available" icon={CheckSquare} variant="emerald" loading={loading} />
+        <KpiCard label="Full Sessions" value={stats?.full_sessions ?? 0} sub="No seats left" icon={Users} variant="amber" loading={loading} />
+        <KpiCard label="Sessions This Month" value={stats?.sessions_this_month ?? 0} sub="In this month" icon={Clock} variant="indigo" loading={loading} />
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -328,12 +350,14 @@ export function SessionsCalendar() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center rounded-lg border border-border/60 bg-muted/50 p-1">
+          <div className="flex items-center rounded-xl border border-slate-200/90 bg-slate-50 p-1">
             <button
               onClick={() => setViewMode('calendar')}
               className={cn(
-                'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
-                viewMode === 'calendar' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground',
+                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+                viewMode === 'calendar'
+                  ? 'bg-white text-[#5846EA] shadow-xs font-bold border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900',
               )}
             >
               <CalendarIcon className="size-3.5" /> Calendar
@@ -341,33 +365,35 @@ export function SessionsCalendar() {
             <button
               onClick={() => setViewMode('list')}
               className={cn(
-                'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
-                viewMode === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground',
+                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+                viewMode === 'list'
+                  ? 'bg-white text-[#5846EA] shadow-xs font-bold border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900',
               )}
             >
               <ListIcon className="size-3.5" /> List
             </button>
           </div>
 
-          <Button variant="outline" size="icon" className="size-8" onClick={() => goToWeek(-1)} aria-label="Previous week">
+          <Button variant="outline" size="icon" className="size-8 hover:border-[#5846EA]/40 hover:text-[#5846EA] transition-colors" onClick={() => goToWeek(-1)} aria-label="Previous week">
             <ChevronLeft className="size-4" />
           </Button>
-          <span className="min-w-[190px] text-center text-sm font-semibold text-foreground">
+          <span className="min-w-[190px] text-center text-sm font-bold text-foreground">
             {format(weekStart, 'dd MMM')} – {format(weekDays[6], 'dd MMM yyyy')}
           </span>
-          <Button variant="outline" size="icon" className="size-8" onClick={() => goToWeek(1)} aria-label="Next week">
+          <Button variant="outline" size="icon" className="size-8 hover:border-[#5846EA]/40 hover:text-[#5846EA] transition-colors" onClick={() => goToWeek(1)} aria-label="Next week">
             <ChevronRight className="size-4" />
           </Button>
-          <Button variant="outline" size="sm" className="h-8" onClick={goToToday}>
+          <Button variant="outline" size="sm" className="h-8 font-semibold hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/40 transition-colors" onClick={goToToday}>
             Today
           </Button>
-          {loading && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+          {loading && <Loader2 className="size-4 animate-spin text-[#5846EA]" />}
         </div>
       </div>
 
       {/* Calendar — a real week computed from weekStart, not a fixed label list. */}
       {viewMode === 'calendar' && (
-        <div className="overflow-x-auto rounded-xl border border-border/80 bg-card shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200/90 bg-white shadow-xs">
           <div className="min-w-[900px]">
             <div className="grid grid-cols-[70px_repeat(7,1fr)] border-b border-border/60">
               <div />
@@ -375,17 +401,22 @@ export function SessionsCalendar() {
                 <div
                   key={day.toISOString()}
                   className={cn(
-                    'border-l border-border/40 px-2 py-2 text-center',
-                    isSameDay(day, new Date()) && 'bg-primary/5',
+                    'border-l border-border/40 px-2 py-2 text-center transition-colors',
+                    isSameDay(day, new Date()) && 'bg-indigo-50/40',
                   )}
                 >
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <p
+                    className={cn(
+                      'text-[11px] font-bold uppercase tracking-wide',
+                      isSameDay(day, new Date()) ? 'text-[#5846EA]' : 'text-muted-foreground',
+                    )}
+                  >
                     {format(day, 'EEE')}
                   </p>
                   <p
                     className={cn(
                       'text-sm font-bold',
-                      isSameDay(day, new Date()) ? 'text-primary' : 'text-foreground',
+                      isSameDay(day, new Date()) ? 'text-[#5846EA] font-extrabold' : 'text-foreground',
                     )}
                   >
                     {format(day, 'd')}
@@ -450,16 +481,23 @@ export function SessionsCalendar() {
                           type="button"
                           onClick={() => openDetail(session)}
                           className={cn(
-                            'mb-1 w-full rounded-md border p-1.5 text-left transition-colors',
+                            'mb-1 w-full rounded-lg border p-1.5 text-left transition-all shadow-2xs hover:shadow-xs',
                             session.session_type === 'classroom'
-                              ? 'border-warning/30 bg-warning/10 hover:bg-warning/20'
-                              : 'border-primary/30 bg-primary/10 hover:bg-primary/20',
+                              ? 'border-amber-200 bg-amber-50/80 hover:bg-amber-100/80 text-amber-950'
+                              : 'border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100/80 text-indigo-950',
                           )}
                         >
-                          <p className="truncate text-[11px] font-bold text-foreground">
+                          <p className="truncate text-[11px] font-bold">
                             {session.room_name}
                           </p>
-                          <p className="truncate text-[10px] text-muted-foreground">
+                          <p
+                            className={cn(
+                              'truncate text-[10px]',
+                              session.session_type === 'classroom'
+                                ? 'text-amber-700 font-medium'
+                                : 'text-indigo-700 font-medium',
+                            )}
+                          >
                             {timeRange(session)}
                           </p>
                         </button>
@@ -475,7 +513,7 @@ export function SessionsCalendar() {
 
       {/* List */}
       {viewMode === 'list' && (
-        <div className="rounded-xl border border-border/80 bg-card shadow-sm">
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
           {loading && sessions.length === 0 ? (
             <div className="space-y-2 p-4">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -485,7 +523,7 @@ export function SessionsCalendar() {
           ) : sessions.length === 0 ? (
             <div className="p-6">
               <EmptyState
-                icon={<CalendarIcon className="size-8" />}
+                icon={<CalendarIcon className="size-8 text-[#5846EA]" />}
                 title="No sessions this week"
                 description={
                   search
@@ -496,6 +534,7 @@ export function SessionsCalendar() {
                   canManage ? (
                     <Button
                       size="sm"
+                      className="bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all"
                       onClick={() => {
                         setEditing(null)
                         setFormOpen(true)
@@ -523,15 +562,19 @@ export function SessionsCalendar() {
                 {sessions.map((session) => (
                   <TableRow
                     key={session.id}
-                    className="cursor-pointer"
+                    className="cursor-pointer hover:bg-slate-50/60"
                     onClick={() => openDetail(session)}
                   >
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {session.session_type === 'classroom' ? (
-                          <MapPin className="size-4 shrink-0 text-warning" />
+                          <div className="size-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                            <MapPin className="size-3.5 text-amber-600" />
+                          </div>
                         ) : (
-                          <Video className="size-4 shrink-0 text-primary" />
+                          <div className="size-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                            <Video className="size-3.5 text-[#5846EA]" />
+                          </div>
                         )}
                         <span className="font-semibold text-foreground">{session.room_name}</span>
                       </div>
@@ -678,7 +721,7 @@ export function SessionsCalendar() {
                   ) : (
                     <Button
                       size="sm"
-                      className="gap-2"
+                      className="gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all"
                       disabled={saving || selected.seat_status === 'full' || selected.is_past}
                       onClick={async () => {
                         const result = await register(selected.id)

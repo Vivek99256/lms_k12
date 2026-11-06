@@ -123,13 +123,76 @@ export function AdministrationGovernance() {
   // KPI cards are driven from the API; each links to the tab that owns it, so
   // "View all" is a real navigation rather than a dead link.
   const stats = [
-    { label: 'Users', value: kpis?.users, sub: `${kpis?.active_users ?? 0} active`, icon: Users, tab: 'users' as const },
-    { label: 'Roles', value: kpis?.roles, sub: 'System roles', icon: Shield, tab: 'roles' as const },
-    { label: 'Permissions', value: kpis?.permissions, sub: 'Rights assigned', icon: Key, tab: 'roles' as const },
-    { label: 'Trainers', value: kpis?.trainers, sub: 'Active trainers', icon: GraduationCap, tab: 'trainers' as const },
-    { label: 'Vendors', value: kpis?.vendors, sub: 'Active vendors', icon: Building2, tab: 'vendors' as const },
-    { label: 'Integrations', value: kpis?.integrations, sub: 'Connected', icon: Zap, tab: 'integrations' as const },
-    { label: 'Audit logs', value: kpis?.audit_logs, sub: 'Last 30 days', icon: FileText, tab: 'audit' as const },
+    {
+      label: 'Users',
+      value: kpis?.users,
+      sub: `${kpis?.active_users ?? 0} active`,
+      icon: Users,
+      tab: 'users' as const,
+      color: 'indigo',
+      badgeBg: 'bg-indigo-50 text-[#5846EA] border-indigo-200/80',
+      iconBg: 'bg-indigo-50 text-[#5846EA] border border-indigo-100',
+    },
+    {
+      label: 'Roles',
+      value: kpis?.roles,
+      sub: 'System roles',
+      icon: Shield,
+      tab: 'roles' as const,
+      color: 'violet',
+      badgeBg: 'bg-violet-50 text-violet-700 border-violet-200/80',
+      iconBg: 'bg-violet-50 text-violet-600 border border-violet-100',
+    },
+    {
+      label: 'Permissions',
+      value: kpis?.permissions,
+      sub: 'Rights assigned',
+      icon: Key,
+      tab: 'roles' as const,
+      color: 'blue',
+      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200/80',
+      iconBg: 'bg-blue-50 text-blue-600 border border-blue-100',
+    },
+    {
+      label: 'Trainers',
+      value: kpis?.trainers,
+      sub: 'Active trainers',
+      icon: GraduationCap,
+      tab: 'trainers' as const,
+      color: 'emerald',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+      iconBg: 'bg-emerald-50 text-emerald-600 border border-emerald-100',
+    },
+    {
+      label: 'Vendors',
+      value: kpis?.vendors,
+      sub: 'Active vendors',
+      icon: Building2,
+      tab: 'vendors' as const,
+      color: 'amber',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200/80',
+      iconBg: 'bg-amber-50 text-amber-600 border border-amber-100',
+    },
+    {
+      label: 'Integrations',
+      value: kpis?.integrations,
+      sub: 'Connected',
+      icon: Zap,
+      tab: 'integrations' as const,
+      color: 'purple',
+      badgeBg: 'bg-purple-50 text-purple-700 border-purple-200/80',
+      iconBg: 'bg-purple-50 text-purple-600 border border-purple-100',
+    },
+    {
+      label: 'Audit logs',
+      value: kpis?.audit_logs,
+      sub: 'Last 30 days',
+      icon: FileText,
+      tab: 'audit' as const,
+      color: 'rose',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200/80',
+      iconBg: 'bg-rose-50 text-rose-600 border border-rose-100',
+    },
   ]
 
   const quickActions = [
@@ -191,7 +254,10 @@ export function AdministrationGovernance() {
   }
 
   return (
-    <div className="flex flex-col gap-6 pb-6">
+    <div
+      className="flex flex-col gap-6 pb-6"
+      style={{ ['--primary' as string]: '#5846EA', ['--primary-foreground' as string]: '#ffffff' }}
+    >
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -202,42 +268,50 @@ export function AdministrationGovernance() {
             Manage users, roles, permissions, trainers, vendors, integrations and system settings.
           </p>
         </div>
-        <Button variant="outline" className="h-9 gap-2" onClick={() => setTab('settings')}>
-          <Settings className="size-4" /> System settings
+        <Button
+          variant="outline"
+          className="h-9 gap-2 font-semibold shadow-xs border-slate-200 text-slate-700 hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/50 transition-colors"
+          onClick={() => setTab('settings')}
+        >
+          <Settings className="size-4 text-[#5846EA]" /> System settings
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="g2g-scrollbar -mb-2 flex items-center gap-4 overflow-x-auto pb-2">
+      {/* Stats - Responsive Grid with no horizontal scrollbar */}
+      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
         {stats.map((stat) => {
           const Icon = stat.icon
           return (
-            <Card key={stat.label} className="min-w-[200px] flex-1 shrink-0 shadow-sm">
-              <CardContent className="relative flex flex-col gap-3 overflow-hidden p-5">
-                <div className="flex items-center gap-2">
-                  <Icon className="size-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold text-foreground">{stat.label}</span>
+            <div
+              key={stat.label}
+              onClick={() => setTab(stat.tab)}
+              className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all duration-200 hover:border-[#5846EA]/40 hover:shadow-sm cursor-pointer"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className={cn('flex size-9 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 shadow-2xs', stat.iconBg)}>
+                  <Icon className="size-4.5" />
                 </div>
-                <div>
-                  <div className="text-3xl font-bold tracking-tight">
-                    {loading ? (
-                      <Skeleton className="h-8 w-16" />
-                    ) : (
-                      (stat.value ?? 0).toLocaleString()
-                    )}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{stat.sub}</div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-600 transition-colors">
+                  {stat.label}
+                </span>
+              </div>
+
+              <div className="mt-3 flex flex-col">
+                <div className="text-2xl font-black tracking-tight text-slate-900 group-hover:text-[#5846EA] transition-colors">
+                  {loading ? <Skeleton className="h-7 w-14" /> : (stat.value ?? 0).toLocaleString()}
                 </div>
-                <Button
-                  variant="link"
-                  className="mt-2 h-auto justify-start p-0 text-xs font-semibold text-primary"
-                  onClick={() => setTab(stat.tab)}
-                >
-                  View all
-                </Button>
-                <Icon className="pointer-events-none absolute -bottom-4 -right-4 size-24 text-muted/10" />
-              </CardContent>
-            </Card>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide border', stat.badgeBg)}>
+                    {stat.sub}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-1 text-[11px] font-bold text-[#5846EA] group-hover:underline">
+                <span>View all</span>
+                <ChevronRight className="size-3 transition-transform group-hover:translate-x-0.5" />
+              </div>
+            </div>
           )
         })}
       </div>
@@ -262,7 +336,7 @@ export function AdministrationGovernance() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
           {/* Tabs */}
-          <div className="g2g-scrollbar flex items-center gap-6 overflow-x-auto border-b border-border/60">
+          <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200/80 pb-0">
             {TABS.map((entry) => {
               const TabIcon = entry.icon
               const isActive = tab === entry.id
@@ -271,14 +345,16 @@ export function AdministrationGovernance() {
                   key={entry.id}
                   onClick={() => setTab(entry.id)}
                   className={cn(
-                    '-mb-px relative flex items-center gap-2 whitespace-nowrap pb-3 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
-                    isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                    'relative flex items-center gap-2 px-3.5 pb-3 text-sm font-bold transition-all cursor-pointer outline-none',
+                    isActive
+                      ? 'text-[#5846EA]'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50/50 rounded-t-lg',
                   )}
                 >
-                  <TabIcon className="size-4" />
-                  {entry.label}
+                  <TabIcon className={cn('size-4', isActive ? 'text-[#5846EA]' : 'text-slate-400')} />
+                  <span>{entry.label}</span>
                   {isActive && (
-                    <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-primary" />
+                    <span className="absolute inset-x-0 bottom-0 h-[2.5px] rounded-t-full bg-[#5846EA]" />
                   )}
                 </button>
               )
@@ -327,12 +403,16 @@ export function AdministrationGovernance() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9 gap-2"
+                      className="h-9 gap-2 font-semibold shadow-xs border-slate-200 text-slate-700 hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/50 transition-colors"
                       onClick={() => setImportOpen((v) => !v)}
                     >
-                      <Upload className="size-4" /> Import users
+                      <Upload className="size-4 text-[#5846EA]" /> Import users
                     </Button>
-                    <Button size="sm" className="h-9 gap-2" onClick={() => openUserForm()}>
+                    <Button
+                      size="sm"
+                      className="h-9 gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-bold shadow-xs transition-all"
+                      onClick={() => openUserForm()}
+                    >
                       <Plus className="size-4" /> Add user
                     </Button>
                   </div>
@@ -520,11 +600,11 @@ export function AdministrationGovernance() {
                     </TableHeader>
                     <TableBody>
                       {users.map((user) => (
-                        <TableRow key={user.id} className="hover:bg-muted/30">
+                        <TableRow key={user.id} className="hover:bg-indigo-50/20 transition-colors">
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border/50 bg-muted">
-                                <span className="text-xs font-semibold text-muted-foreground">
+                              <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-indigo-100 bg-indigo-50 shadow-2xs">
+                                <span className="text-xs font-bold text-[#5846EA]">
                                   {user.initials}
                                 </span>
                               </div>
@@ -698,9 +778,11 @@ export function AdministrationGovernance() {
 
         {/* Right rail */}
         <div className="flex flex-col gap-6">
-          <Card className="shrink-0 border-border/60 shadow-sm">
-            <CardHeader className="border-b border-border/60 pb-3">
-              <CardTitle className="text-base">Quick actions</CardTitle>
+          <Card className="shrink-0 border-border/80 bg-white shadow-2xs rounded-2xl overflow-hidden">
+            <CardHeader className="border-b border-border/50 bg-slate-50/50 px-5 py-3.5">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                <Zap className="size-4 text-[#5846EA]" /> Quick actions
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="flex flex-col">
@@ -710,10 +792,10 @@ export function AdministrationGovernance() {
                     <button
                       key={action.label}
                       onClick={action.run}
-                      className="flex w-full items-center gap-3 border-b border-border/60 px-5 py-3.5 text-sm font-medium text-muted-foreground transition-colors last:border-0 hover:bg-muted/50 hover:text-foreground"
+                      className="group flex w-full items-center gap-3 border-b border-border/40 px-5 py-3 text-sm font-medium text-slate-600 transition-colors last:border-0 hover:bg-indigo-50/50 hover:text-[#5846EA] cursor-pointer"
                     >
-                      <Icon className="size-4 shrink-0" />
-                      {action.label}
+                      <Icon className="size-4 shrink-0 text-[#5846EA] transition-transform group-hover:scale-110" />
+                      <span className="font-semibold">{action.label}</span>
                     </button>
                   )
                 })}
@@ -721,11 +803,13 @@ export function AdministrationGovernance() {
             </CardContent>
           </Card>
 
-          <Card className="flex flex-1 flex-col border-border/60 shadow-sm">
-            <CardHeader className="shrink-0 border-b border-border/60 pb-3">
-              <CardTitle className="text-base">System health</CardTitle>
+          <Card className="flex flex-1 flex-col border-border/80 bg-white shadow-2xs rounded-2xl overflow-hidden">
+            <CardHeader className="shrink-0 border-b border-border/50 bg-slate-50/50 px-5 py-3.5">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                <Activity className="size-4 text-[#5846EA]" /> System health
+              </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-4 p-5">
+            <CardContent className="flex flex-1 flex-col gap-3 p-4">
               {loading ? (
                 <Skeleton className="h-24 w-full" />
               ) : health.length === 0 ? (
@@ -734,10 +818,12 @@ export function AdministrationGovernance() {
                 health.map((check) => {
                   const Icon = HEALTH_ICON[check.status as HealthStatus] ?? Activity
                   return (
-                    <div key={check.key} className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Icon className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate text-sm font-medium text-foreground">
+                    <div key={check.key} className="flex items-start justify-between gap-3 p-2 rounded-xl border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/20 transition-all">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 border border-indigo-100 text-[#5846EA]">
+                          <Icon className="size-3.5" />
+                        </div>
+                        <span className="truncate text-sm font-semibold text-slate-800">
                           {check.label}
                         </span>
                       </div>
@@ -745,10 +831,10 @@ export function AdministrationGovernance() {
                         <div
                           className={cn(
                             'size-2 rounded-full',
-                            HEALTH_DOT[check.status as HealthStatus] ?? 'bg-muted-foreground/40',
+                            check.status === 'healthy' ? 'bg-emerald-500 shadow-xs' : HEALTH_DOT[check.status as HealthStatus] ?? 'bg-muted-foreground/40',
                           )}
                         />
-                        <span className="max-w-[120px] truncate text-xs font-semibold text-muted-foreground">
+                        <span className="max-w-[120px] truncate text-xs font-bold text-slate-500">
                           {check.detail}
                         </span>
                       </div>

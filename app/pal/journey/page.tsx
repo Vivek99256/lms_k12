@@ -85,7 +85,7 @@ function PalJourneyPageContent() {
 
     if (!effectiveStudentId) {
       return (
-        <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
+        <div className="mx-auto w-full space-y-6 px-4 py-6">
           <Card className="border-indigo-100 bg-gradient-to-br from-indigo-50/60 via-white to-purple-50/40 shadow-sm">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -117,7 +117,7 @@ function PalJourneyPageContent() {
     }
 
     return (
-      <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
+      <div className="mx-auto w-full space-y-6 px-4 py-6">
         <ViewAsBanner
           student={selectedStudent}
           audience="Teacher"
@@ -137,7 +137,7 @@ function PalJourneyPageContent() {
 
   // Enrolled student viewing their own journey
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
+    <div className="mx-auto w-full space-y-6 px-4 py-6">
       <MountainJourneyView chapterId={chapterId} />
     </div>
   );

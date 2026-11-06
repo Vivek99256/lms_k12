@@ -62,6 +62,23 @@ const SEEDED_SAMPLE_DISPATCHES: StoredDispatchRow[] = [
     created_at: '2026-10-31T06:09:00.000Z',
     is_sample: 1,
   },
+  {
+    id: 403,
+    module: 'teach-learn',
+    event_key: 'teach_learn.academic_notice',
+    channel: 'email',
+    recipient: 'rajesh.patel@student.edu (Rajesh Patel - F/O Aarav Patel)',
+    recipient_name: 'Rajesh Patel',
+    mobile_number: 'rajesh.patel@student.edu',
+    subject: 'Weekly Academic Digest & Performance Summary',
+    message_body: 'Dear Rajesh Patel, Mathematics homework (Ex 5.2) and Unit Test 2 schedule have been published on the portal. Aarav is performing well with 88% attainment.',
+    status: 'sent',
+    attempts: 1,
+    last_error: null,
+    sent_at: '2026-10-31T05:30:00.000Z',
+    created_at: '2026-10-31T05:29:00.000Z',
+    is_sample: 1,
+  },
 ];
 
 export function TeachLearnDeliveryLog() {
@@ -95,21 +112,25 @@ export function TeachLearnDeliveryLog() {
     return () => window.removeEventListener(DISPATCH_UPDATED_EVENT, handleUpdate);
   }, []);
 
-  const handleCopyPhone = (text: string, id: number, e: React.MouseEvent) => {
+  const handleCopyContact = (text: string, id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    toast.success('Mobile Number Copied', `${text} copied to clipboard.`);
+    toast.success('Destination Copied', `${text} copied to clipboard.`);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
   const filteredDispatches = useMemo(() => {
     return dispatches.filter((d) => {
       const { phone, name } = extractPhoneAndName(d.recipient);
+      const isEmailRow = d.channel === 'email';
+      const destination = d.mobile_number || (isEmailRow ? d.recipient : phone);
+
       const matchesSearch =
         !searchQuery ||
+        (destination && destination.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (phone && phone.includes(searchQuery)) ||
-        (d.mobile_number && d.mobile_number.includes(searchQuery)) ||
+        (d.recipient && d.recipient.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (name && name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (d.recipient_name && d.recipient_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (d.subject && d.subject.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -190,7 +211,7 @@ export function TeachLearnDeliveryLog() {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by Mobile number, Name, Subject, or Homework topic..."
+            placeholder="Search by Mobile, Email, Name, Subject, or Homework topic..."
             className="pl-9 text-sm"
           />
         </div>
@@ -236,7 +257,7 @@ export function TeachLearnDeliveryLog() {
             <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3.5">Dispatched</th>
-                <th className="px-4 py-3.5">Mobile Number</th>
+                <th className="px-4 py-3.5">Destination / Contact</th>
                 <th className="px-4 py-3.5">Recipient / Guardian</th>
                 <th className="px-4 py-3.5">Channel</th>
                 <th className="px-4 py-3.5">Event / Reason</th>
@@ -253,8 +274,9 @@ export function TeachLearnDeliveryLog() {
                 </tr>
               ) : (
                 filteredDispatches.map((row) => {
+                  const isEmailRow = row.channel === 'email';
                   const { phone, name } = extractPhoneAndName(row.recipient);
-                  const displayPhone = row.mobile_number || phone;
+                  const displayContact = row.mobile_number || (isEmailRow ? row.recipient.split(' ')[0] : phone);
                   const displayName = row.recipient_name || name;
 
                   return (
@@ -268,14 +290,30 @@ export function TeachLearnDeliveryLog() {
                       </td>
 
                       <td className="whitespace-nowrap px-4 py-3.5">
-                        <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-                          <Phone className="h-3 w-3 text-emerald-600" />
-                          <span className="font-mono tracking-tight">{displayPhone}</span>
+                        <div
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                            isEmailRow
+                              ? 'border-blue-200 bg-blue-50 text-blue-800'
+                              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                          }`}
+                        >
+                          {isEmailRow ? (
+                            <Mail className="h-3 w-3 text-blue-600" />
+                          ) : (
+                            <Phone className="h-3 w-3 text-emerald-600" />
+                          )}
+                          <span className="font-mono tracking-tight max-w-[170px] truncate">
+                            {displayContact}
+                          </span>
                           <button
                             type="button"
-                            onClick={(e) => handleCopyPhone(displayPhone || '', row.id, e)}
-                            title="Copy mobile number"
-                            className="ml-0.5 rounded p-0.5 text-emerald-600 transition hover:bg-emerald-200 hover:text-emerald-900"
+                            onClick={(e) => handleCopyContact(displayContact || '', row.id, e)}
+                            title="Copy contact"
+                            className={`ml-0.5 rounded p-0.5 transition ${
+                              isEmailRow
+                                ? 'text-blue-600 hover:bg-blue-200 hover:text-blue-900'
+                                : 'text-emerald-600 hover:bg-emerald-200 hover:text-emerald-900'
+                            }`}
                           >
                             {copiedId === row.id ? (
                               <Check className="h-3 w-3 text-emerald-700" />
@@ -318,26 +356,19 @@ export function TeachLearnDeliveryLog() {
 
                       <td className="whitespace-nowrap px-4 py-3.5">
                         {row.status === 'sent' ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
                             <CheckCircle2 className="h-3 w-3" />
-                            <span>sent</span>
+                            <span>Delivered</span>
                           </span>
                         ) : row.status === 'failed' ? (
-                          <div>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-semibold text-rose-800">
-                              <XCircle className="h-3 w-3" />
-                              <span>failed</span>
-                            </span>
-                            {row.last_error && (
-                              <p className="mt-0.5 max-w-[150px] truncate text-[10px] text-rose-600">
-                                {row.last_error}
-                              </p>
-                            )}
-                          </div>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                            <XCircle className="h-3 w-3" />
+                            <span>Failed</span>
+                          </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
                             <Clock className="h-3 w-3" />
-                            <span>queued</span>
+                            <span>Queued</span>
                           </span>
                         )}
                       </td>
@@ -345,8 +376,11 @@ export function TeachLearnDeliveryLog() {
                       <td className="whitespace-nowrap px-4 py-3.5 text-right">
                         <button
                           type="button"
-                          onClick={() => setSelectedRow(row)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#5846EA] hover:underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRow(row);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:border-[#5846EA] hover:text-[#5846EA]"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           <span>Details</span>
@@ -380,33 +414,54 @@ export function TeachLearnDeliveryLog() {
             </div>
 
             <div className="mt-4 space-y-3.5 text-xs">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
-                      Mobile Number
-                    </p>
-                    <p className="mt-0.5 font-mono text-base font-bold text-emerald-950">
-                      {selectedRow.mobile_number || extractPhoneAndName(selectedRow.recipient).phone}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) =>
-                      handleCopyPhone(
-                        selectedRow.mobile_number || extractPhoneAndName(selectedRow.recipient).phone || '',
-                        selectedRow.id,
-                        e
-                      )
-                    }
-                    className="flex items-center gap-1.5 border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-100"
+              {(() => {
+                const isEmailDetail = selectedRow.channel === 'email';
+                const detailContact =
+                  selectedRow.mobile_number ||
+                  (isEmailDetail ? selectedRow.recipient : extractPhoneAndName(selectedRow.recipient).phone);
+
+                return (
+                  <div
+                    className={`rounded-xl border p-3 ${
+                      isEmailDetail
+                        ? 'border-blue-200 bg-blue-50/70'
+                        : 'border-emerald-200 bg-emerald-50/70'
+                    }`}
                   >
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>Copy</span>
-                  </Button>
-                </div>
-              </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p
+                          className={`text-[11px] font-bold uppercase tracking-wider ${
+                            isEmailDetail ? 'text-blue-800' : 'text-emerald-800'
+                          }`}
+                        >
+                          {isEmailDetail ? 'Recipient Email Address' : 'Recipient Mobile Number'}
+                        </p>
+                        <p
+                          className={`mt-0.5 font-mono text-base font-bold ${
+                            isEmailDetail ? 'text-blue-950' : 'text-emerald-950'
+                          }`}
+                        >
+                          {detailContact}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => handleCopyContact(detailContact || '', selectedRow.id, e)}
+                        className={`flex items-center gap-1.5 border bg-white ${
+                          isEmailDetail
+                            ? 'border-blue-300 text-blue-800 hover:bg-blue-100'
+                            : 'border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                        }`}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copy</span>
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="flex justify-between border-b border-slate-100 pb-2">
                 <span className="text-slate-500">Recipient / Name:</span>
@@ -430,41 +485,36 @@ export function TeachLearnDeliveryLog() {
                 <span className="text-slate-800">{formatDateTime(selectedRow.created_at)}</span>
               </div>
 
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500">Delivered Time:</span>
-                <span className="font-semibold text-emerald-700">
-                  {formatDateTime(selectedRow.sent_at || selectedRow.created_at)}
-                </span>
-              </div>
+              {selectedRow.sent_at && (
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Delivered Time:</span>
+                  <span className="font-medium text-emerald-700">
+                    {formatDateTime(selectedRow.sent_at)}
+                  </span>
+                </div>
+              )}
+
+              {selectedRow.subject && (
+                <div className="border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Subject:</span>
+                  <p className="mt-1 font-semibold text-slate-900">{selectedRow.subject}</p>
+                </div>
+              )}
 
               <div>
-                <span className="text-slate-500">Subject / Header:</span>
-                <p className="mt-1 font-semibold text-slate-800">{selectedRow.subject}</p>
-              </div>
-
-              <div>
-                <span className="text-slate-500">Message Content:</span>
-                <div className="mt-1 rounded-xl bg-slate-50 p-3 text-slate-700 leading-relaxed whitespace-pre-wrap border border-slate-100">
+                <span className="text-slate-500">Notice Body:</span>
+                <div className="mt-1.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap max-h-40 overflow-y-auto">
                   {selectedRow.message_body}
                 </div>
               </div>
-
-              {selectedRow.last_error && (
-                <div>
-                  <span className="font-bold text-rose-600">Gateway Error:</span>
-                  <div className="mt-1 rounded-xl bg-rose-50 p-3 text-rose-700 font-mono text-[11px] border border-rose-200">
-                    {selectedRow.last_error}
-                  </div>
-                </div>
-              )}
             </div>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-5 flex justify-end">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setSelectedRow(null)}
-                className="px-5 text-xs"
+                className="text-slate-600"
               >
                 Close
               </Button>
@@ -475,4 +525,3 @@ export function TeachLearnDeliveryLog() {
     </div>
   );
 }
-

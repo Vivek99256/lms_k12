@@ -18,7 +18,7 @@
  */
 
 import React, { useState } from 'react';
-import { AlertCircle, Award, Clock, Download, GraduationCap, RefreshCw, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Award, Clock, Download, GraduationCap, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/g2g/card';
 import { Button } from '@/components/ui/g2g/button';
@@ -55,6 +55,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useLmsCertifications } from './use-lms-certifications';
 import type { CertificateVerification, LearningCertificate } from './certifications-records-service';
+import { downloadCertificatePdf } from './certificate-pdf';
 
 /* ─── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -103,26 +104,48 @@ function KpiCard({
   value,
   sub,
   icon: Icon,
+  variant = 'indigo',
   loading,
 }: {
   label: string;
   value: number;
   sub: string;
   icon: React.ElementType;
+  variant?: 'indigo' | 'emerald' | 'amber' | 'rose' | 'slate';
   loading: boolean;
 }) {
+  const iconVariants = {
+    indigo: 'bg-indigo-50 text-[#5846EA] border-indigo-100',
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100',
+    rose: 'bg-rose-50 text-rose-600 border-rose-100',
+    slate: 'bg-indigo-50/70 text-[#5846EA] border-indigo-100',
+  };
+  const hoverVariants = {
+    indigo: 'hover:border-[#5846EA]/40',
+    emerald: 'hover:border-emerald-400/50',
+    amber: 'hover:border-amber-400/50',
+    rose: 'hover:border-rose-400/50',
+    slate: 'hover:border-[#5846EA]/40',
+  };
+
   return (
-    <Card className="rounded-xl border-border/80 shadow-sm">
-      <CardContent className="p-4">
-        <p className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-          <Icon className="size-4" /> {label}
-        </p>
-        {loading ? (
-          <Skeleton className="mt-1.5 h-7 w-12" />
-        ) : (
-          <h3 className="mt-1 text-2xl font-black tracking-tight text-foreground">{value}</h3>
-        )}
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>
+    <Card className={cn("rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:shadow-sm", hoverVariants[variant])}>
+      <CardContent className="p-0 flex items-center gap-4">
+        <div className={cn("size-11 rounded-xl flex items-center justify-center shrink-0 border shadow-2xs", iconVariants[variant])}>
+          <Icon className="size-5" />
+        </div>
+        <div className="flex flex-col min-w-0">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider truncate">
+            {label}
+          </p>
+          {loading ? (
+            <Skeleton className="mt-1 h-7 w-12" />
+          ) : (
+            <h3 className="text-2xl font-black tracking-tight text-slate-900">{value}</h3>
+          )}
+          <p className="mt-0.5 text-[11px] text-muted-foreground font-medium">{sub}</p>
+        </div>
       </CardContent>
     </Card>
   );
@@ -147,7 +170,7 @@ function CertificateTable({
 }) {
   if (loading) {
     return (
-      <div className="space-y-2 rounded-xl border border-border/80 bg-card p-4 shadow-sm">
+      <div className="space-y-2 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
         {Array.from({ length: 5 }).map((_, index) => (
           <Skeleton key={index} className="h-12 rounded-lg" />
         ))}
@@ -157,14 +180,14 @@ function CertificateTable({
 
   if (certificates.length === 0) {
     return (
-      <div className="rounded-xl border border-border/80 bg-card p-6 shadow-sm">
-        <EmptyState icon={<Award className="size-8" />} title={emptyTitle} description={emptyDescription} />
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-8 shadow-xs">
+        <EmptyState icon={<Award className="size-8 text-[#5846EA]" />} title={emptyTitle} description={emptyDescription} />
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-border/80 bg-card shadow-sm">
+    <div className="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
@@ -178,31 +201,42 @@ function CertificateTable({
         </TableHeader>
         <TableBody>
           {certificates.map((certificate) => (
-            <TableRow key={certificate.id} className="cursor-pointer" onClick={() => onSelect(certificate)}>
+            <TableRow key={certificate.id} className="cursor-pointer hover:bg-slate-50/60 transition-colors" onClick={() => onSelect(certificate)}>
               <TableCell>
                 <div className="flex items-center gap-2.5">
-                  <Award
+                  <div
                     className={cn(
-                      'size-4 shrink-0',
+                      'size-8 rounded-lg flex items-center justify-center shrink-0 border shadow-2xs',
                       certificate.expiry_state === 'expired'
-                        ? 'text-destructive'
+                        ? 'bg-rose-50 text-rose-600 border-rose-100'
                         : certificate.expiry_state === 'expiring'
-                          ? 'text-warning'
-                          : 'text-success'
+                          ? 'bg-amber-50 text-amber-600 border-amber-100'
+                          : 'bg-emerald-50 text-emerald-600 border-emerald-100'
                     )}
-                  />
+                  >
+                    <Award className="size-4" />
+                  </div>
                   <span className="font-semibold text-foreground">{certificate.course_title ?? 'Certificate'}</span>
                 </div>
               </TableCell>
               {showLearner && (
                 <TableCell>
-                  {certificate.learner_name || '—'}
-                  {certificate.employee_no && (
-                    <span className="ml-1 text-[11px] text-muted-foreground">({certificate.employee_no})</span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    <div className="size-6 rounded-full bg-indigo-50 text-[#5846EA] text-[10px] font-bold border border-indigo-100 flex items-center justify-center shrink-0">
+                      {(certificate.learner_name ?? 'U').substring(0, 2).toUpperCase()}
+                    </div>
+                    <span>{certificate.learner_name || '—'}</span>
+                    {certificate.employee_no && (
+                      <span className="text-[11px] text-muted-foreground">({certificate.employee_no})</span>
+                    )}
+                  </div>
                 </TableCell>
               )}
-              <TableCell className="font-mono text-xs">{certificate.certificate_number}</TableCell>
+              <TableCell>
+                <span className="font-mono text-xs text-[#5846EA] font-semibold bg-indigo-50/60 px-2 py-0.5 rounded border border-indigo-100/60">
+                  {certificate.certificate_number}
+                </span>
+              </TableCell>
               <TableCell>{formatDate(certificate.issued_at)}</TableCell>
               <TableCell>
                 {certificate.expires_at ? (
@@ -210,8 +244,12 @@ function CertificateTable({
                     <span>{formatDate(certificate.expires_at)}</span>
                     <span
                       className={cn(
-                        'text-[11px]',
-                        certificate.expiry_state === 'expired' ? 'text-destructive' : 'text-muted-foreground'
+                        'text-[11px] font-medium',
+                        certificate.expiry_state === 'expired'
+                          ? 'text-rose-600'
+                          : certificate.expiry_state === 'expiring'
+                            ? 'text-amber-600'
+                            : 'text-muted-foreground'
                       )}
                     >
                       {expiryHint(certificate)}
@@ -254,6 +292,38 @@ export function CertificationsRecords() {
   const [selected, setSelected] = useState<LearningCertificate | null>(null);
   const [confirmReissue, setConfirmReissue] = useState<LearningCertificate | null>(null);
   const [verification, setVerification] = useState<CertificateVerification | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = async (certificate: LearningCertificate) => {
+    setDownloadingPdf(true);
+    try {
+      // First attempt downloading via backend URL if reachable and returns valid PDF
+      const url = certificateUrl(certificate.id);
+      const res = await fetch(url, { method: 'GET' });
+      if (res.ok && res.headers.get('content-type')?.includes('application/pdf')) {
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `${certificate.certificate_number || 'certificate'}.pdf`;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+        setDownloadingPdf(false);
+        return;
+      }
+    } catch {
+      // Fall through to high-resolution client-side generator
+    }
+
+    // Direct high-resolution client-side generation ensures instant, guaranteed PDF download
+    try {
+      await downloadCertificatePdf(certificate);
+    } catch (err) {
+      console.error('Failed to generate certificate PDF:', err);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const tabs = [
     { id: 'certificates', label: 'Certificates', badge: certificates.length },
@@ -301,7 +371,7 @@ export function CertificationsRecords() {
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-6" style={{ ['--primary' as string]: '#5846EA' }}>
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Certifications &amp; Records</h1>
@@ -314,29 +384,34 @@ export function CertificationsRecords() {
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
-            className="gap-2"
+            className="gap-2 border-slate-200 text-slate-700 hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/50 font-semibold shadow-xs transition-colors"
             onClick={exportCertificates}
             disabled={filteredCertificates.length === 0}
           >
-            <Download className="size-4" /> Export
+            <Download className="size-4 text-[#5846EA]" /> Export
           </Button>
-          <Button className="gap-2" onClick={exportTranscript} disabled={transcript.length === 0}>
+          <Button
+            className="gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
+            onClick={exportTranscript}
+            disabled={transcript.length === 0}
+          >
             <Download className="size-4" /> Download Transcript
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <KpiCard label="Active Certificates" value={kpis.active} sub="Currently valid" icon={Award} loading={loading} />
+        <KpiCard label="Active Certificates" value={kpis.active} sub="Currently valid" icon={Award} variant="emerald" loading={loading} />
         <KpiCard
           label="Expiring Soon"
           value={kpis.expiring}
           sub={`Within ${warningDays} days`}
           icon={Clock}
+          variant="amber"
           loading={loading}
         />
-        <KpiCard label="Expired" value={kpis.expired} sub="Require renewal" icon={AlertCircle} loading={loading} />
-        <KpiCard label="Total Earned" value={kpis.total} sub="All time" icon={Award} loading={loading} />
+        <KpiCard label="Expired" value={kpis.expired} sub="Require renewal" icon={AlertCircle} variant="rose" loading={loading} />
+        <KpiCard label="Total Earned" value={kpis.total} sub="All time" icon={Award} variant="indigo" loading={loading} />
       </div>
 
       <div className="flex items-center gap-6 overflow-x-auto border-b border-border/60">
@@ -345,16 +420,23 @@ export function CertificationsRecords() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'relative flex items-center gap-2 whitespace-nowrap pb-3 text-sm font-semibold outline-none transition-colors',
-              activeTab === tab.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+              'relative flex items-center gap-2 whitespace-nowrap pb-3 text-sm font-bold outline-none transition-colors',
+              activeTab === tab.id ? 'text-[#5846EA]' : 'text-muted-foreground hover:text-foreground'
             )}
           >
             {tab.label}
-            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+            <span
+              className={cn(
+                'rounded-full px-2 py-0.5 text-[11px] font-black',
+                activeTab === tab.id
+                  ? 'bg-indigo-50 text-[#5846EA] border border-indigo-100'
+                  : 'bg-muted text-muted-foreground'
+              )}
+            >
               {tab.badge}
             </span>
             {activeTab === tab.id && (
-              <span className="absolute inset-x-0 bottom-[-1px] h-[2px] rounded-t-full bg-primary" />
+              <span className="absolute inset-x-0 bottom-[-1px] h-[2px] rounded-t-full bg-[#5846EA]" />
             )}
           </button>
         ))}
@@ -397,7 +479,7 @@ export function CertificationsRecords() {
       )}
 
       {activeTab === 'transcript' && (
-        <div className="rounded-xl border border-border/80 bg-card shadow-sm">
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
           {loading ? (
             <div className="space-y-2 p-4">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -407,7 +489,7 @@ export function CertificationsRecords() {
           ) : transcript.length === 0 ? (
             <div className="p-6">
               <EmptyState
-                icon={<GraduationCap className="size-8" />}
+                icon={<GraduationCap className="size-8 text-[#5846EA]" />}
                 title="No completed courses"
                 description="Courses you finish appear on your transcript."
               />
@@ -424,9 +506,16 @@ export function CertificationsRecords() {
               </TableHeader>
               <TableBody>
                 {transcript.map((course) => (
-                  <TableRow key={course.enrollment_id ?? course.id}>
-                    <TableCell className="font-semibold text-foreground">
-                      {course.display_name ?? 'Untitled course'}
+                  <TableRow key={course.enrollment_id ?? course.id} className="hover:bg-slate-50/60">
+                    <TableCell>
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                          <GraduationCap className="size-3.5 text-[#5846EA]" />
+                        </div>
+                        <span className="font-semibold text-foreground">
+                          {course.display_name ?? 'Untitled course'}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>{course.subject_category || '—'}</TableCell>
                     <TableCell>{formatDate(course.start_date)}</TableCell>
@@ -440,7 +529,7 @@ export function CertificationsRecords() {
       )}
 
       {activeTab === 'history' && (
-        <div className="rounded-xl border border-border/80 bg-card shadow-sm">
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
           {loading ? (
             <div className="space-y-2 p-4">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -450,7 +539,7 @@ export function CertificationsRecords() {
           ) : history.length === 0 ? (
             <div className="p-6">
               <EmptyState
-                icon={<GraduationCap className="size-8" />}
+                icon={<GraduationCap className="size-8 text-[#5846EA]" />}
                 title="No learning history"
                 description="Courses you are enrolled in appear here with their progress."
               />
@@ -468,9 +557,16 @@ export function CertificationsRecords() {
               </TableHeader>
               <TableBody>
                 {history.map((course) => (
-                  <TableRow key={course.id}>
-                    <TableCell className="font-semibold text-foreground">
-                      {course.display_name ?? 'Untitled course'}
+                  <TableRow key={course.id} className="hover:bg-slate-50/60">
+                    <TableCell>
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                          <GraduationCap className="size-3.5 text-[#5846EA]" />
+                        </div>
+                        <span className="font-semibold text-foreground">
+                          {course.display_name ?? 'Untitled course'}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       {course.completed_content}/{course.total_content}
@@ -478,7 +574,7 @@ export function CertificationsRecords() {
                     <TableCell>
                       <div className="flex w-28 flex-col gap-1">
                         <span className="text-[11px] font-bold text-foreground">{course.progress_percent}%</span>
-                        <Progress value={course.progress_percent} className="h-1.5 bg-muted-foreground/20 [&>div]:bg-primary" />
+                        <Progress value={course.progress_percent} className="h-1.5 bg-slate-100 [&>div]:bg-[#5846EA]" />
                       </div>
                     </TableCell>
                     <TableCell>
@@ -616,10 +712,13 @@ export function CertificationsRecords() {
                 )}
 
                 <div className="flex flex-wrap gap-2">
-                  <Button asChild variant="outline" className="gap-2">
-                    <a href={certificateUrl(selected.id)} target="_blank" rel="noopener noreferrer">
-                      <Download className="size-4" /> Download PDF
-                    </a>
+                  <Button
+                    className="gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all font-semibold shadow-xs"
+                    disabled={downloadingPdf}
+                    onClick={() => void handleDownloadPdf(selected)}
+                  >
+                    {downloadingPdf ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                    Download PDF
                   </Button>
 
                   {selected.verification_code && (
