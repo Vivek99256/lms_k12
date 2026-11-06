@@ -35,10 +35,17 @@ function emptyStore(): StoreShape {
 }
 
 function resolveBackendUrl(): string {
-  const envUrl = (process.env.NEXT_PUBLIC_AI_BASE_URL || '').trim() ||
-                 (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim() ||
-                 'http://127.0.0.1:8000';
-  return envUrl.replace(/\/$/, '');
+  const aiOverride = (process.env.NEXT_PUBLIC_AI_BASE_URL || '').trim();
+  if (aiOverride) return aiOverride.replace(/\/$/, '');
+
+  const prodUrl = (process.env.NEXT_PUBLIC_API_BASE_URL_PROD || '').trim();
+  const devUrl = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim();
+
+  if (process.env.NODE_ENV === 'production') {
+    return (prodUrl || 'https://dev.triz.co.in').replace(/\/$/, '');
+  }
+
+  return (devUrl || 'http://127.0.0.1:8000').replace(/\/$/, '');
 }
 
 async function fetchSettingsFromBackend(projectId: string): Promise<ProjectChannelSettings | null> {
@@ -48,7 +55,7 @@ async function fetchSettingsFromBackend(projectId: string): Promise<ProjectChann
       method: 'GET',
       headers: { Accept: 'application/json' },
       cache: 'no-store',
-      signal: AbortSignal.timeout(2500),
+      signal: AbortSignal.timeout(3500),
     });
 
     if (res.ok) {
@@ -81,7 +88,7 @@ async function syncSettingsToBackend(settings: ProjectChannelSettings): Promise<
         suggested_prompt_source: settings.suggested_prompt_source,
         updated_by: settings.updated_by,
       }),
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(5000),
     });
   } catch {
     // Non-blocking fallback
@@ -195,8 +202,8 @@ export class JsonFileConversationalAdminStore implements ConversationalAdminStor
       return settings;
     });
 
-    // Asynchronously push to Laravel database for this specific module
-    void syncSettingsToBackend(settings);
+    // Persist to Laravel database for this specific module
+    await syncSettingsToBackend(settings);
 
     return saved;
   }
