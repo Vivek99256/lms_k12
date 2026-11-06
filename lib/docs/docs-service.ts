@@ -28,7 +28,10 @@ export function getDocsVersionDir(version: string): string {
   }
 
   const direct = path.join(DOCS_BASE_DIR, version);
-  if (fs.existsSync(direct) && fs.statSync(direct).isDirectory()) {
+  if (
+    fs.existsSync(/*turbopackIgnore: true*/ direct) &&
+    fs.statSync(/*turbopackIgnore: true*/ direct).isDirectory()
+  ) {
     return direct;
   }
 
@@ -47,9 +50,9 @@ function formatTitleFromSlug(filename: string): string {
 
 export function buildDocNavTree(version: string, currentDir?: string, relativeUrlPrefix = ""): DocNavItem[] {
   const baseDir = currentDir || getDocsVersionDir(version);
-  if (!fs.existsSync(baseDir)) return [];
+  if (!fs.existsSync(/*turbopackIgnore: true*/ baseDir)) return [];
 
-  const entries = fs.readdirSync(baseDir, { withFileTypes: true });
+  const entries = fs.readdirSync(/*turbopackIgnore: true*/ baseDir, { withFileTypes: true });
   const items: DocNavItem[] = [];
 
   for (const entry of entries) {
@@ -57,7 +60,7 @@ export function buildDocNavTree(version: string, currentDir?: string, relativeUr
       continue;
     }
 
-    const fullPath = path.join(baseDir, entry.name);
+    const fullPath = path.join(/*turbopackIgnore: true*/ baseDir, entry.name);
 
     if (entry.isDirectory()) {
       const subPrefix = relativeUrlPrefix ? `${relativeUrlPrefix}/${entry.name}` : entry.name;
@@ -76,7 +79,7 @@ export function buildDocNavTree(version: string, currentDir?: string, relativeUr
       let pageTitle = formatTitleFromSlug(entry.name);
 
       try {
-        const fileContent = fs.readFileSync(fullPath, "utf-8");
+        const fileContent = fs.readFileSync(/*turbopackIgnore: true*/ fullPath, "utf-8");
         const { data, content } = matter(fileContent);
         if (data.title) {
           pageTitle = cleanTitleText(data.title);
@@ -206,22 +209,22 @@ export function resolveDocFilePath(version: string, slugParts: string[]): string
 
   if (!slugParts || slugParts.length === 0) {
     const rootReadme = path.join(versionDir, "README.md");
-    if (fs.existsSync(rootReadme)) return rootReadme;
+    if (fs.existsSync(/*turbopackIgnore: true*/ rootReadme)) return rootReadme;
     return null;
   }
 
-  const relativePath = path.join(...slugParts);
-  const directMd = path.join(versionDir, `${relativePath}.md`);
-  if (fs.existsSync(directMd)) return directMd;
+  const relativePath = path.join(/*turbopackIgnore: true*/ ...slugParts);
+  const directMd = path.join(/*turbopackIgnore: true*/ versionDir, `${relativePath}.md`);
+  if (fs.existsSync(/*turbopackIgnore: true*/ directMd)) return directMd;
 
-  const directMdx = path.join(versionDir, `${relativePath}.mdx`);
-  if (fs.existsSync(directMdx)) return directMdx;
+  const directMdx = path.join(/*turbopackIgnore: true*/ versionDir, `${relativePath}.mdx`);
+  if (fs.existsSync(/*turbopackIgnore: true*/ directMdx)) return directMdx;
 
-  const folderReadmeMd = path.join(versionDir, relativePath, "README.md");
-  if (fs.existsSync(folderReadmeMd)) return folderReadmeMd;
+  const folderReadmeMd = path.join(/*turbopackIgnore: true*/ versionDir, relativePath, "README.md");
+  if (fs.existsSync(/*turbopackIgnore: true*/ folderReadmeMd)) return folderReadmeMd;
 
-  const folderReadmeMdx = path.join(versionDir, relativePath, "README.mdx");
-  if (fs.existsSync(folderReadmeMdx)) return folderReadmeMdx;
+  const folderReadmeMdx = path.join(/*turbopackIgnore: true*/ versionDir, relativePath, "README.mdx");
+  if (fs.existsSync(/*turbopackIgnore: true*/ folderReadmeMdx)) return folderReadmeMdx;
 
   return null;
 }
@@ -234,18 +237,18 @@ export function searchDocs(version: string, query: string): SearchDocResult[] {
   const results: SearchDocResult[] = [];
 
   function traverse(dir: string, relPath = "") {
-    if (!fs.existsSync(dir)) return;
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    if (!fs.existsSync(/*turbopackIgnore: true*/ dir)) return;
+    const entries = fs.readdirSync(/*turbopackIgnore: true*/ dir, { withFileTypes: true });
 
     for (const entry of entries) {
       if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name.startsWith("~$")) continue;
 
-      const fullPath = path.join(dir, entry.name);
+      const fullPath = path.join(/*turbopackIgnore: true*/ dir, entry.name);
       if (entry.isDirectory()) {
         traverse(fullPath, relPath ? `${relPath}/${entry.name}` : entry.name);
       } else if (entry.isFile() && (entry.name.endsWith(".md") || entry.name.endsWith(".mdx"))) {
         try {
-          const fileContent = fs.readFileSync(fullPath, "utf-8");
+          const fileContent = fs.readFileSync(/*turbopackIgnore: true*/ fullPath, "utf-8");
           const { data, content } = matter(fileContent);
           const title = data.title || formatTitleFromSlug(entry.name);
           const isIndex = /^readme\.(md|mdx)$/i.test(entry.name);

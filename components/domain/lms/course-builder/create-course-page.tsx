@@ -156,7 +156,10 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
   const isEditing = Boolean(initialCourseId);
 
   return (
-    <div className="flex h-full w-full flex-col pb-10">
+    <div
+      className="flex h-full w-full flex-col pb-10"
+      style={{ ['--primary' as string]: '#5846EA', ['--primary-foreground' as string]: '#ffffff' }}
+    >
       {/* Top Header */}
       <div className="mb-6 flex items-center justify-between border-b border-border/60 pb-4">
         <div className="flex flex-col gap-1.5">
@@ -165,16 +168,25 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
             <ChevronRight className="size-3" />
             <span>Course Builder</span>
             <ChevronRight className="size-3" />
-            <span className="text-primary">{isEditing ? `Edit Course #${initialCourseId}` : courseId ? `Draft #${courseId}` : 'Create New Course'}</span>
+            <span className="text-[#5846EA] font-bold">{isEditing ? `Edit Course #${initialCourseId}` : courseId ? `Draft #${courseId}` : 'Create New Course'}</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">{isEditing ? 'Edit Course' : 'Course Builder'}</h1>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2 font-semibold shadow-sm" disabled={saving} onClick={() => void saveDraft()}>
-            {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+          <Button
+            variant="outline"
+            className="gap-2 font-semibold shadow-xs border-slate-200 text-slate-700 hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/50 transition-colors"
+            disabled={saving}
+            onClick={() => void saveDraft()}
+          >
+            {saving ? <Loader2 className="size-4 animate-spin text-[#5846EA]" /> : null}
             Save as Draft
           </Button>
-          <Button variant="outline" className="gap-2 font-semibold shadow-sm" onClick={handleCancel}>
+          <Button
+            variant="outline"
+            className="gap-2 font-semibold shadow-xs border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+            onClick={handleCancel}
+          >
             Cancel
           </Button>
         </div>
@@ -192,10 +204,10 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                       className={cn(
                         'flex size-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-200',
                         step === entry.id
-                          ? 'border-primary bg-primary text-primary-foreground shadow-md ring-4 ring-primary/10'
+                          ? 'border-[#5846EA] bg-[#5846EA] text-white shadow-md ring-4 ring-[#5846EA]/20'
                           : step > entry.id
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-muted-foreground/30 bg-background text-muted-foreground group-hover:border-muted-foreground/50'
+                            ? 'border-[#5846EA] bg-indigo-50 text-[#5846EA]'
+                            : 'border-slate-300 bg-white text-slate-400 group-hover:border-slate-400'
                       )}
                     >
                       {step > entry.id ? <CheckCircle2 className="size-4" /> : entry.id}
@@ -203,7 +215,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                     <span
                       className={cn(
                         'hidden whitespace-nowrap text-sm font-bold transition-colors md:block',
-                        step === entry.id ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/80'
+                        step === entry.id ? 'text-[#5846EA]' : 'text-slate-600 group-hover:text-slate-900'
                       )}
                     >
                       {entry.label}
@@ -213,7 +225,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                     <div
                       className={cn(
                         'mx-4 h-[2px] w-full max-w-[60px] rounded-full transition-colors duration-300 lg:max-w-[100px]',
-                        step > entry.id ? 'bg-primary' : 'bg-border'
+                        step > entry.id ? 'bg-[#5846EA]' : 'bg-slate-200'
                       )}
                     />
                   )}
@@ -221,7 +233,9 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
               ))}
             </div>
             <div className="flex items-center gap-3 border-l border-border/60 pl-6">
-              <span className="text-sm font-bold text-muted-foreground">Step {step} of 5</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#5846EA] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+                Step {step} of 5
+              </span>
             </div>
           </div>
         </CardContent>
@@ -422,7 +436,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                         {prerequisites.length > 0 && (
                           <div className="flex flex-wrap gap-1.5">
                             {prerequisites.map((item) => (
-                              <span key={item.id} className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                              <span key={item.id} className="flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-[#5846EA]">
                                 {item.title}
                                 <button
                                   type="button"
@@ -487,7 +501,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                     />
                     <Button
                       size="sm"
-                      className="shrink-0 gap-2"
+                      className="shrink-0 gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
                       disabled={saving || !newModuleName.trim()}
                       onClick={() => void addModule(newModuleName.trim()).then((result) => { if (result.ok) setNewModuleName(''); })}
                     >
@@ -610,8 +624,8 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                           ))}
 
                           {contentDraft?.moduleId === module.id ? (
-                            <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
-                              <span className="text-xs font-bold uppercase tracking-wider text-primary">New {contentDraft.kind}</span>
+                            <div className="flex flex-col gap-2 rounded-lg border border-[#5846EA]/30 bg-indigo-50/20 p-3">
+                              <span className="text-xs font-bold uppercase tracking-wider text-[#5846EA]">New {contentDraft.kind}</span>
                               <Input
                                 placeholder="Title"
                                 className="h-9 bg-background"
@@ -627,6 +641,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                               <div className="flex gap-2">
                                 <Button
                                   size="sm"
+                                  className="bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
                                   disabled={saving || !contentDraft.title.trim()}
                                   onClick={() =>
                                     void addContent(contentDraft.moduleId, contentDraft.kind, contentDraft.title.trim(), contentDraft.url.trim()).then(
@@ -649,7 +664,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                                     key={kind}
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 gap-2 text-xs font-bold"
+                                    className="h-8 gap-2 text-xs font-bold hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/40 transition-colors"
                                     onClick={() => setContentDraft({ moduleId: module.id, kind, title: '', url: '' })}
                                   >
                                     <Icon className="size-3.5" /> {label}
@@ -685,7 +700,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                     />
                     <Button
                       size="sm"
-                      className="shrink-0 gap-2"
+                      className="shrink-0 gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
                       disabled={saving || !quizName.trim()}
                       onClick={() =>
                         void addAssessment({
@@ -747,7 +762,10 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                               <Button
                                 variant={open ? 'default' : 'outline'}
                                 size="sm"
-                                className="shrink-0 gap-1.5 font-semibold"
+                                className={cn(
+                                  "shrink-0 gap-1.5 font-semibold transition-all",
+                                  open ? "bg-[#5846EA] text-white hover:bg-[#4936d8]" : "hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/40"
+                                )}
                                 onClick={() => {
                                   setQuestionDraft(null)
                                   openPaper(open ? null : assessment.id)
@@ -859,7 +877,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="w-fit gap-2 font-semibold"
+                                      className="w-fit gap-2 font-semibold hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/40"
                                       onClick={() =>
                                         setQuestionDraft({
                                           id: null,
@@ -875,7 +893,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                                         })
                                       }
                                     >
-                                      <Plus className="size-4" /> Add question
+                                      <Plus className="size-4 text-[#5846EA]" /> Add question
                                     </Button>
 
                                     {/*
@@ -889,13 +907,13 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="w-fit gap-2 font-semibold"
+                                      className="w-fit gap-2 font-semibold border-indigo-200 bg-indigo-50/60 text-[#5846EA] hover:bg-indigo-100/70"
                                       disabled={saving}
                                       onClick={() => {
                                         void generateQuestions(assessment.id, 5)
                                       }}
                                     >
-                                      <Sparkles className="size-4" /> Write 5 with AI
+                                      <Sparkles className="size-4 text-[#5846EA]" /> Write 5 with AI
                                     </Button>
 
                                     <span className="text-xs text-muted-foreground">
@@ -907,7 +925,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                                     </span>
                                   </div>
                                 ) : (
-                                  <div className="flex flex-col gap-3 rounded-lg border border-primary/40 bg-background p-3">
+                                  <div className="flex flex-col gap-3 rounded-lg border border-[#5846EA]/40 bg-indigo-50/15 p-3">
                                     <Textarea
                                       rows={2}
                                       placeholder="Question"
@@ -1015,7 +1033,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
 
                                       <Button
                                         size="sm"
-                                        className="gap-1.5 font-semibold"
+                                        className="gap-1.5 font-semibold bg-[#5846EA] text-white hover:bg-[#4936d8] shadow-xs transition-all"
                                         disabled={saving || !questionDraft.question_title.trim()}
                                         onClick={() => {
                                           const payload = {
@@ -1171,7 +1189,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                   <p className="mt-1 text-sm font-medium text-muted-foreground">Configure compliance and certificate generation settings.</p>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col gap-6 p-6">
-                  <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex items-start gap-3 rounded-lg border border-[#5846EA]/30 bg-indigo-50/25 p-4">
                     <Checkbox
                       id="enable-cert"
                       className="mt-1"
@@ -1287,7 +1305,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                             {form.restrict_departments.map((id) => {
                               const department = departments.find((entry) => entry.id === id);
                               return (
-                                <span key={id} className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                <span key={id} className="flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-[#5846EA]">
                                   {department?.department ?? `#${id}`}
                                   <button
                                     type="button"
@@ -1315,7 +1333,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                         {form.restrict_roles.length > 0 && (
                           <div className="flex flex-wrap gap-1.5">
                             {form.restrict_roles.map((role) => (
-                              <span key={role} className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                              <span key={role} className="flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-[#5846EA]">
                                 {role}
                                 <button
                                   type="button"
@@ -1367,11 +1385,20 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
 
             {/* Bottom action bar */}
             <div className="mt-auto flex items-center justify-between rounded-b-xl border-t border-border/40 bg-muted/10 p-6">
-              <Button variant="outline" className="px-6 font-bold shadow-sm" disabled={step === 1 || saving} onClick={goBack}>
+              <Button
+                variant="outline"
+                className="px-6 font-bold shadow-xs border-slate-200 text-slate-700 hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/50 transition-colors"
+                disabled={step === 1 || saving}
+                onClick={goBack}
+              >
                 Back
               </Button>
-              <Button className="gap-2 px-8 font-bold shadow-sm" disabled={saving} onClick={() => (step === steps.length ? void handlePublish() : void goNext())}>
-                {saving && <Loader2 className="size-4 animate-spin" />}
+              <Button
+                className="gap-2 px-8 font-bold shadow-xs bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all"
+                disabled={saving}
+                onClick={() => (step === steps.length ? void handlePublish() : void goNext())}
+              >
+                {saving && <Loader2 className="size-4 animate-spin text-white" />}
                 {step === steps.length ? 'Publish Course' : `Continue to ${steps[step]?.label ?? 'Next Step'}`}
                 <ChevronRight className="size-4" />
               </Button>
@@ -1384,22 +1411,25 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
           <Card className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
             <CardHeader className="border-b border-border/40 bg-muted/10 px-5 pb-3 pt-5">
               <CardTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                <Search className="size-4" /> Live Preview
+                <Search className="size-4 text-[#5846EA]" /> Live Preview
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 p-5">
-              <div className="flex aspect-[16/9] w-full items-center justify-center rounded-lg border border-border/60 bg-muted/50 shadow-inner">
+              <div className="flex aspect-[16/9] w-full items-center justify-center rounded-lg border border-dashed border-indigo-200 bg-indigo-50/40 shadow-inner">
                 {preview.thumbnailName ? (
-                  <span className="px-3 text-center text-xs font-semibold text-muted-foreground">{preview.thumbnailName}</span>
+                  <span className="px-3 text-center text-xs font-semibold text-[#5846EA]">{preview.thumbnailName}</span>
                 ) : (
-                  <ImageIcon className="size-10 text-muted-foreground/30" />
+                  <ImageIcon className="size-10 text-indigo-300" />
                 )}
               </div>
               <div className="flex items-start justify-between gap-3">
                 <h3 className="line-clamp-2 text-lg font-black leading-snug tracking-tight text-foreground">{preview.title}</h3>
-                <StatusBadge variant={courseId ? 'pending' : 'default'} className="shrink-0 text-[10px] font-black uppercase tracking-widest shadow-sm">
+                <span className={cn(
+                  "shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest border",
+                  courseId ? "bg-indigo-50 text-[#5846EA] border-indigo-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                )}>
                   {preview.status}
-                </StatusBadge>
+                </span>
               </div>
               <div className="mt-1 flex flex-col gap-2.5 rounded-lg border border-border/40 bg-muted/30 p-3 text-sm">
                 {[
@@ -1421,9 +1451,9 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
             <CardHeader className="border-b border-border/40 bg-muted/10 px-5 py-4">
               <CardTitle className="flex items-center justify-between text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <PackageOpen className="size-4" /> Modules
+                  <PackageOpen className="size-4 text-[#5846EA]" /> Modules
                 </div>
-                <span className="flex size-6 items-center justify-center rounded-md border border-border bg-background text-xs font-black text-foreground shadow-sm">
+                <span className="flex size-6 items-center justify-center rounded-md border border-indigo-100 bg-indigo-50 text-xs font-black text-[#5846EA] shadow-xs">
                   {modules.length}
                 </span>
               </CardTitle>
@@ -1456,7 +1486,7 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
           <Card className="rounded-xl border border-border/80 bg-card shadow-sm">
             <CardHeader className="border-b border-border/40 bg-muted/10 px-5 py-4">
               <CardTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                <CheckCircle2 className="size-4" /> Checklist
+                <CheckCircle2 className="size-4 text-[#5846EA]" /> Checklist
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3.5 p-5">
@@ -1464,12 +1494,12 @@ export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number
                 <button key={item.id} type="button" className="group flex items-start gap-3 text-left" onClick={() => goToStep(item.id)}>
                   <div className="mt-0.5">
                     {item.completed ? (
-                      <CheckCircle2 className="size-4 text-success" />
+                      <CheckCircle2 className="size-4 text-emerald-600" />
                     ) : (
-                      <Circle className="size-4 text-muted-foreground/40 transition-colors group-hover:text-primary" />
+                      <Circle className="size-4 text-slate-300 transition-colors group-hover:text-[#5846EA]" />
                     )}
                   </div>
-                  <span className={cn('text-sm font-bold transition-colors', item.completed ? 'text-muted-foreground line-through opacity-70' : 'text-foreground')}>
+                  <span className={cn('text-sm font-bold transition-colors', item.completed ? 'text-muted-foreground line-through opacity-70' : 'text-foreground group-hover:text-[#5846EA]')}>
                     {item.label}
                   </span>
                 </button>

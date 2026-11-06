@@ -340,7 +340,11 @@ export function SessionFormSheet({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={() => void handleSubmit()} disabled={saving} className="gap-2">
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={saving}
+            className="gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all font-semibold"
+          >
             {saving && <Loader2 className="size-4 animate-spin" />}
             {session ? 'Save changes' : 'Schedule session'}
           </Button>

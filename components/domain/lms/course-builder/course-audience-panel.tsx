@@ -176,7 +176,11 @@ export function CourseAudiencePanel({
         </p>
       )}
 
-      <Button onClick={() => void assign()} disabled={busy || nothingChosen}>
+      <Button
+        className="bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
+        onClick={() => void assign()}
+        disabled={busy || nothingChosen}
+      >
         {busy ? (
           <>
             <Loader2 className="mr-2 size-4 animate-spin" /> Assigning…
@@ -214,7 +218,7 @@ function Picker({
     <div className="space-y-1.5">
       <span className="block text-xs font-medium text-muted-foreground">
         {label}
-        {selected.length > 0 && <span className="ml-1.5 tabular-nums text-primary">{selected.length} selected</span>}
+        {selected.length > 0 && <span className="ml-1.5 tabular-nums text-[#5846EA] font-semibold">{selected.length} selected</span>}
       </span>
       <div className="rounded-lg border">
         {options.length >= 8 && (
@@ -224,7 +228,7 @@ function Picker({
               onChange={(event) => setQuery(event.target.value)}
               placeholder={`Search ${options.length}…`}
               aria-label={`Filter ${label}`}
-              className="h-7 w-full rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/50"
+              className="h-7 w-full rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-[#5846EA]/60"
             />
           </div>
         )}

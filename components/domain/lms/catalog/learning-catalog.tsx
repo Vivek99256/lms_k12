@@ -79,26 +79,36 @@ function KpiCard({
   value,
   icon: Icon,
   loading,
+  variant = 'indigo',
 }: {
   title: string
   value: string | number
   icon: React.ElementType
   loading: boolean
+  variant?: 'indigo' | 'emerald' | 'slate' | 'amber'
 }) {
+  const styles = {
+    indigo: 'bg-indigo-50 text-[#5846EA] border-indigo-100',
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    slate: 'bg-slate-100 text-slate-600 border-slate-200',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100',
+  }[variant]
+
   return (
-    <Card className="rounded-xl border-border/80 bg-card shadow-sm transition-shadow hover:shadow-md">
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1.5">
-          <p className="flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground">
-            <Icon className="size-4" /> {title}
-          </p>
+    <Card className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:border-[#5846EA]/40 hover:shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border shadow-2xs', styles)}>
+          <Icon className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-semibold text-slate-500">{title}</p>
           {loading ? (
-            <Skeleton className="h-8 w-16" />
+            <Skeleton className="mt-1 h-7 w-16" />
           ) : (
-            <h3 className="text-2xl font-black tracking-tight text-foreground">{value}</h3>
+            <h3 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">{value}</h3>
           )}
         </div>
-      </CardContent>
+      </div>
     </Card>
   )
 }
@@ -485,7 +495,7 @@ export function LearningCatalog() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col gap-6 pb-6">
+    <div className="flex h-full w-full flex-col gap-6 pb-6" style={{ ['--primary' as string]: '#5846EA' }}>
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Learning Catalog</h1>
@@ -498,17 +508,17 @@ export function LearningCatalog() {
               Only authors are offered the switch, because only they have
               anything to do in the other view. */}
           {canAuthor && (
-            <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 text-xs font-medium">
+            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold">
               {(['browse', 'manage'] as const).map((value) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setView(value)}
                   className={cn(
-                    'rounded-md px-3 py-1.5 capitalize transition-colors',
+                    'rounded-lg px-3 py-1.5 capitalize transition-all',
                     view === value
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground',
+                      ? 'bg-white text-[#5846EA] shadow-xs font-bold border border-slate-200/80'
+                      : 'text-slate-500 hover:text-slate-900',
                   )}
                 >
                   {value}
@@ -518,14 +528,14 @@ export function LearningCatalog() {
           )}
           <Button
             variant="outline"
-            className="gap-2"
+            className="gap-2 border-slate-200 text-slate-700 hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/50 font-semibold shadow-xs transition-colors"
             onClick={() => exportCsv(courses)}
             disabled={courses.length === 0}
           >
-            <Download className="size-4" /> Export
+            <Download className="size-4 text-[#5846EA]" /> Export
           </Button>
           {canAuthor && (
-            <Button className="shrink-0 gap-2" onClick={openCreate}>
+            <Button className="shrink-0 gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all" onClick={openCreate}>
               <Plus className="size-4" /> New Course
             </Button>
           )}
@@ -562,21 +572,23 @@ export function LearningCatalog() {
       )}
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-        <KpiCard title="Total Courses" value={kpis?.total_courses ?? 0} icon={BookOpen} loading={loading} />
-        <KpiCard title="Active" value={kpis?.active_courses ?? 0} icon={CheckCircle2} loading={loading} />
-        <KpiCard title="Inactive" value={kpis?.inactive_courses ?? 0} icon={Archive} loading={loading} />
-        <KpiCard title="Categories" value={kpis?.categories ?? 0} icon={Layers} loading={loading} />
+        <KpiCard title="Total Courses" value={kpis?.total_courses ?? 0} icon={BookOpen} loading={loading} variant="indigo" />
+        <KpiCard title="Active" value={kpis?.active_courses ?? 0} icon={CheckCircle2} loading={loading} variant="emerald" />
+        <KpiCard title="Inactive" value={kpis?.inactive_courses ?? 0} icon={Archive} loading={loading} variant="slate" />
+        <KpiCard title="Categories" value={kpis?.categories ?? 0} icon={Layers} loading={loading} variant="indigo" />
         <KpiCard
           title="Total Learners"
           value={(kpis?.total_learners ?? 0).toLocaleString()}
           icon={Users}
           loading={loading}
+          variant="indigo"
         />
         <KpiCard
           title="Avg Completion"
           value={`${kpis?.avg_completion_rate ?? 0}%`}
           icon={TrendingUp}
           loading={loading}
+          variant="indigo"
         />
       </div>
 

@@ -36,7 +36,7 @@ export function DocViewer({
     });
 
     // 2. Setup client-side copy buttons for any code block rendered in htmlContent
-    const preBlocks = document.querySelectorAll(".doc-prose pre");
+    const preBlocks = document.querySelectorAll<HTMLPreElement>(".doc-prose pre");
     preBlocks.forEach((pre, index) => {
       if (pre.querySelector(".copy-code-btn")) return;
 
@@ -49,7 +49,7 @@ export function DocViewer({
       pre.appendChild(btn);
 
       btn.addEventListener("click", () => {
-        const code = pre.querySelector("code")?.innerText || pre.innerText;
+        const code = pre.querySelector<HTMLElement>("code")?.innerText || pre.innerText;
         navigator.clipboard.writeText(code);
         btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span style="color:#22c55e">Copied</span>`;
         setTimeout(() => {
@@ -128,4 +128,3 @@ export function DocViewer({
     </div>
   );
 }
-

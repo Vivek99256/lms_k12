@@ -149,17 +149,17 @@ export function CourseDetailsSheet({
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#5846EA]">
                 <Users className="size-3.5" /> Learners
               </div>
-              <p className="mt-1 text-xl font-black text-foreground">{shown.learners}</p>
+              <p className="mt-1 text-xl font-black text-slate-900">{shown.learners}</p>
             </div>
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#5846EA]">
                 <Layers className="size-3.5" /> Chapters
               </div>
-              <p className="mt-1 text-xl font-black text-foreground">
+              <p className="mt-1 text-xl font-black text-slate-900">
                 {loading && !detail ? <Skeleton className="h-6 w-8" /> : (detail?.chapter_count ?? 0)}
               </p>
             </div>
@@ -174,7 +174,7 @@ export function CourseDetailsSheet({
             </div>
             <Progress
               value={shown.completion_rate}
-              className="h-2 bg-muted-foreground/20 [&>div]:bg-primary"
+              className="h-2 bg-slate-100 [&>div]:bg-[#5846EA]"
             />
             <p className="text-[11px] text-muted-foreground">
               {shown.completed_learners} of {shown.learners} enrolled learners completed
@@ -198,7 +198,7 @@ export function CourseDetailsSheet({
               <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Actions
               </h3>
-              <Button className="w-full justify-center gap-2" onClick={() => onEdit(course)}>
+              <Button className="w-full justify-center gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] shadow-xs font-semibold" onClick={() => onEdit(course)}>
                 <Pencil className="size-4" /> Edit course
               </Button>
               {/*

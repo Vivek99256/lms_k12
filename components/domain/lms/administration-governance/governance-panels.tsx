@@ -118,7 +118,7 @@ export function RolesPanel({ governance }: { governance: GovernanceState }) {
           {canAdminister && (
             <Button
               size="sm"
-              className="gap-2"
+              className="gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
               onClick={() => (adding || editingRoleId ? closeForm() : setAdding(true))}
             >
               <Plus className="size-4" /> Add Role
@@ -164,6 +164,7 @@ export function RolesPanel({ governance }: { governance: GovernanceState }) {
             <div className="flex gap-2">
               <Button
                 size="sm"
+                className="bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
                 disabled={saving || !draft.name.trim()}
                 onClick={() =>
                   void saveRole(
@@ -309,7 +310,7 @@ export function RolesPanel({ governance }: { governance: GovernanceState }) {
             {canAdminister && (
               <Button
                 size="sm"
-                className="gap-2"
+                className="gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
                 disabled={saving || !matrixDirty}
                 onClick={() => void savePermissions()}
               >
@@ -461,7 +462,11 @@ export function TrainersPanel({ governance }: { governance: GovernanceState }) {
           </p>
         </div>
         {canAdminister && (
-          <Button size="sm" className="gap-2" onClick={() => open()}>
+          <Button
+            size="sm"
+            className="gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
+            onClick={() => open()}
+          >
             <Plus className="size-4" /> Add trainer
           </Button>
         )}
@@ -526,7 +531,12 @@ export function TrainersPanel({ governance }: { governance: GovernanceState }) {
             Active
           </label>
           <div className="flex gap-2">
-            <Button size="sm" disabled={saving || !draft.name.trim()} onClick={submit}>
+            <Button
+              size="sm"
+              className="bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
+              disabled={saving || !draft.name.trim()}
+              onClick={submit}
+            >
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
               {editing ? 'Update' : 'Save'}
             </Button>
@@ -675,7 +685,11 @@ export function VendorsPanel({ governance }: { governance: GovernanceState }) {
           <p className="text-xs text-muted-foreground">Content and training suppliers</p>
         </div>
         {canAdminister && (
-          <Button size="sm" className="gap-2" onClick={() => open()}>
+          <Button
+            size="sm"
+            className="gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
+            onClick={() => open()}
+          >
             <Plus className="size-4" /> Add vendor
           </Button>
         )}
@@ -736,7 +750,12 @@ export function VendorsPanel({ governance }: { governance: GovernanceState }) {
             Active
           </label>
           <div className="flex gap-2">
-            <Button size="sm" disabled={saving || !draft.name.trim()} onClick={submit}>
+            <Button
+              size="sm"
+              className="bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
+              disabled={saving || !draft.name.trim()}
+              onClick={submit}
+            >
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
               {editing ? 'Update' : 'Save'}
             </Button>
@@ -866,7 +885,11 @@ export function IntegrationsPanel({ governance }: { governance: GovernanceState 
           </p>
         </div>
         {canAdminister && available.length > 0 && (
-          <Button size="sm" className="gap-2" onClick={() => setAdding((v) => !v)}>
+          <Button
+            size="sm"
+            className="gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
+            onClick={() => setAdding((v) => !v)}
+          >
             <Plus className="size-4" /> Add integration
           </Button>
         )}
@@ -886,6 +909,7 @@ export function IntegrationsPanel({ governance }: { governance: GovernanceState 
           </div>
           <Button
             size="sm"
+            className="bg-[#5846EA] text-white hover:bg-[#4936d8] font-semibold shadow-xs transition-all"
             disabled={saving || !provider}
             onClick={() => {
               const picked = PROVIDERS.find((p) => p.value === provider)

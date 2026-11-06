@@ -25,14 +25,14 @@ export async function generateMetadata({ params }: VersionDocPageProps) {
   const { version, slug } = await params;
   const filePath = resolveDocFilePath(version, slug || []);
 
-  if (!filePath || !fs.existsSync(filePath)) {
+  if (!filePath || !fs.existsSync(/*turbopackIgnore: true*/ filePath)) {
     return {
       title: `Documentation v${version} | Scholar`,
     };
   }
 
   try {
-    const rawContent = fs.readFileSync(filePath, "utf-8");
+    const rawContent = fs.readFileSync(/*turbopackIgnore: true*/ filePath, "utf-8");
     const { data, content } = matter(rawContent);
     const h1Match = content.match(/^#\s+(.+)$/m);
     const title = data.title || (h1Match ? h1Match[1] : slug?.slice(-1)[0] || "Overview");
@@ -58,11 +58,11 @@ export default async function VersionDocPage({ params }: VersionDocPageProps) {
   }
 
   const filePath = resolveDocFilePath(version, slug || []);
-  if (!filePath || !fs.existsSync(filePath)) {
+  if (!filePath || !fs.existsSync(/*turbopackIgnore: true*/ filePath)) {
     notFound();
   }
 
-  const fileContent = fs.readFileSync(filePath, "utf-8");
+  const fileContent = fs.readFileSync(/*turbopackIgnore: true*/ filePath, "utf-8");
   const { data, content } = matter(fileContent);
 
   // Extract Title

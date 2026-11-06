@@ -181,7 +181,7 @@ function StudentActivityReportView() {
   const needsStudent = !isStudent && !selectedStudent;
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
+    <div className="mx-auto w-full space-y-6 px-4 py-6">
       <motion.header
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}

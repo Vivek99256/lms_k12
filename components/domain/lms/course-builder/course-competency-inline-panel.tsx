@@ -173,7 +173,7 @@ export function CourseCompetencyInlinePanel({
                 <span className="text-xs tabular-nums text-muted-foreground">{row.competency_code}</span>
               )}
               {row.is_primary && (
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                <span className="rounded-full bg-indigo-50 border border-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-[#5846EA]">
                   primary
                 </span>
               )}
@@ -208,7 +208,7 @@ export function CourseCompetencyInlinePanel({
             variant="outline"
             disabled={!picked || saving}
             onClick={() => void sync([...mappedIds, Number(picked)])}
-            className="h-9 px-3 text-xs font-semibold"
+            className="h-9 px-3 text-xs font-semibold hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/40 transition-colors"
           >
             {saving ? 'Saving…' : 'Add'}
           </Button>

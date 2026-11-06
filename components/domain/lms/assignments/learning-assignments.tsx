@@ -352,7 +352,11 @@ function AssignLearningDialog({
           <Button variant="outline" className="font-bold" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button className="font-bold gap-2" onClick={() => void handleAssign()} disabled={saving}>
+          <Button
+            className="font-bold gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all"
+            onClick={() => void handleAssign()}
+            disabled={saving}
+          >
             {saving ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
             Assign
           </Button>
@@ -510,7 +514,7 @@ function ImportEnrollmentsDialog({
             {result?.imported ? 'Done' : 'Cancel'}
           </Button>
           <Button
-            className="font-bold gap-2"
+            className="font-bold gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all"
             onClick={() => void handleUpload()}
             disabled={uploading || !file}
           >
@@ -678,7 +682,7 @@ export function LearningAssignments() {
           <div className="flex justify-end gap-2">
             <Button
               size="sm"
-              className="h-7 font-bold"
+              className="h-7 font-bold bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all"
               disabled={reviewing}
               onClick={() => void handleReview([row.id], 'approved')}
             >
@@ -687,7 +691,7 @@ export function LearningAssignments() {
             <Button
               variant="outline"
               size="sm"
-              className="h-7 font-bold text-destructive border-destructive/20"
+              className="h-7 font-bold text-destructive border-destructive/20 hover:bg-destructive/10 transition-colors"
               disabled={reviewing}
               onClick={() => void handleReview([row.id], 'rejected')}
             >
@@ -705,7 +709,7 @@ export function LearningAssignments() {
       header: 'Learner',
       render: (_, row) => (
         <div className="flex items-center gap-2.5">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-bold text-[#5846EA] border border-indigo-100 shadow-2xs">
             {row.initials}
           </span>
           <div className="flex min-w-0 flex-col">
@@ -743,7 +747,7 @@ export function LearningAssignments() {
       header: 'Learner / Group',
       render: (_, row) => (
         <div className="flex items-center gap-3">
-          <div className="size-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0 border border-border/50">
+          <div className="size-8 rounded-full bg-indigo-50 flex items-center justify-center text-xs font-bold text-[#5846EA] shrink-0 border border-indigo-100 shadow-2xs">
             {row.learner_name?.substring(0, 2).toUpperCase() || 'U'}
           </div>
           <div className="flex flex-col">
@@ -757,7 +761,9 @@ export function LearningAssignments() {
       header: 'Course / Learning Path',
       render: (_, row) => (
         <div className="flex items-center gap-3">
-          <MonitorPlay className="size-4 text-muted-foreground shrink-0" />
+          <div className="size-7 rounded-lg bg-indigo-50/80 flex items-center justify-center shrink-0 border border-indigo-100/60">
+            <MonitorPlay className="size-3.5 text-[#5846EA]" />
+          </div>
           <div className="flex flex-col">
             <span className="text-sm font-bold text-foreground leading-snug">{row.course_name}</span>
             <span className="text-xs text-muted-foreground">{row.type}</span>
@@ -796,7 +802,7 @@ export function LearningAssignments() {
             <span
               className={cn(
                 'text-xs font-semibold',
-                isOverdue ? 'text-destructive' : 'text-warning',
+                isOverdue ? 'text-rose-600' : 'text-amber-600',
               )}
             >
               {isOverdue
@@ -832,8 +838,8 @@ export function LearningAssignments() {
       header: 'Progress',
       render: (val) => (
         <div className="flex items-center gap-2 w-full max-w-[100px]">
-          <span className="text-xs font-bold w-8">{val}%</span>
-          <Progress value={val as number} className="h-1.5 flex-1" />
+          <span className="text-xs font-bold w-8 text-foreground">{val}%</span>
+          <Progress value={val as number} className="h-1.5 flex-1 [&>div]:bg-[#5846EA]" />
         </div>
       ),
     },
@@ -900,12 +906,12 @@ export function LearningAssignments() {
    * ---------------------------------------------------------------- */
 
   const quickFilterBadges = [
-    { key: 'Overdue', label: 'Overdue', dotClass: 'bg-destructive', badgeClass: 'bg-destructive/5 text-destructive border-destructive/20 hover:bg-destructive/10' },
-    { key: 'Due Today', label: 'Due Today', dotClass: 'bg-warning', badgeClass: 'bg-warning/5 text-warning border-warning/20 hover:bg-warning/10' },
-    { key: 'Due This Week', label: 'Due This Week', dotClass: 'bg-primary', badgeClass: 'bg-primary/5 text-primary border-primary/20 hover:bg-primary/10' },
-    { key: 'Not Started', label: 'Not Started', dotClass: 'bg-muted-foreground/40', badgeClass: 'bg-secondary text-foreground hover:bg-secondary/80' },
-    { key: 'In Progress', label: 'In Progress', dotClass: 'bg-muted-foreground/50', badgeClass: 'bg-muted text-muted-foreground hover:bg-muted/80' },
-    { key: 'Completed', label: 'Completed', dotClass: 'bg-success/50', badgeClass: 'bg-muted text-muted-foreground hover:bg-muted/80' },
+    { key: 'Overdue', label: 'Overdue', dotClass: 'bg-rose-500', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100/70' },
+    { key: 'Due Today', label: 'Due Today', dotClass: 'bg-amber-500', badgeClass: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100/70' },
+    { key: 'Due This Week', label: 'Due This Week', dotClass: 'bg-[#5846EA]', badgeClass: 'bg-indigo-50 text-[#5846EA] border-indigo-200 hover:bg-indigo-100/70' },
+    { key: 'Not Started', label: 'Not Started', dotClass: 'bg-slate-400', badgeClass: 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100' },
+    { key: 'In Progress', label: 'In Progress', dotClass: 'bg-[#5846EA]', badgeClass: 'bg-indigo-50/70 text-[#5846EA] border-indigo-200 hover:bg-indigo-100/60' },
+    { key: 'Completed', label: 'Completed', dotClass: 'bg-emerald-500', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/70' },
   ]
 
   /* ---------------------------------------------------------------- *
@@ -918,7 +924,7 @@ export function LearningAssignments() {
         <AlertCircle className="size-12 text-destructive" />
         <p className="text-lg font-bold text-foreground">Failed to load assignments</p>
         <p className="text-sm text-muted-foreground max-w-md text-center">{error}</p>
-        <Button className="font-bold gap-2" onClick={retry}>
+        <Button className="font-bold gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8]" onClick={retry}>
           <RefreshCw className="size-4" /> Try Again
         </Button>
       </div>
@@ -930,7 +936,7 @@ export function LearningAssignments() {
    * ---------------------------------------------------------------- */
 
   return (
-    <div className="flex flex-col w-full pb-12">
+    <div className="flex flex-col w-full pb-12" style={{ ['--primary' as string]: '#5846EA' }}>
       {/* Modals */}
       <AssignLearningDialog
         open={showAssignDialog}
@@ -962,20 +968,20 @@ export function LearningAssignments() {
           <div className="flex items-center gap-3 border-l border-border/60 pl-4">
             <Button
               variant="outline"
-              className="font-semibold gap-2 shadow-sm"
+              className="font-semibold gap-2 border-slate-200 text-slate-700 hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/50 shadow-xs transition-colors"
               onClick={() => setShowImportDialog(true)}
             >
-              <FileUp className="size-4" /> Import Enrollments
+              <FileUp className="size-4 text-[#5846EA]" /> Import Enrollments
             </Button>
-            <div className="flex rounded-md shadow-sm">
+            <div className="flex rounded-md shadow-xs">
               <Button
-                className="rounded-r-none font-semibold gap-2 border-r border-primary-foreground/20"
+                className="rounded-r-none font-semibold gap-2 bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all border-r border-white/20"
                 onClick={() => setShowAssignDialog(true)}
               >
                 <Plus className="size-4" /> Assign Learning
               </Button>
               <Button
-                className="rounded-l-none px-2 shrink-0"
+                className="rounded-l-none px-2 shrink-0 bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all"
                 onClick={() => setShowAssignDialog(true)}
               >
                 <ChevronDown className="size-4" />
@@ -987,65 +993,65 @@ export function LearningAssignments() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 shrink-0">
-        <Card className="shadow-sm border-border/80 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setQuickFilter('')}>
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="size-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <Users className="size-5 text-muted-foreground" />
+        <Card className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:border-[#5846EA]/40 hover:shadow-sm cursor-pointer" onClick={() => setQuickFilter('')}>
+          <div className="flex items-center gap-4">
+            <div className="size-11 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0 shadow-2xs">
+              <Users className="size-5 text-[#5846EA]" />
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Assigned</span>
-              <span className="text-2xl font-black tracking-tight text-foreground">{loading ? '—' : (stats?.total_assigned ?? 0).toLocaleString()}</span>
+              <span className="text-2xl font-black tracking-tight text-slate-900">{loading ? '—' : (stats?.total_assigned ?? 0).toLocaleString()}</span>
               <span className="text-xs text-muted-foreground font-medium">Users</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
-        <Card className="shadow-sm border-border/80 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setQuickFilter('')}>
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="size-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <Clock className="size-5 text-muted-foreground" />
+        <Card className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:border-amber-400/50 hover:shadow-sm cursor-pointer" onClick={() => setQuickFilter('')}>
+          <div className="flex items-center gap-4">
+            <div className="size-11 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0 shadow-2xs">
+              <Clock className="size-5 text-amber-600" />
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Pending Approval</span>
-              <span className="text-2xl font-black tracking-tight text-foreground">{loading ? '—' : (stats?.pending_approval ?? 0).toLocaleString()}</span>
+              <span className="text-2xl font-black tracking-tight text-slate-900">{loading ? '—' : (stats?.pending_approval ?? 0).toLocaleString()}</span>
               <span className="text-xs text-muted-foreground font-medium">Requests</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
-        <Card className="shadow-sm border-border/80 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setQuickFilter('In Progress')}>
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="size-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <PlayCircle className="size-5 text-muted-foreground" />
+        <Card className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:border-[#5846EA]/40 hover:shadow-sm cursor-pointer" onClick={() => setQuickFilter('In Progress')}>
+          <div className="flex items-center gap-4">
+            <div className="size-11 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0 shadow-2xs">
+              <PlayCircle className="size-5 text-[#5846EA]" />
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">In Progress</span>
-              <span className="text-2xl font-black tracking-tight text-foreground">{loading ? '—' : (stats?.in_progress ?? 0).toLocaleString()}</span>
+              <span className="text-2xl font-black tracking-tight text-slate-900">{loading ? '—' : (stats?.in_progress ?? 0).toLocaleString()}</span>
               <span className="text-xs text-muted-foreground font-medium">Enrollments</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
-        <Card className="shadow-sm border-border/80 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setQuickFilter('Completed')}>
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="size-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <CheckCircle2 className="size-5 text-muted-foreground" />
+        <Card className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:border-emerald-400/50 hover:shadow-sm cursor-pointer" onClick={() => setQuickFilter('Completed')}>
+          <div className="flex items-center gap-4">
+            <div className="size-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 shadow-2xs">
+              <CheckCircle2 className="size-5 text-emerald-600" />
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Completed</span>
-              <span className="text-2xl font-black tracking-tight text-foreground">{loading ? '—' : (stats?.completed ?? 0).toLocaleString()}</span>
+              <span className="text-2xl font-black tracking-tight text-slate-900">{loading ? '—' : (stats?.completed ?? 0).toLocaleString()}</span>
               <span className="text-xs text-muted-foreground font-medium">Enrollments</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
-        <Card className="shadow-sm border-border/80 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setQuickFilter('Overdue')}>
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="size-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <CalendarDays className="size-5 text-muted-foreground" />
+        <Card className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:border-rose-400/50 hover:shadow-sm cursor-pointer" onClick={() => setQuickFilter('Overdue')}>
+          <div className="flex items-center gap-4">
+            <div className="size-11 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0 shadow-2xs">
+              <CalendarDays className="size-5 text-rose-600" />
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Overdue</span>
-              <span className="text-2xl font-black tracking-tight text-foreground">{loading ? '—' : (stats?.overdue ?? 0).toLocaleString()}</span>
+              <span className="text-2xl font-black tracking-tight text-slate-900">{loading ? '—' : (stats?.overdue ?? 0).toLocaleString()}</span>
               <span className="text-xs text-muted-foreground font-medium">Enrollments</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
 
@@ -1062,7 +1068,7 @@ export function LearningAssignments() {
             className={cn(
               'pb-3 cursor-pointer text-sm font-bold flex items-center gap-2 border-b-2 transition-colors',
               activeTab === tab.id
-                ? 'border-primary text-primary'
+                ? 'border-[#5846EA] text-[#5846EA]'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
             onClick={() => setActiveTab(tab.id)}
@@ -1073,7 +1079,7 @@ export function LearningAssignments() {
                 className={cn(
                   'px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none',
                   activeTab === tab.id
-                    ? 'bg-primary/10 text-primary'
+                    ? 'bg-indigo-50 text-[#5846EA] border border-indigo-100'
                     : 'bg-muted text-muted-foreground',
                 )}
               >
@@ -1095,10 +1101,10 @@ export function LearningAssignments() {
                 variant="outline"
                 size="sm"
                 className={cn(
-                  'gap-2 h-8 font-bold',
+                  'gap-2 h-8 font-bold transition-colors',
                   showFilterSidebar
-                    ? 'bg-primary/10 border-primary/30 text-primary'
-                    : 'bg-primary/5 border-primary/20 text-primary',
+                    ? 'bg-indigo-50 border-indigo-200 text-[#5846EA]'
+                    : 'border-slate-200 text-slate-700 hover:bg-indigo-50/50 hover:text-[#5846EA] hover:border-indigo-200',
                 )}
                 onClick={() => setShowFilterSidebar(!showFilterSidebar)}
               >
@@ -1110,7 +1116,7 @@ export function LearningAssignments() {
                     {selectedIds.length} item{selectedIds.length > 1 ? 's' : ''} selected
                   </span>
                   <span
-                    className="text-sm font-semibold text-primary cursor-pointer hover:underline"
+                    className="text-sm font-semibold text-[#5846EA] cursor-pointer hover:underline"
                     onClick={() => setSelectedIds([])}
                   >
                     Clear
@@ -1120,7 +1126,7 @@ export function LearningAssignments() {
               {filters.quickFilter && (
                 <Badge
                   variant="outline"
-                  className="gap-1 font-semibold bg-primary/5 text-primary border-primary/20 cursor-pointer"
+                  className="gap-1 font-semibold bg-indigo-50 text-[#5846EA] border-indigo-200 cursor-pointer"
                   onClick={() => setQuickFilter('')}
                 >
                   {filters.quickFilter} <X className="size-3" />
@@ -1129,21 +1135,10 @@ export function LearningAssignments() {
             </div>
 
             <div className="flex items-center gap-2">
-              {/*
-                * "Assign" was enabled BY a selection and then threw it away -
-                * the dialog resets all its state on open, so picking five rows
-                * and clicking Assign opened an empty form. It no longer claims
-                * to act on the selection; that action lives on the header
-                * "Assign Learning" button instead.
-                *
-                * "Enroll" was renamed. It called handleBulkUpdate('In
-                * Progress'), which sets a progress status and creates no
-                * enrolment of any kind. It now says what it does.
-                */}
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 font-bold bg-background shadow-sm"
+                className="h-8 font-bold bg-background shadow-xs hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/40 transition-colors"
                 disabled={selectedIds.length === 0}
                 onClick={() => handleBulkUpdate('In Progress')}
               >
@@ -1152,7 +1147,7 @@ export function LearningAssignments() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 font-bold bg-background shadow-sm"
+                className="h-8 font-bold bg-background shadow-xs hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50/40 transition-colors"
                 disabled={selectedIds.length === 0}
                 onClick={() => handleBulkUpdate('Completed')}
               >
@@ -1276,7 +1271,7 @@ export function LearningAssignments() {
                     Upload a CSV of learners and courses. Rows are matched by employee number,
                     email or id, and every failure is reported with its line number.
                   </p>
-                  <Button className="gap-2 self-start" onClick={() => setShowImportDialog(true)}>
+                  <Button className="gap-2 self-start bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all" onClick={() => setShowImportDialog(true)}>
                     <FileUp className="size-4" /> Import CSV
                   </Button>
                 </CardContent>
@@ -1288,7 +1283,7 @@ export function LearningAssignments() {
                   <p className="text-xs text-muted-foreground">
                     Pick several learners and one course to create assignments in a single step.
                   </p>
-                  <Button className="gap-2 self-start" onClick={() => setShowAssignDialog(true)}>
+                  <Button className="gap-2 self-start bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all" onClick={() => setShowAssignDialog(true)}>
                     <UserPlus className="size-4" /> Assign learning
                   </Button>
                 </CardContent>
@@ -1307,7 +1302,7 @@ export function LearningAssignments() {
                         key={status}
                         variant="outline"
                         size="sm"
-                        className="font-bold"
+                        className="font-bold hover:border-[#5846EA]/40 hover:text-[#5846EA] hover:bg-indigo-50/40 transition-colors"
                         disabled={selectedIds.length === 0}
                         onClick={() => handleBulkUpdate(status)}
                       >
@@ -1339,7 +1334,7 @@ export function LearningAssignments() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="font-bold gap-2"
+                    className="font-bold gap-2 text-[#5846EA] border-[#5846EA]/30 hover:bg-indigo-50/50 transition-colors"
                     onClick={() => setShowAssignDialog(true)}
                   >
                     <Plus className="size-4" /> Create Assignment
@@ -1403,50 +1398,50 @@ export function LearningAssignments() {
           </div>
 
           {/* Bottom Feature Cards */}
-          <Card className="shadow-sm border-border/80 bg-card mt-6 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border/60 overflow-hidden">
+          <Card className="rounded-2xl border border-slate-200/90 bg-white shadow-xs mt-6 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100 overflow-hidden">
             <div
-              className="flex-1 flex items-start gap-5 p-8 hover:bg-muted/5 transition-colors cursor-pointer group"
+              className="flex-1 flex items-start gap-5 p-7 hover:bg-slate-50/60 transition-colors cursor-pointer group"
               onClick={() => setShowAssignDialog(true)}
             >
-              <div className="size-12 rounded-full bg-muted/40 flex items-center justify-center shrink-0">
-                <UserPlus className="size-5 text-foreground/70" />
+              <div className="size-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0 text-[#5846EA] transition-transform group-hover:scale-105 shadow-2xs">
+                <UserPlus className="size-5 text-[#5846EA]" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="text-sm font-bold text-foreground">Assign to Individuals or Groups</span>
                 <span className="text-[13px] text-muted-foreground leading-snug">Assign learning to employees, teams, or departments.</span>
-                <span className="text-sm font-bold text-primary mt-2 flex items-center gap-1 group-hover:underline">
+                <span className="text-sm font-bold text-[#5846EA] mt-2 flex items-center gap-1 group-hover:underline">
                   Assign Now <ChevronRight className="size-4" />
                 </span>
               </div>
             </div>
 
             <div
-              className="flex-1 flex items-start gap-5 p-8 hover:bg-muted/5 transition-colors cursor-pointer group"
+              className="flex-1 flex items-start gap-5 p-7 hover:bg-slate-50/60 transition-colors cursor-pointer group"
               onClick={() => setActiveTab('approval')}
             >
-              <div className="size-12 rounded-full bg-muted/40 flex items-center justify-center shrink-0">
-                <Mail className="size-5 text-foreground/70" />
+              <div className="size-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0 text-amber-600 transition-transform group-hover:scale-105 shadow-2xs">
+                <Mail className="size-5 text-amber-600" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="text-sm font-bold text-foreground">Pending Approvals</span>
                 <span className="text-[13px] text-muted-foreground leading-snug">Review and act on learner enrollment requests.</span>
-                <span className="text-sm font-bold text-primary mt-2 flex items-center gap-1 group-hover:underline">
+                <span className="text-sm font-bold text-amber-600 mt-2 flex items-center gap-1 group-hover:underline">
                   View Approvals <ChevronRight className="size-4" />
                 </span>
               </div>
             </div>
 
             <div
-              className="flex-1 flex items-start gap-5 p-8 hover:bg-muted/5 transition-colors cursor-pointer group"
+              className="flex-1 flex items-start gap-5 p-7 hover:bg-slate-50/60 transition-colors cursor-pointer group"
               onClick={() => setShowImportDialog(true)}
             >
-              <div className="size-12 rounded-full bg-muted/40 flex items-center justify-center shrink-0">
-                <FileUp className="size-5 text-foreground/70" />
+              <div className="size-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0 text-[#5846EA] transition-transform group-hover:scale-105 shadow-2xs">
+                <FileUp className="size-5 text-[#5846EA]" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="text-sm font-bold text-foreground">Bulk Operations</span>
                 <span className="text-[13px] text-muted-foreground leading-snug">Upload CSV to assign or enroll multiple learners.</span>
-                <span className="text-sm font-bold text-primary mt-2 flex items-center gap-1 group-hover:underline">
+                <span className="text-sm font-bold text-[#5846EA] mt-2 flex items-center gap-1 group-hover:underline">
                   Upload CSV <ChevronRight className="size-4" />
                 </span>
               </div>
@@ -1477,9 +1472,9 @@ export function LearningAssignments() {
                       key={badge.key}
                       variant="outline"
                       className={cn(
-                        'font-semibold gap-1.5 cursor-pointer rounded-full px-3 py-1',
+                        'font-semibold gap-1.5 cursor-pointer rounded-full px-3 py-1 transition-all',
                         filters.quickFilter === badge.key
-                          ? 'bg-primary/15 text-primary border-primary/40 ring-1 ring-primary/20'
+                          ? 'bg-indigo-50 text-[#5846EA] border-[#5846EA]/40 ring-1 ring-[#5846EA]/20'
                           : badge.badgeClass,
                       )}
                       onClick={() => setQuickFilter(badge.key)}
@@ -1582,10 +1577,10 @@ export function LearningAssignments() {
               </div>
             </div>
             <div className="p-5 pt-0 flex items-center justify-between mt-auto">
-              <Button variant="outline" className="font-bold shadow-sm rounded-full px-6" onClick={resetFilters}>
+              <Button variant="outline" className="font-bold shadow-xs rounded-full px-6 hover:bg-slate-50 transition-colors" onClick={resetFilters}>
                 Reset
               </Button>
-              <Button className="font-bold shadow-sm px-8 rounded-full" onClick={applyFilters}>
+              <Button className="font-bold shadow-xs px-8 rounded-full bg-[#5846EA] text-white hover:bg-[#4936d8] transition-all" onClick={applyFilters}>
                 Apply Filters
               </Button>
             </div>

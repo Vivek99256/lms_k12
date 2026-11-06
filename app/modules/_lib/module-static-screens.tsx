@@ -77,6 +77,9 @@ import { UTILITY_AI_STACK_SCREENS } from '@/app/Utility/ai-stack/_screens/ai-sta
 import { DOCUMENT_TEMPLATES_AI_STACK_SCREENS } from '@/app/document-templates/ai-stack/_screens/ai-stack-screens';
 import { CAPABILITY_INTELLIGENCE_REPORT_SCREENS } from '@/app/capability-intelligence/reports/_screens/capability-intelligence-report-screens';
 import { CAPABILITY_INTELLIGENCE_COMMUNICATION_SCREENS } from '@/app/capability-intelligence/communication/_screens/capability-communication-screens';
+import { LMS_REPORT_SCREENS } from '@/app/lms/reports/_screens/lms-report-screens';
+import { LMS_COMMUNICATION_SCREENS } from '@/app/lms/communication/_screens/lms-communication-screens';
+import { TEACH_LEARN_REPORT_SCREENS } from '@/app/teach-learn/reports/_screens/teach-learn-report-screens';
 
 /**
  * The built screens a module's category page renders inline, for the modules that have
@@ -220,6 +223,10 @@ const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   'library:ai-stack': LIBRARY_AI_STACK_SCREENS,
   'library:communication': LIBRARY_COMMUNICATION_SCREENS,
   'lms:ai-stack': LMS_AI_STACK_SCREENS,
+  'lms:reports': LMS_REPORT_SCREENS,
+  'learning-management:reports': LMS_REPORT_SCREENS,
+  'lms:communication': LMS_COMMUNICATION_SCREENS,
+  'learning-management:communication': LMS_COMMUNICATION_SCREENS,
   // `inward-outward:` renders the `inward_outward` module — the key this estate has always
   // used for it, hyphen in the slug and underscore in the key. See the page under
   // app/inward_outward/ai-stack for why it was not given a new one.
@@ -264,6 +271,8 @@ const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   'talent-management:communication': TALENT_MANAGEMENT_COMMUNICATION_SCREENS,
   'teach-learn:communication': TEACH_LEARN_COMMUNICATION_SCREENS,
   'teach_learn:communication': TEACH_LEARN_COMMUNICATION_SCREENS,
+  'teach-learn:reports': TEACH_LEARN_REPORT_SCREENS,
+  'teach_learn:reports': TEACH_LEARN_REPORT_SCREENS,
   'timetable:ai-stack': TIMETABLE_AI_STACK_SCREENS,
   'timetable:communication': TIMETABLE_COMMUNICATION_SCREENS,
   // `transport:` renders the `transportation` module, for the same reason
@@ -358,7 +367,11 @@ export function ModuleCategoryRoute({
                                                     ? 'talent'
                                                     : moduleKey === 'capability-intelligence' || moduleKey === 'capability_intelligence'
                                                       ? 'capability'
-                                                      : undefined;
+                                                      : moduleKey === 'lms'
+                                                        ? 'lms'
+                                                        : moduleKey === 'teach-learn' || moduleKey === 'teach_learn'
+                                                          ? 'teach_learn'
+                                                          : undefined;
 
   return (
     <ModuleCategoryPage
