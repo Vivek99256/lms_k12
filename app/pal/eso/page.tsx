@@ -24,6 +24,7 @@ import {
 import {
   saveAdaptivePracticeAnalysis,
   type AdaptivePracticeAnalysis,
+  type PerformanceLevel,
 } from '@/app/pal/data/pal-explanation-lab';
 import {
   defaultLearnerId,
@@ -505,27 +506,36 @@ function EsoFallbackPracticeDrill({
       const percentage = total > 0 ? Math.round((score.correct / total) * 100) : 0;
       const incorrectList = questionHistory.filter((q) => !q.isCorrect);
 
+      const performanceLevel: PerformanceLevel =
+        percentage >= 75 ? 'proficient' : percentage >= 50 ? 'developing' : 'struggling';
+
       // Save detailed analysis for Explanation Lab
       const analysis: AdaptivePracticeAnalysis = {
+        chapterId: resolvedChapterId || '41675',
+        chapterName: 'Curriculum Chapter',
         conceptId: String(conceptId),
         conceptName: conceptName || `Concept ${conceptId}`,
-        score: score.correct,
-        totalQuestions: total,
-        percentage,
-        incorrectCount: incorrectList.length,
-        weakAreas: incorrectList.map((q) => q.title),
-        masteryVerdict: percentage === 100 ? 'mastered' : percentage >= 70 ? 'competent' : 'needs_support',
-        suggestedNextStep: percentage === 100 ? 'feedback' : 'explanation_lab',
-        misconceptionsIdentified: incorrectList.map((q) => ({
-          misconceptionTag: `gap_${q.questionId}`,
+        score: {
+          correct: score.correct,
+          total,
+          percentage,
+        },
+        difficulty: 'medium',
+        performanceLevel,
+        wrongQuestions: incorrectList.map((q) => ({
+          questionId: q.questionId,
           title: q.title,
-          observedAnswer: q.selectedOptionText || 'Incorrect option chosen',
-          correctConcept: q.correctOptionText || 'Core principle',
-          recommendedLabType: 'virtual_workbench',
+          selectedOptionText: q.selectedOptionText,
+          correctOptionText: q.correctOptionText,
+          feedback: q.feedback,
         })),
-        timestamp: Date.now(),
+        learningGaps:
+          incorrectList.map((q) => q.title).length > 0
+            ? incorrectList.map((q) => q.title)
+            : [`Reinforce practical principles of ${conceptName || `Concept ${conceptId}`}`],
+        completedAt: new Date().toISOString(),
       };
-      saveAdaptivePracticeAnalysis(String(conceptId), analysis);
+      saveAdaptivePracticeAnalysis(resolvedChapterId || String(conceptId), analysis);
 
       if (typeof window !== 'undefined') {
         try {

@@ -788,13 +788,15 @@ export function buildExplanationLabPlan(
     const syntheticConcept: AdaptiveConcept = {
       conceptId: activeAnalysis.conceptId,
       name: activeAnalysis.conceptName,
-      diagnosticAttempts: 1,
+      servable: true,
+      conceptExact: true,
+      availability: {},
+      nextDifficulty: 'medium',
+      ruleFired: 'adaptive_analysis',
+      rationale: activeAnalysis.learningGaps[0] || 'Targeted practical reinforcement',
       diagnosticPercentage: activeAnalysis.score.percentage,
       practiceAttempts: 1,
       practicePercentage: activeAnalysis.score.percentage,
-      isClearedToHard: false,
-      isHardPassed: false,
-      isDiagnosticPassed: activeAnalysis.score.percentage >= 70,
     };
     const generatedLab = generateTopicSpecificLab(syntheticConcept, activeAnalysis, chapterName, subjectName);
     recommendations.unshift({
