@@ -49,6 +49,15 @@ export function ConversationalAiAdmin() {
         tone: 'ok',
         text: `Settings saved for ${settings.project_id} (Voice: ${settings.voice_enabled ? 'Enabled' : 'Disabled'}, Language: ${settings.default_language}).`,
       });
+
+      // Dispatch module-specific event to instantly synchronize mounted chatbot panel without reload
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('conversational-ai:settings-updated', {
+            detail: settings,
+          })
+        );
+      }
     },
     [projects],
   );

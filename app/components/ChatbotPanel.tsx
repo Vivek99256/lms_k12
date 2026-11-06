@@ -468,7 +468,7 @@ export default function ChatbotPanel({
   const spokenIdRef = useRef<string | null>(null);
   const sendingRef = useRef(false);
 
-  // Centralized Channel configuration (Voice & Language synchronized across platforms)
+  // Centralized Channel configuration (Voice & Language synchronized module-specifically)
   const [channelSettings, setChannelSettings] = useState<{
     voice_enabled?: boolean;
     default_language?: string;
@@ -497,6 +497,24 @@ export default function ChatbotPanel({
       isMounted = false;
     };
   }, [workspace.channelSettings]);
+
+  // Real-time synchronization for same-page admin changes with strict module isolation
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleSettingsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<any>).detail;
+      // Module isolation: only update LMS K-12 chatbot if the updated settings belong to lms_k12
+      if (detail && (!detail.project_id || detail.project_id === 'lms_k12')) {
+        setChannelSettings(detail);
+      }
+    };
+
+    window.addEventListener('conversational-ai:settings-updated', handleSettingsUpdated);
+    return () => {
+      window.removeEventListener('conversational-ai:settings-updated', handleSettingsUpdated);
+    };
+  }, []);
 
   const effectiveVoiceEnabled = channelSettings?.voice_enabled ?? workspace.channelSettings?.voice_enabled ?? true;
   const effectiveDefaultLanguage = channelSettings?.default_language ?? workspace.channelSettings?.default_language ?? 'en-IN';
