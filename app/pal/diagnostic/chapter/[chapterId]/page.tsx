@@ -248,7 +248,9 @@ function DiagnosticExam() {
       return;
     }
     if (stageParam && JOURNEY_STEPS.some((s) => s.id === stageParam)) {
-      setSelectedStep(stageParam);
+      queueMicrotask(() => {
+        setSelectedStep(stageParam);
+      });
     }
   }, [searchParams, chapterId, router]);
 
@@ -282,7 +284,7 @@ function DiagnosticExam() {
     loading: checkingCompletion,
   } = useChapterCompletion(chapterId);
 
-  const chapterName = mastery?.chapterName || 'Integers';
+  const [landingChapterName, setLandingChapterName] = useState<string>('');
 
   // Discover subject name dynamically from syllabus
   useEffect(() => {
@@ -293,8 +295,10 @@ function DiagnosticExam() {
       .then(({ fetchPalLanding }) => fetchPalLanding({ signal: controller.signal }))
       .then((landing) => {
         for (const subj of landing.subjects) {
-          if (subj.chapters.some((c) => String(c.id) === String(chapterId))) {
+          const found = subj.chapters.find((c) => String(c.id) === String(chapterId));
+          if (found) {
             setSubjectName(subj.name);
+            setLandingChapterName(found.name);
             break;
           }
         }
@@ -303,6 +307,8 @@ function DiagnosticExam() {
 
     return () => controller.abort();
   }, [chapterId]);
+
+  const chapterName = mastery?.chapterName || landingChapterName || 'Chapter Curriculum';
 
   // Persist completed steps to sessionStorage
   useEffect(() => {
@@ -543,94 +549,39 @@ function DiagnosticExam() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [total, currentIndex, goTo]);
 
-  if (checkingCompletion) return <Centered>Loading this chapter…</Centered>;
+  if (selectedStep !== null) {
+    if (checkingCompletion) return <Centered>Loading this chapter…</Centered>;
 
-  // Nothing left to diagnose. No paper was drawn and no attempt was opened.
-  if (completion.isComplete && mastery) {
-    return (
-      <PalWorkspace
-        eyebrow={mastery.chapterName || 'This chapter'}
-        title="Chapter mastery"
-        description="This chapter is completed, so there is no diagnostic left to take."
-        backHref="/pal"
-        backLabel="Back to subjects"
-        actions={
-          <>
-            <CompletedBadge />
-            <ReadOnlyBadge />
-          </>
-        }
-        rail={
-          <PalRailSection title="Your journey">
-            <JourneyRail
-              current="mastery"
-              completed={COMPLETED_THROUGH_CHECK}
-              bypassed={['intervention']}
-              orientation="vertical"
-            />
-          </PalRailSection>
-        }
-      >
-        <CompletedChapterPanel mastery={mastery} completion={completion} />
-      </PalWorkspace>
-    );
-  }
-
-  if (loading) return <Centered>Drawing your chapter diagnostic…</Centered>;
-
-  if (error && !paper) {
-    return (
-      <Shell chapterId={chapterId}>
-        <ErrorCard message={error} onRetry={load} />
-      </Shell>
-    );
-  }
-
-  // A chapter without enough tagged questions. Said plainly - this is a gap in
-  // the question bank, not something the learner did. Excludes
-  // 'already_attempted', which also has a null attemptId (no NEW paper was
-  // drawn) but for a completely different, non-error reason handled below.
-  if (paper && !paper.attemptId && paper.attemptStatus !== 'already_attempted') {
-    return (
-      <Shell chapterId={chapterId}>
-        <Card className="border-amber-200 bg-amber-50">
-          <CardHeader className="flex flex-row items-start gap-3">
-            <AlertTriangle aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-            <div>
-              <CardTitle className="text-base text-amber-900">
-                This chapter is not ready for a chapter diagnostic yet
-              </CardTitle>
-              <p className="mt-1 text-sm text-amber-800">
-                {paper.message ||
-                  'There are not enough multiple-choice questions tagged for this chapter.'}
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-amber-800">
-              The chapter diagnostic needs five easy, five medium and five hard questions. Your teacher
-              will see this chapter listed as a content gap.
-            </p>
-            <Link href="/pal" className={cn(buttonVariants({ variant: 'outline' }), 'mt-4')}>Back to subjects</Link>
-          </CardContent>
-        </Card>
-      </Shell>
-    );
-  }
-
-  // A submitted attempt already exists and no in_progress one is being
-  // resumed - show the previous result and offer a retake instead of
-  // silently drafting a second attempt the learner never asked for. See
-  // DiagnosticService::previousAttempt() on the backend.
-  if (paper && paper.attemptStatus === 'already_attempted' && paper.previousAttempt) {
-    return (
-      <Shell chapterId={chapterId}>
-        <DiagnosticAlreadyAttemptedGate
-          previous={paper.previousAttempt}
-          onRetake={() => load({ retake: true })}
-        />
-      </Shell>
-    );
+    // Nothing left to diagnose. No paper was drawn and no attempt was opened.
+    if (completion.isComplete && mastery) {
+      return (
+        <PalWorkspace
+          eyebrow={mastery.chapterName || 'This chapter'}
+          title="Chapter mastery"
+          description="This chapter is completed, so there is no diagnostic left to take."
+          backHref="/pal"
+          backLabel="Back to subjects"
+          actions={
+            <>
+              <CompletedBadge />
+              <ReadOnlyBadge />
+            </>
+          }
+          rail={
+            <PalRailSection title="Your journey">
+              <JourneyRail
+                current="mastery"
+                completed={COMPLETED_THROUGH_CHECK}
+                bypassed={['intervention']}
+                orientation="vertical"
+              />
+            </PalRailSection>
+          }
+        >
+          <CompletedChapterPanel mastery={mastery} completion={completion} />
+        </PalWorkspace>
+      );
+    }
   }
 
   // Submitted. A reveal dialog shows the score/tier moment, then sends the
@@ -722,7 +673,45 @@ function DiagnosticExam() {
 
   const diagnosticExamQuestions = (
     <>
-      {paper?.resumed && (
+      {loading ? (
+        <Centered>Drawing your chapter diagnostic…</Centered>
+      ) : error && !paper ? (
+        <ErrorCard message={error} onRetry={load} />
+      ) : paper && !paper.attemptId && paper.attemptStatus !== 'already_attempted' ? (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardHeader className="flex flex-row items-start gap-3">
+            <AlertTriangle aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div>
+              <CardTitle className="text-base text-amber-900">
+                This chapter is not ready for a chapter diagnostic yet
+              </CardTitle>
+              <p className="mt-1 text-sm text-amber-800">
+                {paper.message ||
+                  'There are not enough multiple-choice questions tagged for this chapter.'}
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-amber-800">
+              The chapter diagnostic needs five easy, five medium and five hard questions. Your teacher
+              will see this chapter listed as a content gap.
+            </p>
+            <div className="mt-4 flex items-center gap-3">
+              <Button variant="outline" onClick={() => setSelectedStep(null)}>
+                Return to Journey Overview
+              </Button>
+              <Link href="/pal" className={cn(buttonVariants({ variant: 'ghost' }))}>Back to subjects</Link>
+            </div>
+          </CardContent>
+        </Card>
+      ) : paper && paper.attemptStatus === 'already_attempted' && paper.previousAttempt ? (
+        <DiagnosticAlreadyAttemptedGate
+          previous={paper.previousAttempt}
+          onRetake={() => load({ retake: true })}
+        />
+      ) : (
+        <>
+          {paper?.resumed && (
         <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
           <p className="text-sm font-medium text-indigo-900">
             Picking up where you left off
@@ -838,6 +827,8 @@ function DiagnosticExam() {
           </Button>
         )}
       </div>
+        </>
+      )}
     </>
   );
 

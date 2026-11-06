@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -37,6 +37,7 @@ import {
   acknowledgeConceptLearn,
   fetchAdaptiveConcepts,
   fetchAdaptiveQuestions,
+  generateFallbackAdaptiveQuestions,
   submitAdaptiveAnswer,
   fetchConceptLearn,
   fetchLearningPlan,
@@ -55,6 +56,12 @@ import {
 import { Compass } from 'lucide-react';
 import { ExperimentStepView } from './ExperimentStepView';
 import { ExplanationLabStepView } from './ExplanationLabStepView';
+import {
+  saveAdaptivePracticeAnalysis,
+  type AdaptivePracticeAnalysis,
+  type PerformanceLevel,
+  type WrongQuestionRecord,
+} from '@/app/pal/data/pal-explanation-lab';
 
 export interface JourneyStepContentProps {
   stepId: JourneyStepId;
@@ -130,6 +137,7 @@ export function JourneyStepContent({
           <ExplanationLabStepView
             chapterId={chapterId}
             chapterName={chapterName}
+            subjectName={subjectName}
             onStepComplete={onStepComplete}
             onNextStep={onNextStep}
           />
@@ -413,7 +421,9 @@ function LearnStepView({
   useEffect(() => {
     if (!selectedConceptId) return;
     let active = true;
-    setLesson(null);
+    queueMicrotask(() => {
+      setLesson(null);
+    });
 
     fetchConceptLearn(selectedConceptId)
       .then((res) => {
@@ -581,12 +591,11 @@ function LearnStepView({
               size="sm"
               variant="outline"
               onClick={() => {
-                if (selectedConceptId) {
-                  router.push(`/pal/adaptive/concept/${selectedConceptId}`);
-                }
+                onStepComplete?.('learn');
+                onNextStep?.('practice');
               }}
             >
-              Take Concept Quiz
+              Start Adaptive Practice
               <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
             </Button>
           </div>
@@ -607,7 +616,7 @@ function LearnStepView({
             onNextStep?.('practice');
           }}
         >
-          <span>Complete Step & Continue to Practice</span>
+          <span>Complete Step & Continue to Step 5: Adaptive Practice</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </div>
@@ -632,6 +641,8 @@ function PracticeStepView({
   onBackToCollage?: () => void;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetConceptId = searchParams?.get('conceptId');
   const [concepts, setConcepts] = useState<AdaptiveConcept[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -648,6 +659,48 @@ function PracticeStepView({
   const [isAnswerCorrect, setIsAnswerCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [drillCompleted, setDrillCompleted] = useState(false);
+  const [questionHistory, setQuestionHistory] = useState<
+    Array<{
+      questionId: string;
+      title: string;
+      selectedOptionText?: string;
+      correctOptionText?: string;
+      feedback?: string;
+      difficulty?: string;
+      isCorrect: boolean;
+    }>
+  >([]);
+  const [lastAnalysis, setLastAnalysis] = useState<AdaptivePracticeAnalysis | null>(null);
+
+  const startDrill = useCallback(async (concept: AdaptiveConcept) => {
+    setActiveConcept(concept);
+    setLoadingQuestions(true);
+    setQuestionError(null);
+    setCurrentIndex(0);
+    setSelectedOption(null);
+    setSubmitted(false);
+    setFeedbackText(null);
+    setIsAnswerCorrect(null);
+    setScore({ correct: 0, total: 0 });
+    setDrillCompleted(false);
+    setQuestionHistory([]);
+    setLastAnalysis(null);
+
+    try {
+      const data = await fetchAdaptiveQuestions(concept.conceptId, 5);
+      if (data?.items && data.items.length > 0) {
+        setPracticeSet(data);
+      } else {
+        const fallback = generateFallbackAdaptiveQuestions(concept.conceptId, concept.name, 5, chapterName);
+        setPracticeSet(fallback);
+      }
+    } catch {
+      const fallback = generateFallbackAdaptiveQuestions(concept.conceptId, concept.name, 5, chapterName);
+      setPracticeSet(fallback);
+    } finally {
+      setLoadingQuestions(false);
+    }
+  }, [chapterName]);
 
   useEffect(() => {
     let active = true;
@@ -665,30 +718,17 @@ function PracticeStepView({
     };
   }, [chapterId]);
 
-  const startDrill = async (concept: AdaptiveConcept) => {
-    setActiveConcept(concept);
-    setLoadingQuestions(true);
-    setQuestionError(null);
-    setCurrentIndex(0);
-    setSelectedOption(null);
-    setSubmitted(false);
-    setFeedbackText(null);
-    setIsAnswerCorrect(null);
-    setScore({ correct: 0, total: 0 });
-    setDrillCompleted(false);
-
-    try {
-      const data = await fetchAdaptiveQuestions(concept.conceptId, 5);
-      setPracticeSet(data);
-      if (!data.items || data.items.length === 0) {
-        setQuestionError('No practice questions available for this concept right now.');
+  // Auto-start drill if target concept is specified in URL query (e.g. ?conceptId=7184)
+  useEffect(() => {
+    if (concepts.length > 0 && !activeConcept && targetConceptId) {
+      const found = concepts.find((c) => String(c.conceptId) === String(targetConceptId));
+      if (found) {
+        queueMicrotask(() => {
+          void startDrill(found);
+        });
       }
-    } catch (err: unknown) {
-      setQuestionError(err instanceof Error ? err.message : 'Could not load practice questions.');
-    } finally {
-      setLoadingQuestions(false);
     }
-  };
+  }, [concepts, targetConceptId, activeConcept, startDrill]);
 
   const currentQuestion = practiceSet?.items[currentIndex] ?? null;
   const totalQuestions = practiceSet?.items.length ?? 0;
@@ -697,6 +737,40 @@ function PracticeStepView({
     if (!selectedOption || !currentQuestion || !activeConcept || submitting) return;
 
     setSubmitting(true);
+    const chosenOpt = currentQuestion.options.find((o) => o.id === selectedOption);
+    const rightOpt =
+      currentQuestion.options.find((o) => o.isCorrect) ||
+      (chosenOpt?.isCorrect ? chosenOpt : currentQuestion.options[0]);
+
+    // Handle generated or local questions directly with instant evaluation
+    if (String(currentQuestion.questionId).startsWith('gen-')) {
+      const correct = chosenOpt?.isCorrect === true || chosenOpt?.id === rightOpt?.id;
+      setIsAnswerCorrect(correct);
+      const feedback = correct
+        ? 'Correct! Great job understanding this concept principle.'
+        : `Incorrect. The correct answer is: ${rightOpt?.answer || 'Option A'}.`;
+      setFeedbackText(feedback);
+      setSubmitted(true);
+      setScore((prev) => ({
+        correct: prev.correct + (correct ? 1 : 0),
+        total: prev.total + 1,
+      }));
+      setQuestionHistory((prev) => [
+        ...prev,
+        {
+          questionId: currentQuestion.questionId,
+          title: currentQuestion.title,
+          selectedOptionText: chosenOpt?.answer || selectedOption,
+          correctOptionText: rightOpt?.answer,
+          feedback,
+          difficulty: currentQuestion.difficulty || practiceSet?.difficulty || 'medium',
+          isCorrect: correct,
+        },
+      ]);
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const res = await submitAdaptiveAnswer({
         conceptId: activeConcept.conceptId,
@@ -706,31 +780,58 @@ function PracticeStepView({
 
       const correct = res.isCorrect;
       setIsAnswerCorrect(correct);
-      setFeedbackText(
+
+      const feedback =
         res.feedback ||
-          (correct
-            ? 'Correct! Great job understanding this concept principle.'
-            : 'Incorrect. Take a moment to review the core idea before moving on.')
-      );
+        (correct
+          ? 'Correct! Great job understanding this concept principle.'
+          : 'Incorrect. Take a moment to review the core idea before moving on.');
+      setFeedbackText(feedback);
       setSubmitted(true);
       setScore((prev) => ({
         correct: prev.correct + (correct ? 1 : 0),
         total: prev.total + 1,
       }));
+
+      setQuestionHistory((prev) => [
+        ...prev,
+        {
+          questionId: currentQuestion.questionId,
+          title: currentQuestion.title,
+          selectedOptionText: chosenOpt?.answer || selectedOption,
+          correctOptionText: rightOpt?.answer,
+          feedback,
+          difficulty: currentQuestion.difficulty || practiceSet?.difficulty || 'medium',
+          isCorrect: correct,
+        },
+      ]);
     } catch {
       // Local fallback in case offline or simulated response
-      const isCorrectGuess = selectedOption === currentQuestion.options[0]?.id;
+      const isCorrectGuess = chosenOpt?.isCorrect === true || chosenOpt?.id === rightOpt?.id;
       setIsAnswerCorrect(isCorrectGuess);
-      setFeedbackText(
-        isCorrectGuess
-          ? 'Correct! Solid demonstration of concept mastery.'
-          : 'Not quite. Check your calculation or definition before moving to the next item.'
-      );
+
+      const feedback = isCorrectGuess
+        ? 'Correct! Solid demonstration of concept mastery.'
+        : 'Not quite. Check your calculation or definition before moving to the next item.';
+      setFeedbackText(feedback);
       setSubmitted(true);
       setScore((prev) => ({
         correct: prev.correct + (isCorrectGuess ? 1 : 0),
         total: prev.total + 1,
       }));
+
+      setQuestionHistory((prev) => [
+        ...prev,
+        {
+          questionId: currentQuestion.questionId,
+          title: currentQuestion.title,
+          selectedOptionText: chosenOpt?.answer || selectedOption,
+          correctOptionText: rightOpt?.answer,
+          feedback,
+          difficulty: currentQuestion.difficulty || practiceSet?.difficulty || 'medium',
+          isCorrect: isCorrectGuess,
+        },
+      ]);
     } finally {
       setSubmitting(false);
     }
@@ -744,6 +845,50 @@ function PracticeStepView({
       setFeedbackText(null);
       setIsAnswerCorrect(null);
     } else {
+      // Analyze performance and build topic-specific gap profile
+      if (activeConcept) {
+        const correctCount = score.correct;
+        const totalCount = Math.max(1, score.total);
+        const accuracy = Math.round((correctCount / totalCount) * 100);
+        const performanceLevel: PerformanceLevel =
+          accuracy < 50 ? 'struggling' : accuracy < 70 ? 'developing' : 'proficient';
+
+        const wrongQuestions: WrongQuestionRecord[] = questionHistory
+          .filter((q) => !q.isCorrect)
+          .map((q) => ({
+            questionId: q.questionId,
+            title: q.title,
+            selectedOptionText: q.selectedOptionText,
+            correctOptionText: q.correctOptionText,
+            feedback: q.feedback,
+            difficulty: q.difficulty,
+          }));
+
+        const learningGaps = wrongQuestions.map((q) => q.title);
+
+        const analysis: AdaptivePracticeAnalysis = {
+          chapterId,
+          chapterName,
+          conceptId: activeConcept.conceptId,
+          conceptName: activeConcept.name,
+          score: {
+            correct: correctCount,
+            total: totalCount,
+            percentage: accuracy,
+          },
+          difficulty: practiceSet?.difficulty || 'medium',
+          performanceLevel,
+          wrongQuestions,
+          learningGaps:
+            learningGaps.length > 0
+              ? learningGaps
+              : [`Strengthen practical laboratory application of ${activeConcept.name}`],
+          completedAt: new Date().toISOString(),
+        };
+
+        saveAdaptivePracticeAnalysis(chapterId, analysis);
+        setLastAnalysis(analysis);
+      }
       setDrillCompleted(true);
     }
   };
@@ -773,18 +918,28 @@ function PracticeStepView({
         <div className="space-y-4">
           <Card className="border-amber-200 bg-amber-50">
             <CardContent className="pt-6 text-sm text-amber-900">
-              <p className="font-semibold">{questionError || 'No practice questions found.'}</p>
+              <p className="font-semibold">Ready to generate practice questions for {activeConcept.name}…</p>
               <div className="mt-4 flex gap-2">
+                <Button
+                  size="sm"
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white gap-1.5"
+                  onClick={() => {
+                    const fallback = generateFallbackAdaptiveQuestions(
+                      activeConcept.conceptId,
+                      activeConcept.name,
+                      5,
+                      chapterName
+                    );
+                    setPracticeSet(fallback);
+                    setQuestionError(null);
+                  }}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Generate Practice Questions Now
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => setActiveConcept(null)}>
                   <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
                   Choose another concept
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-emerald-700 hover:bg-emerald-800 text-white"
-                  onClick={() => router.push(`/pal/eso?conceptId=${activeConcept.conceptId}&chapterId=${chapterId}`)}
-                >
-                  Open Engine Session
                 </Button>
               </div>
             </CardContent>
@@ -795,32 +950,141 @@ function PracticeStepView({
 
     if (drillCompleted) {
       const accuracy = Math.round((score.correct / Math.max(1, score.total)) * 100);
+      const isFullMarks = score.total > 0 && score.correct === score.total;
+      const isStruggling = accuracy < 50;
+      const isDeveloping = accuracy >= 50 && accuracy < 70;
+      const wrongCount = lastAnalysis?.wrongQuestions.length ?? (score.total - score.correct);
+
       return (
         <div className="space-y-4">
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-5 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md">
               <Trophy className="h-7 w-7 text-amber-300" />
             </div>
-            <h3 className="mt-3 text-lg font-bold text-emerald-950">Practice Drill Completed!</h3>
+            <h3 className="mt-3 text-lg font-bold text-emerald-950">
+              {isFullMarks ? 'Full Marks Achieved!' : 'Adaptive Practice Completed!'}
+            </h3>
             <p className="text-xs text-emerald-800">
               You scored <span className="font-bold">{score.correct} of {score.total}</span> ({accuracy}%) on {activeConcept.name}.
             </p>
+
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              {isFullMarks ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3.5 py-1 text-xs font-bold text-emerald-800 shadow-2xs">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  Full Marks (100%) — Explanation Lab Not Required
+                </span>
+              ) : isStruggling ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
+                  <AlertTriangle className="h-3.5 w-3.5 text-rose-600" />
+                  Needs Practical Foundation (&lt; 50%)
+                </span>
+              ) : isDeveloping ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                  Developing Understanding (50–69%)
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Proficient Concept Grasp ({accuracy}%)
+                </span>
+              )}
+            </div>
+
+            {/* Performance Gap Analysis Summary */}
+            <div className="mx-auto mt-4 max-w-xl text-left rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-2 font-bold text-xs text-slate-800">
+                <Brain className="h-4 w-4 text-purple-600" />
+                <span>Performance & Learning Gap Analysis</span>
+              </div>
+
+              {isFullMarks ? (
+                <div className="mt-2 space-y-1.5 text-xs text-slate-600">
+                  <p className="text-emerald-700 font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    Zero Misconceptions Detected!
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    You demonstrated full mastery across every practice question. Because you achieved full marks, you can proceed directly to <strong>Step 7: Feedback &amp; Review</strong> without needing the remedial Explanation Lab.
+                  </p>
+                </div>
+              ) : wrongCount > 0 && lastAnalysis?.wrongQuestions?.length ? (
+                <div className="mt-2 space-y-2">
+                  <p className="text-xs text-slate-600">
+                    The system identified <span className="font-semibold text-rose-700">{wrongCount} concept area{wrongCount > 1 ? 's' : ''}</span> where you need practical reinforcement:
+                  </p>
+                  <ul className="space-y-1.5 pl-2 text-xs">
+                    {lastAnalysis.wrongQuestions.map((wq, i) => (
+                      <li key={i} className="flex items-start gap-2 text-slate-700">
+                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
+                        <span className="line-clamp-2">{wq.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50/70 p-2.5 text-xs text-purple-900">
+                    <p className="font-semibold">Next Step: Explanation Lab</p>
+                    <p className="mt-0.5 text-[11px] text-purple-700">
+                      Rather than repeating theory, Explanation Lab has generated a hands-on virtual laboratory experiment and real-world demonstration tailored directly to these misconceptions.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-1 text-xs text-slate-600">
+                  <p className="text-emerald-700 font-semibold">Zero Misconceptions Detected!</p>
+                  <p className="text-[11px]">
+                    You demonstrated full mastery of this practice set. Explanation Lab will provide an interactive simulation where you can test advanced parameters and boundary conditions.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="mt-5 flex flex-wrap justify-center gap-3">
               <Button size="sm" variant="outline" onClick={() => setActiveConcept(null)}>
                 <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
                 Practise Another Concept
               </Button>
-              <Button
-                size="sm"
-                className="gap-2 bg-emerald-700 text-white hover:bg-emerald-800"
-                onClick={() => {
-                  onStepComplete?.('practice');
-                  onNextStep?.('explanation_lab');
-                }}
-              >
-                <span>Continue to Step 6: Explanation Lab</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
+              {isFullMarks ? (
+                <Button
+                  size="sm"
+                  className="gap-2 bg-emerald-700 text-white hover:bg-emerald-800 shadow-sm"
+                  onClick={() => {
+                    const key = `pal_completed_steps_${chapterId}`;
+                    try {
+                      const raw = sessionStorage.getItem(key);
+                      const set = new Set(raw ? JSON.parse(raw) : []);
+                      set.add('practice');
+                      set.add('explanation_lab');
+                      sessionStorage.setItem(key, JSON.stringify(Array.from(set)));
+                    } catch {}
+                    onStepComplete?.('practice');
+                    onStepComplete?.('explanation_lab');
+                    onNextStep?.('feedback');
+                  }}
+                >
+                  <span>Continue to Step 7: Feedback & Review</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="gap-2 bg-emerald-700 text-white hover:bg-emerald-800 shadow-sm"
+                  onClick={() => {
+                    const key = `pal_completed_steps_${chapterId}`;
+                    try {
+                      const raw = sessionStorage.getItem(key);
+                      const set = new Set(raw ? JSON.parse(raw) : []);
+                      set.add('practice');
+                      sessionStorage.setItem(key, JSON.stringify(Array.from(set)));
+                    } catch {}
+                    onStepComplete?.('practice');
+                    onNextStep?.('explanation_lab');
+                  }}
+                >
+                  <span>Continue to Step 6: Explanation Lab</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -1018,24 +1282,69 @@ function PracticeStepView({
       </div>
 
       {/* Completion & Next Step Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
-        <div>
-          <p className="text-xs font-bold text-emerald-950">Adaptive Practice Finished?</p>
-          <p className="mt-0.5 text-xs text-emerald-800">Advance to Step 6: Explanation Lab for experiments on the concepts you found hardest.</p>
-        </div>
-        <Button
-          size="sm"
-          className="gap-2 bg-emerald-700 text-xs font-semibold text-white hover:bg-emerald-800"
-          onClick={() => {
-            onStepComplete?.('practice');
-            onNextStep?.('explanation_lab');
-          }}
-        >
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          <span>Complete Step & Continue to Explanation Lab</span>
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
-      </div>
+      {(() => {
+        const hasOverallFullMarks =
+          lastAnalysis?.score.percentage === 100 ||
+          (concepts.length > 0 && concepts.every((c) => c.practiceAttempts > 0 && c.practicePercentage === 100));
+
+        return (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+            <div>
+              <p className="text-xs font-bold text-emerald-950">
+                {hasOverallFullMarks ? 'Full Marks Achieved on Practice!' : 'Adaptive Practice Finished?'}
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-800">
+                {hasOverallFullMarks
+                  ? 'All practice questions answered with full marks. Advance directly to Step 7: Feedback & Review.'
+                  : 'Advance to Step 6: Explanation Lab for experiments on the concepts you found hardest.'}
+              </p>
+            </div>
+            {hasOverallFullMarks ? (
+              <Button
+                size="sm"
+                className="gap-2 bg-emerald-700 text-xs font-semibold text-white hover:bg-emerald-800"
+                onClick={() => {
+                  const key = `pal_completed_steps_${chapterId}`;
+                  try {
+                    const raw = sessionStorage.getItem(key);
+                    const set = new Set(raw ? JSON.parse(raw) : []);
+                    set.add('practice');
+                    set.add('explanation_lab');
+                    sessionStorage.setItem(key, JSON.stringify(Array.from(set)));
+                  } catch {}
+                  onStepComplete?.('practice');
+                  onStepComplete?.('explanation_lab');
+                  onNextStep?.('feedback');
+                }}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>Complete Step & Continue to Feedback & Review</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="gap-2 bg-emerald-700 text-xs font-semibold text-white hover:bg-emerald-800"
+                onClick={() => {
+                  const key = `pal_completed_steps_${chapterId}`;
+                  try {
+                    const raw = sessionStorage.getItem(key);
+                    const set = new Set(raw ? JSON.parse(raw) : []);
+                    set.add('practice');
+                    sessionStorage.setItem(key, JSON.stringify(Array.from(set)));
+                  } catch {}
+                  onStepComplete?.('practice');
+                  onNextStep?.('explanation_lab');
+                }}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>Complete Step & Continue to Explanation Lab</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1201,7 +1510,7 @@ function FeedbackStepView({
       {/* Completion & Next Step Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
         <div>
-          <p className="text-xs font-bold text-blue-950">Feedback Reviewed?</p>
+          <p className="text-xs font-bold text-blue-950">Feedback & Review Completed?</p>
           <p className="mt-0.5 text-xs text-blue-800">Advance to Step 8: Understanding Check to prove your knowledge.</p>
         </div>
         <Button
@@ -1212,7 +1521,7 @@ function FeedbackStepView({
             onNextStep?.('check');
           }}
         >
-          <span>Complete Step & Continue to Check</span>
+          <span>Complete Step & Continue to Step 8: Understanding Check</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </div>

@@ -652,7 +652,7 @@ function ChapterRow({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => router.push(`/pal/journey?chapterId=${context.chapterId}`)}
+                  onClick={() => router.push(`/pal/diagnostic/chapter/${context.chapterId}`)}
                   className="border-sky-200 text-sky-700 hover:bg-sky-50"
                 >
                   <Mountain className="h-3.5 w-3.5" />
