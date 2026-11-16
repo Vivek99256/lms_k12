@@ -5,6 +5,7 @@ import { Search, ShieldCheck, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { errorMessage } from "@/lib/erp-legacy";
 import { loadRoles, type Role } from "./api";
+import { CategoryTabsTab } from "./CategoryTabsTab";
 import { CopyRightsTab } from "./CopyRightsTab";
 import { EffectiveAccessTab } from "./EffectiveAccessTab";
 import { HistoryTab } from "./HistoryTab";
@@ -24,10 +25,11 @@ const PAGE_THEME = {
   "--accent": "hsl(210 20% 96%)",
 } as React.CSSProperties;
 
-type TabKey = "modules" | "copy" | "effective" | "history";
+type TabKey = "modules" | "tabs" | "copy" | "effective" | "history";
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "modules", label: "Module-wise rights" },
+  { key: "tabs", label: "Module tabs" },
   { key: "copy", label: "Copy rights" },
   { key: "effective", label: "Who can see what" },
   { key: "history", label: "History" },
@@ -177,6 +179,8 @@ export function RoleAccessPage() {
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading roles...</div>
         ) : tab === "modules" ? (
           <ModuleRightsTab role={activeRole} onSaved={changed} />
+        ) : tab === "tabs" ? (
+          <CategoryTabsTab role={activeRole} onSaved={changed} />
         ) : tab === "copy" ? (
           <CopyRightsTab roles={roles} target={activeRole} onApplied={changed} />
         ) : tab === "effective" ? (

@@ -396,6 +396,29 @@ export async function loadHistoryDetail(batchId: string): Promise<HistoryEntry[]
   }));
 }
 
+export type CategoryTab = { key: string; label: string; visible: boolean };
+export type CategoryModule = { module: string; label: string; tabs: CategoryTab[] };
+export type CategoryChange = { module: string; category_key: string; visible: boolean };
+
+/** Every module's navigation tabs (Operations, Reports, Onboarding ...) and whether the role sees each. */
+export async function loadRoleCategories(roleId: number): Promise<CategoryModule[]> {
+  const { data } = await request(`role-access/roles/${roleId}/categories`);
+  return records(data.modules).map((row) => ({
+    module: readString(row.module),
+    label: readString(row.label).trim(),
+    tabs: records(row.tabs).map((tab) => ({
+      key: readString(tab.key),
+      label: readString(tab.label).trim(),
+      visible: Boolean(tab.visible),
+    })),
+  }));
+}
+
+export async function saveRoleCategories(roleId: number, changes: CategoryChange[], confirmAdmin = false): Promise<string> {
+  const { message } = await post(`role-access/roles/${roleId}/categories`, { changes, confirm_admin: confirmAdmin });
+  return message;
+}
+
 export async function undoBatch(batchId: string, confirmAdmin = false): Promise<UndoResult> {
   const { data, message } = await post(`role-access/history/${encodeURIComponent(batchId)}/undo`, {
     confirm_admin: confirmAdmin,
