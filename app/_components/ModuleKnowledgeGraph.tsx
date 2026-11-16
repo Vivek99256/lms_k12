@@ -225,61 +225,84 @@ export function ModuleKnowledgeGraph({ moduleName, label, moduleId }: ModuleKnow
         if (cancelled) return;
         setViews(loadedViews);
 
-        // Fetch ERP modules to find the corresponding module
+        // Fetch every ERP module, then every module's own submodules. This
+        // page's `moduleName` (e.g. "fees", "teach-learn") names a
+        // tblmenumaster SUBMODULE (level 2), not one of the handful of
+        // top-level ERP modules (level 1: "Institute ERP", "LMS + PAL", ...),
+        // so it must be matched at that level first — matching modules first
+        // (as this used to) fails for almost every real page and fell
+        // through to merging every module's submodules into one shared list,
+        // picking whichever came first regardless of which module's tab was
+        // actually open. That shared fallback is what made every module's
+        // Knowledge Graph tab show the same data.
         const modulesPayload = await listErpModules(session);
         const erpModules: ErpModule[] = Array.isArray(modulesPayload?.modules) ? modulesPayload.modules : [];
+
+        const submodulesByModule = await Promise.all(
+          erpModules.map(async (mod) => {
+            try {
+              const res = await listErpSubmodules(session, mod.id);
+              const subs: ErpSubmodule[] = Array.isArray(res?.submodules) ? res.submodules : [];
+              return subs.map((s) => ({ ...s, parentModuleId: mod.id, parentModuleLabel: mod.label }));
+            } catch {
+              return [];
+            }
+          })
+        );
+        const everySubmodule: ScopedSubmodule[] = submodulesByModule.flat();
 
         const normSlug = normalizeKey(moduleName);
         const normLabel = normalizeKey(label);
 
+        // Exact match wins over a fuzzy substring one, tried across the
+        // whole candidate set first so a short page name cannot be stolen by
+        // an unrelated label that merely contains it.
+        function findByName<T extends { label: string }>(items: T[]): T | null {
+          const exact = items.find((item) => {
+            const norm = normalizeKey(item.label);
+            return norm === normSlug || norm === normLabel;
+          });
+          if (exact) return exact;
+
+          return (
+            items.find((item) => {
+              const norm = normalizeKey(item.label);
+              return norm.includes(normSlug) || normSlug.includes(norm);
+            }) ?? null
+          );
+        }
+
+        // 1. This page IS one submodule — match it directly.
+        const matchedSubmodule = findByName(everySubmodule);
+
+        // 2. Only when that fails, this page might itself be a top-level
+        // module (moduleId was supplied explicitly, or the slug really does
+        // name one, e.g. "lms").
         let matchedModule = moduleId ? erpModules.find((m) => m.id === moduleId) : null;
-        if (!matchedModule) {
-          matchedModule = erpModules.find((m) => {
-            const mNorm = normalizeKey(m.label);
-            return mNorm === normSlug || mNorm === normLabel || mNorm.includes(normSlug) || normSlug.includes(mNorm);
-          }) || null;
+        if (!matchedModule && !matchedSubmodule) {
+          matchedModule = findByName(erpModules);
         }
 
         let moduleScoped: ScopedSubmodule[] = [];
+        let target: ScopedSubmodule | null = null;
 
-        if (matchedModule) {
-          try {
-            const res = await listErpSubmodules(session, matchedModule.id);
-            const subs: ErpSubmodule[] = Array.isArray(res?.submodules) ? res.submodules : [];
-            moduleScoped = subs.map((s) => ({
-              ...s,
-              parentModuleId: matchedModule!.id,
-              parentModuleLabel: matchedModule!.label,
-            }));
-          } catch {
-            moduleScoped = [];
-          }
-        } else {
-          // If no single module matched, collect submodules from all modules
-          const submodulesLists = await Promise.all(
-            erpModules.map(async (mod) => {
-              try {
-                const res = await listErpSubmodules(session, mod.id);
-                const subs: ErpSubmodule[] = Array.isArray(res?.submodules) ? res.submodules : [];
-                return subs.map((s) => ({
-                  ...s,
-                  parentModuleId: mod.id,
-                  parentModuleLabel: mod.label,
-                }));
-              } catch {
-                return [];
-              }
-            })
-          );
-          moduleScoped = submodulesLists.flat();
+        if (matchedSubmodule) {
+          // Scope the sidebar to this submodule's real siblings — the other
+          // submodules of the SAME parent module — not every submodule on
+          // the platform.
+          moduleScoped = everySubmodule.filter((s) => s.parentModuleId === matchedSubmodule.parentModuleId);
+          target = matchedSubmodule;
+        } else if (matchedModule) {
+          moduleScoped = everySubmodule.filter((s) => s.parentModuleId === matchedModule!.id);
+          target = moduleScoped.find((s) => s.mapped) || moduleScoped[0] || null;
         }
+        // Neither matched: there is no honest submodule list for this page,
+        // so none is shown — never the unrelated cross-module merge this
+        // used to fall back to.
 
         if (cancelled) return;
         setAllSubmodules(moduleScoped);
         setRelevantSubmodules(moduleScoped);
-
-        // Pick initial target: first submodule with mapped=true, or first submodule
-        const target = moduleScoped.find((s) => s.mapped) || moduleScoped[0] || null;
 
         if (target) {
           setSelectedSubmodule(target);
