@@ -75,8 +75,9 @@ import {
   CONTENT_TEMPLATES,
   type ContentTemplateOption,
   TemplateDesignCanvas,
+  TemplateLayoutWireframe,
 } from './template-design-canvas';
-export { CONTENT_TEMPLATES, type ContentTemplateOption, TemplateDesignCanvas };
+export { CONTENT_TEMPLATES, type ContentTemplateOption, TemplateDesignCanvas, TemplateLayoutWireframe };
 
 interface CatalogueAgentControlCardProps {
   onValidated?: (report?: HierarchyValidationReport | UnifiedTeachLearnReport | unknown) => void;
@@ -2609,35 +2610,9 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                               </span>
                             </div>
 
-                            {/* Template visual preview pill */}
-                            <div
-                              className="rounded-lg p-2.5 my-2 border flex items-center justify-between gap-2 shadow-2xs"
-                              style={{
-                                backgroundColor: tmpl.previewBg,
-                                borderColor: tmpl.borderColor,
-                              }}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div
-                                  className="size-3 rounded-full shrink-0 shadow-xs"
-                                  style={{ backgroundColor: tmpl.paletteDot }}
-                                />
-                                <span
-                                  className="text-[11px] font-mono font-bold truncate"
-                                  style={{ color: tmpl.previewText }}
-                                >
-                                  {tmpl.name}
-                                </span>
-                              </div>
-                              <span
-                                className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
-                                style={{
-                                  backgroundColor: tmpl.previewAccent + '25',
-                                  color: tmpl.previewAccent,
-                                }}
-                              >
-                                SVG Visuals
-                              </span>
+                            {/* Unique Layout Architecture Wireframe Preview */}
+                            <div className="my-2">
+                              <TemplateLayoutWireframe templateId={tmpl.id} />
                             </div>
 
                             <p className="text-[11px] text-slate-600 leading-relaxed mb-2.5 line-clamp-2">
@@ -2747,39 +2722,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                       </div>
                     </div>
 
-                    {/* Quick Switch Palette Bar for Simultaneous Immediate Updates */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 border-b border-indigo-100/60">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
-                        <Palette className="size-3 text-indigo-600" />
-                        Quick Switch Palette:
-                      </span>
-                      {CONTENT_TEMPLATES.map((tmpl) => {
-                        const isSelected = selectedTemplate === tmpl.id;
-                        return (
-                          <button
-                            key={tmpl.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedTemplate(tmpl.id);
-                              if (typeof document !== 'undefined') {
-                                document.documentElement.setAttribute('data-template', tmpl.id);
-                              }
-                            }}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${
-                              isSelected
-                                ? 'bg-indigo-600 text-white shadow-2xs ring-2 ring-indigo-400 font-bold'
-                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
-                            }`}
-                          >
-                            <span
-                              className="size-2 rounded-full shrink-0 shadow-2xs"
-                              style={{ backgroundColor: tmpl.paletteDot }}
-                            />
-                            <span className="truncate">{tmpl.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+
 
                     {/* PPT Mode Slide Selector Bar */}
                     {previewMode === 'ppt' && (
@@ -4092,39 +4035,6 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-950 flex flex-col items-center space-y-4">
-              {/* Quick Switch Palette Bar inside Modal */}
-              <div className="w-full max-w-4xl flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
-                  <Palette className="size-3 text-indigo-400" />
-                  Quick Palette:
-                </span>
-                {CONTENT_TEMPLATES.map((tmpl) => {
-                  const isSelected = selectedTemplate === tmpl.id;
-                  return (
-                    <button
-                      key={tmpl.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedTemplate(tmpl.id);
-                        if (typeof document !== 'undefined') {
-                          document.documentElement.setAttribute('data-template', tmpl.id);
-                        }
-                      }}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${
-                        isSelected
-                          ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 font-bold'
-                          : 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'
-                      }`}
-                    >
-                      <span
-                        className="size-2 rounded-full shrink-0 shadow-2xs"
-                        style={{ backgroundColor: tmpl.paletteDot }}
-                      />
-                      <span className="truncate">{tmpl.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
 
               {previewMode === 'ppt' && (
                 <div className="w-full max-w-4xl flex items-center justify-between text-xs text-slate-400 shrink-0">
