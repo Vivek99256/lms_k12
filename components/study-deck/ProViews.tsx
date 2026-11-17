@@ -6,6 +6,7 @@ import { ArrowRight, Check, Pause, Play, RotateCcw } from 'lucide-react';
 
 import type { BarsInteraction, DeckImage, FlowInteraction, HubInteraction } from '@/lib/study-deck/types';
 import { LabelledArt, TourStage, type ArtId } from './ProTour';
+import { assetUrl } from '@/lib/study-deck/deck';
 import { useStage } from './stage-ui';
 
 /**
@@ -199,13 +200,15 @@ export function FlowView({ interaction, heading, image, assetBase, onDone }: Flo
 
   const progress = total > 1 ? Math.max(0, reached - 1) / (total - 1) : 1;
   const stage = tour && image;
+  // A flow with a picture but no tour art (every generated Branching Scenario): the picture sits beside the steps, as a plain photograph.
+  const photo = !tour && image ? image : null;
   // On a phone the picture takes the slide and only the step being played is written under it.
-  const compact = Boolean(stage) && portrait;
+  const compact = Boolean(stage || photo) && portrait;
 
   return (
     <section
       aria-label="Watch it work"
-      className={`h-full min-h-0 ${compact ? 'flex flex-col gap-[0.6em] p-[0.8em]' : `grid gap-[1.4em] ${stage ? 'grid-cols-[minmax(0,6fr)_minmax(0,5fr)] py-[0.9em] pl-[1.6em] pr-[1em]' : 'p-[1.6em]'}`}`}
+      className={`h-full min-h-0 ${compact ? 'flex flex-col gap-[0.6em] p-[0.8em]' : `grid gap-[1.4em] ${stage || photo ? 'grid-cols-[minmax(0,6fr)_minmax(0,5fr)] py-[0.9em] pl-[1.6em] pr-[1em]' : 'p-[1.6em]'}`}`}
     >
       <div className={`flex min-h-0 min-w-0 flex-col gap-[1.1em] ${compact ? 'order-2 shrink-0 gap-[0.5em]' : 'justify-center-safe'}`}>
         <header className="flex flex-col gap-[0.3em]">
@@ -290,6 +293,16 @@ export function FlowView({ interaction, heading, image, assetBase, onDone }: Flo
       {stage ? (
         <div className={`min-h-0 min-w-0 overflow-hidden ${compact ? 'order-1 flex-1' : ''}`}>
           <TourStage art={tour} image={image} assetBase={assetBase} step={reached} />
+        </div>
+      ) : photo ? (
+        <div className={`relative min-h-0 min-w-0 overflow-hidden bg-slate-200 ${compact ? 'order-1 flex-1' : ''}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies */}
+          <img src={assetUrl(photo.url, assetBase)} alt={photo.alt} className={`absolute inset-0 h-full w-full ${photo.type === 'diagram' ? 'object-contain' : 'object-cover'}`} style={photo.type === 'diagram' ? { background: photo.bg ?? '#eef2f7' } : undefined} />
+          {reached > 0 ? (
+            <p aria-hidden="true" className="absolute inset-x-0 bottom-0 bg-slate-950/75 px-[1.2em] py-[0.7em] text-[1em] font-semibold text-white">
+              {interaction.steps[Math.min(reached, total) - 1].label}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </section>
