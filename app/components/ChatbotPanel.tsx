@@ -659,7 +659,17 @@ export default function ChatbotPanel({
           conversationId: lifecycleThreadRef.current,
           // On an exam's attempt screen this also carries the paper and the question the student is on, so
           // "explain it in simpler words" still means that question. The backend re-checks both.
-          payload: { ...(examHelpPayload(pathname) ?? {}), ...(actionPayload ?? {}) },
+          // Page context (entityType, entityId, filters, pageTitle) ensures context-aware LMS and PAL answering.
+          payload: {
+            ...(examHelpPayload(pathname) ?? {}),
+            ...(actionPayload ?? {}),
+            entity_type: pageAi.entityType ?? null,
+            entity_id: pageAi.entityId ?? null,
+            page_title: pageAi.descriptor?.pageTitle ?? null,
+            page_type: pageAi.descriptor?.pageType ?? null,
+            page_filters: pageAi.descriptor?.filters ?? null,
+            page_data: pageAi.pageData ?? null,
+          },
           module: actionModule ?? workspace.context?.module ?? null,
           route: pathname,
           inputMode: voice ? 'voice' : 'text',
@@ -1371,13 +1381,16 @@ export default function ChatbotPanel({
                           language={answerLanguageOf(message)}
                           module={message.module}
                           auth={session}
-                          onOpen={() =>
+                          onOpen={() => {
                             executeNavigation({
                               route: handoff.route,
                               query: handoff.query,
                               label: handoff.label,
-                            })
-                          }
+                            });
+                            if (typeof onToggleChatbot === 'function') {
+                              onToggleChatbot();
+                            }
+                          }}
                         />
                       );
                     })()}

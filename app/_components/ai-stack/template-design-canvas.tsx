@@ -29,6 +29,8 @@ import {
   Crosshair,
 } from 'lucide-react';
 
+export { TemplateLayoutWireframe } from './template-layout-wireframe';
+
 export interface ContentTemplateOption {
   id: string;
   name: string;
@@ -471,7 +473,7 @@ function ModernTechSlide({
       </div>
 
       {/* Main Slide Stage */}
-      <div className="my-auto py-2">
+      <div className="flex-1 flex flex-col justify-center py-2 sm:py-3 min-h-0">
         {slideIdx === 0 && (
           <div className="space-y-4">
             <div>
@@ -631,7 +633,7 @@ function AcademicClassicSlide({
       </div>
 
       {/* Classical Slide Stage */}
-      <div className="my-auto py-2">
+      <div className="flex-1 flex flex-col justify-center py-2 sm:py-3 min-h-0">
         {slideIdx === 0 && (
           <div className="text-center space-y-3 max-w-2xl mx-auto">
             <span className="text-[10px] font-bold tracking-widest text-blue-900 uppercase">
@@ -792,7 +794,7 @@ function VibrantCreativeSlide({
       </div>
 
       {/* Main Playful Stage */}
-      <div className="my-auto py-2">
+      <div className="flex-1 flex flex-col justify-center py-2 sm:py-3 min-h-0">
         {slideIdx === 0 && (
           <div className="space-y-3.5">
             <div>
@@ -955,7 +957,7 @@ function StemBlueprintSlide({
       </div>
 
       {/* Main Engineering Schematic Stage */}
-      <div className="my-auto py-2">
+      <div className="flex-1 flex flex-col justify-center py-2 sm:py-3 min-h-0">
         {slideIdx === 0 && (
           <div className="space-y-3">
             <div>
@@ -1109,7 +1111,7 @@ function WarmEditorialSlide({
       </div>
 
       {/* Main Editorial Stage */}
-      <div className="my-auto py-2">
+      <div className="flex-1 flex flex-col justify-center py-2 sm:py-3 min-h-0">
         {slideIdx === 0 && (
           <div className="grid grid-cols-12 gap-5 items-center">
             <div className="col-span-7 space-y-2.5">
@@ -1251,7 +1253,7 @@ function MinimalistCleanSlide({
       </div>
 
       {/* Main Swiss Minimal Stage */}
-      <div className="my-auto py-2">
+      <div className="flex-1 flex flex-col justify-center py-2 sm:py-3 min-h-0">
         {slideIdx === 0 && (
           <div className="space-y-4">
             <div>
@@ -1397,7 +1399,7 @@ function InfographicVisualSlide({
       </div>
 
       {/* Main Infographic Stage */}
-      <div className="my-auto py-2">
+      <div className="flex-1 flex flex-col justify-center py-2 sm:py-3 min-h-0">
         {slideIdx === 0 && (
           <div className="space-y-3.5">
             <div>
@@ -1552,7 +1554,7 @@ function GamifiedQuestSlide({
       </div>
 
       {/* Main Quest Stage */}
-      <div className="my-auto py-2">
+      <div className="flex-1 flex flex-col justify-center py-2 sm:py-3 min-h-0">
         {slideIdx === 0 && (
           <div className="space-y-3.5">
             <div>
