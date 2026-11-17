@@ -232,7 +232,7 @@ function ProHero({ slide, assetBase }: { slide: DeckSlide; assetBase: string | n
       </div>
       <div className="relative min-h-0 min-w-0 bg-slate-200">
         {/* eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies */}
-        <img src={assetUrl(image.url, assetBase)} alt={image.alt} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={assetUrl(image.url, assetBase)} alt={image.alt} className={`absolute inset-0 h-full w-full ${image.type === 'diagram' ? 'object-contain' : 'object-cover'}`} style={image.type === 'diagram' ? { background: image.bg ?? '#eef2f7' } : undefined} />
       </div>
     </div>
   );
@@ -549,7 +549,7 @@ function CoverScreen({ deck, slide, assetBase, onStart }: { deck: StudyDeck; sli
     <div className="relative h-full overflow-hidden bg-[#172554] text-white">
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies
-        <img src={assetUrl(image.url, assetBase)} alt={image.alt} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={assetUrl(image.url, assetBase)} alt={image.alt} className={`absolute inset-0 h-full w-full ${image.type === 'diagram' ? 'object-contain' : 'object-cover'}`} style={image.type === 'diagram' ? { background: image.bg ?? '#eef2f7' } : undefined} />
       ) : null}
       <div
         aria-hidden="true"

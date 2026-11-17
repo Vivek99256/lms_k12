@@ -81,7 +81,7 @@ export function DecisionView({ interaction, image, assetBase, heading, onGoto, o
     <section aria-label="Decision" className="relative h-full min-h-0 overflow-hidden bg-slate-900">
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies
-        <img src={assetUrl(image.url, assetBase)} alt={image.alt} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={assetUrl(image.url, assetBase)} alt={image.alt} className={`absolute inset-0 h-full w-full ${image.type === 'diagram' ? 'object-contain' : 'object-cover'}`} style={image.type === 'diagram' ? { background: image.bg ?? '#eef2f7' } : undefined} />
       ) : null}
       <div className="absolute inset-x-0 top-0 z-10 bg-slate-950/70 px-[1.6em] py-[0.7em] text-white">
         <p className="text-[0.7em] font-semibold uppercase tracking-[0.14em] text-sky-200">{heading.kicker}</p>
@@ -213,7 +213,7 @@ export function OutcomeView({ interaction, image, assetBase, heading, onGoto, on
       <div className={`relative min-w-0 overflow-hidden bg-slate-200 ${portrait ? 'h-[24%] shrink-0' : 'min-h-0'}`}>
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element -- deck images are our own stored files or local review copies
-          <img src={assetUrl(image.url, assetBase)} alt={image.alt} className="absolute inset-0 h-full w-full object-cover" />
+          <img src={assetUrl(image.url, assetBase)} alt={image.alt} className={`absolute inset-0 h-full w-full ${image.type === 'diagram' ? 'object-contain' : 'object-cover'}`} style={image.type === 'diagram' ? { background: image.bg ?? '#eef2f7' } : undefined} />
         ) : null}
         <p className={`absolute left-0 top-[1.2em] inline-flex items-center gap-[0.5em] px-[1.1em] py-[0.5em] text-[0.8em] font-bold uppercase tracking-[0.1em] text-white ${sound ? 'bg-sd-accent' : 'bg-[#b45309]'}`}>
           {sound ? <CircleCheck className="h-[1.2em] w-[1.2em]" aria-hidden="true" /> : <TriangleAlert className="h-[1.2em] w-[1.2em]" aria-hidden="true" />}
