@@ -200,6 +200,24 @@ export default function CoherenceMapPage() {
               {map.stats.draftEdges} draft links, AI-tagged
             </span>
           ) : null}
+
+          {health.withoutContent > 0 ? (
+            <>
+              <span className="text-slate-300">·</span>
+              <span><strong className="text-slate-900">{health.withoutContent}</strong> concepts without content</span>
+            </>
+          ) : null}
+          {health.withoutQuestions > 0 ? (
+            <>
+              <span className="text-slate-300">·</span>
+              <span><strong className="text-slate-900">{health.withoutQuestions}</strong> concepts without questions</span>
+            </>
+          ) : null}
+          {!health.fitToUse ? (
+            <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-rose-700">
+              not fit to use
+            </span>
+          ) : null}
         </div>
       ) : null}
 
