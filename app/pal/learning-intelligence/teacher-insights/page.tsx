@@ -21,6 +21,7 @@ import { HEADER_WASH } from '../_components/design-system';
 import ClassScopePicker, { type ClassMapScope } from './_components/ClassScopePicker';
 import ActionItemsTimeline from './_components/ActionItemsTimeline';
 import MisconceptionBoard from './_components/MisconceptionBoard';
+import InterventionSignalsCard from './_components/InterventionSignalsCard';
 import { IsometricClassBoard } from './_components/IsometricClassBoard';
 import { fetchClassReport, fetchClassRoster, type ClassReport, type RosterRow } from '../data/teacher-insights';
 import { fetchClassJourneyPositions, type ClassJourneyResult } from '../data/class-journey';
@@ -224,6 +225,7 @@ export default function TeacherInsightsPage() {
                 <>
                   <ActionItemsTimeline actionItems={report?.actionItems ?? []} roster={roster} onSelectStudent={goToStudent} />
                   <MisconceptionBoard items={report?.misconceptionAnalysis.topMisconceptions ?? []} />
+                  <InterventionSignalsCard roster={roster} onSelectStudent={goToStudent} />
                 </>
               )}
             </div>
