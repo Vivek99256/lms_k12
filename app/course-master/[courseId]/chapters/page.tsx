@@ -6516,6 +6516,9 @@ export default function ChapterListPage() {
               chapterId={Number(activeLibraryChapter.id)}
               canManage={canCreateContent !== false}
               canCreate={canCreateContent === true}
+              standardName={subjectData?.subject?.standard_name}
+              subjectName={subjectData?.subject?.subject_name}
+              chapterName={activeLibraryChapter.title}
             >
               <PrayogshalaTopicPanel
                 key={activeLibraryChapter.id}
