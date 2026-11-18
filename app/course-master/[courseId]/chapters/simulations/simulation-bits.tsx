@@ -4,6 +4,7 @@ import { CheckCircle2, Flag, FlaskConical, type LucideIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
 import type { SimulationCard, SimulationStatus } from '@/app/course-master/data/simulations'
+import { coverRouteUrl } from '@/lib/simulation-cover-query'
 import { coverSrc } from '@/lib/simulation-format'
 import { NOT_MAPPED_LABEL, isPendingReview, type SimulationLink } from '@/lib/simulation-links'
 import { cn } from '@/lib/utils'
@@ -122,15 +123,31 @@ export function ConceptChip({ link, className }: { link: SimulationLink; classNa
  * The picture on a simulation's card: its cover when it has a safe one, otherwise a plain panel with the experiment mark. The cover is a file
  * under /public/simulations/covers (see coverSrc), so nothing here depends on which simulations exist.
  */
-export function SimulationCover({ simulation, className }: { simulation: Pick<SimulationCard, 'cover_url' | 'title'>; className?: string }) {
-  const src = coverSrc(simulation.cover_url)
-  const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  const showImage = src !== null && failedSrc !== src
+export function SimulationCover({
+  simulation,
+  className,
+  chapter,
+  subject,
+}: {
+  simulation: Pick<SimulationCard, 'cover_url' | 'title'> & Partial<Pick<SimulationCard, 'subtitle' | 'summary' | 'category' | 'tags'>>
+  className?: string
+  /** The chapter / topic and subject the card sits under, when the page knows them: they sharpen the automatic picture. */
+  chapter?: string | null
+  subject?: string | null
+}) {
+  const own = coverSrc(simulation.cover_url)
+  // With no cover of its own (or one that fails to load) the card asks for a real photo that fits its topic, so a simulation added tomorrow
+  // - or a chapter and topic that did not exist today - is pictured by its name alone. The route answers 404 when it has nothing, and then the plain panel shows.
+  const auto = coverRouteUrl({ title: simulation.title, subtitle: simulation.subtitle, summary: simulation.summary, category: simulation.category, tags: simulation.tags, chapter, subject })
+  const sources = own ? [own, auto] : [auto]
+  const [failed, setFailed] = useState<readonly string[]>([])
+  const src = sources.find((s) => !failed.includes(s)) ?? null
+  const showImage = src !== null
   return (
     <div className={cn('relative size-full overflow-hidden bg-slate-100', className)}>
       {showImage ? (
-        // eslint-disable-next-line @next/next/no-img-element -- a small static cover from /public; images are unoptimized in this app
-        <img src={src} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setFailedSrc(src)} className="size-full object-cover" />
+        // eslint-disable-next-line @next/next/no-img-element -- a static cover from /public or the cover route; images are unoptimized in this app
+        <img key={src} src={src} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setFailed((f) => [...f, src])} className="size-full object-cover" />
       ) : (
         <div className="grid size-full place-items-center bg-gradient-to-br from-indigo-50 to-slate-100">
           <ExperimentMark size="lg" />

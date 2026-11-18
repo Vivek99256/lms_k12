@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState } from 'react';
 import type { SimulationCard, SimulationProgress } from '@/app/course-master/data/simulations';
 import { useAuthoringProbe, useChapterSimulations, useSimulationLibrary, type SimulationActions } from '@/hooks/use-simulations';
 import { authoringAllowed, cardEditable, shouldProbeAuthoring, simulationsForTopic } from '@/lib/simulation-links';
+import { buildSimulationTrail } from '@/lib/simulation-trail';
 
 import { AddSimulationDialog } from './AddSimulationDialog';
 import { EditSimulationDialog } from './EditSimulationDialog';
@@ -57,10 +58,14 @@ interface Props {
   canManage: boolean;
   /** `canCreateContent === true`: only these people are asked whether they may author. */
   canCreate: boolean;
+  /** The names the page is already showing, for the player's Standard -> Subject -> Chapter -> Topic trail. Any may be missing. */
+  standardName?: string | null;
+  subjectName?: string | null;
+  chapterName?: string | null;
   children: React.ReactNode;
 }
 
-export function SimulationsProvider({ chapterId, canManage, canCreate, children }: Props) {
+export function SimulationsProvider({ chapterId, canManage, canCreate, standardName, subjectName, chapterName, children }: Props) {
   const data = useChapterSimulations(chapterId);
 
   const probeWanted = shouldProbeAuthoring({
@@ -174,7 +179,14 @@ export function SimulationsProvider({ chapterId, canManage, canCreate, children 
         />
       ) : null}
 
-      {playing ? <SimulationPlayer simulation={playing} onClose={onPlayerClose} onProgress={onProgress} /> : null}
+      {playing ? (
+        <SimulationPlayer
+          simulation={playing}
+          trail={buildSimulationTrail({ standard: standardName, subject: subjectName, chapter: chapterName, chapterId, links: playing.links })}
+          onClose={onPlayerClose}
+          onProgress={onProgress}
+        />
+      ) : null}
 
       {authoring && addOpen ? (
         <AddSimulationDialog

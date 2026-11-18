@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Maximize2, Minimize2, RefreshCw, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, Loader2, Maximize2, Minimize2, RefreshCw, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -20,6 +20,7 @@ import {
   type AssetModelRef,
   type HostMessage,
 } from '@/lib/simulation-host'
+import type { TrailSegment } from '@/lib/simulation-trail'
 import { cn } from '@/lib/utils'
 import { describeSimulationError, simulationService, type SimulationCard, type SimulationDetail, type SimulationProgress } from '@/app/course-master/data/simulations'
 
@@ -66,10 +67,13 @@ export interface SimulationPlayerOutcome {
  */
 export function SimulationPlayer({
   simulation,
+  trail = [],
   onClose,
   onProgress,
 }: {
   simulation: SimulationCard
+  /** Standard -> subject -> chapter -> topic, drawn in the top bar (see lib/simulation-trail.ts). Empty draws nothing. */
+  trail?: readonly TrailSegment[]
   onClose: (outcome: SimulationPlayerOutcome) => void
   onProgress: (id: number, report: Pick<SimulationProgress, 'status' | 'percent' | 'step'>) => void
 }) {
@@ -326,7 +330,33 @@ export function SimulationPlayer({
         </Button>
         <span className="h-5 w-px bg-border" aria-hidden="true" />
         <ExperimentMark size="sm" />
-        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{simulation.title}</h2>
+        <h2 className={cn('truncate text-sm font-semibold text-slate-900', trail.length > 0 ? 'max-w-[16rem] shrink-0' : 'min-w-0 flex-1')}>{simulation.title}</h2>
+
+        {trail.length > 0 && (
+          <>
+            <span className="hidden h-5 w-px bg-border md:block" aria-hidden="true" />
+            {/* Where this simulation sits in the curriculum: standard, subject, chapter, topic. Hidden on a narrow screen, where the title matters more. */}
+            <nav aria-label="Where this simulation belongs" className="hidden min-w-0 flex-1 md:block">
+              <ol className="flex min-w-0 items-center gap-1 text-xs text-slate-500">
+                {trail.map((segment, index) => {
+                  const last = index === trail.length - 1
+                  return (
+                    <li key={`${segment.kind}-${index}`} className={cn('flex items-center gap-1', last ? 'min-w-0 shrink' : 'shrink-[2] min-w-0')}>
+                      {index > 0 && <ChevronRight className="size-3 shrink-0 text-slate-400" aria-hidden="true" />}
+                      <span
+                        title={segment.title ?? segment.label}
+                        aria-current={last ? 'location' : undefined}
+                        className={cn('truncate', last ? 'font-medium text-slate-900' : 'text-slate-600')}
+                      >
+                        {segment.label}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ol>
+            </nav>
+          </>
+        )}
 
         <span className="flex items-center gap-3 text-xs text-slate-500" aria-live="polite">
           {saveState === 'saving' && (
