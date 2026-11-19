@@ -20,12 +20,16 @@ import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { AssignWorkPanel } from '@/app/lms/_shared/assign-work-panel';
 import type { QuestionPaperColumn } from '@/app/lms/_shared/question-paper-grid';
 import { QuestionPaperGrid, useQuestionPaperRows } from '@/app/lms/_shared/question-paper-grid';
+import { useStudentAssignedWork } from '@/app/lms/_shared/use-student-assigned-work';
 
 const WORKSHEET_COLUMNS: QuestionPaperColumn[] = ['exam', 'class', 'type', 'paper'];
 
 export default function WorksheetPage() {
   const isStudent = isStudentProfile(getStoredMenuContext()?.user_profile_name);
-  const { rows, isLoading, loadError } = useQuestionPaperRows('worksheet');
+  const papers = useQuestionPaperRows('worksheet');
+  // A student sees the worksheet(s) sent to them, not the school's whole paper list.
+  const assigned = useStudentAssignedWork('worksheet', isStudent);
+  const { rows, isLoading, loadError } = isStudent ? assigned : papers;
 
   return (
     <div className="flex flex-col gap-5 p-6">

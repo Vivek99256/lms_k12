@@ -36,7 +36,7 @@ import {
   type TableExportColumn,
   type TableExportRow,
 } from "@/lib/table-export";
-import { listReviewQueue, type ReviewQueueRow } from "../api";
+import { listReviewQueue, reprocessReview, type ReviewQueueRow } from "../api";
 import RequireStaff from "@/app/lms/_shared/RequireStaff";
 
 const academicFields: DropdownField[] = ["section", "standard", "division", "subject"];
@@ -113,6 +113,47 @@ export default function HomeworkReviewQueuePage() {
     load();
   }, [load]);
 
+  // The evaluation runs on a background queue, exactly as after a student submits, so a
+  // row stays "Checking" for a while. Quietly refresh the list until none is left.
+  const hasChecking = rows.some((row) => row.aiStatus.toLowerCase() === "checking");
+  useEffect(() => {
+    if (!hasChecking) return;
+    const timer = window.setInterval(async () => {
+      try {
+        setRows(await listReviewQueue({ status: status || undefined }));
+      } catch {
+        // keep the current rows; the next tick tries again
+      }
+    }, 6000);
+    return () => window.clearInterval(timer);
+  }, [hasChecking, status]);
+
+  const [rerunningId, setRerunningId] = useState<number | null>(null);
+  const [rerunMessage, setRerunMessage] = useState("");
+
+  // A failed AI run (OCR Failed / Evaluation Failed / Failed) can be retried from the
+  // list. The server refuses once the review is signed off, so those rows get no button.
+  async function handleRerun(row: ReviewQueueRow) {
+    setRerunMessage("");
+    setError("");
+    setRerunningId(row.submissionId);
+    try {
+      await reprocessReview(row.submissionId);
+      setRerunMessage(
+        `Re-evaluation started for ${row.studentName || "the submission"}. Marks will appear here when it finishes.`
+      );
+      await load();
+    } catch (rerunError: unknown) {
+      setError(
+        rerunError instanceof Error
+          ? rerunError.message
+          : "The evaluation couldn’t be re-run."
+      );
+    } finally {
+      setRerunningId(null);
+    }
+  }
+
   // listReviewQueue only accepts a status filter server-side; the class
   // dropdowns above return standard/division/subject ids while the queue row
   // only carries display labels, so they aren't safe to cross-filter against
@@ -165,6 +206,12 @@ export default function HomeworkReviewQueuePage() {
             className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
           >
             {error}
+          </div>
+        ) : null}
+
+        {rerunMessage ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+            {rerunMessage}
           </div>
         ) : null}
 
@@ -307,12 +354,32 @@ export default function HomeworkReviewQueuePage() {
                         <StatusBadge variant={statusVariant(row.status)} label={row.status || "Pending"} />
                       </TableCell>
                       <TableCell>
-                        <Link
-                          href={`/lms/homework/review/${row.submissionId}`}
-                          className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700"
-                        >
-                          <PencilLine className="size-4" /> Review
-                        </Link>
+                        <div className="flex flex-col items-stretch gap-2 whitespace-nowrap">
+                          <Link
+                            href={`/lms/homework/review/${row.submissionId}`}
+                            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700"
+                          >
+                            <PencilLine className="size-4" /> Review
+                          </Link>
+                          {(row.aiStatus.toLowerCase().includes("fail") ||
+                            row.aiStatus.toLowerCase() === "checking") &&
+                          row.status.toLowerCase() !== "reviewed" ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRerun(row)}
+                              disabled={rerunningId !== null}
+                            >
+                              {rerunningId === row.submissionId ? (
+                                <LoaderCircle className="size-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="size-4" />
+                              )}
+                              Re-evaluate
+                            </Button>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
