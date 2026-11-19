@@ -22,6 +22,7 @@ import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { ModuleAuditTrail } from '@/app/_components/module-audit-trail';
 import { ModuleIntelligence } from '@/app/_components/module-intelligence';
 import { ModuleKnowledgeGraph } from '@/app/_components/ModuleKnowledgeGraph';
+import { CurriculumStructureView } from '@/app/_components/CurriculumStructureView';
 import CentralizedKnowledgeGraphExplorer from '@/app/ai/_components/CentralizedKnowledgeGraphExplorer';
 import {
   intelligenceEntryFor,
@@ -715,6 +716,13 @@ export function ModuleCategoryPage({
 
     const label = moduleLabel(moduleName);
     const isOrganizationManagement = moduleName === 'organization-management';
+    // Additive only — every other module's tab (including this condition's
+    // own false branch) renders exactly as before. `CurriculumStructureView`
+    // reads a separate, curated `ai_ontology_views` row
+    // (`curriculum-structure`) through `fetchOntologyView`, not
+    // `GraphModuleBrowser` — it does not replace ModuleKnowledgeGraph's
+    // existing bubble-canvas sample, it renders alongside it.
+    const isTeachLearn = moduleName === 'teach_learn';
 
     return [
       {
@@ -725,7 +733,10 @@ export function ModuleCategoryPage({
           isOrganizationManagement ? (
             <CentralizedKnowledgeGraphExplorer initialFocusModuleKey="organization-management" />
           ) : (
-            <ModuleKnowledgeGraph moduleName={moduleName} label={label} />
+            <>
+              <ModuleKnowledgeGraph moduleName={moduleName} label={label} />
+              {isTeachLearn ? <CurriculumStructureView moduleName={moduleName} /> : null}
+            </>
           ),
       },
     ];

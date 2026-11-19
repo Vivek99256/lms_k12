@@ -142,6 +142,7 @@ export interface TopMisconception {
   description: string | null;
   correctiveAction: string | null;
   detectionCount: number;
+  weakPrerequisite: string | null;
 }
 
 export interface MisconceptionAnalysis {
@@ -161,6 +162,7 @@ function mapMisconceptionAnalysis(raw: unknown): MisconceptionAnalysis {
         description: m.description == null ? null : readString(m.description),
         correctiveAction: m.corrective_action == null ? null : readString(m.corrective_action),
         detectionCount: num(m.detection_count),
+        weakPrerequisite: m.weak_prerequisite == null ? null : readString(m.weak_prerequisite),
       };
     }),
   };

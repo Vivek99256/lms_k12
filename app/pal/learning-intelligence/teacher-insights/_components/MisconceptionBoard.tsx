@@ -27,6 +27,12 @@ export default function MisconceptionBoard({ items }: { items: TopMisconception[
               </Badge>
             </div>
             {m.correctiveAction ? <p className="mt-1 text-xs text-amber-700/80">{m.correctiveAction}</p> : null}
+            {m.weakPrerequisite ? (
+              <p className="mt-1 text-xs text-amber-700/80">
+                Possibly related to a weak prerequisite: {m.weakPrerequisite}. Worth checking before
+                treating it as the cause.
+              </p>
+            ) : null}
           </li>
         ))}
       </ul>
