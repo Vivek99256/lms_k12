@@ -117,6 +117,13 @@ const BASELINE_PREFIXES = ['/dashboard', '/modules', '/teach-learn', '/pal', '/l
  */
 const BASELINE_EXACT = ['/student'];
 
+/**
+ * The learner players the Classroom Resource cards open (the backend's `deep_link` values): a study deck, a vocabulary
+ * deck and an interactive classroom activity. They live under /student but are learner screens, not staff ones, so they
+ * are allowed by their own prefix; every other /student/* route (add_student, student_health, ...) stays refused.
+ */
+const LEARNER_PLAYER_PREFIXES = ['/student/study-deck', '/student/vocabulary-class', '/student/classroom-activity'];
+
 function pathOf(href: string): string {
   return href.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
 }
@@ -130,6 +137,7 @@ export function isStudentRouteAllowed(pathname: string, sections: StudentNavSect
   if (path === '/') return true;
   if (BASELINE_EXACT.includes(path)) return true;
   if (BASELINE_PREFIXES.some((prefix) => startsWithSegment(path, prefix))) return true;
+  if (LEARNER_PLAYER_PREFIXES.some((prefix) => startsWithSegment(path, prefix))) return true;
   return sections.some((section) =>
     section.items.some((item) => startsWithSegment(path, pathOf(item.href))),
   );

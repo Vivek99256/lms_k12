@@ -242,8 +242,13 @@ export default function Header({
    */
   const [documentsVisible, setDocumentsVisible] = useState(false);
 
+  // Platform services, Setup and configuration and AI and insights are
+  // administrator-only. Same cosmetic rule as above: the backend decides.
+  const [adminMenuVisible, setAdminMenuVisible] = useState(false);
+
   useEffect(() => {
     setDocumentsVisible(canAccessDocuments());
+    setAdminMenuVisible(canManageRoleAccess());
   }, [user]);
 
   const platformSetupRoutes: Record<string, string> = {
@@ -690,6 +695,7 @@ const logoUrl = (() => {
               everything stacks, since three columns do not fit a phone at any useful
               width — which is also why a section's span is only applied from sm up.
             */}
+            {adminMenuVisible && (
             <div className="grid max-h-[70vh] grid-cols-1 gap-x-3 gap-y-5 overflow-y-auto p-3 sm:grid-cols-[repeat(3,220px)]">
               {menuGroups.map((group) => {
                 // Read out of the group before the closures below capture it, so
@@ -771,8 +777,9 @@ const logoUrl = (() => {
                 );
               })}
             </div>
+            )}
 
-            <div className="border-t border-border p-2">
+            <div className={`p-2 ${adminMenuVisible ? 'border-t border-border' : ''}`}>
               <button
                 type="button"
                 onClick={(e) => {

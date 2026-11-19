@@ -32,6 +32,27 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ContentCard } from '@/app/course-master/[courseId]/chapters/ContentCard';
+// The very same content model the admin chapter page lists a chapter with (cards, types, tabs, lane rules), so what a
+// student sees in a chapter is what the admin sees there. See classroomResourceModel.ts.
+import {
+  buildApiChapterContentItems,
+  contentMatchesTab,
+  contentSourceOptions,
+  itemsInLane,
+  contentTabCounts,
+  itemsForActiveLane,
+  tabsForLane,
+  visibleContentTabs,
+  type ChapterContentItem,
+} from '@/app/course-master/[courseId]/chapters/classroomResourceModel';
+import { PrayogshalaDetailDialog } from '@/app/course-master/[courseId]/chapters/PrayogshalaDialogs';
+import { PrayogshalaLab } from '@/app/course-master/[courseId]/chapters/PrayogshalaLab';
+import type { PrayogshalaActivity } from '@/app/course-master/data/prayogshala';
+import { showsInLane } from '@/lib/classroomResources';
+import { documentTarget } from '@/lib/documentUrl';
+import { groupVideos } from '@/lib/videoGroups';
+import { pdfFileNameFromTitle } from '@/lib/study-deck/pdf';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -50,6 +71,7 @@ import {
   type LmsSubject,
 } from '@/app/course-master/data/lmsCourses';
 import {
+  downloadStudyDeckPdf,
   fetchChapterContent,
   getSubjectAndChapters,
   type Chapter,
@@ -97,19 +119,8 @@ const CATEGORY_ACCENT_MAP: Record<string, string> = {
   Library: '#DB2777',
 };
 
-const SECTION_BADGES = ['Section A', 'Section A', 'Section B', 'Section B'] as const;
 
 type StudentView = 'subjects' | 'curriculum' | 'chapters' | 'content' | 'question-bank';
-
-type StudentContentGroupBy = 'chapter' | 'concept';
-
-type StudentContentTypeKey =
-  | 'all'
-  | 'presentation'
-  | 'video'
-  | 'revision_notes'
-  | 'remedial'
-  | 'classroom_activity';
 
 type CurriculumSession = {
   academicYearId: string;
@@ -191,38 +202,6 @@ type StudentSubjectItem = LmsSubject & {
   sectionId: string;
   sectionName: string;
 };
-
-type StudentContentItem = {
-  actionLabel: 'Open' | 'Play';
-  chapterId: number;
-  chapterName: string;
-  conceptName: string;
-  conceptId: number | null;
-  id: number;
-  source: string;
-  statText: string;
-  title: string;
-  type: StudentContentTypeKey;
-  typeLabel: string;
-  updatedLabel: string;
-  url: string;
-  /**
-   * Set (by the server) when this row is a study document: revision notes, a remedial class or classroom activities. It
-   * opens in place in the document viewer instead of in a new tab.
-   */
-  studyDocKind: DocumentKind | null;
-  /** An interactive classroom activity opens in its own player route. Only ever one of our own routes. */
-  deepLink: string | null;
-};
-
-const CONTENT_TABS: Array<{ key: StudentContentTypeKey; label: string }> = [
-  { key: 'all', label: 'All content' },
-  { key: 'presentation', label: 'Presentations' },
-  { key: 'video', label: 'Videos' },
-  { key: 'revision_notes', label: 'Revision notes' },
-  { key: 'remedial', label: 'Remedial classes' },
-  { key: 'classroom_activity', label: 'Classroom activity' },
-];
 
 function readString(value: unknown): string {
   return value != null && value !== '' ? String(value) : '';
@@ -485,169 +464,6 @@ function buildStudentChapters(chapters: Chapter[]): StudentChapterView[] {
   });
 }
 
-const DOCUMENT_TYPE: Record<DocumentKind, { key: StudentContentTypeKey; label: string }> = {
-  revision_notes: { key: 'revision_notes', label: KIND_LABEL.revision_notes },
-  remedial: { key: 'remedial', label: KIND_LABEL.remedial },
-  activities: { key: 'classroom_activity', label: KIND_LABEL.activities },
-};
-
-function normalizeContentType(rawType: string, asset: Record<string, unknown>) {
-  // A study document is whatever kind the server says it is, not what its title happens to contain.
-  const documentKind = documentKindOf(asset);
-  if (documentKind) return DOCUMENT_TYPE[documentKind];
-
-  const filename = readString(asset.filename).toLowerCase();
-  const combinedLabel = [
-    rawType,
-    readString(asset.content_category),
-    readString(asset.file_type),
-    readString(asset.title),
-    filename,
-  ]
-    .join(' ')
-    .toLowerCase();
-
-  if (combinedLabel.includes('video') || /\.(mp4|mov|webm|m4v)(?:$|\?)/.test(filename)) {
-    return { key: 'video' as const, label: 'Video' };
-  }
-
-  if (combinedLabel.includes('remedial')) {
-    return { key: 'remedial' as const, label: 'Remedial class' };
-  }
-
-  if (
-    combinedLabel.includes('classroom activity') ||
-    combinedLabel.includes('activity') ||
-    combinedLabel.includes('worksheet')
-  ) {
-    return { key: 'classroom_activity' as const, label: 'Classroom activity' };
-  }
-
-  if (combinedLabel.includes('presentation') || /\.(ppt|pptx|key)(?:$|\?)/.test(filename)) {
-    return { key: 'presentation' as const, label: 'Classroom presentation' };
-  }
-
-  return { key: 'revision_notes' as const, label: 'Revision notes' };
-}
-
-function resolveChapterConceptId(chapter: StudentChapterView, conceptName: string, asset: ChapterContentAsset & Record<string, unknown>) {
-  const rawConceptId = asset.concept_id ?? asset.conceptId ?? asset.conceptID;
-  if (rawConceptId != null && rawConceptId !== '') {
-    const parsedConceptId = Number(rawConceptId);
-    if (Number.isFinite(parsedConceptId)) return parsedConceptId;
-  }
-
-  const normalizedConceptName = conceptName.trim().toLowerCase();
-  if (!normalizedConceptName || normalizedConceptName === 'all concepts') {
-    return null;
-  }
-
-  const matchedConcept = chapter.concepts.find((concept) => concept.name.trim().toLowerCase() === normalizedConceptName);
-  if (!matchedConcept) return null;
-
-  const parsedConceptId = Number(matchedConcept.id);
-  return Number.isFinite(parsedConceptId) ? parsedConceptId : null;
-}
-
-function formatUpdatedLabel(value: unknown) {
-  const raw = readString(value);
-  if (!raw) return 'updated date unavailable';
-
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) {
-    return `updated ${raw.split(' ')[0]}`;
-  }
-
-  return `updated ${parsed.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })}`;
-}
-
-function getContentStatText(asset: Record<string, unknown>) {
-  const duration = readString(asset.duration ?? asset.duration_minutes);
-  if (duration) return `${duration} min`;
-
-  const pages = Number(asset.pages ?? asset.page_count ?? 0);
-  if (pages > 0) return `${pages} pages`;
-
-  const slides = Number(asset.slides ?? asset.slide_count ?? 0);
-  if (slides > 0) return `${slides} slides`;
-
-  return readString(asset.file_type) || 'content file';
-}
-
-function normalizeChapterContent(
-  chapter: StudentChapterView,
-  categories: Record<string, ChapterContentAsset[]>
-): StudentContentItem[] {
-  return Object.entries(categories).flatMap(([conceptName, assets]) =>
-    (assets ?? []).map((rawAsset, index) => {
-      const asset = rawAsset as ChapterContentAsset & Record<string, unknown>;
-      const contentType = normalizeContentType(conceptName, asset);
-      // Not simply "the first link that is set": a raw .pptx export link opens a
-      // Save As dialog rather than the deck, so Open would download instead of
-      // showing anything. resolveViewableUrl picks the candidate a tab can
-      // actually render - the gamma.app deck page where there is one, the Office
-      // Online viewer for Office files, inline-viewable links as they are.
-      const url =
-        resolveViewableUrl(
-          [
-            readString(asset.url),
-            readString(asset.file_url),
-            readString(asset.content_url),
-            readString(asset.media_url),
-            readString(asset.link),
-            readString(asset.filename),
-          ],
-          readString(asset.filename)
-        ) ?? '';
-
-      return {
-        id: Number(asset.id ?? `${chapter.id}${index + 1}`),
-        title:
-          readString(asset.title) ||
-          readString(asset.content_title) ||
-          readString(asset.name) ||
-          'Untitled content',
-        type: contentType.key,
-        typeLabel: contentType.label,
-        chapterId: Number(chapter.id),
-        chapterName: chapter.name,
-        conceptName: conceptName || 'All concepts',
-        conceptId: resolveChapterConceptId(chapter, conceptName, asset),
-        source:
-          readString(asset.source) ||
-          readString(asset.upload_type) ||
-          'Uploaded',
-        statText: getContentStatText(asset),
-        updatedLabel: formatUpdatedLabel(asset.updated_at ?? asset.created_at),
-        url,
-        studyDocKind: documentKindOf(asset),
-        deepLink: readString(asset.deep_link).startsWith('/student/classroom-activity/') ? readString(asset.deep_link) : null,
-        actionLabel: contentType.key === 'video' ? 'Play' : 'Open',
-      };
-    })
-  );
-}
-
-function getContentIcon(type: StudentContentTypeKey) {
-  switch (type) {
-    case 'presentation':
-      return BookOpen;
-    case 'video':
-      return Video;
-    case 'classroom_activity':
-      return ClipboardList;
-    case 'remedial':
-      return LifeBuoy;
-    case 'revision_notes':
-    default:
-      return FileText;
-  }
-}
-
 function CurriculumSkeleton() {
   return (
     <div className="space-y-4">
@@ -665,8 +481,9 @@ export default function StudentPage() {
   const { menuContext } = useAuth();
 
   const [contentError, setContentError] = useState<string | null>(null);
-  const [contentGroupBy, setContentGroupBy] = useState<StudentContentGroupBy>('chapter');
-  const [contentItemsByChapter, setContentItemsByChapter] = useState<Record<string, StudentContentItem[]>>({});
+  const [contentSourceFilter, setContentSourceFilter] = useState('all');
+  const [contentReloadKey, setContentReloadKey] = useState(0);
+  const [contentItemsByChapter, setContentItemsByChapter] = useState<Record<string, ChapterContentItem[]>>({});
   const [contentSearch, setContentSearch] = useState('');
   const [curriculumResponse, setCurriculumResponse] = useState<CurriculumApiResult | null>(null);
   const [data, setData] = useState<LmsCoursesResponse | null>(null);
@@ -679,7 +496,9 @@ export default function StudentPage() {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedChapter, setSelectedChapter] = useState<StudentChapterView | null>(null);
-  const [selectedContentType, setSelectedContentType] = useState<StudentContentTypeKey>('all');
+  const [selectedContentType, setSelectedContentType] = useState<string>('All content');
+  const [openPrayogshala, setOpenPrayogshala] = useState<PrayogshalaActivity | null>(null);
+  const [labActivity, setLabActivity] = useState<PrayogshalaActivity | null>(null);
   // The study document open over the page, if any (revision notes, a remedial class, classroom activities).
   const [openDocument, setOpenDocument] = useState<DocumentViewerItem | null>(null);
   const [selectedStandard, setSelectedStandard] = useState('all');
@@ -732,15 +551,14 @@ export default function StudentPage() {
   }, [menuContext]);
 
   const studentSubjects = useMemo<StudentSubjectItem[]>(() => {
-    return (data?.lms_subject ?? []).map((subject, index) => {
-      const fallbackSectionName = SECTION_BADGES[index % SECTION_BADGES.length];
+    return (data?.lms_subject ?? []).map((subject) => {
       const sectionName =
         subject.section_name ||
         subject.section ||
         subject.division_name ||
         subject.division ||
-        fallbackSectionName;
-      const sectionId = String(subject.section_id ?? subject.division_id ?? sectionName);
+        '';
+      const sectionId = sectionName ? String(subject.section_id ?? subject.division_id ?? sectionName) : '';
       const chapterCount = Number(subject.chapter_count ?? subject.chapters_count ?? subject.chapters?.length ?? 0);
       const keyConceptCount = getTotalKeyConceptCount(
         Array.isArray(subject.chapters) ? subject.chapters : [],
@@ -805,7 +623,7 @@ export default function StudentPage() {
           String(subject.standard_id) === String(selectedStandard)
       )
       .forEach((subject) => {
-        if (!sectionMap.has(subject.sectionId)) {
+        if (subject.sectionId && !sectionMap.has(subject.sectionId)) {
           sectionMap.set(subject.sectionId, subject.sectionName);
         }
       });
@@ -826,7 +644,9 @@ export default function StudentPage() {
         String(subject.sectionId) === String(selectedSection);
 
       return matchesSearch && matchesStandard && matchesSection;
-    });
+    })
+      // Subjects a student can actually open come first; the empty ones follow.
+      .sort((x, y) => Number(y.chapterCount > 0) - Number(x.chapterCount > 0));
   }, [search, selectedSection, selectedStandard, studentSubjects]);
 
   useEffect(() => {
@@ -848,7 +668,8 @@ export default function StudentPage() {
         (item) =>
           String(item.subject_id) === subjectIdParam &&
           (!standardIdParam || String(item.standard_id) === String(standardIdParam)) &&
-          (!sectionIdParam || String(item.sectionId) === String(sectionIdParam))
+          // A subject with no real section ignores a section_id the link carries (older links name "Section A").
+          (!sectionIdParam || !item.sectionId || String(item.sectionId) === String(sectionIdParam))
       ) ?? null;
 
     if (!subject) return;
@@ -962,7 +783,10 @@ export default function StudentPage() {
 
         setContentItemsByChapter((current) => ({
           ...current,
-          [selectedChapter.id]: normalizeChapterContent(selectedChapter, response.content_categories ?? {}),
+          [selectedChapter.id]: buildApiChapterContentItems(
+            { id: String(selectedChapter.id), title: selectedChapter.name },
+            response.content_categories ?? {}
+          ),
         }));
       } catch {
         if (!cancelled) {
@@ -980,40 +804,39 @@ export default function StudentPage() {
     return () => {
       cancelled = true;
     };
-  }, [contentItemsByChapter, selectedChapter, selectedSubject, studentView]);
+  }, [contentItemsByChapter, contentReloadKey, selectedChapter, selectedSubject, studentView]);
 
-  const selectedChapterContent = selectedChapter ? contentItemsByChapter[selectedChapter.id] ?? [] : [];
-
-  const baseFilteredContent = useMemo(
-    () =>
-      selectedChapterContent.filter((item) => {
-        const matchesSearch =
-          !contentSearch ||
-          item.title.toLowerCase().includes(contentSearch.toLowerCase()) ||
-          item.conceptName.toLowerCase().includes(contentSearch.toLowerCase());
-        const matchesType = selectedContentType === 'all' || item.type === selectedContentType;
-        const matchesChapter = !selectedChapter || Number(item.chapterId) === Number(selectedChapter.id);
-        return matchesSearch && matchesType && matchesChapter;
-      }),
-    [contentSearch, selectedChapter, selectedChapterContent, selectedContentType]
+  const selectedChapterContent = useMemo(
+    () => (selectedChapter ? contentItemsByChapter[selectedChapter.id] ?? [] : []),
+    [contentItemsByChapter, selectedChapter]
   );
 
-  const filteredContent = useMemo(() => {
-    if (contentGroupBy === 'chapter') {
-      return baseFilteredContent.filter((item) => item.conceptId === null);
-    }
-
-    return baseFilteredContent.filter((item) => item.conceptId !== null);
-  }, [baseFilteredContent, contentGroupBy]);
-
-  const groupedConceptContent = useMemo(() => {
-    return filteredContent.reduce<Record<string, StudentContentItem[]>>((groups, item) => {
-      const key = item.conceptName || 'All concepts';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(item);
-      return groups;
-    }, {});
-  }, [filteredContent]);
+  // The list below is the admin's Classroom Resource lane, rule for rule (classroomResourceModel.ts): the same lane filter,
+  // the same tabs and tab counts, the same search and source filters. The student sees it Chapter wise, as the admin does
+  // in that lane. The server has already withheld what a student must not read (Teacher Resources).
+  const classroomTabs = tabsForLane('classroom');
+  const laneContentItems = useMemo(() => itemsForActiveLane(selectedChapterContent, {
+    lane: 'classroom',
+    search: contentSearch,
+    source: contentSourceFilter,
+    showsInLane: (item) => showsInLane(item, 'classroom'),
+  }), [contentSearch, contentSourceFilter, selectedChapterContent]);
+  const contentSources = useMemo(() => contentSourceOptions(itemsInLane(selectedChapterContent, 'classroom')), [selectedChapterContent]);
+  const activeContentTab = classroomTabs.includes(selectedContentType) ? selectedContentType : 'All content';
+  const tabCounts = useMemo(() => contentTabCounts(laneContentItems, classroomTabs), [classroomTabs, laneContentItems]);
+  const visibleTabs = useMemo(
+    () => visibleContentTabs(classroomTabs, tabCounts, activeContentTab),
+    [activeContentTab, classroomTabs, tabCounts]
+  );
+  const filteredContent = useMemo(
+    () => laneContentItems.filter((item) => contentMatchesTab(item, activeContentTab)),
+    [activeContentTab, laneContentItems]
+  );
+  // The Videos tab is shown in sections once the chapter's videos carry a section; otherwise it stays one flat list.
+  const videoSections = useMemo(
+    () => (activeContentTab === 'Videos' ? groupVideos(filteredContent) : null),
+    [activeContentTab, filteredContent]
+  );
 
   const subjectName = detailSubject?.subject_name || curriculumResponse?.curriculum_data?.curriculum_name || 'Curriculum';
   const standardName = detailSubject?.standard_name ? `Grade ${detailSubject.standard_name}` : 'Grade';
@@ -1145,8 +968,8 @@ export default function StudentPage() {
     setSelectedSubject(subject);
     setSelectedChapter(null);
     setContentSearch('');
-    setSelectedContentType('all');
-    setContentGroupBy('chapter');
+    setSelectedContentType('All content');
+    setContentSourceFilter('all');
     setCurriculumResponse(null);
     setSubjectData(null);
     setExpandedChapterId(null);
@@ -1158,8 +981,8 @@ export default function StudentPage() {
     setSelectedChapter(chapter);
     setContentError(null);
     setContentSearch('');
-    setSelectedContentType('all');
-    setContentGroupBy('chapter');
+    setSelectedContentType('All content');
+    setContentSourceFilter('all');
     setStudentView('content');
   };
 
@@ -1181,18 +1004,55 @@ export default function StudentPage() {
     setContentError(null);
   };
 
-  const handleOpenContent = (item: StudentContentItem) => {
+  const handleOpenContent = (item: ChapterContentItem) => {
+    // A Prayogshala activity is a structured document: an interactive lab opens full-screen, a plain activity in the
+    // detail dialog (read-only here: a student never manages activities).
+    if (item.prayogshala) {
+      if (item.prayogshala.lab_config) setLabActivity(item.prayogshala);
+      else setOpenPrayogshala(item.prayogshala);
+      return;
+    }
     // A study document is a PDF with an online practice beside it, and opens in place over this page: no route, no new tab.
-    if (item.studyDocKind) {
-      setOpenDocument({ chapterId: item.chapterId, contentId: item.id, title: item.title, kind: item.studyDocKind });
+    const chapterId = Number(item.chapterId);
+    const contentId = Number(item.id);
+    if (item.studyDocKind && Number.isFinite(chapterId) && Number.isFinite(contentId)) {
+      setOpenDocument({ chapterId, contentId, title: item.title, kind: item.studyDocKind });
       return;
     }
+    // A study deck, vocabulary deck or classroom activity opens in its own student player. Only the student's own routes
+    // are followed: an H5P item's link points at the teacher's editor under /h5p, which a student must not be sent to.
     if (item.deepLink) {
-      router.push(item.deepLink);
+      if (item.deepLink.startsWith('/student/')) {
+        setContentError(null);
+        router.push(item.deepLink);
+      } else {
+        setContentError('This interactive activity opens in the teacher editor and is not available to students yet.');
+      }
       return;
     }
-    if (!item.url) return;
-    window.open(item.url, '_blank', 'noopener,noreferrer');
+    // A document opens at its own complete public URL (a PDF in the browser's viewer, a .docx as a download). A missing or
+    // incomplete URL is reported, never opened and never silently ignored.
+    const target = documentTarget(item.contentUrl);
+    if (!target.ok) {
+      setContentError(target.message);
+      return;
+    }
+    setContentError(null);
+    window.open(target.url, '_blank', 'noopener,noreferrer');
+  };
+
+  /** The study deck's classroom PDF as a download, found by the server from the content row (as on the admin page). */
+  const handleDownloadPdf = (item: ChapterContentItem) => {
+    const instituteId = Number(getRequestContext()?.sub_institute_id ?? menuContext?.sub_institute_id ?? NaN);
+    const chapterId = Number(item.chapterId);
+    const contentId = Number(item.id);
+    if (![instituteId, chapterId, contentId].every(Number.isFinite)) {
+      setContentError('Your session data is missing. Sign in again and retry.');
+      return;
+    }
+    downloadStudyDeckPdf(chapterId, contentId, instituteId, pdfFileNameFromTitle(item.title)).catch((error: unknown) => {
+      setContentError(error instanceof Error ? error.message : 'Couldn’t download the PDF.');
+    });
   };
 
   const returnToCourseMaster = () => {
@@ -1226,7 +1086,7 @@ export default function StudentPage() {
 
               <p className="mt-1 text-[13px] leading-5 text-[#475569] sm:text-[14px]">
                 {getGradeLabel(subject.standard_name)}
-                <span className="mx-1">·</span>
+                {subject.sectionName ? <span className="mx-1">·</span> : null}
                 {subject.sectionName}
               </p>
             </div>
@@ -1238,35 +1098,28 @@ export default function StudentPage() {
         </div>
 
         <p className="mt-4 text-[13px] leading-5 text-[#3F5572] sm:text-[14px]">
-          {subject.keyConceptCount} key concepts
-          <span className="mx-1">·</span>
-          {subject.lessonPlanCount} lesson plans created
+          {subject.lessonPlanCount > 0
+            ? `${subject.lessonPlanCount} learning items to explore`
+            : 'Learning content is on its way'}
         </p>
-
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="text-[14px] font-medium text-[#334155] sm:text-[15px]">Lesson planning coverage</span>
-          <span className="text-[14px] font-semibold text-[#334155] sm:text-[15px]">{subject.coverage}%</span>
-        </div>
-
-        <div className="mt-2.5 h-[7px] overflow-hidden rounded-full bg-[#EEF2F7]">
-          <div className="h-full rounded-full bg-[#5648E8]" style={{ width: `${subject.coverage}%` }} />
-        </div>
 
         <div className="mt-4 border-t border-[#E4EAF2] pt-4">
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => handleSelectSubject(subject, 'curriculum')}
-              className="inline-flex min-w-0 items-center justify-center rounded-[16px] border border-[#C8D3E3] bg-white px-3 py-2.5 text-[14px] font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF] sm:px-4 sm:text-[15px]"
+              disabled={subject.chapterCount === 0}
+              className="inline-flex min-w-0 items-center justify-center rounded-[12px] border border-[#C8D3E3] bg-white px-3 py-2.5 text-[14px] font-medium text-[#0F172A] transition hover:border-[#AAB8CF] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <ListTree size={16} className="mr-2" />
-              Curriculum
+              Syllabus
             </button>
 
             <button
               type="button"
               onClick={() => handleSelectSubject(subject, 'chapters')}
-              className="inline-flex min-w-0 items-center justify-center rounded-[16px] border border-[#C8D3E3] bg-white px-3 py-2.5 text-[14px] font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF] sm:px-4 sm:text-[15px]"
+              disabled={subject.chapterCount === 0}
+              className="inline-flex min-w-0 items-center justify-center rounded-[12px] bg-[#5648E8] px-3 py-2.5 text-[14px] font-medium text-white transition hover:bg-[#4A3DD0] disabled:cursor-not-allowed disabled:bg-[#C7CBD6]"
             >
               <BookOpen size={16} className="mr-2" />
               Chapters
@@ -1283,13 +1136,13 @@ export default function StudentPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7A889D]">
-              Academic year 2026-27 - Term 1
+              {getSyear() ? `Academic year ${getSyear()}` : 'Academic year'}
             </p>
             <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-[#172554] sm:text-[34px]">
-              Learning management
+              My subjects
             </h1>
             <p className="mt-2 max-w-3xl text-[14px] leading-6 text-[#5B6B82]">
-              Plan lessons, manage concept-level content, and run mastery-based assessments.
+              Pick a subject to explore its chapters, lessons and practice.
             </p>
           </div>
 
@@ -1317,6 +1170,7 @@ export default function StudentPage() {
               />
             </div>
 
+            {standardOptions.length > 1 ? (
             <div className="w-full lg:w-[165px]">
               <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">Standard</Label>
               <Select value={selectedStandard} onValueChange={(value) => setSelectedStandard(value ?? 'all')}>
@@ -1334,6 +1188,9 @@ export default function StudentPage() {
               </Select>
             </div>
 
+            ) : null}
+
+            {sectionOptions.length > 1 ? (
             <div className="w-full lg:w-[165px]">
               <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">Section</Label>
               <Select value={selectedSection} onValueChange={(value) => setSelectedSection(value ?? 'all')}>
@@ -1350,10 +1207,13 @@ export default function StudentPage() {
                 </SelectContent>
               </Select>
             </div>
+            ) : null}
           </div>
 
           <p className="text-[15px] font-medium text-[#334155]">
-            {filteredSubjects.length} of {studentSubjects.length} subjects
+            {filteredSubjects.length === studentSubjects.length
+              ? `${studentSubjects.length} subjects`
+              : `${filteredSubjects.length} of ${studentSubjects.length} subjects`}
           </p>
         </div>
 
@@ -1670,69 +1530,52 @@ export default function StudentPage() {
     );
   };
 
-  const renderContentCards = (items: StudentContentItem[]) => {
+  /** The chapter's cards, laid out exactly as the admin's Classroom Resource lane lays them out. */
+  const renderContentCards = (items: ChapterContentItem[]) => {
+    if (videoSections) {
+      return (
+        <div className="space-y-10" data-testid="video-sections">
+          {videoSections.map((section) => (
+            <section key={section.key} data-testid={`video-section-${section.key}`}>
+              <div className="mb-4 flex items-center gap-3">
+                <h2 className="text-[20px] font-bold leading-7 text-slate-950">{section.label}</h2>
+                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200">
+                  {section.items.length} video{section.items.length === 1 ? '' : 's'}
+                </span>
+              </div>
+              {section.items.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-8 text-center text-sm text-slate-500">
+                  {section.emptyMessage}
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
+                  {section.items.map((item) => (
+                    <ContentCard
+                      key={item.id}
+                      item={item}
+                      onOpen={() => handleOpenContent(item)}
+                      onDownloadPdf={() => handleDownloadPdf(item)}
+                      hideChapter
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
+      );
+    }
+
     return (
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        {items.map((item) => {
-          const ContentIcon = getContentIcon(item.type);
-
-          return (
-            <article
-              key={item.id}
-              className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
-            >
-              <div className="flex h-[116px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
-                <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
-                  {item.typeLabel}
-                </span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                  <Upload size={12} />
-                  {item.source}
-                </span>
-              </div>
-
-              <div className="-mt-[52px] flex justify-center px-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
-                  <ContentIcon size={28} />
-                </div>
-              </div>
-
-              <div className="px-4 pb-4 pt-3">
-                <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
-                  {item.typeLabel}
-                </div>
-
-                <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
-
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {item.chapterName}
-                  <span className="mx-1">·</span>
-                  {item.conceptName || 'All concepts'}
-                </p>
-
-                <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
-                 
-
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleOpenContent(item);
-                    }}
-                    className="inline-flex h-9 items-center rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] transition hover:bg-[#e3e9ff] hover:text-[#4338ca]"
-                  >
-                    {item.actionLabel === 'Play' ? (
-                      <Play size={14} className="mr-2" />
-                    ) : (
-                      <Eye size={14} className="mr-2" />
-                    )}
-                    {item.actionLabel}
-                  </button>
-                </div>
-              </div>
-            </article>
-          );
-        })}
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
+        {items.map((item) => (
+          <ContentCard
+            key={item.id}
+            item={item}
+            onOpen={() => handleOpenContent(item)}
+            onDownloadPdf={() => handleDownloadPdf(item)}
+          />
+        ))}
       </div>
     );
   };
@@ -1905,7 +1748,6 @@ export default function StudentPage() {
 
   const renderContentView = () => {
     const chapterLabel = selectedChapter?.name || 'Selected chapter';
-    const totalItems = selectedChapterContent.length;
 
     return (
       <div>
@@ -1968,68 +1810,46 @@ export default function StudentPage() {
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <span className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Group By
-              </span>
-
-              <div className="inline-flex rounded-2xl bg-slate-100/90 p-1">
-                <button
-                  type="button"
-                  onClick={() => setContentGroupBy('chapter')}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                    contentGroupBy === 'chapter'
-                      ? 'bg-white text-[#4f46e5] shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <BookOpen size={15} />
-                  Chapter wise
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setContentGroupBy('concept')}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                    contentGroupBy === 'concept'
-                      ? 'bg-white text-[#4f46e5] shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <Target size={15} />
-                  Concept wise
-                </button>
-              </div>
-            </div>
+            {/* The Classroom Resource lane is always Chapter wise on the admin page; it is a label there, not a switch. */}
+            <span className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200/50 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm">
+              <BookOpen size={14} className="text-slate-500" />
+              Chapter wise
+            </span>
           </div>
         </div>
 
-        <div className="mt-6 border-b border-slate-200/80">
+        <div className="mb-4 mt-6 border-b border-slate-200/80">
           <div className="flex flex-wrap items-center gap-6 text-[15px]">
-            {CONTENT_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setSelectedContentType(tab.key)}
-                className={`inline-flex items-center gap-2 border-b-2 px-1 py-3 font-medium transition-colors ${
-                  selectedContentType === tab.key
-                    ? 'border-[#4f46e5] text-[#4f46e5]'
-                    : 'border-transparent text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                {tab.key === 'all' ? <BookOpen size={16} /> : null}
-                {tab.key === 'presentation' ? <BookOpen size={16} /> : null}
-                {tab.key === 'video' ? <Video size={16} /> : null}
-                {tab.key === 'revision_notes' ? <FileText size={16} /> : null}
-                {tab.key === 'classroom_activity' ? <ClipboardList size={16} /> : null}
-                {tab.label}
-              </button>
-            ))}
+            {visibleTabs.map((tab) => {
+              const count = tabCounts[tab] ?? 0;
+              const isActive = activeContentTab === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setSelectedContentType(tab)}
+                  className={`inline-flex items-center gap-2 border-b-2 px-1 py-3 font-medium transition-colors ${
+                    isActive
+                      ? 'border-[#4f46e5] text-[#4f46e5]'
+                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  {tab}
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
+                      isActive ? 'bg-[#eef2ff] text-[#4f46e5]' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="mt-5">
-          <div className="relative w-full max-w-[270px]">
+        <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative w-full lg:max-w-xs">
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
               value={contentSearch}
@@ -2039,70 +1859,84 @@ export default function StudentPage() {
             />
           </div>
 
-          <p className="mt-4 text-sm text-slate-500">
-            {filteredContent.length} of {totalItems} items
-          </p>
-
-          <p className="mt-4 inline-flex items-center gap-2 text-sm text-[#3157ff]">
-            <Info size={15} />
-            Showing content your teacher has shared for the topics you're learning.
-          </p>
+          {/* Deselecting means "All sources", as on the admin page. */}
+          <Select value={contentSourceFilter} onValueChange={(value) => setContentSourceFilter(value || 'all')}>
+            <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm lg:w-[190px]">
+              <SelectValue>{contentSourceFilter === 'all' ? 'All sources' : contentSourceFilter}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sources</SelectItem>
+              {contentSources.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {contentError ? (
-          <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {contentError}
+          <div className="flex flex-col items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
+            <span>{contentError}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setContentError(null);
+                setContentReloadKey((key) => key + 1);
+                // Forget this chapter's cached list so the effect fetches it again.
+                if (selectedChapter) {
+                  setContentItemsByChapter((current) => {
+                    const next = { ...current };
+                    delete next[selectedChapter.id];
+                    return next;
+                  });
+                }
+              }}
+              className="h-9 rounded-full bg-white px-4 text-rose-700"
+            >
+              Try again
+            </button>
           </div>
         ) : isContentLoading ? (
-          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">
-            Loading content...
-          </div>
-        ) : totalItems === 0 ? (
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500">
-            No learning content is available for this chapter.
-          </div>
-        ) : filteredContent.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500">
-            No content matches the selected filters.
-          </div>
-        ) : contentGroupBy === 'chapter' ? (
-          <div className="mt-6">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div className="flex items-center gap-3">
-                <BookOpen className="h-5 w-5 text-violet-600" />
-                <h3 className="text-base font-semibold text-slate-900">{chapterLabel}</h3>
-              </div>
-
-              <Badge variant="secondary" className="h-auto rounded-full bg-[#F2F5FA] px-3 py-1 text-[12px] font-medium text-[#51657F]">
-                {filteredContent.length} items
-              </Badge>
-            </div>
-
-            <div className="mt-5">{renderContentCards(filteredContent)}</div>
-          </div>
-        ) : (
-          <div className="mt-6 space-y-8">
-            {Object.entries(groupedConceptContent).map(([conceptName, items]) => (
-              <section key={conceptName}>
-                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                  <div className="flex items-center gap-3">
-                    <Target className="h-5 w-5 text-violet-600" />
-                    <h3 className="text-base font-semibold text-slate-900">{conceptName || 'All concepts'}</h3>
-                  </div>
-
-                  <Badge variant="secondary" className="h-auto rounded-full bg-[#F2F5FA] px-3 py-1 text-[12px] font-medium text-[#51657F]">
-                    {items.length} items
-                  </Badge>
-                </div>
-
-                <div className="mt-5">{renderContentCards(items)}</div>
-              </section>
+          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
+            {[1, 2, 3, 4, 5, 6].map((item) => (
+              <div key={item} className="h-56 animate-pulse rounded-xl bg-slate-100" />
             ))}
           </div>
+        ) : filteredContent.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500">
+            No content is available for this chapter.
+          </div>
+        ) : (
+          renderContentCards(filteredContent)
         )}
+
+        <PrayogshalaDetailDialog
+          activity={openPrayogshala}
+          canManage={false}
+          onClose={() => setOpenPrayogshala(null)}
+          onEdit={() => undefined}
+          onRemove={async () => undefined}
+        />
+        {labActivity?.lab_config ? (
+          <PrayogshalaLab activity={labActivity} lab={labActivity.lab_config} onClose={() => setLabActivity(null)} />
+        ) : null}
       </div>
     );
   };
+
+  // A link that names a subject and a view (e.g. ?subject_id=..&view=chapters) opens that view directly: while the
+  // effect above is about to apply it, show the skeleton instead of flashing the subject list first.
+  const deepLinkPending =
+    studentView === 'subjects' &&
+    !selectedSubject &&
+    Boolean(searchParams?.get('subject_id') && searchParams?.get('view')) &&
+    studentSubjects.some(
+      (item) =>
+        String(item.subject_id) === searchParams?.get('subject_id') &&
+        (!searchParams?.get('standard_id') || String(item.standard_id) === String(searchParams?.get('standard_id'))) &&
+        (!searchParams?.get('section_id') || !item.sectionId || String(item.sectionId) === String(searchParams?.get('section_id')))
+    );
 
   return (
     <div className="min-h-full bg-[#E9EEF7] px-6 py-5">
@@ -2114,6 +1948,8 @@ export default function StudentPage() {
             {error}
           </div>
         ) : isDetailLoading && studentView !== 'subjects' ? (
+          <CurriculumSkeleton />
+        ) : deepLinkPending ? (
           <CurriculumSkeleton />
         ) : studentView === 'subjects' ? (
           renderSubjectsView()
