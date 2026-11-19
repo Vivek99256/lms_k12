@@ -37,6 +37,8 @@ import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_com
 import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
 import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
 
+import StudentDashboard from './StudentDashboard';
+
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 /** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
@@ -73,7 +75,22 @@ function tierColor(percent: number): string {
   return 'bg-rose-500';
 }
 
+/** A student gets their own home; teachers and admins keep the pick-a-student progress view. */
 export default function LmsDashboardPage() {
+  const isStudent = useMemo(() => currentUserProfile().toLowerCase() === 'student', []);
+  if (isStudent) {
+    return (
+      <div className="min-h-full px-4 py-5 sm:px-6">
+        <div className="mx-auto w-full max-w-[1400px]">
+          <StudentDashboard />
+        </div>
+      </div>
+    );
+  }
+  return <LmsProgressView />;
+}
+
+function LmsProgressView() {
   const session = useMemo(() => buildSessionContext(), []);
   const profileName = useMemo(() => currentUserProfile(), []);
   const isStudent = profileName.toLowerCase() === 'student';
