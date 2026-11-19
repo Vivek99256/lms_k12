@@ -258,7 +258,12 @@ export async function POST(request: Request) {
       stage_counts: {},
       lifecycle_trace: [],
       lifecycle_stage_counts: {},
-      links: {},
+      links: {
+        nav_route: intent.route,
+        nav_label: intent.actionLabel || `Open ${intent.headline || targetLabel}`,
+        nav_title: intent.headline || targetLabel,
+        nav_desc: `Open ${intent.headline || targetLabel}.`,
+      },
       duration_ms: 0,
     };
 

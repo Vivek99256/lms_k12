@@ -429,7 +429,7 @@ const SOFT_NAVIGATION_VERBS = ['show me', 'show', 'i want to see', 'let me see',
 const DESTINATION_WORDS = ['tab', 'page', 'screen', 'module', 'section'];
 
 function normalize(text: string): string {
-  return text.trim().toLowerCase().replace(/[^\w\s/-]/g, '').replace(/\s+/g, ' ');
+  return text.trim().toLowerCase().replace(/&/g, ' and ').replace(/[^\w\s/-]/g, '').replace(/\s+/g, ' ');
 }
 
 function containsPhrase(haystack: string, needle: string): boolean {
@@ -819,6 +819,69 @@ interface SpecialScreenRoute {
 }
 
 const SPECIAL_SCREEN_ROUTES: SpecialScreenRoute[] = [
+  {
+    phrases: ['standard 6 page', 'open standard 6', 'take me to standard 6', 'go to standard 6', 'navigate to standard 6', 'standard page', 'course master', 'course master page', 'courses page', 'all courses page'],
+    route: '/course-master',
+    moduleName: 'teach_learn',
+    moduleLabel: 'Teach/Learn',
+    categoryLabel: 'Course Master',
+    headline: 'Standard 6 Courses',
+    actionLabel: 'Open Course Master',
+  },
+  {
+    phrases: ['science subject page', 'open science subject', 'go to science subject', 'navigate to science subject', 'open science page', 'subject page', 'subjects page'],
+    route: '/course-master/3975-103/chapters',
+    moduleName: 'teach_learn',
+    moduleLabel: 'Teach/Learn',
+    categoryLabel: 'Subject Chapters',
+    headline: 'Science Subject',
+    actionLabel: 'Open Science Subject',
+  },
+  {
+    phrases: ['course details page', 'course details', 'course detail page', 'course details screen', 'course page'],
+    route: '/course-master',
+    moduleName: 'teach_learn',
+    moduleLabel: 'Teach/Learn',
+    categoryLabel: 'Course Details',
+    headline: 'Course Details',
+    actionLabel: 'Open Course Details',
+  },
+  {
+    phrases: ['show me the chapters for this course', 'chapters for this course', 'chapters page', 'chapters screen', 'course chapters', 'open chapters'],
+    route: '/chapters',
+    moduleName: 'teach_learn',
+    moduleLabel: 'Teach/Learn',
+    categoryLabel: 'Chapters',
+    headline: 'Course Chapters',
+    actionLabel: 'Open Chapters',
+  },
+  {
+    phrases: ['topic details page', 'topic details screen', 'topic details', 'topics page', 'open topic details', 'topic page'],
+    route: '/course-master/3975-103/chapters',
+    moduleName: 'teach_learn',
+    moduleLabel: 'Teach/Learn',
+    categoryLabel: 'Topics',
+    headline: 'Topic Details',
+    actionLabel: 'Open Topics',
+  },
+  {
+    phrases: ['exam and assessment module', 'exam assessment module', 'exam and assessment', 'exam assessment', 'exam & assessment'],
+    route: '/exam-assessment',
+    moduleName: 'exam_assessment',
+    moduleLabel: 'Exam & Assessment',
+    categoryLabel: 'Module',
+    headline: 'Exam & Assessment',
+    actionLabel: 'Open Exam & Assessment',
+  },
+  {
+    phrases: ['pal dashboard', 'pal module', 'new pal dashboard', 'pal home'],
+    route: '/pal',
+    moduleName: 'new_pal',
+    moduleLabel: 'PAL',
+    categoryLabel: 'Dashboard',
+    headline: 'PAL Dashboard',
+    actionLabel: 'Open PAL Dashboard',
+  },
   {
     phrases: ['fee collection page', 'fee collection screen', 'open fee collection', 'open fee collect', 'go to fee collection', 'take me to fees collection', 'open the fee collection page', 'collect fees page'],
     route: '/fees/collect',

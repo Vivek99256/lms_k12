@@ -49,6 +49,7 @@ import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 import { AdaptiveLearningButton } from '@/app/pal/_components/AdaptiveLearningButton';
 import { PracticePanel } from '@/app/pal/_components/PracticePanel';
+import { RecommendedNextCard } from '@/app/pal/_components/RecommendedNextCard';
 import {
   CompletedBadge,
   ReadOnlyBadge,
@@ -321,6 +322,11 @@ function PalEntryPageContent() {
             {error}
           </div>
         )}
+
+        {/* Self-view only — a teacher/staff browsing a student's subjects
+            would need the on-behalf-of variant of this endpoint, which this
+            card does not call. */}
+        {!isStaff && <RecommendedNextCard />}
 
         {/* When staff haven't picked a student yet, the picker above is the
             only prompt — no separate empty card. */}

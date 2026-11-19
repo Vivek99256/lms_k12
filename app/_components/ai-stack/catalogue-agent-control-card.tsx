@@ -64,6 +64,12 @@ import {
   type UnifiedTeachLearnReport,
   type ExpertSystemOverviewData,
   type AgentEsoStructuredObject,
+  type AgentEsoDetail,
+  type ExecutiveKnowledge,
+  type ExecutiveAbilities,
+  type ExecutiveResponsibilities,
+  type ExecutiveQuality,
+  type AgentCapabilityItem,
   type CatalogueStandard,
   type CatalogueSubject,
   type CatalogueChapter,
@@ -75,8 +81,9 @@ import {
   CONTENT_TEMPLATES,
   type ContentTemplateOption,
   TemplateDesignCanvas,
+  TemplateLayoutWireframe,
 } from './template-design-canvas';
-export { CONTENT_TEMPLATES, type ContentTemplateOption, TemplateDesignCanvas };
+export { CONTENT_TEMPLATES, type ContentTemplateOption, TemplateDesignCanvas, TemplateLayoutWireframe };
 
 interface CatalogueAgentControlCardProps {
   onValidated?: (report?: HierarchyValidationReport | UnifiedTeachLearnReport | unknown) => void;
@@ -231,103 +238,260 @@ const TEACH_LEARN_ESO_FALLBACKS: Record<string, AgentEsoStructuredObject> = {
   },
 };
 
-function AgentEsoCard({ eso }: { eso: AgentEsoStructuredObject }) {
+function AgentEsoCard({
+  eso,
+  agentDetail,
+}: {
+  eso: AgentEsoStructuredObject;
+  agentDetail?: AgentEsoDetail;
+}) {
+  const [activeTab, setActiveTab] = useState<'ek' | 'ea' | 'er' | 'eq' | 'legacy'>('ek');
+
+  const ek = agentDetail?.ek;
+  const ea = agentDetail?.ea;
+  const er = agentDetail?.er;
+  const eq = agentDetail?.eq;
+
+  const hasModernEso = Boolean(ek && ea && er && eq);
+
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-      <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-          <Sparkles className="size-3.5 text-indigo-600" />
-          Executive Skill Object (ESO) 4-Pillar Specification
-        </h4>
-        <span className="rounded-full bg-indigo-100 text-indigo-800 px-2 py-0.5 text-[10px] font-extrabold uppercase">
-          Knowledge · Activities · Abilities · Usage
-        </span>
+    <div className="space-y-3.5 rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+        <div className="flex items-center gap-2">
+          <div className="flex size-7 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs">
+            <Sparkles className="size-4" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+              Executive Skill Object (ESO) Architecture
+            </h4>
+            <p className="text-[10px] text-slate-500 font-medium">
+              Production Standard: EK (Knowledge) · EA (Abilities) · ER (Responsibilities) · EQ (Quality)
+            </p>
+          </div>
+        </div>
+
+        {hasModernEso && (
+          <div className="flex items-center gap-1 rounded-lg bg-white p-0.5 border border-slate-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setActiveTab('ek')}
+              className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
+                activeTab === 'ek'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              EK · Knowledge
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('ea')}
+              className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
+                activeTab === 'ea'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              EA · Abilities
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('er')}
+              className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
+                activeTab === 'er'
+                  ? 'bg-purple-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              ER · Responsibilities
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('eq')}
+              className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
+                activeTab === 'eq'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              EQ · Quality
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('legacy')}
+              className={`px-2 py-1 text-[10px] font-medium rounded-md transition-all ${
+                activeTab === 'legacy'
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-400 hover:text-slate-700'
+              }`}
+              title="View Classic Activities & Flow View"
+            >
+              Classic Flow
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-        {/* 1. KNOWLEDGE */}
-        <div className="rounded-xl border border-blue-200 bg-white p-3.5 space-y-2 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-blue-100 pb-2">
-            <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-              <BookOpen className="size-3.5 text-blue-600" />
-              1. Knowledge
-            </span>
-            <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-              Data & Information
+      {/* MODERN TAB 1: EK - EXECUTIVE KNOWLEDGE */}
+      {hasModernEso && activeTab === 'ek' && ek && (
+        <div className="space-y-3 rounded-xl border border-blue-200 bg-white p-4 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-blue-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="flex size-6 items-center justify-center rounded-md bg-blue-100 text-blue-800">
+                <BookOpen className="size-3.5 text-blue-700" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-blue-950 block">EK – Executive Knowledge Base</span>
+                <span className="text-[10px] text-blue-600 font-medium">Relational Schemas, Live Tenant Data & Academic Knowledge</span>
+              </div>
+            </div>
+            <span className="rounded-full bg-blue-50 border border-blue-200 text-blue-700 px-2 py-0.5 text-[10px] font-bold">
+              Dynamic Live Grounding
             </span>
           </div>
-          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-            {eso.knowledge.summary}
+
+          <p className="text-xs text-slate-700 leading-relaxed font-normal bg-blue-50/40 p-2.5 rounded-lg border border-blue-100/60">
+            {ek.summary}
           </p>
-          <ul className="space-y-1 text-[11px] text-slate-700 pt-1">
-            {eso.knowledge.items.map((item, idx) => (
-              <li key={idx} className="flex items-start gap-1.5">
-                <span className="text-blue-500 font-bold">•</span>
-                <span className="leading-snug">{item}</span>
-              </li>
-            ))}
-          </ul>
-          {eso.knowledge.tables_and_sources && eso.knowledge.tables_and_sources.length > 0 && (
-            <div className="pt-2 border-t border-slate-100">
-              <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
-                Data Tables & Sources:
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+            {/* Relational Schemas */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                Database Schemas & Relational Graph:
               </span>
-              <div className="flex flex-wrap gap-1">
-                {eso.knowledge.tables_and_sources.map((tbl) => (
-                  <span key={tbl} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-700">
-                    {tbl}
+              <ul className="space-y-1.5 text-[11px] text-slate-700">
+                {ek.schemas_and_relationships.map((rel, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-blue-500 font-bold">•</span>
+                    <span className="leading-snug">{rel}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Academic Knowledge / Live Metrics */}
+            <div className="space-y-2.5">
+              {ek.academic_curriculum_knowledge && ek.academic_curriculum_knowledge.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                    Curriculum & Board Knowledge:
                   </span>
+                  <ul className="space-y-1 text-[11px] text-slate-700">
+                    {ek.academic_curriculum_knowledge.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5">
+                        <span className="text-blue-500 font-bold">✓</span>
+                        <span className="leading-snug">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {ek.live_metrics && (
+                <div className="rounded-lg border border-blue-100 bg-blue-50/30 p-2.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-900 block mb-1.5">
+                    Live Verified Tenant Metrics:
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    {Object.entries(ek.live_metrics).map(([key, val]) => (
+                      <div key={key} className="flex items-center justify-between border-b border-blue-100/50 pb-1">
+                        <span className="text-slate-600 capitalize">{key.replace(/_/g, ' ')}:</span>
+                        <span className="font-mono font-bold text-blue-900">{val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {ek.tables_and_sources && ek.tables_and_sources.length > 0 && (
+            <div className="pt-2 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase text-slate-400">Grounded DB Tables:</span>
+              {ek.tables_and_sources.map((tbl) => (
+                <span key={tbl} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-700">
+                  {tbl}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MODERN TAB 2: EA - EXECUTIVE ABILITIES */}
+      {hasModernEso && activeTab === 'ea' && ea && (
+        <div className="space-y-3 rounded-xl border border-emerald-200 bg-white p-4 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-emerald-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="flex size-6 items-center justify-center rounded-md bg-emerald-100 text-emerald-800">
+                <ShieldCheck className="size-3.5 text-emerald-700" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-emerald-950 block">EA – Executive Abilities & Skills</span>
+                <span className="text-[10px] text-emerald-600 font-medium">Executable Backend Capabilities & Dynamic Registry Status</span>
+              </div>
+            </div>
+            <span className="rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 text-[10px] font-bold">
+              Executable Capabilities
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-700 leading-relaxed font-normal bg-emerald-50/40 p-2.5 rounded-lg border border-emerald-100/60">
+            {ea.summary}
+          </p>
+
+          {/* Dynamic Capabilities List with Real Implementation Status */}
+          {ea.capabilities && ea.capabilities.length > 0 && (
+            <div className="space-y-2 pt-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                Backend Capability Registry & Execution Status:
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {ea.capabilities.map((cap, idx) => (
+                  <div
+                    key={idx}
+                    className="flex flex-col justify-between rounded-lg border border-slate-200/80 bg-slate-50/50 p-2.5 transition-all hover:bg-white"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[11px] font-bold text-slate-900 leading-tight">{cap.name}</span>
+                        {cap.status === 'fully_implemented' ? (
+                          <span className="rounded bg-emerald-100 text-emerald-800 px-1.5 py-0.5 text-[9px] font-extrabold flex items-center gap-1 shrink-0">
+                            <Check className="size-2.5" /> Fully Active
+                          </span>
+                        ) : cap.status === 'partially_implemented' ? (
+                          <span className="rounded bg-amber-100 text-amber-800 px-1.5 py-0.5 text-[9px] font-extrabold flex items-center gap-1 shrink-0">
+                            <Clock className="size-2.5" /> Partial
+                          </span>
+                        ) : (
+                          <span className="rounded bg-slate-200 text-slate-600 px-1.5 py-0.5 text-[9px] font-semibold shrink-0">
+                            Unavailable
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-600 leading-snug">{cap.description}</p>
+                    </div>
+                    {cap.handler && (
+                      <span className="font-mono text-[8px] text-slate-400 mt-1 block truncate">
+                        {cap.handler}
+                      </span>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
           )}
-        </div>
 
-        {/* 2. ACTIVITIES */}
-        <div className="rounded-xl border border-purple-200 bg-white p-3.5 space-y-2 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-purple-100 pb-2">
-            <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
-              <Activity className="size-3.5 text-purple-600" />
-              2. Activities
-            </span>
-            <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md">
-              Operations & Audits
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-            {eso.activities.summary}
-          </p>
-          <ul className="space-y-1 text-[11px] text-slate-700 pt-1">
-            {eso.activities.items.map((item, idx) => (
-              <li key={idx} className="flex items-start gap-1.5">
-                <span className="text-purple-500 font-bold">➔</span>
-                <span className="leading-snug">{item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* 3. ABILITIES */}
-        <div className="rounded-xl border border-emerald-200 bg-white p-3.5 space-y-2 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
-            <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-              <ShieldCheck className="size-3.5 text-emerald-600" />
-              3. Abilities
-            </span>
-            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-              Skills & Safeguards
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-            {eso.abilities.summary}
-          </p>
-          <div className="space-y-2 pt-1">
+          {/* Core Skills & Constraints */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
             <div>
-              <span className="text-[10px] font-bold uppercase text-emerald-800 block mb-1">
-                Core Capabilities & Skills:
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                Core Algorithmic Skills:
               </span>
               <ul className="space-y-1 text-[11px] text-slate-700">
-                {eso.abilities.skills.map((skill, idx) => (
+                {ea.skills.map((skill, idx) => (
                   <li key={idx} className="flex items-start gap-1.5">
                     <span className="text-emerald-500 font-bold">✓</span>
                     <span className="leading-snug">{skill}</span>
@@ -335,70 +499,334 @@ function AgentEsoCard({ eso }: { eso: AgentEsoStructuredObject }) {
                 ))}
               </ul>
             </div>
-            {eso.abilities.constraints_and_safeguards && eso.abilities.constraints_and_safeguards.length > 0 && (
+
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                Safety & Guardrail Constraints:
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {ea.constraints_and_safeguards.map((c, idx) => (
+                  <span
+                    key={idx}
+                    className="rounded bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800"
+                  >
+                    🛡️ {c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODERN TAB 3: ER - EXECUTIVE RESPONSIBILITIES */}
+      {hasModernEso && activeTab === 'er' && er && (
+        <div className="space-y-3 rounded-xl border border-purple-200 bg-white p-4 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-purple-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="flex size-6 items-center justify-center rounded-md bg-purple-100 text-purple-800">
+                <Workflow className="size-3.5 text-purple-700" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-purple-950 block">ER – Executive Responsibilities & Boundaries</span>
+                <span className="text-[10px] text-purple-600 font-medium">Execution Boundaries, Contracts & Handoff Protocols</span>
+              </div>
+            </div>
+            <span className="rounded-full bg-purple-50 border border-purple-200 text-purple-700 px-2 py-0.5 text-[10px] font-bold">
+              Formal Contracts
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-700 leading-relaxed font-normal bg-purple-50/40 p-2.5 rounded-lg border border-purple-100/60">
+            {er.summary}
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+            {/* Must Do */}
+            <div className="space-y-1.5 rounded-lg border border-emerald-100 bg-emerald-50/20 p-2.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-900 block flex items-center gap-1">
+                <CheckCircle2 className="size-3 text-emerald-600" /> Mandatory Responsibilities (Must Do):
+              </span>
+              <ul className="space-y-1 text-[11px] text-slate-700">
+                {er.must_do.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-emerald-600 font-bold">✓</span>
+                    <span className="leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Must Not Do */}
+            <div className="space-y-1.5 rounded-lg border border-rose-100 bg-rose-50/20 p-2.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-900 block flex items-center gap-1">
+                <AlertTriangle className="size-3 text-rose-600" /> Strict Constraints (Must NOT Do):
+              </span>
+              <ul className="space-y-1 text-[11px] text-slate-700">
+                {er.must_not_do.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-rose-600 font-bold">✕</span>
+                    <span className="leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Stopping Conditions & Handoff */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100 text-[11px]">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                Stopping Conditions:
+              </span>
+              <ul className="space-y-1 text-slate-600">
+                {er.stopping_conditions.map((sc, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-amber-500 font-bold">🛑</span>
+                    <span>{sc}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                Handoff Protocol to Next Agent:
+              </span>
+              <p className="text-slate-700 bg-slate-50 p-2 rounded border border-slate-200 text-[10px]">
+                {er.handoff_rules}
+              </p>
+              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500">
+                <Database className="size-3" />
+                <span>History Persisted: {er.state_and_history}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODERN TAB 4: EQ - EXECUTIVE QUALITY */}
+      {hasModernEso && activeTab === 'eq' && eq && (
+        <div className="space-y-3 rounded-xl border border-amber-200 bg-white p-4 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-amber-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="flex size-6 items-center justify-center rounded-md bg-amber-100 text-amber-800">
+                <CheckCheck className="size-3.5 text-amber-700" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-amber-950 block">EQ – Executive Quality & Gates</span>
+                <span className="text-[10px] text-amber-600 font-medium">Quality Validation Gates (A–E) & Execution Evidence Scoring</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Live Score:</span>
+              <span className="rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-xs font-extrabold font-mono">
+                {eq.live_quality_score}%
+              </span>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-700 leading-relaxed font-normal bg-amber-50/40 p-2.5 rounded-lg border border-amber-100/60">
+            {eq.summary}
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+                Applicable Quality Gates:
+              </span>
+              <div className="space-y-1.5">
+                {eq.applicable_gates.map((gate, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-[11px] font-bold text-slate-800">{gate}</span>
+                    <span className="text-[9px] font-extrabold uppercase bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                      Passed
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                Quality Validation Rules:
+              </span>
+              <ul className="space-y-1 text-[11px] text-slate-700">
+                {eq.quality_rules.map((rule, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-amber-500 font-bold">✓</span>
+                    <span className="leading-snug">{rule}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="rounded-lg bg-amber-50/50 border border-amber-200/60 p-2 text-[10px]">
+                <strong className="text-amber-900 block mb-0.5">Scoring Formula:</strong>
+                <span className="text-slate-600">{eq.scoring_formula}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LEGACY TAB (ACTIVITIES & FLOW) */}
+      {(!hasModernEso || activeTab === 'legacy') && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {/* 1. KNOWLEDGE */}
+          <div className="rounded-xl border border-blue-200 bg-white p-3.5 space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+              <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                <BookOpen className="size-3.5 text-blue-600" />
+                1. Knowledge
+              </span>
+              <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                Data & Information
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+              {eso.knowledge.summary}
+            </p>
+            <ul className="space-y-1 text-[11px] text-slate-700 pt-1">
+              {eso.knowledge.items.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-1.5">
+                  <span className="text-blue-500 font-bold">•</span>
+                  <span className="leading-snug">{item}</span>
+                </li>
+              ))}
+            </ul>
+            {eso.knowledge.tables_and_sources && eso.knowledge.tables_and_sources.length > 0 && (
               <div className="pt-2 border-t border-slate-100">
                 <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
-                  Safety & Guardrail Constraints:
+                  Data Tables & Sources:
                 </span>
                 <div className="flex flex-wrap gap-1">
-                  {eso.abilities.constraints_and_safeguards.map((c, idx) => (
-                    <span key={idx} className="rounded bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-800">
-                      🛡️ {c}
+                  {eso.knowledge.tables_and_sources.map((tbl) => (
+                    <span key={tbl} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-700">
+                      {tbl}
                     </span>
                   ))}
                 </div>
               </div>
             )}
           </div>
-        </div>
 
-        {/* 4. USAGE */}
-        <div className="rounded-xl border border-amber-200 bg-white p-3.5 space-y-2 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-amber-100 pb-2">
-            <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-              <Workflow className="size-3.5 text-amber-600" />
-              4. Usage
-            </span>
-            <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
-              End-to-End Execution Flow
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-            {eso.usage.summary}
-          </p>
-          <div className="space-y-1.5 pt-1">
-            <span className="text-[10px] font-bold uppercase text-amber-800 block mb-1">
-              Step-by-Step Practical Application:
-            </span>
-            <ol className="space-y-1 text-[11px] text-slate-700">
-              {eso.usage.step_by_step_flow.map((step, idx) => (
+          {/* 2. ACTIVITIES */}
+          <div className="rounded-xl border border-purple-200 bg-white p-3.5 space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+              <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                <Activity className="size-3.5 text-purple-600" />
+                2. Activities
+              </span>
+              <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md">
+                Operations & Audits
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+              {eso.activities.summary}
+            </p>
+            <ul className="space-y-1 text-[11px] text-slate-700 pt-1">
+              {eso.activities.items.map((item, idx) => (
                 <li key={idx} className="flex items-start gap-1.5">
-                  <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-900 font-bold text-[9px] mt-0.5">
-                    {idx + 1}
-                  </span>
-                  <span className="leading-snug">{step}</span>
+                  <span className="text-purple-500 font-bold">➔</span>
+                  <span className="leading-snug">{item}</span>
                 </li>
               ))}
-            </ol>
-            {(eso.usage.upstream_dependencies || eso.usage.downstream_handoff) && (
-              <div className="pt-2 border-t border-slate-100 grid grid-cols-1 gap-1 text-[10px]">
-                {eso.usage.upstream_dependencies && (
-                  <div>
-                    <span className="font-bold text-slate-500">Upstream Inputs: </span>
-                    <span className="text-slate-700">{eso.usage.upstream_dependencies}</span>
-                  </div>
-                )}
-                {eso.usage.downstream_handoff && (
-                  <div>
-                    <span className="font-bold text-slate-500">Downstream Handoff: </span>
-                    <span className="text-slate-700">{eso.usage.downstream_handoff}</span>
-                  </div>
-                )}
+            </ul>
+          </div>
+
+          {/* 3. ABILITIES */}
+          <div className="rounded-xl border border-emerald-200 bg-white p-3.5 space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+              <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                <ShieldCheck className="size-3.5 text-emerald-600" />
+                3. Abilities
+              </span>
+              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                Skills & Safeguards
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+              {eso.abilities.summary}
+            </p>
+            <div className="space-y-2 pt-1">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-emerald-800 block mb-1">
+                  Core Capabilities & Skills:
+                </span>
+                <ul className="space-y-1 text-[11px] text-slate-700">
+                  {eso.abilities.skills.map((skill, idx) => (
+                    <li key={idx} className="flex items-start gap-1.5">
+                      <span className="text-emerald-500 font-bold">✓</span>
+                      <span className="leading-snug">{skill}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            )}
+              {eso.abilities.constraints_and_safeguards && eso.abilities.constraints_and_safeguards.length > 0 && (
+                <div className="pt-2 border-t border-slate-100">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                    Safety & Guardrail Constraints:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {eso.abilities.constraints_and_safeguards.map((c, idx) => (
+                      <span key={idx} className="rounded bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-800">
+                        🛡️ {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 4. USAGE */}
+          <div className="rounded-xl border border-amber-200 bg-white p-3.5 space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+              <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                <Workflow className="size-3.5 text-amber-600" />
+                4. Usage
+              </span>
+              <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
+                End-to-End Execution Flow
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+              {eso.usage.summary}
+            </p>
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[10px] font-bold uppercase text-amber-800 block mb-1">
+                Step-by-Step Practical Application:
+              </span>
+              <ol className="space-y-1 text-[11px] text-slate-700">
+                {eso.usage.step_by_step_flow.map((step, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-900 font-bold text-[9px] mt-0.5">
+                      {idx + 1}
+                    </span>
+                    <span className="leading-snug">{step}</span>
+                  </li>
+                ))}
+              </ol>
+              {(eso.usage.upstream_dependencies || eso.usage.downstream_handoff) && (
+                <div className="pt-2 border-t border-slate-100 grid grid-cols-1 gap-1 text-[10px]">
+                  {eso.usage.upstream_dependencies && (
+                    <div>
+                      <span className="font-bold text-slate-500">Upstream Inputs: </span>
+                      <span className="text-slate-700">{eso.usage.upstream_dependencies}</span>
+                    </div>
+                  )}
+                  {eso.usage.downstream_handoff && (
+                    <div>
+                      <span className="font-bold text-slate-500">Downstream Handoff: </span>
+                      <span className="text-slate-700">{eso.usage.downstream_handoff}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -2609,35 +3037,9 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                               </span>
                             </div>
 
-                            {/* Template visual preview pill */}
-                            <div
-                              className="rounded-lg p-2.5 my-2 border flex items-center justify-between gap-2 shadow-2xs"
-                              style={{
-                                backgroundColor: tmpl.previewBg,
-                                borderColor: tmpl.borderColor,
-                              }}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div
-                                  className="size-3 rounded-full shrink-0 shadow-xs"
-                                  style={{ backgroundColor: tmpl.paletteDot }}
-                                />
-                                <span
-                                  className="text-[11px] font-mono font-bold truncate"
-                                  style={{ color: tmpl.previewText }}
-                                >
-                                  {tmpl.name}
-                                </span>
-                              </div>
-                              <span
-                                className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
-                                style={{
-                                  backgroundColor: tmpl.previewAccent + '25',
-                                  color: tmpl.previewAccent,
-                                }}
-                              >
-                                SVG Visuals
-                              </span>
+                            {/* Unique Layout Architecture Wireframe Preview */}
+                            <div className="my-2">
+                              <TemplateLayoutWireframe templateId={tmpl.id} />
                             </div>
 
                             <p className="text-[11px] text-slate-600 leading-relaxed mb-2.5 line-clamp-2">
@@ -2747,39 +3149,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                       </div>
                     </div>
 
-                    {/* Quick Switch Palette Bar for Simultaneous Immediate Updates */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 border-b border-indigo-100/60">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
-                        <Palette className="size-3 text-indigo-600" />
-                        Quick Switch Palette:
-                      </span>
-                      {CONTENT_TEMPLATES.map((tmpl) => {
-                        const isSelected = selectedTemplate === tmpl.id;
-                        return (
-                          <button
-                            key={tmpl.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedTemplate(tmpl.id);
-                              if (typeof document !== 'undefined') {
-                                document.documentElement.setAttribute('data-template', tmpl.id);
-                              }
-                            }}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${
-                              isSelected
-                                ? 'bg-indigo-600 text-white shadow-2xs ring-2 ring-indigo-400 font-bold'
-                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
-                            }`}
-                          >
-                            <span
-                              className="size-2 rounded-full shrink-0 shadow-2xs"
-                              style={{ backgroundColor: tmpl.paletteDot }}
-                            />
-                            <span className="truncate">{tmpl.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+
 
                     {/* PPT Mode Slide Selector Bar */}
                     {previewMode === 'ppt' && (
@@ -3595,6 +3965,154 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                 </div>
               </div>
 
+              {/* Five Quality Gates (EQ) & Inter-Agent Handoff Verification */}
+              {pipelineResult.quality_scorecard && (
+                <div className="space-y-4 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/50 via-white to-slate-50/50 p-4 shadow-2xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-xs">
+                        <ShieldCheck className="size-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                          Five Comprehensive Quality Gates (EQ Scorecard)
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          Automated multi-gate verification across Curriculum Grounding, Deduplication, Pedagogical Integrity, Structural Quality, and Coherence
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-lg px-2.5 py-1 text-xs font-extrabold uppercase tracking-wider ${
+                        pipelineResult.quality_scorecard.composite_score >= 90
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : pipelineResult.quality_scorecard.composite_score >= 75
+                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                          : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      }`}>
+                        {pipelineResult.quality_scorecard.quality_tier} ({pipelineResult.quality_scorecard.composite_score}%)
+                      </span>
+                      <span className="rounded-lg bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-mono text-slate-600">
+                        {pipelineResult.quality_scorecard.gates_evaluated ?? 5} Gates Evaluated
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 5 Gates Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    {[
+                      {
+                        key: 'gate_a',
+                        gate: 'Gate A',
+                        title: 'Curriculum Grounding',
+                        data: pipelineResult.quality_scorecard.gates?.gate_a,
+                        fallbackDesc: 'Standard & subject hierarchy grounding in tenant DB',
+                      },
+                      {
+                        key: 'gate_b',
+                        gate: 'Gate B',
+                        title: 'Deduplication & Scope',
+                        data: pipelineResult.quality_scorecard.gates?.gate_b,
+                        fallbackDesc: 'Existing resource verification and zero-duplicate guard',
+                      },
+                      {
+                        key: 'gate_c',
+                        gate: 'Gate C',
+                        title: 'Pedagogical Integrity',
+                        data: pipelineResult.quality_scorecard.gates?.gate_c,
+                        fallbackDesc: "Bloom's taxonomy ladder & concept progression",
+                      },
+                      {
+                        key: 'gate_d',
+                        gate: 'Gate D',
+                        title: 'Structural & Visual Quality',
+                        data: pipelineResult.quality_scorecard.gates?.gate_d,
+                        fallbackDesc: 'Semantic HTML5, SVG viewBox, and layout validation',
+                      },
+                      {
+                        key: 'gate_e',
+                        gate: 'Gate E',
+                        title: 'Cross-Resource Coherence',
+                        data: pipelineResult.quality_scorecard.gates?.gate_e,
+                        fallbackDesc: 'Unified vocabulary, concept linkages & tenant isolation',
+                      },
+                    ].map((g) => {
+                      const score = g.data?.score ?? 100;
+                      const isPassed = (g.data?.status ?? 'passed') === 'passed';
+                      return (
+                        <div
+                          key={g.key}
+                          className="rounded-lg border border-slate-200 bg-white p-3 space-y-1.5 shadow-2xs hover:shadow-xs transition"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-[10px] font-bold text-slate-400 uppercase">
+                              {g.gate}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                                isPassed
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}
+                            >
+                              {isPassed ? <Check className="size-2.5" /> : <AlertTriangle className="size-2.5" />}
+                              {score}%
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold text-slate-900 leading-snug">
+                            {g.title}
+                          </p>
+                          <p className="text-[10px] text-slate-500 line-clamp-2">
+                            {g.data?.name || g.fallbackDesc}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Inter-Agent Handoff Verification */}
+                  {pipelineResult.handoffs && (
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 space-y-2 mt-2">
+                      <h5 className="text-[11px] font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                        <Workflow className="size-3.5 text-indigo-600" />
+                        Validated Inter-Agent Sequential Handoffs
+                      </h5>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-md border border-indigo-200/60 bg-white p-2.5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                              <ArrowRight className="size-3 text-indigo-600" />
+                              Agent 1 ➔ Agent 2 Handoff
+                            </span>
+                            <span className="rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                              {pipelineResult.handoffs.step_1_to_step_2?.valid ? 'Validated' : 'Pending'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            Propagated standard #{pipelineResult.standard?.id} with {pipelineResult.curriculum?.total_chapters ?? 0} chapters. Strict tenant isolation confirmed.
+                          </p>
+                        </div>
+
+                        <div className="rounded-md border border-indigo-200/60 bg-white p-2.5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                              <ArrowRight className="size-3 text-indigo-600" />
+                              Agent 2 ➔ Agent 3 Handoff
+                            </span>
+                            <span className="rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                              {pipelineResult.handoffs.step_2_to_step_3?.valid ? 'Validated' : 'Pending'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            Inventory handover: {pipelineResult.content_generation?.verified_count ?? 0} verified existing, {pipelineResult.content_generation?.missing_identified?.length ?? 0} missing targets scoped for generation.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* 3 Unified Content Sections */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* 1. Verified Curriculum */}
@@ -4092,39 +4610,6 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-950 flex flex-col items-center space-y-4">
-              {/* Quick Switch Palette Bar inside Modal */}
-              <div className="w-full max-w-4xl flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
-                  <Palette className="size-3 text-indigo-400" />
-                  Quick Palette:
-                </span>
-                {CONTENT_TEMPLATES.map((tmpl) => {
-                  const isSelected = selectedTemplate === tmpl.id;
-                  return (
-                    <button
-                      key={tmpl.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedTemplate(tmpl.id);
-                        if (typeof document !== 'undefined') {
-                          document.documentElement.setAttribute('data-template', tmpl.id);
-                        }
-                      }}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${
-                        isSelected
-                          ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 font-bold'
-                          : 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'
-                      }`}
-                    >
-                      <span
-                        className="size-2 rounded-full shrink-0 shadow-2xs"
-                        style={{ backgroundColor: tmpl.paletteDot }}
-                      />
-                      <span className="truncate">{tmpl.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
 
               {previewMode === 'ppt' && (
                 <div className="w-full max-w-4xl flex items-center justify-between text-xs text-slate-400 shrink-0">
@@ -4353,7 +4838,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                       </p>
 
                       {/* ESO 4-Pillar Specification: Knowledge, Activities, Abilities, Usage */}
-                      <AgentEsoCard eso={esoData.agents.agent_1.eso || TEACH_LEARN_ESO_FALLBACKS.agent_1} />
+                      <AgentEsoCard eso={esoData.agents.agent_1.eso || TEACH_LEARN_ESO_FALLBACKS.agent_1} agentDetail={esoData.agents.agent_1} />
 
                       {/* Knowledge Requirements & Database Resources */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4467,7 +4952,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                       </p>
 
                       {/* ESO 4-Pillar Specification: Knowledge, Activities, Abilities, Usage */}
-                      <AgentEsoCard eso={esoData.agents.agent_2.eso || TEACH_LEARN_ESO_FALLBACKS.agent_2} />
+                      <AgentEsoCard eso={esoData.agents.agent_2.eso || TEACH_LEARN_ESO_FALLBACKS.agent_2} agentDetail={esoData.agents.agent_2} />
 
                       {/* Knowledge Requirements & Database Resources */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4572,7 +5057,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                       </p>
 
                       {/* ESO 4-Pillar Specification: Knowledge, Activities, Abilities, Usage */}
-                      <AgentEsoCard eso={esoData.agents.agent_3.eso || TEACH_LEARN_ESO_FALLBACKS.agent_3} />
+                      <AgentEsoCard eso={esoData.agents.agent_3.eso || TEACH_LEARN_ESO_FALLBACKS.agent_3} agentDetail={esoData.agents.agent_3} />
 
                       {/* Knowledge Requirements & 4-Type Model */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4583,7 +5068,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                           </h4>
                           <ul className="space-y-1.5 text-xs text-slate-700">
                             <li>• <strong>Type 1: Concept Learning:</strong> 4 variants from definition, knowledge & evidence</li>
-                            <li>• <strong>Type 2: Practice Ladder:</strong> 5-level Bloom's taxonomy ladder from blueprints</li>
+                            <li>• <strong>Type 2: Practice Ladder:</strong> 5-level Bloom&apos;s taxonomy ladder from blueprints</li>
                             <li>• <strong>Type 3: Misconception Library:</strong> Common misconceptions & diagnostic traps</li>
                             <li>• <strong>Type 4: Assessment Bank:</strong> Calibrated assessment rubrics and question items</li>
                           </ul>

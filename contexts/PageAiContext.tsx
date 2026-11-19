@@ -309,6 +309,9 @@ export function usePageAiContext() {
         descriptor: null,
         entityType: undefined as string | undefined,
         entityId: undefined as string | number | undefined,
+        pageTitle: undefined as string | undefined,
+        pageType: undefined as PageType | undefined,
+        filters: undefined as Record<string, unknown> | Array<{ key: string; label?: string; value: unknown }> | undefined,
         selectedRecords: undefined,
         pageData: undefined as Record<string, unknown> | undefined,
       };
@@ -320,6 +323,9 @@ export function usePageAiContext() {
       descriptor,
       entityType: descriptor.entityType ?? undefined,
       entityId: descriptor.entityId ?? undefined,
+      pageTitle: descriptor.pageTitle,
+      pageType: descriptor.pageType,
+      filters: descriptor.filters,
       selectedRecords: toSelectedRecords(descriptor),
       pageData: Object.keys(pageData).length ? pageData : undefined,
     };

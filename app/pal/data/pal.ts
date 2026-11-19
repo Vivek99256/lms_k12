@@ -403,6 +403,80 @@ function mapWorkspacePayload(
   };
 }
 
+// --- recommendation feed ----------------------------------------------------
+
+/**
+ * "What should I do next" — GET /api/pal/recommendations/next
+ * (RecommendationFeedController::next()). Self-view only: no learner_id is
+ * sent, so the backend resolves the learner from the signed-in student's own
+ * auth context — the same convention `pal_auth` already uses for
+ * student-scoped reads elsewhere. The endpoint always returns a usable
+ * action (graph-aware when a coherence map is projected for this class and
+ * subject, a deterministic SQL fallback otherwise); content_recommendations
+ * is real but sparse today (its backing table is nearly empty platform-wide)
+ * and career_narrative is `insufficient_evidence` for most learners — both
+ * are treated as optional, not error conditions.
+ */
+export interface RecommendationFeedData {
+  graphAware: boolean;
+  action: string;
+  reason: string;
+  targetConceptName: string | null;
+  hasScope: boolean;
+  contentTitle: string | null;
+  contentUrl: string | null;
+  careerNarrative: string | null;
+  careerMessage: string | null;
+}
+
+export async function fetchRecommendationFeed(
+  opts: { signal?: AbortSignal } = {}
+): Promise<RecommendationFeedData> {
+  const session = requireSession();
+  const url = `${session.baseUrl}/api/pal/recommendations/next`;
+
+  const response = await fetch(url, { headers: createAuthHeaders(session), signal: opts.signal });
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('You are not allowed to view this recommendation.');
+  }
+  if (!response.ok) {
+    throw new Error(`Couldn’t load your recommendation.`);
+  }
+
+  const payload = toRecord(await response.json());
+  const data = toRecord(payload.data);
+  const action = toRecord(data.next_best_action);
+  const why = toRecord(action.why);
+  const targetConcept = toRecord(action.target_concept);
+  const careerNarrative = toRecord(data.career_narrative);
+
+  // content_recommendations is an object keyed by concept id; take the first
+  // concept's real recommendation, if any.
+  const contentByConcept = toRecord(data.content_recommendations);
+  let contentTitle: string | null = null;
+  let contentUrl: string | null = null;
+  for (const value of Object.values(contentByConcept)) {
+    const recommended = toRecord(toRecord(value).recommended);
+    if (recommended.title) {
+      contentTitle = readString(recommended.title);
+      contentUrl = recommended.url ? readString(recommended.url) : null;
+      break;
+    }
+  }
+
+  return {
+    graphAware: Boolean(action.graph_aware),
+    action: readString(action.action),
+    reason: readString(action.reason ?? why.because),
+    targetConceptName: targetConcept.name ? readString(targetConcept.name) : null,
+    hasScope: Boolean(data.scope),
+    contentTitle,
+    contentUrl,
+    careerNarrative: careerNarrative.narrative ? readString(careerNarrative.narrative) : null,
+    careerMessage: careerNarrative.message ? readString(careerNarrative.message) : null,
+  };
+}
+
 export async function fetchPalLanding(
   opts: { student?: PalStudentSelection; signal?: AbortSignal } = {}
 ): Promise<PalLandingData> {

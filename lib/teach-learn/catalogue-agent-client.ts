@@ -509,6 +509,19 @@ export interface UnifiedTeachLearnReport {
     summary_message?: string;
     coverage_before?: ContentCoverageCheck;
   };
+  quality_scorecard?: {
+    composite_score: number;
+    overall_status: string;
+    quality_tier: string;
+    gates_evaluated?: number;
+    evaluated_at?: string;
+    gates?: Record<string, any>;
+    remediation_recommendations?: string[];
+  };
+  handoffs?: {
+    step_1_to_step_2?: { valid: boolean; from?: string; to?: string; message?: string; error?: string; standard_id?: number; chapters_count?: number; payload_summary?: Record<string, any> };
+    step_2_to_step_3?: { valid: boolean; from?: string; to?: string; message?: string; error?: string; existing_count?: number; missing_count?: number; payload_summary?: Record<string, any> };
+  };
 }
 
 export interface RunPipelineOptions {
@@ -623,6 +636,62 @@ export async function runTeachLearnPipeline(
   return handleResponse<{ report: UnifiedTeachLearnReport; server_time: string }>(res);
 }
 
+export interface ExecutiveKnowledge {
+  summary: string;
+  schemas_and_relationships: string[];
+  academic_curriculum_knowledge?: string[];
+  pedagogical_knowledge?: string[];
+  live_metrics: Record<string, number>;
+  tables_and_sources: string[];
+}
+
+export interface AgentCapabilityItem {
+  agent: string;
+  name: string;
+  description: string;
+  status: 'fully_implemented' | 'partially_implemented' | 'unavailable';
+  handler?: string;
+}
+
+export interface ExecutiveAbilities {
+  summary: string;
+  skills: string[];
+  capabilities?: AgentCapabilityItem[];
+  constraints_and_safeguards: string[];
+}
+
+export interface ExecutiveResponsibilities {
+  summary: string;
+  must_do: string[];
+  must_not_do: string[];
+  allowed_data_access: string[];
+  dependencies: string;
+  input_contract: Record<string, unknown>;
+  output_contract: Record<string, unknown>;
+  stopping_conditions: string[];
+  error_handling: string;
+  handoff_rules: string;
+  state_and_history: string;
+}
+
+export interface ExecutiveQuality {
+  summary: string;
+  applicable_gates: string[];
+  quality_rules: string[];
+  scoring_formula: string;
+  live_quality_score: number;
+  tenant_isolation_verified: boolean;
+  deduplication_enforced?: boolean;
+}
+
+export interface CapabilityRegistrySummary {
+  total: number;
+  fully_implemented: number;
+  partially_implemented: number;
+  unavailable: number;
+  readiness_percentage: number;
+}
+
 export interface AgentEsoStructuredObject {
   knowledge: {
     summary: string;
@@ -675,18 +744,24 @@ export interface AgentEsoDetail {
     enforcement: string;
     rules: string[];
   };
+  ek?: ExecutiveKnowledge;
+  ea?: ExecutiveAbilities;
+  er?: ExecutiveResponsibilities;
+  eq?: ExecutiveQuality;
   eso?: AgentEsoStructuredObject;
 }
 
 export interface ExpertSystemOverviewData {
   overview: {
     system_name: string;
+    framework_version?: string;
     module: string;
     sub_institute_id: number;
     architecture: string;
     generated_at: string;
     total_agents: number;
     status: string;
+    capability_summary?: CapabilityRegistrySummary;
   };
   agents: {
     agent_1: AgentEsoDetail;
@@ -698,6 +773,10 @@ export interface ExpertSystemOverviewData {
     execution_order: string[];
     data_flow: Record<string, string>;
     isolation_and_safety: Record<string, boolean>;
+  };
+  capability_registry?: {
+    summary: CapabilityRegistrySummary;
+    items: Record<string, AgentCapabilityItem>;
   };
 }
 
