@@ -32,6 +32,7 @@ import {
   Send,
   Users,
 } from "lucide-react";
+import { buildSessionContext, createAuthHeaders } from "@/lib/erp-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -107,18 +108,69 @@ type WorkTypeCopy = {
  * download round-trip first. `rel="noreferrer"` because the tab it opens is
  * not ours to be reached back into.
  */
+const pdfPreviewClass =
+  "inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-[8px] border border-[#CFD9E6] bg-white px-3 text-[12px] font-semibold text-[#5846EA] transition hover:border-[#5846EA] hover:bg-[#F5F4FF]";
+
+/**
+ * A stored paper is served by `GET /api/question-paper/{id}/pdf`, which needs the bearer token.
+ * A plain new-tab link cannot send it and the tab showed "Authentication required", so the file
+ * is fetched with the session's headers and shown from a blob URL. The tab is opened first,
+ * inside the click, so the browser does not treat it as a popup.
+ */
+async function openAuthenticatedPdf(href: string) {
+  const tab = window.open("", "_blank");
+  const say = (text: string) => {
+    if (tab) tab.document.body.textContent = text;
+    else window.alert(text);
+  };
+  say("Opening PDF…");
+
+  try {
+    const response = await fetch(href, {
+      headers: {
+        ...createAuthHeaders(buildSessionContext()),
+        Accept: "application/pdf, application/json",
+      },
+    });
+    const type = response.headers.get("content-type") ?? "";
+
+    if (!response.ok || !type.includes("pdf")) {
+      const body = type.includes("json")
+        ? ((await response.json().catch(() => null)) as { message?: string } | null)
+        : null;
+      throw new Error(body?.message || "The PDF could not be opened.");
+    }
+
+    const url = URL.createObjectURL(await response.blob());
+    if (tab) tab.location.href = url;
+    else window.open(url, "_blank");
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    say(error instanceof Error ? error.message : "The PDF could not be opened.");
+  }
+}
+
 export function PdfPreviewLink({ href, title }: { href: string; title: string }) {
+  // A file the teacher just picked is already a local blob: URL and needs no credentials.
+  if (href.startsWith("blob:")) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer" title={title} className={pdfPreviewClass}>
+        <FileText size={14} />
+        PDF
+      </a>
+    );
+  }
+
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
+    <button
+      type="button"
       title={title}
-      className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-[8px] border border-[#CFD9E6] bg-white px-3 text-[12px] font-semibold text-[#5846EA] transition hover:border-[#5846EA] hover:bg-[#F5F4FF]"
+      onClick={() => void openAuthenticatedPdf(href)}
+      className={pdfPreviewClass}
     >
       <FileText size={14} />
       PDF
-    </a>
+    </button>
   );
 }
 

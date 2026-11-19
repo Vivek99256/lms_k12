@@ -188,10 +188,18 @@ function toSubmission(row: UnknownRecord): AssignmentSubmissionRow {
 // Module 2 — Assignment Submission (student)
 // ---------------------------------------------------------------------------
 
-/** The logged-in student's assignments (submitted + pending). */
-export async function listAssignmentSubmissions(): Promise<AssignmentSubmissionRow[]> {
+/**
+ * The logged-in student's work of one kind (submitted + pending). Defaults to plain assignments:
+ * worksheets and projects are the same rows under another `work_type` but belong on their own
+ * Worksheet / Project tabs, not in the Assignment Submission list.
+ */
+export async function listAssignmentSubmissions(
+  workType: "assignment" | "worksheet" | "project" = "assignment"
+): Promise<AssignmentSubmissionRow[]> {
   const payload = await postJson("lms-assignment/submission-list", {});
-  return dataRows(payload).map(toSubmission);
+  return dataRows(payload)
+    .map(toSubmission)
+    .filter((row) => row.workType === workType);
 }
 
 export type SubmissionUpload = {
