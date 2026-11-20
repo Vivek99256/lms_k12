@@ -335,3 +335,8 @@ export async function getAssignmentAiStatus(
   const payload = await postJson(`lms-assignment/ai-status/${assignmentId}`, {});
   return toAiEvaluationStatus(isRecord(payload.data) ? payload.data : {});
 }
+
+/** Re-runs the AI evaluation on a submitted assignment. Refused once the teacher has completed the review. */
+export async function reevaluateAssignment(assignmentId: number): Promise<void> {
+  await postJson(`lms-assignment/reevaluate/${assignmentId}`, {});
+}
