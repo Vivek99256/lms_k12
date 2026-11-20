@@ -528,8 +528,10 @@ function AgentEsoCard({
                       <div key={key} className="flex items-center justify-between border-b border-blue-100/50 pb-1">
                         <span className="text-slate-600 capitalize">{key.replace(/_/g, ' ')}:</span>
                         <span className="font-mono font-bold text-blue-900">
-                          {typeof val === 'number' && key.includes('demand') || key.includes('collected') || key.includes('outstanding')
-                            ? `₹${val.toLocaleString('en-IN')}`
+                          {typeof val === 'number'
+                            ? (key.includes('demand') || key.includes('collected') || key.includes('outstanding')
+                                ? `₹${val.toLocaleString('en-IN')}`
+                                : String(val))
                             : String(val)}
                         </span>
                       </div>
@@ -886,12 +888,13 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
       }
 
       if (esoRes.status === 'fulfilled') {
-        const e = esoRes.value;
-        setEso(e.eso || e);
+        const e = esoRes.value as any;
+        setEso((e?.eso || e) as FeesEso);
       }
 
       if (standardsRes.status === 'fulfilled') {
-        const stdList = standardsRes.value.standards || [];
+        const val = standardsRes.value as any;
+        const stdList = Array.isArray(val) ? val : val?.standards || [];
         setStandards(stdList);
       }
     } catch (err) {
@@ -1464,11 +1467,15 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="all">All Standards (School-wide)</option>
-                  {standards.map((s) => (
-                    <option key={s.standard_id} value={s.standard_id}>
-                      {s.standard_name}
-                    </option>
-                  ))}
+                  {standards.map((s) => {
+                    const stdId = s.standard_id ?? s.id;
+                    const stdName = s.standard_name ?? s.name;
+                    return (
+                      <option key={stdId} value={stdId}>
+                        {stdName}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -2164,14 +2171,18 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
                       </tr>
                     ))
                   ) : (
-                    standards.map((s) => (
-                      <tr key={s.standard_id} className="hover:bg-slate-50 transition">
-                        <td className="px-4 py-2.5 font-bold text-slate-900">{s.standard_name}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-slate-700">~{(s as any).students_count || 120}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-rose-600">{formatRupees(44814 * 10)}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-slate-500">0%</td>
-                      </tr>
-                    ))
+                    standards.map((s) => {
+                      const stdId = s.standard_id ?? s.id;
+                      const stdName = s.standard_name ?? s.name;
+                      return (
+                        <tr key={stdId} className="hover:bg-slate-50 transition">
+                          <td className="px-4 py-2.5 font-bold text-slate-900">{stdName}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-slate-700">~{(s as any).students_count || 120}</td>
+                          <td className="px-4 py-2.5 text-right font-bold text-rose-600">{formatRupees(44814 * 10)}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-slate-500">0%</td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
