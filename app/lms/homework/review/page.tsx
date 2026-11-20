@@ -355,12 +355,22 @@ export default function HomeworkReviewQueuePage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col items-stretch gap-2 whitespace-nowrap">
-                          <Link
-                            href={`/lms/homework/review/${row.submissionId}`}
-                            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700"
-                          >
-                            <PencilLine className="size-4" /> Review
-                          </Link>
+                          {/* A reviewed homework offers Edit (not Review): the teacher can still correct marks or remarks. */}
+                          {row.status.toLowerCase() === "reviewed" ? (
+                            <Link
+                              href={`/lms/homework/review/${row.submissionId}?edit=1`}
+                              className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                            >
+                              <PencilLine className="size-4" /> Edit
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/lms/homework/review/${row.submissionId}`}
+                              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700"
+                            >
+                              <PencilLine className="size-4" /> Review
+                            </Link>
+                          )}
                           {(row.aiStatus.toLowerCase().includes("fail") ||
                             row.aiStatus.toLowerCase() === "checking") &&
                           row.status.toLowerCase() !== "reviewed" ? (

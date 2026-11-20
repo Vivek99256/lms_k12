@@ -431,6 +431,15 @@ export default function HomeworkDetailPage() {
                           ) : null}
 
                           {submission.aiStatus &&
+                          submission.aiStatus.toLowerCase() === "evaluated" &&
+                          !submission.feedbackPublished ? (
+                            <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
+                              <Sparkles className="size-3.5 shrink-0 text-amber-500" />
+                              <p className="text-xs font-medium text-amber-700">
+                                Submitted. Your teacher is reviewing it; your result will appear here once they publish it.
+                              </p>
+                            </div>
+                          ) : submission.aiStatus &&
                           submission.aiStatus.toLowerCase() === "evaluated" ? (
                             <div className="mt-3 flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50 px-3 py-2">
                               <Sparkles className="size-3.5 shrink-0 text-violet-500" />

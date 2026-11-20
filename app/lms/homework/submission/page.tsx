@@ -395,6 +395,9 @@ function StaffHomeworkSubmissionPage() {
     subject: "",
   });
   const [submissionDate, setSubmissionDate] = useState("");
+  // "pending" = homework still to be marked submitted (the original screen); "submitted" = what has been, with each
+  // student's AI score and annotated PDF.
+  const [view, setView] = useState<"pending" | "submitted">("pending");
   const [rows, setRows] = useState<SubmissionRow[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [rowState, setRowState] = useState<Record<number, RowState>>({});
@@ -407,7 +410,7 @@ function StaffHomeworkSubmissionPage() {
 
   const allChecked = rows.length > 0 && selected.size === rows.length;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (viewOverride?: "pending" | "submitted") => {
     setError("");
     setSuccess("");
     setLoading(true);
@@ -421,6 +424,7 @@ function StaffHomeworkSubmissionPage() {
         division: readValue(filters.division ?? ""),
         subject: readValue(filters.subject ?? ""),
         submissionDate,
+        status: viewOverride ?? view,
       });
       setRows(data);
     } catch (loadError: unknown) {
@@ -433,7 +437,14 @@ function StaffHomeworkSubmissionPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, submissionDate]);
+  }, [filters, submissionDate, view]);
+
+  function switchView(next: "pending" | "submitted") {
+    if (next === view) return;
+    setView(next);
+    // Already searched: reload the same class for the other list. Otherwise the choice is used on the first Search.
+    if (searched) void load(next);
+  }
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -551,7 +562,7 @@ function StaffHomeworkSubmissionPage() {
           </p>
           <Button
             type="button"
-            onClick={load}
+            onClick={() => void load()}
             disabled={loading}
             className="w-full sm:w-auto"
           >
@@ -565,7 +576,127 @@ function StaffHomeworkSubmissionPage() {
         </div>
       </section>
 
-      {searched ? (
+      <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 text-sm">
+        {(["pending", "submitted"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => switchView(option)}
+            className={`rounded-md px-4 py-1.5 font-medium transition ${
+              view === option ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {option === "pending" ? "Pending" : "Submitted"}
+          </button>
+        ))}
+      </div>
+
+      {searched && view === "submitted" ? (
+        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <Table>
+              <TableHeader className="bg-slate-50">
+                <TableRow>
+                  <TableHead>GR No</TableHead>
+                  <TableHead>Student Name</TableHead>
+                  <TableHead>Std / Div</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Submission Date</TableHead>
+                  <TableHead>Remark</TableHead>
+                  <TableHead>Submission File</TableHead>
+                  <TableHead>AI Status</TableHead>
+                  <TableHead>AI Score</TableHead>
+                  <TableHead>Evaluation PDF</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="h-24 text-center text-slate-500">
+                      <LoaderCircle className="mx-auto size-6 animate-spin text-slate-300" />
+                    </TableCell>
+                  </TableRow>
+                ) : rows.length ? (
+                  rows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.enrollmentNo || "-"}</TableCell>
+                      <TableCell>{row.studentName}</TableCell>
+                      <TableCell>
+                        {row.standard || "-"} / {row.division || "-"}
+                      </TableCell>
+                      <TableCell>{row.title || "-"}</TableCell>
+                      <TableCell>{row.submissionDate || "-"}</TableCell>
+                      <TableCell className="max-w-48 truncate" title={row.submissionRemarks}>
+                        {row.submissionRemarks || "-"}
+                      </TableCell>
+                      <TableCell>
+                        {row.submissionFile ? (
+                          <a href={row.submissionFile} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                            View
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.aiStatus ? (
+                          <span
+                            title={row.aiFailureReason || undefined}
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              row.aiStatus.toLowerCase() === "evaluated"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : row.aiStatus.toLowerCase() === "checking"
+                                  ? "bg-amber-50 text-amber-700"
+                                  : row.aiStatus.toLowerCase().includes("fail")
+                                    ? "bg-rose-50 text-rose-700"
+                                    : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {row.aiStatus.toLowerCase() === "checking" ? "Checking..." : row.aiStatus}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.aiScore !== null && row.aiTotalQuestions !== null ? (
+                          <span className="font-medium">
+                            {row.aiScore}/{row.aiTotalQuestions}
+                            {row.aiPercentage !== null ? ` (${Math.round(row.aiPercentage)}%)` : ""}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.reviewedPdfUrl ? (
+                          <a href={row.reviewedPdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                            Download
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={10} className="h-36 text-center">
+                      <div className="flex flex-col items-center gap-1.5">
+                        <FileCheck2 className="size-8 text-slate-300" />
+                        <p className="text-sm font-medium text-slate-600">No submitted homework</p>
+                        <p className="text-xs text-slate-400">Try a different standard, division or subject.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </section>
+      ) : null}
+
+      {searched && view === "pending" ? (
         <form
           onSubmit={handleSubmit}
           className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
