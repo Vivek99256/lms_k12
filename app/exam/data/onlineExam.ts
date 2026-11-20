@@ -99,6 +99,8 @@ export interface OnlineExamListItem {
   name: string;
   standardId: string;
   subjectId: string;
+  /** The subject's display name as the student's own standard maps it ('' when the server did not send one). */
+  subjectName: string;
   gradeId: string;
   examType: string;
   totalMarks: number;
@@ -168,6 +170,11 @@ export interface AttemptBreakdown {
 // List online exams (already-live REST endpoint)
 // ---------------------------------------------------------------------------
 
+function isYes(value: unknown): boolean {
+  if (typeof value === 'string') return ['yes', 'y', 'true', '1'].includes(value.trim().toLowerCase());
+  return value === true || value === 1;
+}
+
 export async function listOnlineExams(
   filter: { standardId?: string; subjectId?: string } = {},
   signal?: AbortSignal
@@ -179,6 +186,8 @@ export async function listOnlineExams(
   url.searchParams.set('syear', session.syear);
   url.searchParams.set('user_profile_name', userProfileName());
   url.searchParams.set('user_id', session.userId);
+  // Online exams only: worksheets, projects, quizzes, offline papers and the rest are not exams a student attempts here.
+  url.searchParams.set('exam_type', 'online');
   if (filter.standardId) url.searchParams.set('standard_id', filter.standardId);
   if (filter.subjectId) url.searchParams.set('subject_id', filter.subjectId);
 
@@ -193,22 +202,21 @@ export async function listOnlineExams(
         name: readString(r.paper_name) || `Paper #${readString(r.id)}`,
         standardId: readString(r.standard_id),
         subjectId: readString(r.subject_id),
+        subjectName: readString(r.subject_name),
         gradeId: readString(r.grade_id),
         examType: readString(r.exam_type),
         totalMarks: readNumber(r.total_marks),
         totalQuestions: readNumber(r.total_ques),
         openDate: readString(r.open_date),
         closeDate: readString(r.close_date),
-        activeExam: Boolean(r.active_exam),
+        // The server sends "yes"/"no"; Boolean("no") is true, which showed every closed exam as Open.
+        activeExam: isYes(r.active_exam),
         attempts: readNumber(r.total_attempt),
         attemptsAllowed: Math.max(1, readNumber(r.attempt_allowed)),
       };
     })
     .filter((e) => e.id)
-    .filter((e) => {
-      const t = e.examType.toLowerCase();
-      return t === 'online' || t === '' || t === 'practice';
-    });
+    .filter((e) => e.examType.trim().toLowerCase() === 'online');
 }
 
 // ---------------------------------------------------------------------------

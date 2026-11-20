@@ -277,7 +277,7 @@ export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }
       ? BRANCHING_STYLE
       : styleFor(item.type);
   const TypeIcon = isCreate ? Plus : badges?.kind === 'branching_scenario' ? GitBranch : badges?.kind === 'powerpoint' ? Presentation : style.icon;
-  const typeLabel = isCreate ? 'New' : badges?.kind === 'branching_scenario' ? 'Branching scenario' : badges?.kind === 'powerpoint' ? 'PowerPoint' : item.type;
+  const typeLabel = isCreate ? 'New' : badges?.kind === 'branching_scenario' ? 'Interactive Practice' : badges?.kind === 'powerpoint' ? 'Learning Presentation' : item.type;
   const fileType = item.statValue?.trim();
   // 'link' is how the table records an external URL; it is not a file format,
   // so it is worth saying plainly rather than showing as an extension.

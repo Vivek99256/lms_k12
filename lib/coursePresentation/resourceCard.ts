@@ -43,8 +43,8 @@ const FORMAT_SHORT: Record<ResourceFormat, string> = {
 };
 
 const FORMAT_BADGE: Record<ResourceFormat, string> = {
-  interactive_slides: 'PowerPoint',
-  branching_scenario: 'Branching scenario',
+  interactive_slides: 'Learning Presentation',
+  branching_scenario: 'Interactive Practice',
 };
 
 function clean(value: string | null | undefined): string | null {

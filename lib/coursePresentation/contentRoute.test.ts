@@ -55,7 +55,7 @@ test('resolveSelectedContent resolves interactive slides template preview when a
   const resolved = resolveSelectedContent(8592, 'explicit_instruction', 'interactive_slides', preflight);
   assert.ok(resolved !== null);
   assert.equal(resolved.url, '/student/study-deck/8592?source=preview&pedagogy=explicit_instruction&format=interactive_slides');
-  assert.equal(resolved.label, 'Open PowerPoint');
+  assert.equal(resolved.label, 'Open Learning Presentation');
   assert.equal(resolved.kind, 'template_preview');
 });
 
