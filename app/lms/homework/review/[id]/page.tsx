@@ -93,6 +93,11 @@ export default function HomeworkReviewDetailPage() {
   const [teacherRemarks, setTeacherRemarks] = useState("");
   const [status, setStatus] = useState<string>("Reviewed");
   const [publish, setPublish] = useState(true);
+  // A reviewed homework opens locked; Edit (from the list, or the button below) unlocks the marks to correct them.
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("edit") === "1") setEditing(true);
+  }, []);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [success, setSuccess] = useState("");
@@ -205,6 +210,7 @@ export default function HomeworkReviewDetailPage() {
     : 0;
   const attention = detail ? detail.answers.filter((answer) => answer.needsAttention).length : 0;
   const isReviewed = detail?.submission.status === "Reviewed";
+  const marksLocked = isReviewed && !editing;
 
   return (
     <RequireStaff>
@@ -311,7 +317,17 @@ export default function HomeworkReviewDetailPage() {
                     </p>
                   </div>
 
-                  {isReviewed ? null : (
+                  {isReviewed ? (
+                    marksLocked ? (
+                      <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
+                        Edit marks
+                      </Button>
+                    ) : (
+                      <span className="text-xs font-medium text-amber-700">
+                        Editing a reviewed homework: saving updates the student&rsquo;s result.
+                      </span>
+                    )
+                  ) : (
                     <Button
                       type="button"
                       variant="outline"
@@ -377,7 +393,7 @@ export default function HomeworkReviewDetailPage() {
                             key={answer.questionNo}
                             answer={answer}
                             value={marks[answer.questionNo] ?? ""}
-                            disabled={isReviewed}
+                            disabled={marksLocked}
                             onChange={(value) =>
                               setMarks((current) => ({ ...current, [answer.questionNo]: value }))
                             }

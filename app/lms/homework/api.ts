@@ -62,6 +62,15 @@ export type SubmissionRow = {
   homeworkDate: string;
   submissionDate: string;
   submissionRemarks: string;
+  /** Present for homework already marked submitted (the "Submitted" view). */
+  submissionFile: string;
+  aiStatus: string;
+  aiFailureReason: string;
+  aiScore: number | null;
+  aiTotalQuestions: number | null;
+  aiPercentage: number | null;
+  reviewedPdfUrl: string;
+  evaluatedAt: string;
 };
 
 export type SubmissionReportRow = {
@@ -491,6 +500,14 @@ function toSubmission(row: UnknownRecord): SubmissionRow {
     homeworkDate: readString(row.homework_date),
     submissionDate: readString(row.submission_date),
     submissionRemarks: readString(row.submission_remarks),
+    submissionFile: readString(row.submission_file),
+    aiStatus: readString(row.ai_status),
+    aiFailureReason: readString(row.ai_failure_reason),
+    aiScore: readNullableNumber(row.ai_score),
+    aiTotalQuestions: readNullableNumber(row.ai_total_questions),
+    aiPercentage: readNullableNumber(row.ai_percentage),
+    reviewedPdfUrl: readString(row.reviewed_pdf_path) || readString(row.ai_generated_file),
+    evaluatedAt: readString(row.evaluated_at),
   };
 }
 
@@ -894,7 +911,7 @@ export async function bulkDeleteHomework(ids: number[]): Promise<number> {
 // ---------------------------------------------------------------------------
 
 export async function listSubmissions(
-  filters: HomeworkFilters & { submissionDate?: string }
+  filters: HomeworkFilters & { submissionDate?: string; status?: "pending" | "submitted" }
 ): Promise<SubmissionRow[]> {
   const payload = await postJson("lms-homework/submission-list", {
     grade: filters.grade || null,
@@ -902,6 +919,7 @@ export async function listSubmissions(
     division: filters.division || null,
     subject: filters.subject || null,
     submission_date: filters.submissionDate || null,
+    status: filters.status || "pending",
   });
   return dataRows(payload).map(toSubmission);
 }

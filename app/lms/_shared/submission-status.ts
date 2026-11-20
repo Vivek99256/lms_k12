@@ -53,9 +53,11 @@ export function studentSubmissionStatus(row: {
     return { label: "AI Evaluating", variant: "processing" };
   }
 
+  // The AI has finished, but a teacher always reviews before the student sees a result, so the student is only told
+  // it is under review (the score and PDF stay hidden until the teacher publishes the feedback).
   if (normalizedAiStatus === "evaluated") {
     return {
-      label: "AI Evaluated",
+      label: "Under Review",
       variant: "warning",
     };
   }
