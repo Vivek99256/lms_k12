@@ -124,6 +124,30 @@ export const BASELINE_AGENTS: Agent[] = [
     updated_at: '2026-10-28T12:00:00.000Z',
   },
   {
+    id: 'agt_master_fees',
+    name: 'Fees Master Autonomous Agent',
+    description:
+      'Autonomous master pipeline agent for Fees: continuously reads fee position and arrears, gathers line-item evidence, verifies duplicate reminder cooldowns, and drafts non-destructive reminder notices for administrator approval.',
+    module: 'fees',
+    tenant_id: '1',
+    tools_allowed: [
+      'fees.position',
+      'fees.arrears',
+      'fees.getPending',
+      'fees.collection_report',
+      'fees.reminder_history',
+      'fees.send_reminders',
+    ],
+    instructions:
+      'Run sequential 3-agent fees pipeline: scan fee position and arrears, corroborate collection evidence and reminder history, and synthesize personalized reminder drafts for human approval.',
+    trigger: 'scheduled',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'System Admin',
+    created_at: '2026-10-25T08:00:00.000Z',
+    updated_at: '2026-10-28T12:00:00.000Z',
+  },
+  {
     id: 'agt_34dc52f6dc24',
     name: 'Course catalogue reader',
     description:
@@ -274,36 +298,6 @@ export const BASELINE_AGENTS: Agent[] = [
     created_by_name: 'Kalpesh1 Sheth1',
     created_at: '2026-10-31T10:10:00.000Z',
     updated_at: '2026-10-31T10:10:00.000Z',
-  },
-  {
-    id: 'agt_8294009535e7',
-    name: 'Fee defaulter analyst',
-    description: 'Reads the live fee records and reports who owes anything, and how much. Changes nothing.',
-    module: 'fees',
-    tenant_id: '1',
-    tools_allowed: ['fees.list_defaulters'],
-    instructions: 'Report only what the fee records return.',
-    trigger: 'manual',
-    status: 'active',
-    created_by: '7013',
-    created_by_name: 'Kalpesh1 Sheth1',
-    created_at: '2026-09-29T06:57:09.734Z',
-    updated_at: '2026-09-29T06:57:09.734Z',
-  },
-  {
-    id: 'agt_630f357e5bfb',
-    name: 'Fee collection reporter',
-    description: 'Reads what was actually collected over a date range, from the receipts. Changes nothing.',
-    module: 'fees',
-    tenant_id: '1',
-    tools_allowed: ['fees.collection_report'],
-    instructions: 'Report collections exactly as the receipts show them.',
-    trigger: 'manual',
-    status: 'active',
-    created_by: '7013',
-    created_by_name: 'Kalpesh1 Sheth1',
-    created_at: '2026-09-29T08:51:56.476Z',
-    updated_at: '2026-09-29T08:51:56.476Z',
   },
   {
     id: 'agt_a8ae3ff89b3e',
@@ -467,6 +461,60 @@ export const BASELINE_AGENTS: Agent[] = [
     created_by_name: 'Kalpesh1 Sheth1',
     created_at: '2026-10-31T10:35:00.000Z',
     updated_at: '2026-10-31T10:35:00.000Z',
+  },
+  // ---- Fees sequential pipeline --------------------------------------------
+  // Ids match the `agent_id` values in the backend FeesEsoRegistry, so each pipeline step
+  // lands in the Library / Run Log / Analysis tabs under the agent that performed it.
+  {
+    id: 'agt_fees_position_reader',
+    name: 'Fee position & arrears reader',
+    description:
+      'Step 1 of the Fees pipeline. Reads the school-wide fee ledger and scans for students who owe, always stating how many it checked. Changes nothing.',
+    module: 'fees',
+    tenant_id: '1',
+    tools_allowed: ['fees.position', 'fees.arrears', 'fees.list_defaulters'],
+    instructions:
+      'Report only what the fee records return. State how many students were checked against the cohort so a partial sweep is never read as a school-wide figure.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'System Admin',
+    created_at: '2026-11-20T08:00:00.000Z',
+    updated_at: '2026-11-20T08:00:00.000Z',
+  },
+  {
+    id: 'agt_fees_evidence_analyst',
+    name: 'Collection evidence & reminder history analyst',
+    description:
+      'Step 2 of the Fees pipeline. Corroborates each student who owes with line items and recent collections, and holds back anyone already reminded. Changes nothing.',
+    module: 'fees',
+    tenant_id: '1',
+    tools_allowed: ['fees.getPending', 'fees.collection_report', 'fees.reminder_history'],
+    instructions:
+      'Report collections exactly as the receipts show them. Do not estimate a total for a period the report did not cover.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'System Admin',
+    created_at: '2026-11-20T08:00:00.000Z',
+    updated_at: '2026-11-20T08:00:00.000Z',
+  },
+  {
+    id: 'agt_fees_reminder_drafter',
+    name: 'Fee reminder drafter (pipeline)',
+    description:
+      'Step 3 of the Fees pipeline. Prepares the reminder list for the students cleared by Step 2 and stops for an administrator to approve. Sends nothing.',
+    module: 'fees',
+    tenant_id: '1',
+    tools_allowed: ['fees.send_reminders', 'fees.draft_reminder'],
+    instructions:
+      'Write a short, respectful reminder with the amount and the due date. Never threaten. Never send: a person approves every send.',
+    trigger: 'manual',
+    status: 'active',
+    created_by: '7013',
+    created_by_name: 'System Admin',
+    created_at: '2026-11-20T08:00:00.000Z',
+    updated_at: '2026-11-20T08:00:00.000Z',
   },
 ];
 
@@ -699,10 +747,26 @@ async function fetchDbRuns(tenantId: string, filter?: RunListFilter): Promise<Ag
         mod = 'new_pal';
         agtId = 'agt_pal_gamification_reader';
         agtName = 'PAL Agent';
+      } else if (key === 'fees.position' || key === 'fees.arrears' || key === 'agt_fees_position_reader' || key === 'fees_pipeline_step_1' || key === 'fees.list_defaulters') {
+        mod = 'fees';
+        agtId = 'agt_fees_position_reader';
+        agtName = 'Fee Position & Arrears Reader';
+      } else if (key === 'fees.getPending' || key === 'fees.collection_report' || key === 'fees.reminder_history' || key === 'agt_fees_evidence_analyst' || key === 'fees_pipeline_step_2') {
+        mod = 'fees';
+        agtId = 'agt_fees_evidence_analyst';
+        agtName = 'Collection Evidence & Reminder History Analyst';
+      } else if (key === 'fees.send_reminders' || key === 'fees.draft_reminder' || key === 'agt_fees_reminder_drafter' || key === 'fees_pipeline_step_3') {
+        mod = 'fees';
+        agtId = 'agt_fees_reminder_drafter';
+        agtName = 'Fee Reminder Drafter';
+      } else if (key === 'k12_fees' || key === 'fees_pipeline' || key === 'agt_master_fees') {
+        mod = 'fees';
+        agtId = 'agt_master_fees';
+        agtName = 'Fees Master Autonomous Agent';
       } else if (key.startsWith('fees.')) {
         mod = 'fees';
-        agtId = 'agt_8294009535e7';
-        agtName = 'Fee defaulter analyst';
+        agtId = 'agt_fees_position_reader';
+        agtName = 'Fee Position & Arrears Reader';
       } else if (key.startsWith('attendance.')) {
         mod = 'attendance';
         agtId = 'agt_a8ae3ff89b3e';
