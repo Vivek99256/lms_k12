@@ -230,6 +230,8 @@ export interface FeesStandard {
   id: number;
   name: string;
   code?: string;
+  standard_id?: number;
+  standard_name?: string;
 }
 
 function headers(context: IntelligenceContext): HeadersInit {
