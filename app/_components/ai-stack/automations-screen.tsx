@@ -81,6 +81,7 @@ import { ExamAssessmentAgentControlCard } from './exam-assessment-agent-control-
 import { EngagementAgentControlCard } from './engagement-agent-control-card';
 import { CurriculumPlanningAgentControlCard } from './curriculum-planning-agent-control-card';
 import { PalAgentControlCard } from './pal-agent-control-card';
+import { FeesAgentControlCard } from './fees-agent-control-card';
 
 interface ToolAgentEsoInfo {
   name: string;
@@ -1024,6 +1025,364 @@ const TOOL_AGENT_ESO_MAP: Record<string, ToolAgentEsoInfo> = {
       ],
     },
   },
+  'fees.position': {
+    name: 'Fee position reader',
+    module: 'Fees',
+    tool: 'fees.position',
+    knowledge: {
+      summary: 'Institution fee structure breakdowns, student enrollment rosters, fee head allocations, and whole-school demand and collection aggregates.',
+      items: [
+        'Fee structure blueprints categorized by admission year, quota, and standard from fees_breackoff',
+        'Student enrollment and active roster records from tblstudent and tblstudent_enrollment',
+        'Fee collection transaction records and payment mode splits from fees_collect',
+        'Floored arrears rule: balance is calculated per student so overpayments never offset other students dues',
+      ],
+      tables: ['fees_breackoff', 'fees_collect', 'tblstudent', 'tblstudent_enrollment', 'standard'],
+    },
+    activities: {
+      summary: 'Computes total school demand, total collections, and net outstanding arrears across all standards for the academic year.',
+      items: [
+        'Scans entire institute enrollment against fee structure matrices',
+        'Aggregates collected payments with receipt-level verification',
+        'Calculates real collection percentage and identifies highest-arrears standards',
+        'Grounds whole-school metrics for downstream pipeline validation',
+      ],
+    },
+    abilities: {
+      summary: 'Zero-fabrication financial calculation, tenant boundary isolation, and floored debtor aggregation.',
+      skills: [
+        'Grouped SQL ledger aggregation without heavy hydration',
+        'Floored student arrears calculation guaranteeing true defaulter detection',
+        'Multi-year academic transition tolerance',
+      ],
+      safeguards: [
+        'Read-only execution with zero modifications to ledger entries',
+        'Sub-institute tenant isolation strictly enforced',
+        'Audit trail logged in ai_agent_runs',
+      ],
+    },
+    usage: {
+      summary: 'Executes as the foundational grounding step (Step 1a) of the Fees pipeline, verifying whole-school financial position before scanning individual defaulters.',
+      step_by_step_flow: [
+        'Step 1: Ingests sub_institute_id and active academic year',
+        'Step 2: Aggregates total demand by matching student enrollments against fees_breackoff',
+        'Step 3: Aggregates receipts from fees_collect excluding cancelled entries',
+        'Step 4: Computes collection rate and net outstanding balance floored per student',
+        'Step 5: Delivers validated ledger position to Gate 1',
+      ],
+    },
+  },
+  'fees.arrears': {
+    name: 'Fee arrears scanner',
+    module: 'Fees',
+    tool: 'fees.arrears',
+    knowledge: {
+      summary: 'Student fee balances, class-wise pending amounts, overdue fee heads, and cohort arrears distributions.',
+      items: [
+        'Student fee ledger balances from FeesPendingService and fees_breackoff',
+        'Class and division mappings from standard and tblstudent',
+        'Minimum arrears threshold filters and cohort sampling rules',
+      ],
+      tables: ['fees_breackoff', 'fees_collect', 'tblstudent', 'standard'],
+    },
+    activities: {
+      summary: 'Scans student cohorts to extract students with verified positive outstanding balances.',
+      items: [
+        'Sweeps student cohort within target standard or across the entire school',
+        'Computes precise individual balances across tuition, term, and transport heads',
+        'Filters candidates by minimum amount threshold',
+        'Discloses cohort size and scan coverage transparently',
+      ],
+    },
+    abilities: {
+      summary: 'Cohort-bounded arrears scanning, transparent sampling disclosure, and strict student-level isolation.',
+      skills: [
+        'Per-student pending fee reconciliation',
+        'Safe cohort limit bounding preventing memory overflow',
+        'Ranked candidate extraction based on overdue amount',
+      ],
+      safeguards: [
+        'Strictly read-only against fee balances',
+        'Always reports cohort coverage to avoid misrepresenting samples as estate totals',
+        'Tenant boundary enforcement',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 1b of the Fees pipeline, feeding verified debtor candidates to Gate 1.',
+      step_by_step_flow: [
+        'Step 1: Receives limit and optional standard/minimum amount filters',
+        'Step 2: Queries student records and calculates pending dues per student',
+        'Step 3: Filters students with balance > 0 meeting threshold criteria',
+        'Step 4: Compiles candidate debtor records with coverage metadata',
+        'Step 5: Passes candidate list to Gate 1 validation',
+      ],
+    },
+  },
+  'fees.list_defaulters': {
+    name: 'Fee defaulter analyst',
+    module: 'Fees',
+    tool: 'fees.list_defaulters',
+    knowledge: {
+      summary: 'Student fee ledgers, cohort arrears records, and real-time outstanding balances.',
+      items: [
+        'Student fee balances and pending dues from fees_breackoff and fees_collect',
+        'Class and student demographic details from tblstudent and standard',
+        'Cohort coverage parameters (checked vs total count)',
+      ],
+      tables: ['fees_breackoff', 'fees_collect', 'tblstudent', 'standard'],
+    },
+    activities: {
+      summary: 'Reads live fee records and reports who owes anything, how much, and cohort coverage ratio.',
+      items: [
+        'Scans live fee accounts for positive balances',
+        'Computes total amount owed across scanned students',
+        'Presents verified list of defaulters with standard and section information',
+      ],
+    },
+    abilities: {
+      summary: 'Deterministic balance verification, coverage disclosure, and read-only safety.',
+      skills: [
+        'Live ledger balance queries',
+        'Defaulter ranking and categorization',
+        'Coverage-aware reporting',
+      ],
+      safeguards: [
+        'Never modifies fee ledger records',
+        'Tenant isolation enforced',
+        'Zero data fabrication',
+      ],
+    },
+    usage: {
+      summary: 'Enables quick on-demand checks of student fee arrears with transparent cohort coverage.',
+      step_by_step_flow: [
+        'Step 1: Receives filter criteria (standard, limit, min amount)',
+        'Step 2: Scans student cohort against live fee breakoff and receipt tables',
+        'Step 3: Extracts students with positive unpaid balances',
+        'Step 4: Formats structured defaulter list with cohort check counts',
+      ],
+    },
+  },
+  'fees.collection_report': {
+    name: 'Fee collection reporter',
+    module: 'Fees',
+    tool: 'fees.collection_report',
+    knowledge: {
+      summary: 'Actual receipt transactions, payment mode breakdowns, cashier logs, and daily/monthly collection summaries.',
+      items: [
+        'Receipt records, payment modes (Cash, Cheque, Online, DD), and timestamps from fees_collect',
+        'Active receipt filter: strictly excludes cancelled receipts where is_deleted = "Y"',
+        'Student payer details and standard mappings from tblstudent',
+      ],
+      tables: ['fees_collect', 'tblstudent', 'standard'],
+    },
+    activities: {
+      summary: 'Reads what was actually collected over a date range directly from issued receipts.',
+      items: [
+        'Aggregates collections across specified date ranges',
+        'Breaks down totals by payment mode (Cash, Bank, Online)',
+        'Verifies cashier and receipt numbers',
+      ],
+    },
+    abilities: {
+      summary: 'Receipt-grounded collection reconciliation and payment channel segregation.',
+      skills: [
+        'Time-windowed collection queries',
+        'Payment mode classification and sum verification',
+        'Receipt validity checks',
+      ],
+      safeguards: [
+        'Strictly read-only against collection records',
+        'Cancelled receipts automatically excluded from totals',
+        'Tenant boundary enforcement',
+      ],
+    },
+    usage: {
+      summary: 'Executes as Step 2a of the Fees pipeline to ground recent payment velocity and avoid reminding recently paid families.',
+      step_by_step_flow: [
+        'Step 1: Receives date range or defaults to current month',
+        'Step 2: Queries fees_collect for active receipts in window',
+        'Step 3: Aggregates totals by payment mode and cashier',
+        'Step 4: Delivers collection evidence to Gate 2',
+      ],
+    },
+  },
+  'fees.getPending': {
+    name: 'Pending fee line-item reader',
+    module: 'Fees',
+    tool: 'fees.getPending',
+    knowledge: {
+      summary: 'Granular pending fee heads (tuition, laboratory, library, exam, transport) per student.',
+      items: [
+        'Fee structure heads and amounts from fees_breackoff and new_fees_title_master',
+        'Allocated concession and scholarship deductions from fees_concession',
+        'Partial payments allocated against specific heads in fees_collect',
+      ],
+      tables: ['fees_breackoff', 'fees_collect', 'new_fees_title_master', 'tblstudent'],
+    },
+    activities: {
+      summary: 'Pulls itemized pending fee heads for each candidate student to establish precise audit evidence.',
+      items: [
+        'Retrieves student line-item dues by fee head',
+        'Calculates remaining balance for each specific head',
+        'Verifies total arrears matches sum of line items',
+      ],
+    },
+    abilities: {
+      summary: 'Itemized fee head breakdown and mathematical consistency verification.',
+      skills: [
+        'Multi-head fee breakdown',
+        'Concession-aware net calculation',
+        'Line-item audit trail preparation',
+      ],
+      safeguards: [
+        'Read-only execution',
+        'Tenant boundary isolation',
+        'Zero data mutation',
+      ],
+    },
+    usage: {
+      summary: 'Executes in Step 2 of the Fees pipeline to enrich debtor candidates with line-item breakdown before reminder drafting.',
+      step_by_step_flow: [
+        'Step 1: Receives validated candidates from Gate 1',
+        'Step 2: Fetches pending heads for each candidate student',
+        'Step 3: Attaches line-item breakdown to candidate evidence',
+        'Step 4: Passes enriched candidates to duplicate and cooldown checks',
+      ],
+    },
+  },
+  'fees.reminder_history': {
+    name: 'Reminder history auditor',
+    module: 'Fees',
+    tool: 'fees.reminder_history',
+    knowledge: {
+      summary: 'Past fee communication logs, reminder timestamps, dispatch channels, and cooldown intervals.',
+      items: [
+        'Communication audit logs from ai_audit_logs with operation = "reminder_drafted" or "communication_drafted"',
+        'Configurable reminder cooldown window (default 7 days, up to 90 days)',
+        'Recipient contact channels (email, SMS, WhatsApp)',
+      ],
+      tables: ['ai_audit_logs', 'tblstudent'],
+    },
+    activities: {
+      summary: 'Audits past reminder history to detect families contacted within the active cooldown window.',
+      items: [
+        'Queries audit log for recent reminder records',
+        'Calculates days elapsed since last contact for each candidate',
+        'Suppresses candidates contacted within cooldown threshold',
+      ],
+    },
+    abilities: {
+      summary: 'Duplicate notification suppression and cooldown enforcement.',
+      skills: [
+        'Temporal audit log indexing and cutoff filtering',
+        'Recipient contact deduplication',
+        'Cooldown explanation tagging',
+      ],
+      safeguards: [
+        'Suppression prevents spamming parents with repetitive notices',
+        'Audit trail logged for every suppression decision',
+        'Read-only operation',
+      ],
+    },
+    usage: {
+      summary: 'Executes in Step 2 of the Fees pipeline to classify candidates into eligible vs held-back cohorts.',
+      step_by_step_flow: [
+        'Step 1: Computes cooldown cutoff date (today - cooldown_days)',
+        'Step 2: Checks candidate students against ai_audit_logs',
+        'Step 3: Tags students reminded after cutoff as held_back with reason',
+        'Step 4: Delivers clean eligible cohort to Gate 2',
+      ],
+    },
+  },
+  'fees.draft_reminder': {
+    name: 'Fee reminder drafter',
+    module: 'Fees',
+    tool: 'fees.draft_reminder',
+    knowledge: {
+      summary: 'Institutional tone guidelines, student fee balance, due date, and family contact details.',
+      items: [
+        'Respectful, supportive tone standards (no threats or harassment)',
+        'Recipient details: student name, parent contact, class, amount, deadline',
+        'Masked contact information for privacy protection',
+      ],
+      tables: ['tblstudent'],
+    },
+    activities: {
+      summary: 'Drafts a respectful, concise reminder message for one family. Sends nothing.',
+      items: [
+        'Formulates courteous, plain-language reminder message',
+        'Includes verified amount, due date, and payment instructions',
+        'Formats draft for human review and approval',
+      ],
+    },
+    abilities: {
+      summary: 'Empathetic communication drafting, privacy masking, and draft-only safety.',
+      skills: [
+        'Institutional tone calibration',
+        'Personalized reminder formatting',
+        'Clear payment call-to-action formulation',
+      ],
+      safeguards: [
+        'Strictly draft-only: sends zero messages autonomously',
+        'Requires explicit human review before dispatch',
+        'Contact details masked for privacy',
+      ],
+    },
+    usage: {
+      summary: 'Drafts individual fee reminder messages ready for human administrator review.',
+      step_by_step_flow: [
+        'Step 1: Receives student name, amount, due date, and tone preference',
+        'Step 2: Formulates polite, professional reminder text',
+        'Step 3: Previews drafted message without sending',
+      ],
+    },
+  },
+  'fees.send_reminders': {
+    name: 'Fee reminder pipeline drafter',
+    module: 'Fees',
+    tool: 'fees.send_reminders',
+    knowledge: {
+      summary: 'Batch reminder policies, cryptographic approval fingerprints, contact channel availability, and privacy masking.',
+      items: [
+        'Student parent contact records from tblstudent (mobile, email)',
+        'Channel reachability rules: flags missing phone or email addresses',
+        'Cryptographic approval fingerprint generation for tamper-proof human authorization',
+      ],
+      tables: ['tblstudent', 'ai_audit_logs'],
+    },
+    activities: {
+      summary: 'Generates non-destructive, preview-only reminder drafts with cryptographic approval fingerprints.',
+      items: [
+        'Drafts personalized reminder notices for all eligible candidates',
+        'Identifies unreachable students lacking valid contact channels',
+        'Generates sha256 approval fingerprint for the preview batch',
+        'Enforces Gate 3 quality validation and logs draft audit record',
+      ],
+    },
+    abilities: {
+      summary: 'Cryptographic fingerprint generation, reachability auditing, and preview-only non-destructive safety.',
+      skills: [
+        'Batch reminder template generation',
+        'Parent contact reachability validation',
+        'Tamper-evident approval fingerprinting',
+      ],
+      safeguards: [
+        'Strictly preview-only: zero messages sent prematurely without administrator approval',
+        'Cryptographic fingerprint required for downstream authorization',
+        'Full run logged in ai_agent_runs and ai_audit_logs',
+      ],
+    },
+    usage: {
+      summary: 'Culminates the Fees pipeline (Step 3), depositing previewed reminders and approval fingerprint for administrative sign-off.',
+      step_by_step_flow: [
+        'Step 1: Ingests eligible candidates from Gate 2',
+        'Step 2: Validates contact details and flags unreachable students',
+        'Step 3: Compiles reminder drafts and generates approval fingerprint',
+        'Step 4: Evaluates Gate 3 quality criteria (zero sent prematurely)',
+        'Step 5: Delivers final report and preview to the administrator queue',
+      ],
+    },
+  },
 };
 
 function ToolAgentEsoModal({
@@ -1374,6 +1733,8 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
         <CurriculumPlanningAgentControlCard onValidated={refreshAll} />
       ) : module.boundAgent?.agentKey === 'k12_new_pal' ? (
         <PalAgentControlCard onValidated={refreshAll} />
+      ) : module.boundAgent?.agentKey === 'k12_fees' || module.key === 'fees' ? (
+        <FeesAgentControlCard onValidated={refreshAll} />
       ) : module.boundAgent ? (
         <BoundAgentPanel module={module} agent={module.boundAgent} />
       ) : (
