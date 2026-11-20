@@ -159,7 +159,7 @@ function OnlineExamResultContent() {
   const band = bandFor(percent);
 
   // Nothing to review until the exam has been attempted: no score, no breakdown, no answers.
-  if (result && (result.noAttempt || result.attemptsRemaining > 0)) {
+  if (result && result.noAttempt) {
     return (
       <div className="min-h-full px-4 py-5 sm:px-6">
         <div className="mx-auto flex w-full max-w-md flex-col items-center py-20 text-center">
@@ -168,10 +168,8 @@ function OnlineExamResultContent() {
           </span>
           <h1 className="mt-4 text-lg font-semibold text-slate-900">No result yet</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {result.noAttempt
-              ? `You haven't attempted ${result.paperName || 'this exam'} yet. `
-              : `You have ${result.attemptsRemaining} attempt${result.attemptsRemaining === 1 ? '' : 's'} left on ${result.paperName || 'this exam'}. `}
-            Your result and answers appear here once you have used all your attempts.
+            {`You haven't attempted ${result.paperName || 'this exam'} yet. `}
+            Your result and answers appear here as soon as you submit an attempt.
           </p>
           <div className="mt-5 flex gap-2">
             <Button variant="outline" onClick={() => router.push('/exam/online')}>
@@ -182,7 +180,7 @@ function OnlineExamResultContent() {
               onClick={() => router.push(`/exam/online/${paperId}`)}
               className="bg-[#4f46e5] text-white hover:bg-[#4338ca]"
             >
-              {result.noAttempt ? 'Attempt exam' : 'Attempt again'}
+              Attempt exam
             </Button>
           </div>
         </div>

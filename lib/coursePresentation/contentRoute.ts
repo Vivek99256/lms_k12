@@ -40,7 +40,7 @@ export function resolveSelectedContent(
     if (format === 'interactive_slides') {
       return {
         url,
-        label: 'Open PowerPoint',
+        label: 'Open Learning Presentation',
         kind: 'stored_presentation',
         title: matchingResource.title,
       };
@@ -59,7 +59,7 @@ export function resolveSelectedContent(
     if (format === 'interactive_slides') {
       return {
         url,
-        label: 'Open PowerPoint',
+        label: 'Open Learning Presentation',
         kind: 'template_preview',
         title: 'Classroom Presentation',
       };

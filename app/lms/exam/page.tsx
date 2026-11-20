@@ -2034,6 +2034,9 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         formData.append('sub_institute_id', session.subInstituteId);
         formData.append('user_profile_name', session.userProfileName);
         formData.append('user_id', session.userId);
+        // A teacher's subjects come from their timetable for this academic year, so the year must be sent; without it
+        // the list was empty for teachers (admins are not filtered by year, which is why only they saw chapters).
+        if (session.syear) formData.append('syear', session.syear);
 
         const response = await fetch(`${API_BASE_URL}/api/lms-courses`, {
           method: 'POST',
