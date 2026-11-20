@@ -75,21 +75,46 @@ export default function AnnotateAssignmentPage() {
   const [submissionFilter, setSubmissionFilter] = useState<
     "all" | "submitted" | "pending"
   >("submitted");
+  const [standardFilter, setStandardFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("");
   const [titleFilter, setTitleFilter] = useState("");
   const [page, setPage] = useState(1);
   const [reevaluatingId, setReevaluatingId] = useState<number | null>(null);
   const [actionError, setActionError] = useState("");
 
+  // Cascading filters: standard -> its subjects -> that subject's assignments. Each list offers only what the choice
+  // above it leaves, so a combination with no rows can never be picked.
+  const standardOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => row.standardName).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+      ),
+    [rows]
+  );
   const subjectOptions = useMemo(
     () =>
-      Array.from(new Set(rows.map((row) => row.subjectName).filter(Boolean))).sort(),
-    [rows]
+      Array.from(
+        new Set(
+          rows
+            .filter((row) => !standardFilter || row.standardName === standardFilter)
+            .map((row) => row.subjectName)
+            .filter(Boolean)
+        )
+      ).sort(),
+    [rows, standardFilter]
   );
   const titleOptions = useMemo(
     () =>
-      Array.from(new Set(rows.map((row) => row.title).filter(Boolean))).sort(),
-    [rows]
+      Array.from(
+        new Set(
+          rows
+            .filter((row) => !standardFilter || row.standardName === standardFilter)
+            .filter((row) => !subjectFilter || row.subjectName === subjectFilter)
+            .map((row) => row.title)
+            .filter(Boolean)
+        )
+      ).sort(),
+    [rows, standardFilter, subjectFilter]
   );
 
   const counts = useMemo(() => {
@@ -102,6 +127,7 @@ export default function AnnotateAssignmentPage() {
     return rows.filter((row) => {
       if (submissionFilter === "submitted" && !row.studentSubmitted) return false;
       if (submissionFilter === "pending" && row.studentSubmitted) return false;
+      if (standardFilter && row.standardName !== standardFilter) return false;
       if (subjectFilter && row.subjectName !== subjectFilter) return false;
       if (titleFilter && row.title !== titleFilter) return false;
       if (needle) {
@@ -110,7 +136,7 @@ export default function AnnotateAssignmentPage() {
       }
       return true;
     });
-  }, [rows, search, submissionFilter, subjectFilter, titleFilter]);
+  }, [rows, search, submissionFilter, standardFilter, subjectFilter, titleFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -276,7 +302,7 @@ export default function AnnotateAssignmentPage() {
           ))}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="relative block">
             <span className="sr-only">Search student</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -292,9 +318,29 @@ export default function AnnotateAssignmentPage() {
             />
           </label>
           <select
+            value={standardFilter}
+            onChange={(event) => {
+              setStandardFilter(event.target.value);
+              // The subject and assignment lists below belong to the standard just chosen.
+              setSubjectFilter("");
+              setTitleFilter("");
+              setPage(1);
+            }}
+            aria-label="Filter by standard"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          >
+            <option value="">All standards</option>
+            {standardOptions.map((standard) => (
+              <option key={standard} value={standard}>
+                Std {standard}
+              </option>
+            ))}
+          </select>
+          <select
             value={subjectFilter}
             onChange={(event) => {
               setSubjectFilter(event.target.value);
+              setTitleFilter("");
               setPage(1);
             }}
             aria-label="Filter by subject"
