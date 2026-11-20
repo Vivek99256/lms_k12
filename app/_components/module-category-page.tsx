@@ -24,6 +24,7 @@ import { ModuleIntelligence } from '@/app/_components/module-intelligence';
 import { ModuleKnowledgeGraph } from '@/app/_components/ModuleKnowledgeGraph';
 import { CurriculumStructureView } from '@/app/_components/CurriculumStructureView';
 import CentralizedKnowledgeGraphExplorer from '@/app/ai/_components/CentralizedKnowledgeGraphExplorer';
+import { fetchResolvedKnowledgeGraphSettings } from '@/lib/intelligence/ai-knowledge-graph-settings';
 import {
   intelligenceEntryFor,
   ModuleIntelligenceContractScreen,
@@ -709,8 +710,40 @@ export function ModuleCategoryPage({
    * `ai_ontology_views` coverage rather than anything this page can know
    * in advance.
    */
+  // Centralized management, decentralized execution for the Knowledge Graph
+  // tab: read once per module from the central resolver rather than kept as a
+  // setting of this page's own. Defaults to enabled so a slow or failed
+  // request never hides a tab that should be showing.
+  const [knowledgeGraphEnabled, setKnowledgeGraphEnabled] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchResolvedKnowledgeGraphSettings()
+      .then((result) => {
+        if (cancelled) return;
+        const resolved = result.modules?.[moduleName];
+        setKnowledgeGraphEnabled(resolved === undefined ? true : resolved);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setKnowledgeGraphEnabled(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [moduleName]);
+
   const graphScreens = useMemo<ModuleStaticScreen[]>(() => {
     if (categoryKey !== KNOWLEDGE_GRAPH_CATEGORY_KEY && category?.key !== KNOWLEDGE_GRAPH_CATEGORY_KEY) {
+      return [];
+    }
+
+    // Centralized management, decentralized execution: this module reads the
+    // central on/off decision rather than keeping a Knowledge Graph setting of
+    // its own. See KnowledgeGraphSettingsResolver / /api/ai/knowledge-graph/settings.
+    if (!knowledgeGraphEnabled) {
       return [];
     }
 
@@ -740,7 +773,7 @@ export function ModuleCategoryPage({
           ),
       },
     ];
-  }, [categoryKey, category, moduleName]);
+  }, [categoryKey, category, moduleName, knowledgeGraphEnabled]);
 
   /**
    * The Intelligence tab, for any module that has not brought its own.

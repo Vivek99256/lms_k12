@@ -27,7 +27,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Maximize, Minimize, Network, ServerCrash, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Maximize, Minimize, Network, ServerCrash, Settings, X } from 'lucide-react';
 
 import {
   fetchErpModuleGraph,
@@ -780,6 +780,18 @@ export default function CentralizedKnowledgeGraphExplorer({
           >
             {pathFinderOpen ? 'Hide path finder' : 'Path finder'}
           </button>
+          <Link
+            href="/ai/knowledge-graph/settings"
+            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+              dark
+                ? 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+            }`}
+            title="Turn the Knowledge Graph on or off per module"
+          >
+            <Settings className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Settings</span>
+          </Link>
           <button
             type="button"
             onClick={toggleFullscreen}

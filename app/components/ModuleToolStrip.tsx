@@ -9,6 +9,7 @@ import {
   FileClock,
   GitBranch,
   LifeBuoy,
+  Lightbulb,
   Network,
   SlidersHorizontal,
   UserPlus,
@@ -34,6 +35,7 @@ export const TOOL_STRIP_CATEGORY_KEYS = [
   'workflow',
   'audit-trail',
   'knowledge-graph',
+  'recommendation',
 ] as const;
 
 const TOOL_ICONS: Record<(typeof TOOL_STRIP_CATEGORY_KEYS)[number], LucideIcon> = {
@@ -44,6 +46,7 @@ const TOOL_ICONS: Record<(typeof TOOL_STRIP_CATEGORY_KEYS)[number], LucideIcon> 
   workflow: GitBranch,
   'audit-trail': FileClock,
   'knowledge-graph': Network,
+  recommendation: Lightbulb,
 };
 
 function categoryKeyOf(item: Level3Item): (typeof TOOL_STRIP_CATEGORY_KEYS)[number] | null {

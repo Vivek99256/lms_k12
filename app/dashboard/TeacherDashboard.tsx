@@ -9,6 +9,7 @@ import { DashboardBarChart } from '@/app/dashboard/_components/DashboardBarChart
 import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
 import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
 import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
+import { friendlyError } from '@/lib/user-messages';
 
 /** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
 const TEACHER_WIDGETS = [
@@ -51,7 +52,7 @@ export default function TeacherDashboard() {
           logout();
           return;
         }
-        setError(err.message);
+        setError(friendlyError(err, "We couldn't load the dashboard. Please try again."));
       })
       .finally(() => setLoading(false));
   }, [logout]);
