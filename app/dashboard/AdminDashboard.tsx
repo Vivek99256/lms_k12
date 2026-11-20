@@ -225,7 +225,7 @@ export default function AdminDashboard() {
             logout();
             return;
           }
-          setError(err.message);
+          setError(friendlyError(err, "We couldn't load the dashboard. Please try again."));
         })
         .finally(() => {
           setLoading(false);
