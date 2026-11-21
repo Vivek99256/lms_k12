@@ -57,10 +57,14 @@ export default function MarksEntryPage() {
 
   const terms = useMemo(() => {
     const selectedAcademicYear = typeof window === 'undefined' ? '' : localStorage.getItem('selectedAcademicYear') || '';
-    return toOptions(academicTerms.filter((item) => {
-      const year = readString(item.syear);
-      return !selectedAcademicYear || !year || year === selectedAcademicYear;
-    }));
+    // academic_year rows: `id` is the row id (e.g. 1963); exams are keyed by `term_id` (e.g. 150).
+    return academicTerms
+      .filter((item) => {
+        const year = readString(item.syear);
+        return !selectedAcademicYear || !year || year === selectedAcademicYear;
+      })
+      .map((item) => ({ id: readString(item.term_id ?? item.id), label: readString(item.title ?? item.name) }))
+      .filter((option) => option.id && option.label);
   }, [academicTerms]);
   const [sections, setSections] = useState<SelectOption[]>([]);
   const [standards, setStandards] = useState<SelectOption[]>([]);
@@ -255,7 +259,7 @@ export default function MarksEntryPage() {
             <form onSubmit={handleSearch} className="space-y-6">
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 <Field label="Select Term" icon={<Calendar />}>
-                  <Select value={term} onValueChange={(value) => {
+                  <Select items={toSelectItems(terms)} value={term} onValueChange={(value) => {
                     setTerm(value ?? '');
                     setSection(''); setSections([]); setStandard(''); setStandards([]); setDivision(''); setDivisions([]);
                     setSubject(''); setSubjects([]); setSubjectsDict({}); setExamMaster(''); setExamMasters([]); setExam(''); setExams([]);
@@ -274,7 +278,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Search Section" icon={<Users />}>
-                  <Select value={section} onValueChange={(value) => {
+                  <Select items={toSelectItems(sections)} value={section} onValueChange={(value) => {
                     setSection(value ?? '');
                     setStandard(''); setStandards([]); setDivision(''); setDivisions([]); setSubject(''); setSubjects([]); setSubjectsDict({});
                     setExamMaster(''); setExamMasters([]); setExam(''); setExams([]);
@@ -293,7 +297,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Search Standard" icon={<GraduationCap />}>
-                  <Select value={standard} onValueChange={(value) => {
+                  <Select items={toSelectItems(standards)} value={standard} onValueChange={(value) => {
                     setStandard(value ?? '');
                     setDivision(''); setDivisions([]); setSubject(''); setSubjects([]); setSubjectsDict({}); setExamMaster(''); setExamMasters([]); setExam(''); setExams([]);
                   }} disabled={!section}>
@@ -311,7 +315,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Search Division" icon={<Layers />}>
-                  <Select value={division} onValueChange={(value) => {
+                  <Select items={toSelectItems(divisions)} value={division} onValueChange={(value) => {
                     setDivision(value ?? '');
                     setSubject(''); setSubjects([]); setSubjectsDict({}); setExamMaster(''); setExamMasters([]); setExam(''); setExams([]);
                   }} disabled={!standard}>
@@ -329,7 +333,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Select Subject" icon={<BookOpen />}>
-                  <Select value={subject} onValueChange={(value) => {
+                  <Select items={toSelectItems(subjects)} value={subject} onValueChange={(value) => {
                     setSubject(value ?? ''); setExamMaster(''); setExamMasters([]); setExam(''); setExams([]);
                   }} disabled={!division}>
                     <SelectTrigger className="w-full">
@@ -346,7 +350,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Select Exam Master" icon={<FileText />}>
-                  <Select value={examMaster} onValueChange={(value) => { setExamMaster(value ?? ''); setExam(''); setExams([]); }} disabled={!subject}>
+                  <Select items={toSelectItems(examMasters)} value={examMaster} onValueChange={(value) => { setExamMaster(value ?? ''); setExam(''); setExams([]); }} disabled={!subject}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select exam master" />
                     </SelectTrigger>
@@ -361,7 +365,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Select Exam" icon={<ClipboardList />}>
-                  <Select value={exam} onValueChange={(value) => setExam(value ?? '')} disabled={!examMaster}>
+                  <Select items={toSelectItems(exams)} value={exam} onValueChange={(value) => setExam(value ?? '')} disabled={!examMaster}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select exam" />
                     </SelectTrigger>
@@ -632,6 +636,11 @@ function loadOptions(
       if (!cancelled) setter([]);
     });
   return () => { cancelled = true; };
+}
+
+/** Base UI's Select.Value shows the raw value unless the root knows each value's label. */
+function toSelectItems(options: SelectOption[]): { value: string; label: string }[] {
+  return options.map((option) => ({ value: option.id, label: option.label }));
 }
 
 function findLabel(options: SelectOption[], id: string): string {
