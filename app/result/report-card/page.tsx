@@ -118,7 +118,9 @@ export default function NewReportCardPage() {
         id: readString(row.id ?? row.student_id),
         rollNo: readString(row.roll_no),
         enrollmentNo: readString(row.enrollment_no ?? row.gr_number ?? row.gr_no),
-        studentName: readString(row.student_name ?? row.name ?? row.full_name),
+        // SearchStudent() returns tblstudent.* (first/middle/last name), not a combined name.
+        studentName: readString(row.student_name ?? row.name ?? row.full_name)
+          || [row.first_name, row.middle_name, row.last_name].map(readString).filter(Boolean).join(' '),
         standard: readString(row.standard_name ?? row.standard),
         division: readString(row.division_name ?? row.division),
       })).filter((row) => row.id);
