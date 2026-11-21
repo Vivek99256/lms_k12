@@ -28,6 +28,7 @@ import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
 import { useModuleLevel3Nav } from '@/app/_lib/use-module-level3-nav';
 import { ShellMenuContext, type ShellMenuState } from '@/app/components/shell-menu-context';
+import { fetchResolvedKnowledgeGraphSettings } from '@/lib/intelligence/ai-knowledge-graph-settings';
 
 interface SelectedBranch {
   level1Key: string;
@@ -272,8 +273,17 @@ function findNewPalMenuNode(items: MenuItem[]): SubmenuItem | undefined {
  * see, by cross-referencing the menu-rights API's "New PAL" node — the same
  * data source Access Roles writes to and every other module's level-3 bar
  * reads from.
+ *
+ * `knowledgeGraphEnabled` drops `pal-knowledge-graph` on top of the rights
+ * filter. New PAL brings its own hardcoded sub-nav instead of the DB-driven
+ * `fees_menu_categories` bar every other module's Knowledge Graph button
+ * already reads `KnowledgeGraphSettingsResolver` through (see
+ * AbstractMenuCategoryApiController::index() in next_lms_erp), so this one
+ * button needed its own read of the same central decision — otherwise New
+ * PAL's switch in /ai/knowledge-graph/settings would keep this one button on
+ * screen while every other module's own button correctly disappeared.
  */
-function newPalLevel3Items(pathname: string, menuItems: MenuItem[]): Level3Item[] | null {
+function newPalLevel3Items(pathname: string, menuItems: MenuItem[], knowledgeGraphEnabled: boolean): Level3Item[] | null {
   const lowerPath = pathname.toLowerCase().replace(/\/+$/, '') || '/';
 
   const inNewPal =
@@ -285,9 +295,10 @@ function newPalLevel3Items(pathname: string, menuItems: MenuItem[]): Level3Item[
   const newPalNode = findNewPalMenuNode(menuItems);
   const allowedLabels = new Set((newPalNode?.submenus ?? []).map((submenu) => normalizeMenuLabel(submenu.label)));
 
-  const items = NEW_PAL_LEVEL3_ITEMS.filter((item) =>
-    allowedLabels.has(normalizeMenuLabel(NEW_PAL_LEVEL3_DB_NAMES[`${item.id}`] ?? item.label)),
-  );
+  const items = NEW_PAL_LEVEL3_ITEMS.filter((item) => {
+    if (item.id === 'pal-knowledge-graph' && !knowledgeGraphEnabled) return false;
+    return allowedLabels.has(normalizeMenuLabel(NEW_PAL_LEVEL3_DB_NAMES[`${item.id}`] ?? item.label));
+  });
   return items.length ? items : null;
 }
 
@@ -314,6 +325,32 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [userProfileName, setUserProfileName] = useState('');
   const [hasBrainAccess, setHasBrainAccess] = useState(() => isBrainVisibleByLmsSession());
   const [isStudent, setIsStudent] = useState(() => isStudentSession());
+
+  // Centralized management, decentralized execution: New PAL's "Knowledge
+  // Graph" button is the one level-3 item this shell hardcodes rather than
+  // reading from a module's own category feed (see NEW_PAL_LEVEL3_ITEMS), so
+  // it has to ask the central resolver itself instead of inheriting the
+  // answer the way every other module's button does. Defaults to enabled so
+  // a slow or failed request never hides a button that should be showing.
+  const [newPalKnowledgeGraphEnabled, setNewPalKnowledgeGraphEnabled] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchResolvedKnowledgeGraphSettings()
+      .then((result) => {
+        if (cancelled) return;
+        const resolved = result.modules?.['new_pal'];
+        setNewPalKnowledgeGraphEnabled(resolved === undefined ? true : resolved);
+      })
+      .catch(() => {
+        if (!cancelled) setNewPalKnowledgeGraphEnabled(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /*
     The shell is a fixed-viewport app: it is exactly 100vh, it clips its own
@@ -892,7 +929,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // module's navigation over it.
     const arrivedFromEngagement =
       normalizeMenuLabel(selectedL2?.label ?? '') === 'engagement' && Boolean(moduleLevel3Menu.navigation);
-    const newPalItems = arrivedFromEngagement ? null : newPalLevel3Items(pathname, displayedMenuItems);
+    const newPalItems = arrivedFromEngagement ? null : newPalLevel3Items(pathname, displayedMenuItems, newPalKnowledgeGraphEnabled);
     if (newPalItems) {
       return { parentLabel: 'New PAL', items: newPalItems };
     }
