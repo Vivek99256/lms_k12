@@ -1261,6 +1261,9 @@ export interface QuestionTypeCatalogEntry {
   lms_question_type_id?: number | null;
   /** Set when this form belongs to one publisher rather than the standard set. */
   publisher?: string | null;
+  /** 1 = active catalogue form. 0 = in use by existing questions but not an
+   *  active catalogue form, so it must not be offered when adding a question. */
+  status?: number;
   total?: number;
 }
 

@@ -1301,8 +1301,11 @@ export default function ChapterListPage() {
   // Only the catalog forms that belong to the chosen Question Type, keyed by
   // question_type_catalog.lms_question_type_id -- the real FK, not a name match.
   const manualQuestionFormatOptions = useMemo(() => {
+    // status 0 = inactive format; never offered for a new question.
     const matches = questionTypeCatalog.filter(
-      (entry) => entry.lms_question_type_id === QUESTION_TYPE_API_CONFIG[manualQuestionType].question_type_id
+      (entry) =>
+        entry.status !== 0 &&
+        entry.lms_question_type_id === QUESTION_TYPE_API_CONFIG[manualQuestionType].question_type_id
     );
 
     // The catalog carries one row per (code, publisher) -- 'case_study' from
