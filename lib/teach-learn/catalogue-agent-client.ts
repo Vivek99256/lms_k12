@@ -503,6 +503,10 @@ export interface UnifiedTeachLearnReport {
       message?: string;
     }>;
     generated_count?: number;
+    skipped_count?: number;
+    failed_count?: number;
+    failed_resources?: Array<{ chapter_id: number; resource_type: string; error: string }>;
+    images_applied?: boolean;
     verified_count?: number;
     duplicates_prevented?: number;
     assessment_created?: boolean;
@@ -539,6 +543,8 @@ export interface RunPipelineOptions {
   selected_resources?: string[];
   selected_template?: 'modern_tech' | 'academic_classic' | 'vibrant_creative' | 'stem_blueprint' | 'warm_editorial' | 'minimalist_clean' | 'infographic_visual' | 'gamified_quest' | string;
   generate_assessment?: boolean;
+  /** Optional user-chosen images (http(s) URL or site path) for the generated layouts. Omitted when none are chosen. */
+  selected_images?: { hero?: string; hook?: string };
   check_only?: boolean;
   days_back?: number;
   days_ahead?: number;

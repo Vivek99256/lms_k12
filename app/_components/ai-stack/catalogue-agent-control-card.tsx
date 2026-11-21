@@ -909,6 +909,9 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
   // Stage 3: Student Learning Experience & Template Layout
   const [selectedStudentExperience, setSelectedStudentExperience] = useState<string>('ppt');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('modern_tech');
+  // Optional user-chosen images for the generated resources (empty = keep the curated defaults).
+  const [heroImageUrl, setHeroImageUrl] = useState<string>('');
+  const [hookImageUrl, setHookImageUrl] = useState<string>('');
 
   // Interactive Design View (Preview Before Generation) State
   const [previewMode, setPreviewMode] = useState<'ppt' | 'pdf'>('ppt');
@@ -1336,6 +1339,15 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
     }
 
     setPipelineError(null);
+    // Only well-formed http(s) URLs or site paths are sent; the server re-checks them.
+    const cleanImage = (v: string) => {
+      const t = v.trim();
+      const wellFormed = /^https?:\/\//i.test(t) || (t.startsWith('/') && !t.startsWith('//'));
+      return t.length > 0 && t.length <= 2048 && !/[\s"'<>]/.test(t) && wellFormed ? t : undefined;
+    };
+    const hero = cleanImage(heroImageUrl);
+    const hook = cleanImage(hookImageUrl);
+    const selectedImages = hero || hook ? { ...(hero ? { hero } : {}), ...(hook ? { hook } : {}) } : undefined;
     await executePipeline({
       standard_ids: selectedStandardIds,
       subject_ids: selectedSubjectIds,
@@ -1345,6 +1357,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
       selected_resources: selectedResourceTypes,
       selected_template: selectedTemplate,
       generate_assessment: includeAssessment,
+      ...(selectedImages ? { selected_images: selectedImages } : {}),
       check_only: false,
     });
   };
@@ -3067,6 +3080,28 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                     Bloom&apos;s Calibrated
                   </span>
                 </label>
+
+                {/* Optional images for generated resources */}
+                <div className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2">
+                  <span className="text-xs font-bold text-slate-900 block">Images (optional)</span>
+                  <span className="text-[11px] text-slate-600 block">
+                    Paste an image URL to use instead of the stock photo. Leave blank to keep the defaults.
+                  </span>
+                  <input
+                    type="url"
+                    value={heroImageUrl}
+                    onChange={(e) => setHeroImageUrl(e.target.value)}
+                    placeholder="Hero image URL (https://...)"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
+                  />
+                  <input
+                    type="url"
+                    value={hookImageUrl}
+                    onChange={(e) => setHookImageUrl(e.target.value)}
+                    placeholder="Context / hook image URL (https://...)"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
+                  />
+                </div>
 
                 <div className="flex items-center justify-between pt-2">
                   <button
