@@ -201,79 +201,7 @@ export default function KnowledgeGraphSettingsPage() {
               </div>
             </section>
 
-            <section className="mt-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-foreground">Modules</h2>
-                <div className="relative w-full max-w-xs">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={filter}
-                    onChange={(event) => setFilter(event.target.value)}
-                    placeholder="Filter modules…"
-                    className="w-full rounded-md border border-border bg-background py-1.5 pl-8 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-3 overflow-hidden rounded-lg border border-border bg-card">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-full border-collapse text-left text-sm">
-                    <thead>
-                      <tr>
-                        <th className="border-b border-border px-4 py-2.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                          Module
-                        </th>
-                       
-                        <th className="border-b border-border px-4 py-2.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground" />
-                        <th className="border-b border-border px-4 py-2.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                          Enabled
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {modules.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                            No modules match &ldquo;{filter}&rdquo;.
-                          </td>
-                        </tr>
-                      ) : (
-                        modules.map((row) => (
-                          <tr key={row.module}>
-                            <td className="px-4 py-2.5 text-foreground">
-                              {row.module_label}
-                              {/* <span className="ml-2 font-mono text-[11px] text-muted-foreground">{row.module}</span> */}
-                            </td>
-                            {/* <td className="px-4 py-2.5 text-muted-foreground">{SOURCE_LABEL[row.source]}</td> */}
-                            <td className="px-4 py-2.5">
-                              {row.source === 'institute_module' && (
-                                <button
-                                  type="button"
-                                  onClick={() => resetModule(row)}
-                                  disabled={busy === row.module}
-                                  title="Return to this school's default"
-                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                                >
-                                  <RotateCcw className="size-3" />
-                                  Reset
-                                </button>
-                              )}
-                            </td>
-                            <td className="px-4 py-2.5">
-                              <Switch
-                                checked={row.enabled}
-                                disabled={busy === row.module}
-                                onChange={(event) => toggleModule(row, event.target.checked)}
-                              />
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </section>
+            
 
             <ExplorerTreeSection />
           </>
@@ -522,7 +450,7 @@ function ExplorerTreeModuleRow({
             {module.submodules.length} submodule{module.submodules.length === 1 ? '' : 's'}
           </span>
         </button>
-        <button
+        {/* <button
           type="button"
           onClick={onResetModule}
           disabled={busy === module.label}
@@ -531,7 +459,7 @@ function ExplorerTreeModuleRow({
         >
           <RotateCcw className="size-3" />
           Reset
-        </button>
+        </button> */}
         <Switch
           checked={module.enabled}
           disabled={busy === module.label}
@@ -551,16 +479,9 @@ function ExplorerTreeModuleRow({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-foreground">
                       {submodule.label}
-                      {submodule.linked_module_key && (
-                        <span
-                          className="ml-2 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700"
-                          title="Switching either one off switches both off"
-                        >
-                          also controls {submodule.linked_module_key} tab
-                        </span>
-                      )}
+                    
                     </p>
-                    {submodule.mapped ? (
+                    {/* {submodule.mapped ? (
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         {submodule.node_types.map((nodeType) => {
                           const count = liveCounts.get(nodeType.label);
@@ -597,9 +518,9 @@ function ExplorerTreeModuleRow({
                       </div>
                     ) : (
                       <p className="mt-1 text-[11px] text-muted-foreground">Not mapped to the graph yet.</p>
-                    )}
+                    )} */}
                   </div>
-                  <button
+                  {/* <button
                     type="button"
                     onClick={() => onResetSubmodule(submodule.label)}
                     disabled={busy === key || !module.enabled}
@@ -608,7 +529,7 @@ function ExplorerTreeModuleRow({
                   >
                     <RotateCcw className="size-3" />
                     Reset
-                  </button>
+                  </button> */}
                   <Switch
                     checked={submodule.enabled}
                     disabled={busy === key || !module.enabled}
