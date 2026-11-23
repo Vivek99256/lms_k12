@@ -49,6 +49,33 @@ import type { AiStackModule, AiStackOperationSpec } from '@/app/_components/ai-s
 const SESSION_KEYS = { user: 'userData', menu: 'menuContext', year: 'selectedAcademicYear' };
 
 /**
+ * Reads one JSON blob by key, trying `sessionStorage` before `localStorage`.
+ *
+ * `getFeesSession()` (app/fees/_lib/fees-api.ts) already does this — checking
+ * both storages, not just `localStorage` — because which one a login flow
+ * actually populates is not the same across every entry point into the app.
+ * This function originally checked `localStorage` only, which left the first
+ * caller to use it outside Fees's own screens (`ModuleApprovalQueue`, used
+ * generically across modules) silently reading `{}` whenever a session
+ * happened to live in `sessionStorage` instead — surfacing as a bare "Failed
+ * to fetch" with no indication the session, not the network, was the cause.
+ */
+function readStoredRecord(key: string): Record<string, unknown> {
+  if (typeof window === 'undefined') return {};
+
+  for (const storage of [sessionStorage, localStorage]) {
+    try {
+      const parsed = JSON.parse(storage.getItem(key) || '{}') as Record<string, unknown>;
+      if (Object.keys(parsed).length > 0) return parsed;
+    } catch {
+      // Try the next storage rather than failing the whole read.
+    }
+  }
+
+  return {};
+}
+
+/**
  * The signed-in session, for the workspace calls these screens make.
  *
  * Reads exactly what `hooks/use-ai-workspace.ts` reads, in the same order, so a report
@@ -56,17 +83,26 @@ const SESSION_KEYS = { user: 'userData', menu: 'menuContext', year: 'selectedAca
  * There is no default institute and no default year, and there must never be one: the
  * backend derives the tenant from the bearer token, and a default here could only ever be
  * wrong in the direction of showing one school another school's records.
+ *
+ * `baseUrl` falls back to `NEXT_PUBLIC_GRAPH_API_BASE_URL` when `host_name` is not in the
+ * session blob — the same fallback `readGraphSession()` (app/_components/graph/graph-session.ts)
+ * already applies, needed for the identical reason: a pre-resolved empty/missing `baseUrl`
+ * here does not fail loudly, it makes every request below a relative fetch against the
+ * Next.js origin instead of the Laravel API, which is indistinguishable from a network
+ * failure to whoever is looking at the resulting "Failed to fetch".
  */
 export function readModuleWorkspaceSession(): WorkspaceSession {
   if (typeof window === 'undefined') return {};
 
   try {
-    const userData = JSON.parse(localStorage.getItem(SESSION_KEYS.user) || '{}') as Record<string, unknown>;
-    const menuContext = JSON.parse(localStorage.getItem(SESSION_KEYS.menu) || '{}') as Record<string, unknown>;
+    const userData = readStoredRecord(SESSION_KEYS.user);
+    const menuContext = readStoredRecord(SESSION_KEYS.menu);
+
+    const hostName = String(userData.host_name ?? menuContext.host_name ?? '');
 
     return {
       token: String(userData.user_token ?? userData.token ?? menuContext.user_token ?? menuContext.token ?? ''),
-      baseUrl: String(userData.host_name ?? ''),
+      baseUrl: hostName || process.env.NEXT_PUBLIC_GRAPH_API_BASE_URL || null,
       instituteId: String(userData.sub_institute_id ?? menuContext.sub_institute_id ?? ''),
       academicYear: String(
         localStorage.getItem(SESSION_KEYS.year) ?? userData.syear ?? userData.academic_year_id ?? '',
