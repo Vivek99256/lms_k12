@@ -38,6 +38,7 @@
  * module operation, and nothing in it may become so.
  */
 
+import { getFeesSession } from '@/app/fees/_lib/fees-api';
 import { fetchAgents } from '@/lib/agents/client';
 import type { Agent } from '@/lib/agents/types';
 import { recordModuleActivitySafely, type RecordModuleActivityInput } from '@/lib/intelligence/ai-module';
@@ -46,68 +47,60 @@ import type { WorkspaceSession } from '@/lib/intelligence/workspace';
 
 import type { AiStackModule, AiStackOperationSpec } from '@/app/_components/ai-stack/ai-stack-module';
 
-const SESSION_KEYS = { user: 'userData', menu: 'menuContext', year: 'selectedAcademicYear' };
-
-/**
- * Reads one JSON blob by key, trying `sessionStorage` before `localStorage`.
- *
- * `getFeesSession()` (app/fees/_lib/fees-api.ts) already does this — checking
- * both storages, not just `localStorage` — because which one a login flow
- * actually populates is not the same across every entry point into the app.
- * This function originally checked `localStorage` only, which left the first
- * caller to use it outside Fees's own screens (`ModuleApprovalQueue`, used
- * generically across modules) silently reading `{}` whenever a session
- * happened to live in `sessionStorage` instead — surfacing as a bare "Failed
- * to fetch" with no indication the session, not the network, was the cause.
- */
-function readStoredRecord(key: string): Record<string, unknown> {
-  if (typeof window === 'undefined') return {};
-
-  for (const storage of [sessionStorage, localStorage]) {
-    try {
-      const parsed = JSON.parse(storage.getItem(key) || '{}') as Record<string, unknown>;
-      if (Object.keys(parsed).length > 0) return parsed;
-    } catch {
-      // Try the next storage rather than failing the whole read.
-    }
-  }
-
-  return {};
-}
-
 /**
  * The signed-in session, for the workspace calls these screens make.
  *
- * Reads exactly what `hooks/use-ai-workspace.ts` reads, in the same order, so a report
- * built from an AI Stack tab is scoped identically to one built from the assistant panel.
- * There is no default institute and no default year, and there must never be one: the
- * backend derives the tenant from the bearer token, and a default here could only ever be
- * wrong in the direction of showing one school another school's records.
+ * Delegates entirely to `getFeesSession()` (app/fees/_lib/fees-api.ts) rather
+ * than its own, narrower lookup. This function originally read only
+ * `localStorage.getItem('userData')`/`'menuContext'` directly — two key
+ * names, one storage. `getFeesSession()` is the version actually proven to
+ * work across this app's different login entry points: it tries nine
+ * possible key names (`userData`, `menuContext`, `sessionData`, `session`,
+ * `auth`, …) across both `sessionStorage` and `localStorage`. The first
+ * caller to use this function outside Fees's own screens
+ * (`ModuleApprovalQueue`, used generically across modules) silently read
+ * `{}` whenever the signed-in session lived under a key or storage this
+ * function's own narrower list didn't cover.
  *
- * `baseUrl` falls back to `NEXT_PUBLIC_GRAPH_API_BASE_URL` when `host_name` is not in the
- * session blob — the same fallback `readGraphSession()` (app/_components/graph/graph-session.ts)
- * already applies, needed for the identical reason: a pre-resolved empty/missing `baseUrl`
- * here does not fail loudly, it makes every request below a relative fetch against the
- * Next.js origin instead of the Laravel API, which is indistinguishable from a network
- * failure to whoever is looking at the resulting "Failed to fetch".
+ * `baseUrl` applies the identical override `readGraphSession()`
+ * (app/_components/graph/graph-session.ts) already does, for the identical
+ * reason: `session.hostName` is whatever Laravel APP_URL the backend
+ * returned at LOGIN time, which is not necessarily the host this browser can
+ * actually reach — a remote login host blocked by that host's own CORS
+ * policy, or simply down, fails as a bare "Failed to fetch" with no hint
+ * that the session, not this feature, picked the wrong host. Preferring
+ * `NEXT_PUBLIC_GRAPH_API_BASE_URL` (the var `.env.local` stages for exactly
+ * this, with its own 127.0.0.1:8000 fallback) is what let every other
+ * `/api/ai/*` call on this same page succeed; this function silently used
+ * the raw, unreachable `hostName` instead, which was the second half of why
+ * approvals alone kept failing after the session-lookup half was fixed.
+ *
+ * There is no default institute and no default year, and there must never be
+ * one: the backend derives the tenant from the bearer token, and a default
+ * here could only ever be wrong in the direction of showing one school
+ * another school's records.
  */
 export function readModuleWorkspaceSession(): WorkspaceSession {
   if (typeof window === 'undefined') return {};
 
   try {
-    const userData = readStoredRecord(SESSION_KEYS.user);
-    const menuContext = readStoredRecord(SESSION_KEYS.menu);
+    const session = getFeesSession();
 
-    const hostName = String(userData.host_name ?? menuContext.host_name ?? '');
+    let baseUrl = process.env.NEXT_PUBLIC_GRAPH_API_BASE_URL || session.hostName || null;
+    if (baseUrl && baseUrl.includes('127.0.0.1:8000')) {
+      baseUrl =
+        process.env.NEXT_PUBLIC_API_BASE_URL_DEV ||
+        process.env.NEXT_PUBLIC_ERP_BASE_URL ||
+        session.hostName ||
+        'https://dev.triz.co.in';
+    }
 
     return {
-      token: String(userData.user_token ?? userData.token ?? menuContext.user_token ?? menuContext.token ?? ''),
-      baseUrl: hostName || process.env.NEXT_PUBLIC_GRAPH_API_BASE_URL || null,
-      instituteId: String(userData.sub_institute_id ?? menuContext.sub_institute_id ?? ''),
-      academicYear: String(
-        localStorage.getItem(SESSION_KEYS.year) ?? userData.syear ?? userData.academic_year_id ?? '',
-      ),
-      termId: String(userData.term_id ?? userData.marking_period_id ?? menuContext.term_id ?? ''),
+      token: session.token,
+      baseUrl: baseUrl || session.hostName || null,
+      instituteId: session.subInstituteId,
+      academicYear: session.academicYearId,
+      termId: session.termId,
     };
   } catch {
     return {};
