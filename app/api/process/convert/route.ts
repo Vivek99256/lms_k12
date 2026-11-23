@@ -97,12 +97,24 @@ Rules:
 
 /** The model was asked for JSON only, but a stray code fence or sentence around it is tolerated. */
 function parseJsonObject(text: string): unknown {
+  // Strip markdown code fences the model sometimes wraps around JSON.
+  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
   try {
-    return JSON.parse(text);
+    return JSON.parse(stripped);
   } catch {
-    const match = text.match(/\{[\s\S]*\}/);
+    // Try to extract the outermost {...} block.
+    const match = stripped.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("The AI reply was not a JSON object.");
-    return JSON.parse(match[0]);
+    try {
+      return JSON.parse(match[0]);
+    } catch (inner) {
+      // Fix common AI-generated JSON mistakes: missing commas between } { pairs.
+      const repaired = match[0]
+        .replace(/\}\s*\{/g, '},{')   // missing comma between objects in an array
+        .replace(/\]\s*\[/g, '],[')   // missing comma between arrays
+        .replace(/"\s*\n\s*"/g, '","'); // bare newline inside string
+      return JSON.parse(repaired);
+    }
   }
 }
 
