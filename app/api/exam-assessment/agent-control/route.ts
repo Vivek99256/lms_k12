@@ -66,6 +66,8 @@ export async function GET(request: NextRequest) {
     let endpoint = '/api/ai/exam-assessment/agent/state';
     if (action === 'eso') {
       endpoint = '/api/ai/exam-assessment/agent/eso';
+    } else if (action === 'history') {
+      endpoint = '/api/ai/exam-assessment/agent/history';
     }
 
     let upstream = await fetch(`${backendUrl}${endpoint}`, {
@@ -94,8 +96,45 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const getData = await upstream.json().catch(() => ({ success: false, message: 'Upstream returned invalid JSON' }));
-    return NextResponse.json(getData, { status: upstream.status });
+    const getData = await upstream.json().catch(() => null);
+    if (getData && upstream.ok) {
+      return NextResponse.json(getData, { status: upstream.status });
+    }
+
+    // Fallback for history if backend is unreachable or returns empty
+    if (action === 'history') {
+      try {
+        const store = getAgentStore();
+        const runs = await store.listRuns(instituteId, { module: 'exam_assessment', limit: 25 });
+        return NextResponse.json({
+          success: true,
+          data: {
+            history: runs.map((r) => ({
+              id: r.id,
+              run_reference: r.id,
+              agent_name: r.agent_name,
+              agent_key: r.input?.tool || 'exam_assessment.pipeline',
+              step_number: ((r.output?.result as Record<string, unknown>)?.pipeline_step as number) || null,
+              trigger_type: r.trigger,
+              status: r.status,
+              duration_ms: r.duration_ms,
+              started_at: r.started_at,
+              finished_at: r.finished_at,
+              input: r.input,
+              output: r.output,
+            })),
+            total_runs: runs.length,
+          },
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    return NextResponse.json(
+      getData || { success: false, message: 'Upstream returned invalid JSON' },
+      { status: upstream.status || 502 }
+    );
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : 'Exam Assessment proxy failed' },
