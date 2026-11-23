@@ -5,9 +5,17 @@ import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
 import { useBrainResource } from '@/app/enterprise-brain/_components/useBrainResource';
 import { readGraphSession } from '@/app/_components/graph/graph-session';
-import { Surface } from '@/components/intelligence/module/primitives';
-import { fetchFeesRecommendations, toDisplayCard } from '@/app/fees/recommendation/_lib/fees-recommendation-api';
+import { Section, Surface } from '@/components/intelligence/module/primitives';
+import {
+  fetchFeesRecommendations,
+  fetchFeesRecommendationIntelligence,
+  toDisplayCard,
+  type FeesRecommendationIntelligencePayload,
+  type FeesRecommendationPayload,
+} from '@/app/fees/recommendation/_lib/fees-recommendation-api';
+import { ModuleApprovalQueue } from '@/app/_components/ai-stack/module-approval-queue';
 import { FeesRecommendationCardView } from './recommendation-card';
+import { AgenticStatusCard, NextBestActionCard } from './intelligence-sections';
 
 /** The Fees module's own accent — same literal every other Fees screen uses. */
 const FEES_ACCENT = '#5846EA';
@@ -26,8 +34,13 @@ const FEES_ACCENT = '#5846EA';
  * needs exactly as much as every Brain screen does, despite this panel
  * having nothing to do with the Brain's SQL pipeline.
  */
+interface FeesRecommendationScreenData {
+  legacy: FeesRecommendationPayload;
+  intelligence: FeesRecommendationIntelligencePayload;
+}
+
 export function FeesRecommendationScreen() {
-  const { data, error, loading, refreshing, refresh } = useBrainResource(async () => {
+  const { data, error, loading, refreshing, refresh, setData } = useBrainResource<FeesRecommendationScreenData>(async () => {
     const session = readGraphSession();
     const syear = session.academicYear ? String(session.academicYear) : '';
 
@@ -35,7 +48,12 @@ export function FeesRecommendationScreen() {
       throw new Error('No academic year is selected.');
     }
 
-    return fetchFeesRecommendations(syear);
+    const [legacy, intelligence] = await Promise.all([
+      fetchFeesRecommendations(syear),
+      fetchFeesRecommendationIntelligence(syear),
+    ]);
+
+    return { legacy, intelligence };
   }, []);
 
   const style = { '--intel-accent': FEES_ACCENT, '--intel-accent-glow': `${FEES_ACCENT}1A` } as CSSProperties;
@@ -81,11 +99,11 @@ export function FeesRecommendationScreen() {
             Recommendation
           </p>
           <h1 className="mt-1 text-[24px] font-bold leading-tight tracking-tight text-slate-950">
-            Fees — graph-based recommendations
+            Fees —  intelligence capabilities
           </h1>
           <p className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-500">
-            Academic year {data.syear} · read directly from Neo4j. Every card is either a real graph finding or an
-            honest reason why one isn’t available yet — never a guess.
+            Academic year {data.legacy.syear} · Cross-Module, Graph Reasoning and Predictive cards are real graph/
+            signal findings or an honest reason why one isn’t available yet — never a guess.
           </p>
         </div>
         <button
@@ -99,16 +117,126 @@ export function FeesRecommendationScreen() {
         </button>
       </header>
 
-      <ul className="space-y-3">
-        {data.cards.map((card) => (
-          <li key={card.id}>
-            <FeesRecommendationCardView card={toDisplayCard(card)} />
-          </li>
-        ))}
-      </ul>
+      {(() => {
+        const coverageCard = data.legacy.cards.find((card) => card.id === 'fees.platform_coverage');
+        return coverageCard ? <FeesRecommendationCardView card={toDisplayCard(coverageCard)} /> : null;
+      })()}
+
+      <Section
+        eyebrow="Capability 1"
+        title="Cross-Module Intelligence"
+        description="Fees correlated against attendance, admissions enquiries and PAL engagement/mastery — a second module's data, not just Fees' own."
+      >
+        {data.intelligence.capabilities.cross_module.available ? (
+          <ul className="space-y-3">
+            {data.intelligence.capabilities.cross_module.cards.map((card) => (
+              <li key={card.id}>
+                <FeesRecommendationCardView card={toDisplayCard(card)} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Surface className="px-4 py-4">
+            <p className="text-[13px] text-slate-600">{data.intelligence.capabilities.cross_module.reason}</p>
+          </Surface>
+        )}
+      </Section>
+
+      <Section
+        eyebrow="Capability 2"
+        title="Graph Reasoning"
+        description="Relationships discovered by walking/aggregating the graph — never a single direct edge."
+      >
+        {data.intelligence.capabilities.graph_reasoning.available ? (
+          <ul className="space-y-3">
+            {data.intelligence.capabilities.graph_reasoning.cards.map((card) => (
+              <li key={card.id}>
+                <FeesRecommendationCardView card={toDisplayCard(card)} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Surface className="px-4 py-4">
+            <p className="text-[13px] text-slate-600">{data.intelligence.capabilities.graph_reasoning.reason}</p>
+          </Surface>
+        )}
+      </Section>
+
+      <Section
+        eyebrow="Capability 3"
+        title="Predictive Intelligence"
+        description="Students whose fee balance is trending worse across recorded sweeps — projected forward, not guessed."
+      >
+        {data.intelligence.capabilities.predictive.cards.length > 0 ? (
+          <ul className="space-y-3">
+            {data.intelligence.capabilities.predictive.cards.map((card) => (
+              <li key={card.id}>
+                <FeesRecommendationCardView card={toDisplayCard(card)} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Surface className="px-4 py-4">
+            <p className="text-[13px] text-slate-600">
+              No worsening fee-payment trend has been recorded yet. This needs at least two sweeps of the
+              k12_fees_predictive agent before a trend can be computed.
+            </p>
+          </Surface>
+        )}
+      </Section>
+
+      <Section
+        eyebrow="Capability 4"
+        title="Recommendation Intelligence"
+        description="The single most relevant next action — ranked over already-governed recommendations and cases, for one subject at a time."
+      >
+        <NextBestActionCard
+          available={data.intelligence.capabilities.recommendation.available}
+          reason={data.intelligence.capabilities.recommendation.reason}
+          topPick={data.intelligence.capabilities.recommendation.top_pick}
+        />
+      </Section>
+
+      <Section
+        eyebrow="Capability 5"
+        title="Agentic Intelligence"
+        description="Operational state of the two governed Fees agents — every recommendation they draft still waits for human approval."
+      >
+        <AgenticStatusCard
+          agentState={data.intelligence.capabilities.agentic.agent_state}
+          pendingApprovalsCount={data.intelligence.capabilities.agentic.pending_approvals_count}
+          onStateChange={(nextState) => {
+            setData((current) =>
+              current
+                ? {
+                    ...current,
+                    intelligence: {
+                      ...current.intelligence,
+                      capabilities: {
+                        ...current.intelligence.capabilities,
+                        agentic: { ...current.intelligence.capabilities.agentic, agent_state: nextState },
+                      },
+                    },
+                  }
+                : current,
+            );
+          }}
+        />
+      </Section>
+
+      <Section
+        eyebrow="Human approval"
+        title="Waiting for a person"
+        description="Every recommendation FeesAgent/FeesPredictiveAgent drafts pauses here until an administrator decides — reusing the same approval queue every other module's Automations tab already uses, not a Fees-specific copy."
+      >
+        <div className="space-y-4">
+          <ModuleApprovalQueue moduleLabel="Fees collection" workflowKey="fees_collection" onChanged={refresh} />
+          <ModuleApprovalQueue moduleLabel="Fees proactive outreach" workflowKey="fees_proactive_outreach" onChanged={refresh} />
+        </div>
+      </Section>
 
       <footer className="border-t border-slate-100 pt-3 text-[11.5px] leading-5 text-slate-400">
-        Generated {data.generated_at} · source: Neo4j (:FeeRecord, :FeePayment, :Student, :StuDetail)
+        Generated {data.intelligence.generated_at}
       </footer>
     </div>
   );
