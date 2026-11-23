@@ -95,9 +95,9 @@ export function FeesRecommendationScreen() {
     <div style={style} className="space-y-6 px-1 pb-12">
       <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-[color:var(--intel-accent)]">
+          {/* <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-[color:var(--intel-accent)]">
             Recommendation
-          </p>
+          </p> */}
           <h1 className="mt-1 text-[24px] font-bold leading-tight tracking-tight text-slate-950">
             Fees —  intelligence capabilities
           </h1>
