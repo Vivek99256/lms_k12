@@ -288,6 +288,62 @@ export interface WorkflowPayload {
   summary: WorkflowSummary;
 }
 
+/** Who a graph-resolved approver type resolves to right now, or `resolved: false` when the graph has no answer. */
+export interface WorkflowApproverPreview {
+  resolved: boolean;
+  staff_id: number | null;
+  name: string | null;
+}
+
+export interface FeesIntelligenceData {
+  student_id: number;
+  siblings: Array<{
+    student_id: number;
+    name: string;
+    has_sibling_concession_eligible: boolean;
+    recommended_discount_percent: number;
+  }>;
+  defaulter_risk: {
+    risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
+    score: number;
+    reasons: string[];
+    recommended_action: string;
+  };
+  concession_evaluation: {
+    eligible: boolean;
+    recommended_waiver_percent: number;
+    rationale: string;
+  };
+  no_dues_clearance: {
+    cleared: boolean;
+    pending_amount: number;
+    pending_installments: number;
+  };
+  notification_channel_routing: {
+    recommended_channel: string;
+    confidence: number;
+    stats: {
+      whatsapp_read_rate: number;
+      sms_delivery_rate: number;
+      email_open_rate: number;
+    };
+    rationale: string;
+  };
+  concession_escalation: {
+    amount: number;
+    required_approver_role: string;
+    target_step_name: string;
+    is_escalated_to_trustee: boolean;
+    reason: string;
+  };
+  tc_auto_approval: {
+    cleared: boolean;
+    pending_amount: number;
+    auto_approve_step: boolean;
+    message: string;
+  };
+}
+
 export interface WorkflowInput {
   flow_key?: ItemKey;
   name?: string;

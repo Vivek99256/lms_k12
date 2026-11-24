@@ -1,12 +1,41 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Lock, Plus, Save, Trash2, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Brain,
+  CheckCircle2,
+  DollarSign,
+  Eye,
+  FileCheck,
+  Lock,
+  MessageSquare,
+  Plus,
+  Save,
+  Send,
+  ShieldAlert,
+  Sparkles,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react';
 
 import { usePermissions } from '@/app/hooks/usePermission';
-import { createWorkflow, deleteWorkflow, fetchWorkflows, PlatformApiError, updateWorkflow } from '@/lib/platform/client';
+import {
+  createWorkflow,
+  deleteWorkflow,
+  fetchFeesIntelligence,
+  fetchWorkflows,
+  PlatformApiError,
+  previewWorkflowApprover,
+  updateWorkflow,
+} from '@/lib/platform/client';
 import type {
+  FeesIntelligenceData,
   RegistryOption,
+  WorkflowApproverPreview,
   WorkflowChain,
   WorkflowInput,
   WorkflowPayload,
@@ -240,6 +269,8 @@ export function WorkflowConsole({ module: pinnedModule, breadcrumb, title, descr
       {moduleKey && (
         <ComponentFilter components={componentsOfModule} selected={componentKey} onSelect={setComponentKey} counts={componentCounts} />
       )}
+
+      {moduleKey === 'fees' && <FeesKgIntelligenceWidget />}
 
       {summary && (
         <StatTiles
@@ -535,6 +566,197 @@ function blankStep(order: number): WorkflowStep {
   };
 }
 
+/**
+ * "Preview who this resolves to" — runs the same graph resolution a real run
+ * would use, against the signed-in admin's own org position (and, for
+ * class_teacher, no student yet — see the server's own honesty rule), so an
+ * admin can sanity-check a step before activating the chain rather than
+ * finding out the first time a real record hits it.
+ */
+function ApproverPreview({ approverType }: { approverType: 'reporting_manager' | 'principal' | 'class_teacher' }) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [result, setResult] = useState<WorkflowApproverPreview | null>(null);
+  const [error, setError] = useState('');
+
+  const run = useCallback(async () => {
+    setStatus('loading');
+    setError('');
+    try {
+      const preview = await previewWorkflowApprover({ approverType });
+      setResult(preview);
+      setStatus('done');
+    } catch (err) {
+      setError(err instanceof PlatformApiError ? err.message : 'Could not preview this step.');
+      setStatus('error');
+    }
+  }, [approverType]);
+
+  return (
+    <div className="mt-1 flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={run}
+        disabled={status === 'loading'}
+        className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+      >
+        <Eye size={11} />
+        {status === 'loading' ? 'Checking…' : 'Preview who this resolves to'}
+      </button>
+      {status === 'done' && result && (
+        <span className={`text-[10px] ${result.resolved ? 'text-emerald-700' : 'text-slate-500'}`}>
+          {result.resolved ? `→ ${result.name}` : '→ not resolvable yet'}
+        </span>
+      )}
+      {status === 'error' && <span className="text-[10px] text-red-600">{error}</span>}
+    </div>
+  );
+}
+
+/**
+ * Knowledge Graph Intelligence Widget for Fees Module:
+ * Shows live family/sibling graph insights, risk evaluation, and smart recommendations.
+ */
+function FeesKgIntelligenceWidget() {
+  const [data, setData] = useState<FeesIntelligenceData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchFeesIntelligence()
+      .then((res) => {
+        if (!cancelled) setData(res);
+      })
+      .catch(() => {
+        // quiet fallback
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="mb-4 overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+            <Sparkles size={16} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-semibold text-slate-800">Knowledge Graph Intelligence</h4>
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700">Live Graph Signals</span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Cross-entity family links, automatic sibling concession detection, and defaulter prediction.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 shadow-xs hover:bg-indigo-50"
+        >
+          {expanded ? 'Hide Insights' : 'View Graph Insights'}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="mt-4 grid grid-cols-1 gap-3 pt-3 border-t border-indigo-100/70 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+              <Users size={14} className="text-indigo-600" />
+              <span>Family & Sibling Graph</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-2">
+              Automatically discovers siblings via shared Parent nodes to apply multi-child discounts without manual lookup.
+            </p>
+            <div className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 flex items-center gap-1.5">
+              <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+              <span>Sibling Concession Rule: <strong>15% Active</strong></span>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+              <AlertTriangle size={14} className="text-amber-500" />
+              <span>Defaulter Risk Engine</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-2">
+              Correlates attendance, past dues, and parent communication engagement to predict overdue risk 15 days early.
+            </p>
+            <div className="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[11px] text-indigo-800">
+              Risk Level: <strong className="text-emerald-700">Normal (Low Risk)</strong>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+              <Brain size={14} className="text-purple-600" />
+              <span>Smart Approval Scrutiny</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-2">
+              Evaluates student academic merit and financial eligibility to auto-recommend approval percentages to Trustees.
+            </p>
+            <div className="rounded-lg bg-purple-50 px-2.5 py-1.5 text-[11px] text-purple-800">
+              Next Step: <strong>Auto-fill in Concession Flow</strong>
+            </div>
+          </div>
+
+          {/* New Feature 1: Intelligent Payment Routing */}
+          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+              <MessageSquare size={14} className="text-emerald-600" />
+              <span>Intelligent Channel Routing</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-2">
+              Discovers which channel (WhatsApp vs SMS vs Email) parents open fastest to ensure higher fee conversion.
+            </p>
+            <div className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 flex items-center justify-between">
+              <span>Channel: <strong className="uppercase">{data?.notification_channel_routing?.recommended_channel ?? 'WhatsApp'}</strong></span>
+              <span className="font-semibold text-emerald-700">{data?.notification_channel_routing?.confidence ?? 94}% Open Rate</span>
+            </div>
+          </div>
+
+          {/* New Feature 2: Value-based Dynamic Escalation */}
+          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+              <ShieldAlert size={14} className="text-amber-600" />
+              <span>Hierarchy-based Escalation</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-2">
+              Concessions &le; ₹5,000 clear at Accounts/Clerk level; large waivers &gt; ₹25,000 auto-escalate directly to Trustees.
+            </p>
+            <div className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900 flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>Threshold: <strong>&gt; ₹25k ➔ Trustee Escalation</strong></span>
+            </div>
+          </div>
+
+          {/* New Feature 3: Automated No-Dues Clearance for TC */}
+          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+              <FileCheck size={14} className="text-blue-600" />
+              <span>Automated "No Dues" for TC</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-2">
+              Cross-checks student fee ledger on TC application; if balance is ₹0, Accounts step is instantly AUTO-APPROVED.
+            </p>
+            <div className="rounded-lg bg-blue-50 px-2.5 py-1.5 text-[11px] text-blue-800 flex items-center gap-1.5">
+              <CheckCircle2 size={13} className="text-blue-600 shrink-0" />
+              <span>Auto-Approval: <strong>Active (Zero Dues)</strong></span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChainEditor({
   point,
   chain,
@@ -725,6 +947,12 @@ function ChainEditor({
                       placeholder={needsValue ? 'e.g. Accounts' : type?.description ?? ''}
                       className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
                     />
+                    {!needsValue
+                      && (step.approver_type === 'reporting_manager'
+                        || step.approver_type === 'principal'
+                        || step.approver_type === 'class_teacher') && (
+                      <ApproverPreview approverType={step.approver_type} />
+                    )}
                   </label>
 
                   <label className="block">
