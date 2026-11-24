@@ -18,7 +18,9 @@ export function resolveDashboardRole(userProfileName: string | null | undefined)
 
   if (TEACHER_PROFILES.has(normalized)) return 'teacher';
   if (STUDENT_PROFILES.has(normalized)) return 'student';
-  if (ADMIN_PROFILES.has(normalized)) return 'admin';
+  // The three core admin profiles use the role workspace too (server role "admin"), which carries every
+  // figure the old admin dashboard had plus the premium panels. To go back, return 'admin' here.
+  if (ADMIN_PROFILES.has(normalized)) return 'workspace';
 
   // Profile names are free text per school ("Class Teacher", "Senior Teacher", "HOD").
   // Falling through to the admin dashboard for these gave teachers a dashboard whose

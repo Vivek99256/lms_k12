@@ -68,7 +68,7 @@ async function postDashboardProxy<T extends ApiStatusPayload>(path: string, sess
  * where the Vercel serverless function can't reach the Laravel host but the
  * browser can, since the backend already answers CORS preflights for this origin.
  */
-async function postDashboardDirect<T extends ApiStatusPayload>(laravelPath: string, session: DashboardSession, signal?: AbortSignal): Promise<T> {
+async function postDashboardDirect<T extends ApiStatusPayload>(laravelPath: string, session: DashboardSession, signal?: AbortSignal, extra?: Record<string, string>): Promise<T> {
   const headers = new Headers();
   headers.set('Accept', 'application/json');
   headers.set('Content-Type', 'application/json');
@@ -86,6 +86,7 @@ async function postDashboardDirect<T extends ApiStatusPayload>(laravelPath: stri
       syear: session.academicYearId,
       user_id: session.userId,
       term_id: session.termId,
+      ...extra,
     }),
   });
 
@@ -279,6 +280,18 @@ export type RoleWorkspaceWidgets = {
   upcoming_exams?: { count: number; items: WorkspaceListItem[] } | null;
   exam_evaluation?: { batches: number; sheets: number; evaluated: number; approved: number } | null;
   students_by_class?: Array<{ standard_id: number; standard_name: string; students: number | string }> | null;
+  fees_period?: { amount: number; previous: number; label: string } | null;
+  admissions_period?: { count: number; previous: number; label: string } | null;
+  visitors_period?: { count: number; previous: number; label: string } | null;
+  absent_today?: { date: string | null; total: number; items: Array<{ id: number; name: string; class_name: string; phone: string | null }> } | null;
+  staff_on_leave_list?: { total: number; items: Array<{ id: number; name: string; until: string }> } | null;
+  birthdays?: { students: Array<{ id: number; name: string; in_days: number; date: string }>; staff: Array<{ id: number; name: string; in_days: number; date: string }>; student_total: number; staff_total: number } | null;
+  upcoming_events?: Array<{ id: string; title: string; date: string; kind: string }> | null;
+  followups_due?: { total: number; items: Array<{ id: number; name: string; detail: string | null; phone: string | null; date: string }> } | null;
+  pending_approvals?: { leaves: number; requisitions: number; purchase_orders: number; total: number } | null;
+  library_overdue?: { total: number; items: Array<{ id: number; title: string; detail: string; days: number; date: string }> } | null;
+  stock_reorder?: { total: number; items: Array<{ id: number; title: string; recorded: number; reorder_at: number }> } | null;
+  exam_results?: { exam: string | null; rows: Array<{ standard_name: string; students: number; average: number; best: number }> } | null;
   class_attendance?: { date: string | null; rows: Array<{ standard_id: number; standard_name: string; present: number; absent: number; rate: number | null }> } | null;
   gender_split?: { Male: number; Female: number; 'Not recorded': number } | null;
   admission_funnel?: { enquiries: number; registered: number; admitted: number } | null;
@@ -289,9 +302,25 @@ export type RoleWorkspaceSummary = ApiStatusPayload & {
   role: string;
   label: string;
   profile_name: string;
+  period: WorkspacePeriod;
+  can_see_fees: boolean;
   widgets: RoleWorkspaceWidgets;
 };
 
-export function fetchRoleWorkspace(session: DashboardSession, signal?: AbortSignal) {
-  return postDashboardDirect<RoleWorkspaceSummary>('/api/role-workspace/summary', session, signal);
+export type WorkspacePeriod = 'today' | 'week' | 'month' | 'year';
+
+export function fetchRoleWorkspace(session: DashboardSession, signal?: AbortSignal, period: WorkspacePeriod = 'today') {
+  return postDashboardDirect<RoleWorkspaceSummary>('/api/role-workspace/summary', session, signal, { period });
+}
+
+/** Collected vs outstanding and payment modes. Refused by the server for roles without fee access. */
+export type WorkspaceFees = ApiStatusPayload & {
+  summary: {
+    collected_amount: number; demand_amount: number; outstanding_amount: number; collection_rate: number; receipts_count: number; fine_amount: number; discount_amount: number;
+  } | null;
+  payment_mode_mix: Array<{ payment_mode: string; receipts: number; amount: number }>;
+};
+
+export function fetchWorkspaceFees(session: DashboardSession, signal?: AbortSignal) {
+  return postDashboardDirect<WorkspaceFees>('/api/role-workspace/fees', session, signal);
 }
