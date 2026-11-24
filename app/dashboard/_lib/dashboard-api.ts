@@ -292,6 +292,14 @@ export type RoleWorkspaceWidgets = {
   library_overdue?: { total: number; items: Array<{ id: number; title: string; detail: string; days: number; date: string }> } | null;
   stock_reorder?: { total: number; items: Array<{ id: number; title: string; recorded: number; reorder_at: number }> } | null;
   exam_results?: { exam: string | null; rows: Array<{ standard_name: string; students: number; average: number; best: number }> } | null;
+  chronic_absentees?: { days: number; threshold: number; total: number; items: Array<{ id: number; name: string; class_name: string; absences: number; phone: string | null }> } | null;
+  substitutes_needed?: { teachers: number; periods: number; uncovered: number; items: Array<{ id: number; title: string; detail: string }> } | null;
+  parent_msg_age?: { total: number; oldest_days: number | null; lt3: number; d3_7: number; gt7: number } | null;
+  task_aging?: { total: number; oldest_days: number | null; le7: number; d8_30: number; gt30: number } | null;
+  homework_rate?: { days: number; total: number; overall: number | null; rows: Array<{ standard_name: string; total: number; done: number; rate: number | null }> } | null;
+  strength_changes?: { joined_month: number; joined_year: number; left_year: number; tc_year: number } | null;
+  transport_summary?: { students: number; buses: number; over_capacity: number; top: Array<{ id: number; title: string; students: number; capacity: number; fill: number | null }> } | null;
+  hostel_summary?: { hostels: number; rooms: number; rooms_in_use: number; residents: number } | null;
   class_attendance?: { date: string | null; rows: Array<{ standard_id: number; standard_name: string; present: number; absent: number; rate: number | null }> } | null;
   gender_split?: { Male: number; Female: number; 'Not recorded': number } | null;
   admission_funnel?: { enquiries: number; registered: number; admitted: number } | null;
@@ -304,13 +312,16 @@ export type RoleWorkspaceSummary = ApiStatusPayload & {
   profile_name: string;
   period: WorkspacePeriod;
   can_see_fees: boolean;
+  can_find_student: boolean;
+  standard_id: number;
+  standards: Array<{ id: number; name: string }>;
   widgets: RoleWorkspaceWidgets;
 };
 
 export type WorkspacePeriod = 'today' | 'week' | 'month' | 'year';
 
-export function fetchRoleWorkspace(session: DashboardSession, signal?: AbortSignal, period: WorkspacePeriod = 'today') {
-  return postDashboardDirect<RoleWorkspaceSummary>('/api/role-workspace/summary', session, signal, { period });
+export function fetchRoleWorkspace(session: DashboardSession, signal?: AbortSignal, period: WorkspacePeriod = 'today', standardId = 0) {
+  return postDashboardDirect<RoleWorkspaceSummary>('/api/role-workspace/summary', session, signal, { period, standard_id: String(standardId) });
 }
 
 /** Collected vs outstanding and payment modes. Refused by the server for roles without fee access. */
@@ -323,4 +334,11 @@ export type WorkspaceFees = ApiStatusPayload & {
 
 export function fetchWorkspaceFees(session: DashboardSession, signal?: AbortSignal) {
   return postDashboardDirect<WorkspaceFees>('/api/role-workspace/fees', session, signal);
+}
+
+/** Front-office student lookup: name or admission number in, class and a parent's number out. */
+export type FoundStudent = { id: number; name: string; enrollment_no: string | null; class_name: string; phone: string | null };
+
+export function fetchFindStudent(session: DashboardSession, q: string, signal?: AbortSignal) {
+  return postDashboardDirect<ApiStatusPayload & { items: FoundStudent[] }>('/api/role-workspace/find-student', session, signal, { q });
 }

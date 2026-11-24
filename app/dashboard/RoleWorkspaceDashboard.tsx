@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpRight, BookOpen, CalendarCheck, CalendarClock, Cake, ClipboardCheck, ClipboardList, DoorOpen, Download, FileText, Filter, GraduationCap,
   History, Inbox, LineChart, ListChecks, Megaphone, MessageCircleWarning, MessageSquareText, Package, PenLine, Phone, PieChart, Printer,
-  ReceiptIndianRupee, RefreshCw, ShieldCheck, Store, TriangleAlert, Trophy, UserMinus, UserX, Users, Wallet, Zap, type LucideIcon,
+  ReceiptIndianRupee, RefreshCw, RotateCcw, ShieldCheck, Store, TriangleAlert, Trophy, UserMinus, UserRoundX, UserX, Users, Wallet, Zap, type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -16,6 +16,10 @@ import {
   Segmented, StatStrip, SURFACE, type AttentionItem, type Row, type Tone,
 } from '@/app/dashboard/_components/PremiumKit';
 import { DashboardError } from '@/app/dashboard/_components/DashboardPrimitives';
+import {
+  AlertLimit, HomeworkPanel, HostelPanel, MovablePanel, ParentWaitPanel, StrengthPanel, StudentFinder, TaskAgePanel, TransportPanel, usePanelOrder,
+} from '@/app/dashboard/_components/WorkspaceExtras';
+import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 import { RoleQuickActions, type QuickActionId } from '@/app/dashboard/_components/RoleQuickActions';
 import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
 import { useDrill } from '@/app/dashboard/_components/useDrill';
@@ -278,7 +282,8 @@ const KPIS = {
 type KpiKey = keyof typeof KPIS;
 
 type ChartKey =
-  | 'attendance_trend' | 'fee_trend' | 'fees_overview' | 'class_attendance' | 'fees_month' | 'admission_funnel' | 'exam_results' | 'gender_split' | 'students_by_class';
+  | 'attendance_trend' | 'fee_trend' | 'fees_overview' | 'class_attendance' | 'fees_month' | 'admission_funnel' | 'exam_results' | 'gender_split' | 'students_by_class'
+  | 'parent_msg_age' | 'task_aging' | 'homework_rate' | 'strength_changes' | 'transport_summary' | 'hostel_summary';
 
 const CHART_LABEL: Record<ChartKey, string> = {
   attendance_trend: 'Attendance trend',
@@ -290,11 +295,18 @@ const CHART_LABEL: Record<ChartKey, string> = {
   exam_results: 'Exam results by class',
   gender_split: 'Gender split',
   students_by_class: 'Students by class',
+  parent_msg_age: 'Parent messages: waiting time',
+  task_aging: 'Open tasks: age',
+  homework_rate: 'Homework completion',
+  strength_changes: 'Student strength changes',
+  transport_summary: 'Transport',
+  hostel_summary: 'Hostel',
 };
 
 type ListKey =
   | 'recent_circulars' | 'recent_enquiries' | 'recent_parent_messages' | 'my_tasks' | 'upcoming_exams_list' | 'recent_requisitions' | 'recent_fee_receipts'
-  | 'pending_approvals' | 'absent_today' | 'staff_on_leave' | 'birthdays' | 'upcoming_events' | 'followups_due' | 'library_overdue' | 'stock_reorder';
+  | 'pending_approvals' | 'absent_today' | 'staff_on_leave' | 'birthdays' | 'upcoming_events' | 'followups_due' | 'library_overdue' | 'stock_reorder'
+  | 'chronic_absentees' | 'substitutes_needed';
 
 type ListDef = {
   label: string; title: string; description: string | ((w: RoleWorkspaceWidgets) => string); icon: LucideIcon; empty: string;
@@ -371,6 +383,21 @@ const LISTS: Record<ListKey, ListDef> = {
       id: i.id, title: i.name, detail: [i.class_name, i.phone].filter(Boolean).join(' · '), trailing: callLink(i.phone),
     }))),
   },
+  chronic_absentees: {
+    label: 'Repeated absence', title: 'Repeated absence', icon: UserRoundX,
+    description: (w) => (w.chronic_absentees ? `${num(w.chronic_absentees.total)} student(s) absent ${w.chronic_absentees.threshold}+ of the last ${w.chronic_absentees.days} marked days` : 'Absent most of the last 10 marked days'),
+    empty: 'No student has been absent on 5 or more of the last 10 marked days.',
+    rows: (w) => (w.chronic_absentees == null ? null : w.chronic_absentees.items.map((i) => ({
+      id: i.id, title: i.name, detail: [i.class_name, i.phone].filter(Boolean).join(' · '), trailing: callLink(i.phone),
+      badge: { tone: (i.absences >= 8 ? 'act' : 'watch') as Tone, text: `${i.absences} of ${w.chronic_absentees?.days ?? 10} days` },
+    }))),
+  },
+  substitutes_needed: {
+    label: 'Substitutes needed', title: 'Substitutes needed today', icon: UserMinus,
+    description: (w) => (w.substitutes_needed ? `${num(w.substitutes_needed.uncovered)} of ${num(w.substitutes_needed.periods)} period(s) without a proxy` : 'Periods of teachers on leave'),
+    empty: 'Every period of a teacher on leave is covered.',
+    rows: (w) => (w.substitutes_needed == null ? null : w.substitutes_needed.items.map((i) => ({ id: i.id, title: i.title, detail: i.detail, badge: { tone: 'act' as Tone, text: 'No proxy' } }))),
+  },
   staff_on_leave: {
     label: 'Staff on leave', title: 'Staff on leave today', icon: UserMinus,
     description: (w) => (w.staff_on_leave_list ? `${num(w.staff_on_leave_list.total)} on approved leave` : 'Approved leave covering today'),
@@ -429,10 +456,10 @@ const LISTS: Record<ListKey, ListDef> = {
 
 type AttentionDef = { key: string; icon: LucideIcon; count: number; display?: string; text: string; tone: Tone; drill?: readonly string[] };
 
-const ATTENDANCE_TARGET = 85;
+const DEFAULT_ATTENDANCE_TARGET = 85;
 
 /** Built only from figures the server sent for this role, so a role never sees another's alerts. */
-function attentionFor(w: RoleWorkspaceWidgets): AttentionDef[] {
+function attentionFor(w: RoleWorkspaceWidgets, target: number): AttentionDef[] {
   const out: AttentionDef[] = [];
   const add = (key: string, icon: LucideIcon, count: number | null | undefined, text: string, tone: Tone, drill?: readonly string[]) => {
     if (count && count > 0) out.push({ key, icon, count, text, tone, drill });
@@ -440,12 +467,16 @@ function attentionFor(w: RoleWorkspaceWidgets): AttentionDef[] {
   const a = w.attendance_today;
   if (a && a.present + a.absent > 0) {
     const rate = (a.present / (a.present + a.absent)) * 100;
-    if (rate < ATTENDANCE_TARGET) out.push({ key: 'lowrate', icon: CalendarCheck, count: Math.round(rate), display: formatPercent(rate), text: `attendance today — below the ${ATTENDANCE_TARGET}% target`, tone: 'act', drill: ['student attendance'] });
+    if (rate < target) out.push({ key: 'lowrate', icon: CalendarCheck, count: Math.round(rate), display: formatPercent(rate), text: `attendance today — below your ${target}% limit`, tone: 'act', drill: ['student attendance'] });
   }
   add('complaints', TriangleAlert, w.complaints?.open, 'complaints are still open', 'act', ['complaint management']);
   const lowClasses = w.class_attendance?.rows.filter((r) => r.rate != null && r.rate < 75).length;
   add('lowclass', CalendarCheck, lowClasses, 'classes are below 75% attendance', 'act', ['student attendance']);
+  add('substitutes', UserMinus, w.substitutes_needed?.uncovered, 'periods have no substitute today', 'act', ['proxy management']);
+  add('chronic', UserRoundX, w.chronic_absentees?.total, 'students keep missing school', 'act', ['student attendance']);
   add('library', BookOpen, w.library_overdue?.total, 'books are overdue', 'act', ['issue/overdue report']);
+  add('waiting', MessageCircleWarning, w.parent_msg_age?.gt7, 'parent messages have waited over a week', 'act', ['parent communication']);
+  add('oldtasks', ListChecks, w.task_aging?.gt30, 'tasks have been open over 30 days', 'watch', ['task management']);
   add('followups', Phone, w.followups_due?.total, 'enquiry follow-ups are due', 'watch', ['admission inquiry']);
   add('parent', MessageCircleWarning, w.parent_msgs_pending, 'parent messages are waiting for a reply', 'watch', ['parent communication']);
   add('leaves', CalendarClock, w.leaves_pending, 'leave requests need a decision', 'watch', ['leave application']);
@@ -495,8 +526,8 @@ const LEADERSHIP: Layout = {
   subtitle: "Here's how the school is running today.",
   primary: ['students_total', 'attendance_today', 'fees_today', 'staff_on_leave_today'],
   glance: ['staff_total', 'admissions_year', 'parent_msgs_pending', 'complaints', 'leaves_pending'],
-  charts: ['attendance_trend', 'fee_trend', 'fees_overview', 'class_attendance', 'fees_month', 'admission_funnel', 'exam_results', 'gender_split', 'students_by_class'],
-  lists: ['pending_approvals', 'absent_today', 'staff_on_leave', 'birthdays', 'upcoming_events', 'upcoming_exams_list', 'recent_circulars'],
+  charts: ['attendance_trend', 'fee_trend', 'fees_overview', 'class_attendance', 'homework_rate', 'fees_month', 'admission_funnel', 'strength_changes', 'exam_results', 'parent_msg_age', 'task_aging', 'transport_summary', 'hostel_summary', 'gender_split', 'students_by_class'],
+  lists: ['pending_approvals', 'substitutes_needed', 'absent_today', 'chronic_absentees', 'staff_on_leave', 'birthdays', 'upcoming_events', 'upcoming_exams_list', 'recent_circulars'],
   actions: ['circular', 'parent-comm', 'attendance', 'timetable', 'fees-report', 'strength', 'exam-schedule', 'complaint'],
 };
 
@@ -505,8 +536,8 @@ const ROLE_LAYOUTS: Record<string, Layout> = {
     subtitle: "Here's today's overview across the school.",
     primary: ['students_total', 'attendance_today', 'fees_today', 'admissions_year'],
     glance: ['staff_total', 'staff_on_leave_today', 'visitors_today', 'complaints', 'tasks_pending_all', 'parent_msgs_pending', 'leaves_pending'],
-    charts: ['attendance_trend', 'fee_trend', 'fees_overview', 'class_attendance', 'fees_month', 'admission_funnel', 'exam_results', 'gender_split', 'students_by_class'],
-    lists: ['pending_approvals', 'absent_today', 'followups_due', 'staff_on_leave', 'birthdays', 'upcoming_events', 'recent_fee_receipts', 'recent_enquiries', 'upcoming_exams_list', 'recent_circulars'],
+    charts: ['attendance_trend', 'fee_trend', 'fees_overview', 'class_attendance', 'homework_rate', 'fees_month', 'admission_funnel', 'strength_changes', 'exam_results', 'parent_msg_age', 'task_aging', 'transport_summary', 'hostel_summary', 'gender_split', 'students_by_class'],
+    lists: ['pending_approvals', 'substitutes_needed', 'absent_today', 'chronic_absentees', 'followups_due', 'staff_on_leave', 'birthdays', 'upcoming_events', 'recent_fee_receipts', 'recent_enquiries', 'upcoming_exams_list', 'recent_circulars'],
     actions: ['add-student', 'search-student', 'collect-fees', 'enquiry', 'circular', 'notify', 'attendance', 'timetable', 'fees-report', 'strength', 'result', 'task'],
   },
   principal: LEADERSHIP,
@@ -515,8 +546,8 @@ const ROLE_LAYOUTS: Record<string, Layout> = {
     subtitle: "Here's what needs attention across the school today.",
     primary: ['students_total', 'attendance_today', 'fees_today', 'admissions_year'],
     glance: ['staff_total', 'visitors_today', 'complaints', 'tasks_pending_all', 'parent_msgs_pending'],
-    charts: ['attendance_trend', 'fees_overview', 'class_attendance', 'fees_month', 'admission_funnel', 'gender_split'],
-    lists: ['pending_approvals', 'absent_today', 'followups_due', 'staff_on_leave', 'birthdays', 'upcoming_events', 'recent_enquiries', 'recent_circulars'],
+    charts: ['attendance_trend', 'fees_overview', 'class_attendance', 'fees_month', 'admission_funnel', 'strength_changes', 'parent_msg_age', 'task_aging', 'gender_split'],
+    lists: ['pending_approvals', 'substitutes_needed', 'absent_today', 'chronic_absentees', 'followups_due', 'staff_on_leave', 'birthdays', 'upcoming_events', 'recent_enquiries', 'recent_circulars'],
     actions: ['add-student', 'search-student', 'collect-fees', 'enquiry', 'circular', 'notify', 'visitor', 'task'],
   },
   clerk: {
@@ -539,8 +570,8 @@ const ROLE_LAYOUTS: Record<string, Layout> = {
     subtitle: 'Students who may need support, and messages waiting for a reply.',
     primary: ['students_total', 'attendance_today', 'parent_msgs_pending', 'tasks_pending_me'],
     glance: ['upcoming_exams'],
-    charts: ['exam_results'],
-    lists: ['absent_today', 'recent_parent_messages', 'upcoming_exams_list', 'birthdays', 'upcoming_events', 'recent_circulars'],
+    charts: ['exam_results', 'parent_msg_age'],
+    lists: ['chronic_absentees', 'absent_today', 'recent_parent_messages', 'upcoming_exams_list', 'birthdays', 'upcoming_events', 'recent_circulars'],
     actions: ['search-student', 'parent-comm', 'circular', 'timetable', 'result'],
   },
   librarian: {
@@ -572,7 +603,7 @@ const ROLE_LAYOUTS: Record<string, Layout> = {
     subtitle: 'The school at a glance.',
     primary: ['students_total', 'fees_today', 'attendance_today', 'admissions_year'],
     glance: ['staff_total', 'complaints'],
-    charts: ['attendance_trend', 'fee_trend', 'fees_overview', 'class_attendance', 'fees_month', 'admission_funnel', 'exam_results', 'gender_split', 'students_by_class'],
+    charts: ['attendance_trend', 'fee_trend', 'fees_overview', 'class_attendance', 'fees_month', 'admission_funnel', 'strength_changes', 'exam_results', 'transport_summary', 'hostel_summary', 'gender_split', 'students_by_class'],
     lists: ['upcoming_events', 'recent_circulars'],
     actions: ['fees-report', 'strength', 'result', 'circular'],
   },
@@ -947,9 +978,9 @@ const PERIOD_OPTIONS: Array<{ id: WorkspacePeriod; label: string }> = [
  * under the right key (`home.<role>`) — never under a placeholder that would flash hidden widgets.
  */
 function RoleWorkspaceView({
-  data, loadedAt, refreshing, onRefresh, onPeriod,
+  data, loadedAt, refreshing, onRefresh, onPeriod, onFilter,
 }: {
-  data: RoleWorkspaceSummary; loadedAt: Date | null; refreshing: boolean; onRefresh: () => void; onPeriod: (p: WorkspacePeriod) => void;
+  data: RoleWorkspaceSummary; loadedAt: Date | null; refreshing: boolean; onRefresh: () => void; onPeriod: (p: WorkspacePeriod) => void; onFilter: (standardId: number) => void;
 }) {
   const { user } = useAuth();
   const drill = useDrill();
@@ -960,6 +991,22 @@ function RoleWorkspaceView({
   const period = data.period ?? 'today';
   const firstName = (user?.name || '').trim().split(/\s+/)[0];
   const hasPeriod = Boolean(w.fees_period || w.admissions_period || w.visitors_period);
+
+  // Per-person, per-browser choices: attendance alert limit and panel order.
+  const [target, setTarget] = useState<number>(() => {
+    try {
+      const n = Number(window.localStorage.getItem('dash-att-target'));
+      return Number.isFinite(n) && n >= 50 && n <= 100 ? n : DEFAULT_ATTENDANCE_TARGET;
+    } catch {
+      return DEFAULT_ATTENDANCE_TARGET;
+    }
+  });
+  const changeTarget = (n: number) => {
+    setTarget(n);
+    try { window.localStorage.setItem('dash-att-target', String(n)); } catch { /* not remembered */ }
+  };
+  const order = usePanelOrder(`dash-order:${data.role}:${user?.email ?? 'me'}`);
+  const [dragging, setDragging] = useState<string | null>(null);
 
   const figures = (keys: KpiKey[]) => keys.flatMap((key) => {
     if (!prefs.isVisible(`kpi.${key}`)) return [];
@@ -1015,6 +1062,13 @@ function RoleWorkspaceView({
   if (on('exam_results') && w.exam_results) mid.push(<ExamResultsPanel key="exam-results" data={w.exam_results} />);
   if (on('gender_split') && w.gender_split) mid.push(<GenderPanel key="gender" data={w.gender_split} />);
 
+  if (on('homework_rate') && w.homework_rate) mid.push(<HomeworkPanel key="homework" data={w.homework_rate} />);
+  if (on('parent_msg_age') && w.parent_msg_age) mid.push(<ParentWaitPanel key="parent-age" data={w.parent_msg_age} />);
+  if (on('task_aging') && w.task_aging) mid.push(<TaskAgePanel key="task-age" data={w.task_aging} />);
+  if (on('strength_changes') && w.strength_changes) mid.push(<StrengthPanel key="strength" data={w.strength_changes} />);
+  if (on('transport_summary') && w.transport_summary) mid.push(<TransportPanel key="transport" data={w.transport_summary} />);
+  if (on('hostel_summary') && w.hostel_summary) mid.push(<HostelPanel key="hostel" data={w.hostel_summary} />);
+
   if (on('students_by_class') && w.students_by_class) {
     const rows = w.students_by_class;
     mid.push(
@@ -1047,17 +1101,30 @@ function RoleWorkspaceView({
       </Panel>,
     );
 
-  const attention: AttentionItem[] = attentionFor(w).map((a) => ({ key: a.key, icon: a.icon, count: a.count, display: a.display, text: a.text, tone: a.tone, onClick: drill(a.drill) }));
+  const attention: AttentionItem[] = attentionFor(w, target).map((a) => ({ key: a.key, icon: a.icon, count: a.count, display: a.display, text: a.text, tone: a.tone, onClick: drill(a.drill) }));
   const customize = prefs.ready ? <CustomizeDashboard widgets={widgets} {...prefs.customizeProps} className="!h-9 bg-white shadow-sm" /> : undefined;
   const isQuick = (n: React.ReactNode) => React.isValidElement(n) && n.key === 'quick';
   // Lead with the main panels, then shortcuts, then the charts, then the lists.
   const panels = [...main, ...side.filter(isQuick), ...mid, ...side.filter((n) => !isQuick(n))];
   const nothing = hero.length === 0 && glanceItems.length === 0 && panels.length === 0;
+  const keyed = panels.map((node, i) => ({ node, key: String((node as React.ReactElement).key ?? i) }));
+  const ordered = order.arrange(keyed);
+  const orderedKeys = ordered.map((x) => x.key);
+
+  // Tell the assistant what is on screen, so "why is attendance low?" can be answered from these figures.
+  const selectedClass = data.standards.find((c) => c.id === data.standard_id)?.name;
+  useRegisterPageAiContext({
+    pageTitle: `${data.label} dashboard`,
+    pageType: 'dashboard',
+    filters: selectedClass ? { class: selectedClass, period } : { period },
+    metrics: [...primaryFigs, ...glanceFigs].slice(0, 12).map((f) => ({ key: f.key, label: f.label, value: f.fig.value, trend: f.fig.delta?.text })),
+    availableActions: ['Change period', 'Filter by class', 'Find a student', 'Download CSV', 'Print', 'Reorder panels'],
+  });
 
   const exportCsv = () => {
     const rows: string[][] = [['Section', 'Item', 'Value', 'Detail']];
     for (const f of [...primaryFigs, ...glanceFigs]) rows.push(['Figures', f.label, f.fig.value, [f.fig.delta?.text, f.fig.context].filter(Boolean).join(' — ')]);
-    for (const a of attentionFor(w)) rows.push(['Needs attention', a.text, a.display ?? String(a.count), '']);
+    for (const a of attentionFor(w, target)) rows.push(['Needs attention', a.text, a.display ?? String(a.count), '']);
     for (const key of layout.lists) {
       const def = LISTS[key];
       for (const r of def.rows(w) ?? []) rows.push([def.title, r.title, r.badge?.text ?? '', r.detail ?? '']);
@@ -1069,7 +1136,23 @@ function RoleWorkspaceView({
 
   const tools = (
     <>
+      {data.can_find_student && <StudentFinder openSearch={drill(['search/edit student'])} />}
+      {data.standards.length > 0 && w.students_total != null && (
+        <label className="inline-flex items-center">
+          <span className="sr-only">Show one class</span>
+          <select
+            value={data.standard_id}
+            onChange={(e) => onFilter(Number(e.target.value))}
+            className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+          >
+            <option value={0}>All classes</option>
+            {data.standards.map((c) => <option key={c.id} value={c.id}>Class {c.name}</option>)}
+          </select>
+        </label>
+      )}
       {hasPeriod && <Segmented label="Period" value={period} onChange={onPeriod} options={PERIOD_OPTIONS} />}
+      {w.attendance_today && <AlertLimit value={target} onChange={changeTarget} />}
+      {order.custom && <button type="button" onClick={order.reset} className={HERO_BTN} title="Put the panels back in their original order"><RotateCcw size={15} aria-hidden /> <span className="hidden md:inline">Reset layout</span></button>}
       <button type="button" onClick={exportCsv} className={HERO_BTN} title="Download these figures as a CSV file"><Download size={15} aria-hidden /> <span className="hidden md:inline">CSV</span></button>
       <button type="button" onClick={() => window.print()} className={HERO_BTN} title="Print, or save as PDF"><Printer size={15} aria-hidden /> <span className="hidden md:inline">Print</span></button>
     </>
@@ -1099,8 +1182,8 @@ function RoleWorkspaceView({
             // Panels flow into as many columns as the width allows (about 28rem each), so the layout
             // follows the window, browser zoom and big monitors without any breakpoint to maintain.
             <div className="[column-gap:1rem] [column-width:28rem]">
-              {panels.map((panel, i) => (
-                <div key={i} className="mb-4 break-inside-avoid">{panel}</div>
+              {ordered.map(({ node, key }) => (
+                <MovablePanel key={key} id={key} keys={orderedKeys} dragging={dragging} setDragging={setDragging} move={order.move} nudge={order.nudge}>{node}</MovablePanel>
               ))}
             </div>
           )}
@@ -1120,13 +1203,14 @@ export default function RoleWorkspaceDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [period, setPeriod] = useState<WorkspacePeriod>('today');
+  const [standardId, setStandardId] = useState(0);
 
   const load = useCallback(
-    (mode: 'initial' | 'refresh' = 'initial', nextPeriod: WorkspacePeriod = period) => {
+    (mode: 'initial' | 'refresh' = 'initial', nextPeriod: WorkspacePeriod = period, nextStandard: number = standardId) => {
       if (mode === 'initial') setLoading(true);
       else setRefreshing(true);
       setError(null);
-      fetchRoleWorkspace(getDashboardSession(), undefined, nextPeriod)
+      fetchRoleWorkspace(getDashboardSession(), undefined, nextPeriod, nextStandard)
         .then((payload) => {
           setData(payload);
           setLoadedAt(new Date());
@@ -1145,24 +1229,29 @@ export default function RoleWorkspaceDashboard() {
           setRefreshing(false);
         });
     },
-    [logout, period],
+    [logout, period, standardId],
   );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load('initial', 'today');
+    load('initial', 'today', 0);
     // Only on mount; later changes go through changePeriod / the refresh button.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const changePeriod = (p: WorkspacePeriod) => {
     setPeriod(p);
-    load('refresh', p);
+    load('refresh', p, standardId);
+  };
+
+  const changeFilter = (id: number) => {
+    setStandardId(id);
+    load('refresh', period, id);
   };
 
   if (data) {
     // key=role: a different role (e.g. after switching profile) remounts and re-reads its own saved layout.
-    return <RoleWorkspaceView key={data.role} data={data} loadedAt={loadedAt} refreshing={refreshing} onRefresh={() => load('refresh')} onPeriod={changePeriod} />;
+    return <RoleWorkspaceView key={data.role} data={data} loadedAt={loadedAt} refreshing={refreshing} onRefresh={() => load('refresh')} onPeriod={changePeriod} onFilter={changeFilter} />;
   }
 
   const firstName = (user?.name || '').trim().split(/\s+/)[0];
