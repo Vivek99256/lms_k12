@@ -134,42 +134,52 @@ export function Hero({
         </div>
         <div className="flex items-center gap-2">{actions}</div>
       </div>
-      {children && <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">{children}</div>}
+      {children && <div className="mt-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">{children}</div>}
     </header>
   );
 }
 
+
 /**
  * Headline figure. Every tile has the same three rows — label, number (+ trend), context — with the
  * context pinned to the bottom, so tiles with and without a trend line up and never look half empty.
+ * With `onClick` the whole tile opens the screen behind the number.
  */
 export function HeroStat({
-  label, value, icon: Icon, context, delta, spark, sparkLabel, footer,
+  label, value, icon: Icon, context, delta, spark, sparkLabel, footer, onClick,
 }: {
-  label: string; value: string | number; icon: LucideIcon; context?: React.ReactNode; delta?: React.ReactNode; spark?: Array<number | null>; sparkLabel?: string; footer?: React.ReactNode;
+  label: string; value: string | number; icon: LucideIcon; context?: React.ReactNode; delta?: React.ReactNode; spark?: Array<number | null>; sparkLabel?: string; footer?: React.ReactNode; onClick?: () => void;
 }) {
-  return (
-    <div className={`${SURFACE} group flex min-w-0 flex-col justify-between gap-2.5 p-3.5 transition-shadow hover:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_14px_32px_-14px_rgba(79,70,229,0.28)]`}>
+  const base = `${SURFACE} group flex min-w-0 flex-col justify-between gap-2.5 p-3.5 text-left transition-shadow hover:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_14px_32px_-14px_rgba(79,70,229,0.28)]`;
+  const body = (
+    <>
       <div>
         <div className="flex items-center justify-between gap-3">
           <span className="truncate text-[13px] font-medium text-slate-500">{label}</span>
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-100">
-            <Icon size={16} strokeWidth={1.75} aria-hidden />
+            <Icon size={15} strokeWidth={1.75} aria-hidden />
           </span>
         </div>
-        <div className="mt-3 flex items-end justify-between gap-3">
+        <div className="mt-1.5 flex items-end justify-between gap-3">
           <div className="min-w-0 text-[1.6rem] font-semibold leading-none tracking-tight text-slate-900 tabular-nums">{value}</div>
           {spark && <Sparkline values={spark} label={sparkLabel ?? `${label}, recent trend`} width={92} height={32} />}
         </div>
       </div>
       <div>
-        {footer && <div className="mb-2.5">{footer}</div>}
+        {footer && <div className="mb-2">{footer}</div>}
         <div className="flex min-h-[1.25rem] flex-wrap items-center gap-x-2 gap-y-1">
           {delta}
           {context && <span className="truncate text-xs text-slate-500">{context}</span>}
         </div>
       </div>
-    </div>
+    </>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} title={`Open ${label}`} className={`${base} cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 active:scale-[0.99] motion-reduce:transition-none`}>
+      {body}
+    </button>
+  ) : (
+    <div className={base}>{body}</div>
   );
 }
 
@@ -181,7 +191,7 @@ export function Panel({
   title: string; description?: string; icon?: LucideIcon; action?: React.ReactNode; children: React.ReactNode; flush?: boolean; className?: string;
 }) {
   return (
-    <section className={`${SURFACE} ${className}`}>
+    <section className={`${SURFACE} @container ${className}`}>
       <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-4">
         <div className="flex min-w-0 items-start gap-3">
           {Icon && (
@@ -427,7 +437,7 @@ export function RowList({ rows, icon: Icon }: { rows: Row[]; icon: LucideIcon })
   );
 }
 
-export function BarList({ rows, format = (v) => v.toLocaleString('en-IN') }: { rows: Array<{ label: string; value: number }>; format?: (v: number) => string }) {
+export function BarList({ rows, format = (v) => v.toLocaleString('en-IN'), showShare = true }: { rows: Array<{ label: string; value: number }>; format?: (v: number) => string; showShare?: boolean }) {
   const max = Math.max(...rows.map((r) => r.value), 1);
   const total = rows.reduce((s, r) => s + r.value, 0);
   return (
@@ -440,7 +450,7 @@ export function BarList({ rows, format = (v) => v.toLocaleString('en-IN') }: { r
           </span>
           <span className="w-20 text-right tabular-nums text-slate-900">
             {format(r.value)}
-            {total > 0 && <span className="ml-1.5 text-[11px] text-slate-400">{Math.round((r.value / total) * 100)}%</span>}
+            {showShare && total > 0 && <span className="ml-1.5 text-[11px] text-slate-400">{Math.round((r.value / total) * 100)}%</span>}
           </span>
         </li>
       ))}
@@ -504,7 +514,9 @@ export function Funnel({ steps }: { steps: Array<{ label: string; value: number 
 
 /* ---------- attention & glance ---------- */
 
-export function AttentionBar({ items }: { items: Array<{ key: string; icon: LucideIcon; count: number; text: string; tone: Tone }> }) {
+export type AttentionItem = { key: string; icon: LucideIcon; count: number; display?: string; text: string; tone: Tone; onClick?: () => void };
+
+export function AttentionBar({ items }: { items: AttentionItem[] }) {
   if (items.length === 0) return null;
   return (
     <section aria-label="Needs your attention" className="mb-4 flex flex-wrap gap-2">
@@ -512,28 +524,47 @@ export function AttentionBar({ items }: { items: Array<{ key: string; icon: Luci
         <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60 motion-reduce:animate-none" /><span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" /></span>
         Needs attention
       </span>
-      {items.map((it) => (
-        <span key={it.key} className="inline-flex items-center gap-2 rounded-full bg-white py-1.5 pl-2.5 pr-3.5 text-sm text-slate-600 ring-1 ring-slate-900/[0.07] shadow-sm">
-          <it.icon size={14} strokeWidth={2} className={it.tone === 'act' ? 'text-red-600' : 'text-amber-600'} aria-hidden />
-          <span><b className="font-semibold tabular-nums text-slate-900">{it.count.toLocaleString('en-IN')}</b> {it.text}</span>
-        </span>
-      ))}
+      {items.map((it) => {
+        const inner = (
+          <>
+            <it.icon size={14} strokeWidth={2} className={it.tone === 'act' ? 'text-red-600' : 'text-amber-600'} aria-hidden />
+            <span><b className="font-semibold tabular-nums text-slate-900">{it.display ?? it.count.toLocaleString('en-IN')}</b> {it.text}</span>
+          </>
+        );
+        const cls = 'inline-flex items-center gap-2 rounded-full bg-white py-1.5 pl-2.5 pr-3.5 text-sm text-slate-600 ring-1 ring-slate-900/[0.07] shadow-sm';
+        return it.onClick ? (
+          <button key={it.key} type="button" onClick={it.onClick} className={`${cls} outline-none transition-colors hover:bg-slate-50 hover:ring-indigo-200 focus-visible:ring-2 focus-visible:ring-indigo-500/50`}>{inner}</button>
+        ) : (
+          <span key={it.key} className={cls}>{inner}</span>
+        );
+      })}
     </section>
   );
 }
 
-export function StatStrip({ items }: { items: Array<{ key: string; label: string; value: string | number; icon: LucideIcon }> }) {
+/** Secondary figures. The cells wrap to however many fit the width; hairlines come from a 1px gap on a tinted base. */
+export function StatStrip({ items }: { items: Array<{ key: string; label: string; value: string | number; icon: LucideIcon; onClick?: () => void }> }) {
   return (
-    <section aria-label="At a glance" className={`${SURFACE} grid grid-cols-2 sm:grid-cols-3 lg:flex`}>
-      {items.map((it, i) => (
-        <div key={it.key} className={`flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 ${i > 0 ? 'lg:border-l lg:border-slate-100' : ''}`}>
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"><it.icon size={15} strokeWidth={1.75} aria-hidden /></span>
-          <div className="min-w-0">
-            <div className="text-base font-semibold leading-tight tabular-nums text-slate-900">{it.value}</div>
-            <div className="truncate text-xs text-slate-500" title={it.label}>{it.label}</div>
-          </div>
-        </div>
-      ))}
+    <section aria-label="At a glance" className={`${SURFACE} overflow-hidden`}>
+      <div className="grid gap-px bg-slate-100 [grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))]">
+        {items.map((it) => {
+          const cls = 'flex min-w-0 items-center gap-3 bg-white px-4 py-3.5 text-left';
+          const inner = (
+            <>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"><it.icon size={15} strokeWidth={1.75} aria-hidden /></span>
+              <div className="min-w-0">
+                <div className="text-base font-semibold leading-tight tabular-nums text-slate-900">{it.value}</div>
+                <div className="truncate text-xs text-slate-500" title={it.label}>{it.label}</div>
+              </div>
+            </>
+          );
+          return it.onClick ? (
+            <button key={it.key} type="button" onClick={it.onClick} title={`Open ${it.label}`} className={`${cls} outline-none transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/40`}>{inner}</button>
+          ) : (
+            <div key={it.key} className={cls}>{inner}</div>
+          );
+        })}
+      </div>
     </section>
   );
 }
