@@ -17,21 +17,24 @@ import RoleWorkspaceDashboard from '@/app/dashboard/RoleWorkspaceDashboard';
  * independently RBAC-checked server-side, so this branch is UX routing only.
  */import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 
-export default function Dashboard() {
-  /*
-   * Registers the page shape only.
-   *
-   * The stat tiles below are hardcoded placeholders, not retrieved figures. Passing
-   * them as `metrics` would put invented numbers into the assistant's prompt, and the
-   * grounding rules exist precisely to stop that — so they are deliberately withheld.
-   * The moment these tiles read from an API, add them here as `metrics` and the
-   * assistant can be asked about them.
-   */
+/**
+ * Registers the page shape only, for the dashboards whose tiles are not read from an API.
+ *
+ * Those tiles are hardcoded placeholders, not retrieved figures. Passing them as `metrics` would put
+ * invented numbers into the assistant's prompt, and the grounding rules exist precisely to stop that —
+ * so they are deliberately withheld. The role workspace reads real figures and registers them itself,
+ * so this must not be mounted there: a parent's registration would overwrite the child's.
+ */
+function PlaceholderAiContext() {
   useRegisterPageAiContext({
     pageTitle: 'Dashboard',
     pageType: 'dashboard',
   });
 
+  return null;
+}
+
+export default function Dashboard() {
   const [role, setRole] = useState<DashboardRole | null>(null);
 
   useEffect(() => {
@@ -48,8 +51,12 @@ export default function Dashboard() {
     );
   }
 
-  if (role === 'teacher') return <TeacherDashboard />;
-  if (role === 'student') return <StudentDashboard />;
   if (role === 'workspace') return <RoleWorkspaceDashboard />;
-  return <AdminDashboard />;
+
+  return (
+    <>
+      <PlaceholderAiContext />
+      {role === 'teacher' ? <TeacherDashboard /> : role === 'student' ? <StudentDashboard /> : <AdminDashboard />}
+    </>
+  );
 }
