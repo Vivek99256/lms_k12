@@ -146,7 +146,24 @@ function Results({ model, d }: { model: ExperimentModel; d: BuilderDesign }) {
  * `preview` is for a teacher checking a lab before approving it: the same experiment students get, but nothing is
  * loaded, saved, submitted or marked, and every concept of the lab is already chosen.
  */
-export function ExperimentBuilderWorkspace({ chapterId, scope, model, preview = false }: { chapterId: string; chapterName: string; scope: ActivityScope; model: ExperimentModel; preview?: boolean }) {
+export function ExperimentBuilderWorkspace({
+  chapterId,
+  scope,
+  model,
+  preview = false,
+  onAnother,
+}: {
+  chapterId: string;
+  chapterName: string;
+  scope: ActivityScope;
+  model: ExperimentModel;
+  preview?: boolean;
+  /**
+   * Asks the Application Lab to choose the student's next experiment again, from the server, and go there if there is a new one.
+   * Resolves to whether there was.
+   */
+  onAnother?: () => Promise<boolean>;
+}) {
   const [view, setView] = useState<View>(
     preview
       ? { kind: 'ready', concepts: model.concepts.map((name) => ({ name, description: '', taught: true })), record: null }
@@ -309,15 +326,24 @@ export function ExperimentBuilderWorkspace({ chapterId, scope, model, preview = 
       .finally(() => setBusy(false));
   };
 
-  const startAnother = () => {
-    if (!window.confirm('Design another experiment? This one stays as it is.')) return;
-    saveExperimentBuilder(chapterId, scope, emptyDesign(model.id, [], model.version, autoBench(model)), true)
-      .then(({ record }) => {
-        dirty.current = false;
-        setD(record ? record.design : emptyDesign(model.id, [], model.version, autoBench(model)));
-        setView((v) => (v.kind === 'ready' ? { ...v, record } : v));
-      })
-      .catch((e: unknown) => setNotice(errorText(e, 'Couldn’t start a new one.')));
+  /**
+   * Looks for another experiment. A finished one is never repeated and its result is kept; the Application Lab chooses the next
+   * from the student's concepts. When there is none, this says so instead of starting one.
+   */
+  const another = () => {
+    if (preview) {
+      setNotice('Preview only: the student’s next experiment is chosen by the Application Lab.');
+      return;
+    }
+    const none = 'There is no new approved experiment for the concepts you have studied yet. Your finished work is kept. When you study more concepts, or your teacher adds an experiment, a new one can appear.';
+    if (!onAnother) {
+      setNotice(none);
+      return;
+    }
+    // Asked again each time, so an experiment approved a moment ago is found.
+    onAnother().then((found) => {
+      if (!found) setNotice(none);
+    });
   };
 
   if (view.kind === 'loading') {
@@ -596,7 +622,7 @@ export function ExperimentBuilderWorkspace({ chapterId, scope, model, preview = 
             <h4 className="mb-1 text-sm font-bold text-slate-900">What you ran</h4>
             <Results model={model} d={d} />
           </div>
-          <Feedback evaluation={view.record?.evaluation ?? null} busy={busy} onRetry={submit} onNew={startAnother} newLabel="Design another experiment" />
+          <Feedback evaluation={view.record?.evaluation ?? null} busy={busy} onRetry={submit} onNew={another} newLabel="Look for another experiment" />
         </div>
       ) : null}
     </div>

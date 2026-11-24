@@ -88,6 +88,8 @@ export function VirtualLabRunner({ chapterId, labId, onClose, standalone = false
   const scene = useRef<LabSceneHandle>(null);
 
   const [loaded, setLoaded] = useState(false);
+  // How far the student has got (a stage number), so they can go back to any step they have reached and check it again.
+  const [furthest, setFurthest] = useState(0);
   const [persisted, setPersisted] = useState(false);
   const [status, setStatus] = useState<LabStatus>('in_progress');
   const [progress, setProgress] = useState<LabProgress>(emptyProgress());
@@ -137,6 +139,7 @@ export function VirtualLabRunner({ chapterId, labId, onClose, standalone = false
       logRef.current = base.log ?? [];
       setSnap(sim.snapshot(worldRef.current));
       setProgress(base);
+      setFurthest(Math.max(0, LAB_STAGES.findIndex((x) => x.id === base.stage)));
       setStatus(st);
       setEvaluation(ev);
       setPersisted(server);
@@ -237,6 +240,7 @@ export function VirtualLabRunner({ chapterId, labId, onClose, standalone = false
   const goto = useCallback(
     (next: LabStageId) => {
       if (sim && worldRef.current) setSnap(sim.snapshot(worldRef.current));
+      setFurthest((f) => Math.max(f, LAB_STAGES.findIndex((x) => x.id === next)));
       update({ stage: next });
     },
     [sim, update]
@@ -302,15 +306,21 @@ export function VirtualLabRunner({ chapterId, labId, onClose, standalone = false
         </div>
         <ol className="order-3 flex w-full items-center gap-1 overflow-x-auto md:order-none md:w-auto md:min-w-0 md:flex-1" aria-label="Progress">
           {LAB_STAGES.map((s, i) => (
-            <li
-              key={s.id}
-              aria-current={s.id === stage ? 'step' : undefined}
-              className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                s.id === stage ? 'bg-sky-600 text-white' : i < stageIndex ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'
-              }`}
-            >
-              <span>{i + 1}</span>
-              <span className={s.id === stage ? '' : 'hidden lg:inline'}>{s.label}</span>
+            <li key={s.id} aria-current={s.id === stage ? 'step' : undefined} className="shrink-0">
+              {/* A step already reached can be opened again to check it; nothing is lost, and the work stays saved. */}
+              <button
+                type="button"
+                disabled={locked || s.id === stage || i > furthest || s.id === 'feedback'}
+                onClick={() => goto(s.id)}
+                title={!locked && i <= furthest && s.id !== stage ? `Go back to step ${i + 1}: ${s.label}` : undefined}
+                data-testid={`stage-${s.id}`}
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold disabled:cursor-default ${
+                  s.id === stage ? 'bg-sky-600 text-white' : i < stageIndex ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : i <= furthest ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                <span>{i + 1}</span>
+                <span className={s.id === stage ? '' : 'hidden lg:inline'}>{s.label}</span>
+              </button>
             </li>
           ))}
         </ol>

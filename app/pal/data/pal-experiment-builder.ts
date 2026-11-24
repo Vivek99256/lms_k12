@@ -121,6 +121,8 @@ export async function fetchExperimentBuilder(
   appendCommonParams(params, ctx);
   if (ctx.userId) params.set('user_id', ctx.userId);
   addScope(params, scope);
+  // Only the work on THIS lab: another lab's work in the same scope is a different experiment.
+  params.set('lab', modelId);
   const response = await fetch(`${url(ctx.baseUrl, chapterId)}?${params.toString()}`, { headers: headers(ctx), signal });
   if (!response.ok) throw new Error('Couldn’t load your experiment lab. Try again.');
   const payload = rec(await response.json());
