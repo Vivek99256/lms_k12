@@ -239,3 +239,59 @@ export type MyIcardSummary = ApiStatusPayload & {
 export function fetchMyIcard(session: DashboardSession, signal?: AbortSignal) {
   return postDashboardProxy<MyIcardSummary>('/api/dashboard/teacher-icard', session, signal);
 }
+
+/**
+ * Role workspace — Principal, Clerk, Librarian, Store Keeper, Exam Department, Trustee, Peon …
+ * The server decides which role the caller is and which widgets they get; a widget it cannot
+ * compute comes back as null and is shown as "no data", never as a made-up figure.
+ */
+export type WorkspaceListItem = { id: number; title: string; detail?: string | null; date?: string | null; done?: boolean };
+
+export type RoleWorkspaceWidgets = {
+  students_total?: number | null;
+  staff_total?: number | null;
+  attendance_today?: { present: number; absent: number; not_marked: number; total_students: number } | null;
+  attendance_trend?: Array<{ date: string; label: string; present: number; absent: number; rate: number | null }> | null;
+  staff_on_leave_today?: number | null;
+  leaves_pending?: number | null;
+  my_leaves_pending?: number | null;
+  fees_today?: number | null;
+  fee_trend?: Array<{ date: string; label: string; amount: number }> | null;
+  recent_fee_receipts?: Array<{ id: number; receipt_no: string; amount: number; date: string | null; student_name: string }> | null;
+  admissions_year?: number | null;
+  recent_enquiries?: WorkspaceListItem[] | null;
+  parent_msgs_pending?: number | null;
+  recent_parent_messages?: WorkspaceListItem[] | null;
+  recent_circulars?: WorkspaceListItem[] | null;
+  visitors_today?: { total: number; inside: number } | null;
+  complaints?: { total: number; open: number } | null;
+  tasks_pending_all?: number | null;
+  tasks_pending_me?: { count: number; items: WorkspaceListItem[] } | null;
+  inward_month?: number | null;
+  outward_month?: number | null;
+  petty_cash_month?: number | null;
+  requisitions?: { pending: number; approved: number; rejected: number; on_hold: number } | null;
+  recent_requisitions?: WorkspaceListItem[] | null;
+  po_status?: { awaiting: number; decided: number } | null;
+  items_total?: number | null;
+  vendors_total?: number | null;
+  purchases_month?: { count: number; amount: number } | null;
+  upcoming_exams?: { count: number; items: WorkspaceListItem[] } | null;
+  exam_evaluation?: { batches: number; sheets: number; evaluated: number; approved: number } | null;
+  students_by_class?: Array<{ standard_id: number; standard_name: string; students: number | string }> | null;
+  class_attendance?: { date: string | null; rows: Array<{ standard_id: number; standard_name: string; present: number; absent: number; rate: number | null }> } | null;
+  gender_split?: { Male: number; Female: number; 'Not recorded': number } | null;
+  admission_funnel?: { enquiries: number; registered: number; admitted: number } | null;
+  fees_month?: { this_month: number; last_month_same_days: number; month_label: string; last_month_label: string } | null;
+};
+
+export type RoleWorkspaceSummary = ApiStatusPayload & {
+  role: string;
+  label: string;
+  profile_name: string;
+  widgets: RoleWorkspaceWidgets;
+};
+
+export function fetchRoleWorkspace(session: DashboardSession, signal?: AbortSignal) {
+  return postDashboardDirect<RoleWorkspaceSummary>('/api/role-workspace/summary', session, signal);
+}

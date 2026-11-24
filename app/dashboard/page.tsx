@@ -6,6 +6,7 @@ import { resolveDashboardRole, type DashboardRole } from '@/app/dashboard/_lib/r
 import AdminDashboard from '@/app/dashboard/AdminDashboard';
 import TeacherDashboard from '@/app/dashboard/TeacherDashboard';
 import StudentDashboard from '@/app/dashboard/StudentDashboard';
+import RoleWorkspaceDashboard from '@/app/dashboard/RoleWorkspaceDashboard';
 
 /**
  * Single post-login destination for every role. Detects the signed-in
@@ -49,5 +50,6 @@ export default function Dashboard() {
 
   if (role === 'teacher') return <TeacherDashboard />;
   if (role === 'student') return <StudentDashboard />;
+  if (role === 'workspace') return <RoleWorkspaceDashboard />;
   return <AdminDashboard />;
 }

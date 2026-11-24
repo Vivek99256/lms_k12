@@ -16,9 +16,8 @@ import PageHeader from '@/components/result/PageHeader';
 import FilterBar, { type FilterFieldDef, type FilterValues } from '@/components/result/FilterBar';
 import { Banner, Checkbox, EmptyState, Skeleton, TableSkeleton } from '@/components/result/primitives';
 import { toast } from '@/components/result/toast';
-import { printElement } from '@/components/result/print';
-import { sanitizeHtml } from '@/lib/security/sanitize-html';
-import { asRecord, extractRows, readString, resultGet, resultPost, toCollection, toOptions } from '@/lib/result/api';
+import LegacyReportFrame, { printLegacyReportFrame } from '@/components/result/LegacyReportFrame';
+import { asRecord, extractRows, readString, resultGet, resultPost, toCollection } from '@/lib/result/api';
 
 type StudentRow = {
   id: string;
@@ -50,7 +49,7 @@ export default function NewReportCardPage() {
   const [savingMobile, setSavingMobile] = useState(false);
   const [reportHtml, setReportHtml] = useState('');
   const [studentHtml, setStudentHtml] = useState<Record<string, string>>({});
-  const printRef = useRef<HTMLDivElement>(null);
+  const reportFrameRef = useRef<HTMLIFrameElement>(null);
 
   /* ------------------------------------------ mount: templates + types */
   useEffect(() => {
@@ -90,7 +89,11 @@ export default function NewReportCardPage() {
   }, []);
 
   const formatOptions = useMemo<StaticOption[]>(() => {
-    const terms = toOptions(academicTerms).map((option) => ({ value: option.id, label: option.label }));
+    // Marks are stored per `term_id` (e.g. 1). `id` on an academic_year row is the table row id
+    // (e.g. 1924), which matches no marks and renders an empty report card.
+    const terms = academicTerms
+      .map((row) => ({ value: readString(row.term_id ?? row.id), label: readString(row.title ?? row.name) }))
+      .filter((option) => option.value && option.label);
     return [...terms, { value: 'yearly', label: 'Yearly' }];
   }, [academicTerms]);
 
@@ -324,7 +327,7 @@ export default function NewReportCardPage() {
                   Generated report cards
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => printElement(printRef.current, 'Report cards')}>
+                  <Button variant="outline" size="sm" onClick={() => printLegacyReportFrame(reportFrameRef.current)}>
                     <Printer className="h-3.5 w-3.5" />
                     Print paper
                   </Button>
@@ -336,10 +339,11 @@ export default function NewReportCardPage() {
               </div>
             </CardHeader>
             <CardContent className="p-4">
-              <div
-                ref={printRef}
-                className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white p-4"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportHtml, { document: true }) }}
+              {/* Grand-marksheet templates (12, 51, 52, 57) put several students on a page, like the old ERP print. */}
+              <LegacyReportFrame
+                html={reportHtml}
+                frameRef={reportFrameRef}
+                onePerPage={![12, 51, 52, 57].includes(Number(lastFilters.template))}
               />
             </CardContent>
           </Card>
