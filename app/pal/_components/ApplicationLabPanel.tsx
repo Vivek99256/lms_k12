@@ -16,10 +16,8 @@ import { fetchExplanationLab } from '@/app/pal/data/pal-explanation-workspace';
 import { fetchExperimentBuilder } from '@/app/pal/data/pal-experiment-builder';
 import { fetchExperimentDesign } from '@/app/pal/data/pal-experiment-design';
 import { fetchVirtualLab } from '@/app/pal/data/pal-virtual-lab';
-import { fetchLabModel } from '@/app/pal/data/pal-lab-spec';
-import { modelForScope } from '@/lib/experiment-builder/registry';
-import type { ExperimentModel } from '@/lib/experiment-builder/types';
-import { labForScope } from '@/lib/virtual-lab/registry';
+import { fetchLabSelection, type LabSelection } from '@/app/pal/data/pal-lab-selection';
+import { getLab } from '@/lib/virtual-lab/registry';
 
 import { ExplanationWorkspace } from './explanation-lab/ExplanationWorkspace';
 import { ExperimentDesignWorkspace } from './explanation-lab/ExperimentDesignWorkspace';
@@ -35,9 +33,11 @@ const VirtualLabRunner = dynamic(() => import('./virtual-lab/VirtualLabRunner').
  *      chapter (open only once every concept has been studied). Nothing is
  *      chosen for the student.
  *   2. Choose how: the first activity, or an experiment you design yourself, both limited
- *      to that scope. The first activity is an interactive 3D science mission
- *      when the chapter has one that fits the scope, and otherwise an
- *      AI-generated challenge built from the chapter.
+ *      to that scope. WHICH experiment each card offers is chosen by the server from the
+ *      student's studied concepts, the chapter's approved labs and what they have done (see
+ *      LabSelector): several labs per chapter, the two cards never the same experiment, a
+ *      finished one not repeated. The first activity is an interactive 3D science mission
+ *      when one is chosen for it, and otherwise an AI-generated challenge built from the chapter.
  *   3. Do it in its own workspace, explain it, and get feedback.
  *
  * Each (scope, activity) pair has its own saved progress and marking. The server
@@ -68,8 +68,9 @@ export function ApplicationLabPanel({
   chapterName: string;
 }) {
   const [options, setOptions] = useState<ScopeOptions | null>(null);
-  // The approved virtual lab for this chapter, if a teacher has approved one. Without it the guided form is used.
-  const [labSpec, setLabSpec] = useState<ExperimentModel | null>(null);
+  // Which experiment each card offers for the chosen scope, as the server chose it. Null while it is being chosen.
+  const [selection, setSelection] = useState<LabSelection | null>(null);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [scope, setScope] = useState<ActivityScope | null>(null);
@@ -99,36 +100,35 @@ export function ApplicationLabPanel({
     return () => controller.abort();
   }, [loadOptions]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchLabModel(chapterId, controller.signal)
-      .then((m) => {
-        if (!controller.signal.aborted) setLabSpec(m);
-      })
-      .catch(() => undefined);
-    return () => controller.abort();
-  }, [chapterId]);
-
-  // Where each activity stands for the chosen scope. Reads only; nothing is generated here.
+  // The server chooses the experiments for the scope, then where each activity stands is read. Reads only; nothing is generated here.
   const refresh = useCallback(
     (forScope: ActivityScope, signal?: AbortSignal) => {
-      const lab = labForScope(chapterId, chapterName, forScope.concepts, forScope.type === 'chapter');
-      if (lab) {
-        fetchVirtualLab(chapterId, lab.id, signal)
-          .then(({ record }) => setAi(describe(record?.status, record?.evaluation?.scorePercent)))
-          .catch(() => undefined);
-      } else {
-        fetchExplanationLab(chapterId, forScope, signal)
-          .then((r) => setAi(describe(r?.status, r?.evaluation?.scorePercent)))
-          .catch(() => undefined);
-      }
-      const builder = modelForScope(labSpec, forScope.concepts, forScope.type === 'chapter');
-      const status = builder
-        ? fetchExperimentBuilder(chapterId, builder.id, forScope, signal)
-        : fetchExperimentDesign(chapterId, forScope, signal);
-      status.then(({ record }) => setOwn(describe(record?.status, record?.evaluation?.scorePercent))).catch(() => undefined);
+      fetchLabSelection(chapterId, forScope, signal)
+        .then((sel) => {
+          if (signal?.aborted) return;
+          setSelectionError(null);
+          setSelection(sel);
+          const mission = sel.mission && getLab(sel.mission.key) ? sel.mission : null;
+          if (mission) {
+            fetchVirtualLab(chapterId, mission.key, signal)
+              .then(({ record }) => setAi(describe(record?.status, record?.evaluation?.scorePercent)))
+              .catch(() => undefined);
+          } else {
+            fetchExplanationLab(chapterId, forScope, signal)
+              .then((r) => setAi(describe(r?.status, r?.evaluation?.scorePercent)))
+              .catch(() => undefined);
+          }
+          const status = sel.design ? fetchExperimentBuilder(chapterId, sel.design.key, forScope, signal) : fetchExperimentDesign(chapterId, forScope, signal);
+          status.then(({ record }) => setOwn(describe(record?.status, record?.evaluation?.scorePercent))).catch(() => undefined);
+        })
+        .catch((e: unknown) => {
+          if (signal?.aborted) return;
+          // Without a choice the guided activities still work: no lab is claimed.
+          setSelectionError(e instanceof Error ? e.message : 'Couldn’t choose your experiments.');
+          setSelection({ design: null, mission: null, shared: false, moreDesign: 0, moreMission: 0, designNote: null, missionNote: null, history: [] });
+        });
     },
-    [chapterId, chapterName, labSpec]
+    [chapterId]
   );
 
   useEffect(() => {
@@ -141,16 +141,31 @@ export function ApplicationLabPanel({
   const chooseScope = (next: ActivityScope) => {
     setAi({ label: 'Not started', tone: 'idle' });
     setOwn({ label: 'Not started', tone: 'idle' });
+    setSelection(null);
     setScope(next);
   };
 
-  const builderModel = scope ? modelForScope(labSpec, scope.concepts, scope.type === 'chapter') : null;
+  const builderModel = selection?.design?.model ?? null;
+  const missionLab = selection?.mission ? getLab(selection.mission.key) : null;
 
   // ---- step 3: a workspace ----------------------------------------------------------
   if (scope && active) {
+    const backToCards = () => setActive(null);
+    // Chooses again, from the server: leaves for the cards only when there is a NEW experiment (never the one just finished).
+    const lookForAnother = async (): Promise<boolean> => {
+      try {
+        const sel = await fetchLabSelection(chapterId, scope);
+        setSelection(sel);
+        const next = !!sel.design && sel.design.state === 'new' && sel.design.key !== builderModel?.id;
+        if (next) setActive(null);
+        return next;
+      } catch {
+        return false;
+      }
+    };
     return (
       <div className="space-y-3">
-        <Button size="sm" variant="outline" onClick={() => setActive(null)} className="h-8 gap-1.5 text-xs">
+        <Button size="sm" variant="outline" onClick={backToCards} className="h-8 gap-1.5 text-xs">
           <ArrowLeft className="h-3.5 w-3.5" /> Back to the two activities
         </Button>
         <div className="rounded-xl border border-sky-200 bg-white p-4">
@@ -160,7 +175,14 @@ export function ApplicationLabPanel({
           {active === 'ai' ? (
             <ExplanationWorkspace key={`ai:${scopeId(scope)}`} chapterId={chapterId} chapterName={chapterName} scope={scope} />
           ) : builderModel ? (
-            <ExperimentBuilderWorkspace key={`own:${scopeId(scope)}`} chapterId={chapterId} chapterName={chapterName} scope={scope} model={builderModel} />
+            <ExperimentBuilderWorkspace
+              key={`own:${scopeId(scope)}:${builderModel.id}`}
+              chapterId={chapterId}
+              chapterName={chapterName}
+              scope={scope}
+              model={builderModel}
+              onAnother={lookForAnother}
+            />
           ) : (
             <ExperimentDesignWorkspace key={`own:${scopeId(scope)}`} chapterId={chapterId} chapterName={chapterName} scope={scope} />
           )}
@@ -171,39 +193,51 @@ export function ApplicationLabPanel({
 
   // ---- step 2: how ------------------------------------------------------------------
   if (scope) {
-    const mission = labForScope(chapterId, chapterName, scope.concepts, scope.type === 'chapter');
-    const cards: { id: Which; title: string; icon: React.ReactNode; body: string; points: string[]; status: Status }[] = [
-      mission
+    if (!selection) {
+      return (
+        <div className="flex min-h-[160px] items-center justify-center gap-2 text-sm text-slate-600" role="status">
+          <Loader2 className="h-5 w-5 animate-spin text-sky-600" aria-hidden /> Choosing the right experiments for what you have studied…
+        </div>
+      );
+    }
+    const mission = missionLab && selection.mission ? selection.mission : null;
+    const cards: { id: Which; title: string; icon: React.ReactNode; body: string; points: string[]; status: Status; note: string | null }[] = [
+      mission && missionLab
         ? {
             id: 'ai',
             title: 'Interactive Science Mission',
             icon: <FlaskConical className="h-5 w-5 text-sky-600" aria-hidden />,
-            body: `${mission.title}. Do a real investigation in a 3D lab: predict, set up a fair test with your own hands, run the experiment and explain what you found.`,
+            body: `${missionLab.title}. Do a real investigation in a 3D lab: predict, set up a fair test with your own hands, run the experiment and explain what you found.`,
             points: ['Pick up equipment and set it up yourself', 'Watch the experiment happen and record the evidence', 'Earn points and badges as a scientist'],
             status: ai,
+            note: null,
           }
         : {
-        id: 'ai',
-        title: 'AI-Generated Activity',
-        icon: <Sparkles className="h-5 w-5 text-sky-600" aria-hidden />,
-        body:
-          scope.type === 'chapter'
-            ? 'One activity that connects the important ideas of the whole chapter. You do it yourself, then explain it.'
-            : `An activity made from ${scope.concepts.length === 1 ? 'the concept you chose' : 'the concepts you chose'}. You do it yourself, then explain it.`,
-        points: ['Built only from your chosen scope', 'You build, arrange or experiment', 'You explain what you did and why'],
-        status: ai,
-      },
+            id: 'ai',
+            title: 'AI-Generated Activity',
+            icon: <Sparkles className="h-5 w-5 text-sky-600" aria-hidden />,
+            body:
+              scope.type === 'chapter'
+                ? 'One activity that connects the important ideas of the whole chapter. You do it yourself, then explain it.'
+                : `An activity made from ${scope.concepts.length === 1 ? 'the concept you chose' : 'the concepts you chose'}. You do it yourself, then explain it.`,
+            points: ['Built only from your chosen scope', 'You build, arrange or experiment', 'You explain what you did and why'],
+            status: ai,
+            // Said only when it is true: there is no new 3D mission for these concepts.
+            note: selection.missionNote && /completed every|No approved/.test(selection.missionNote) ? `No 3D mission for these concepts right now. ${selection.missionNote}` : null,
+          },
       {
         id: 'own',
         title: 'Design Your Own Experiment',
         icon: <Microscope className="h-5 w-5 text-violet-600" aria-hidden />,
         body: builderModel
-          ? 'You get a real problem, a lab and a shelf of equipment. Build your own investigation, run it in a simulation, and explain what your results show. Nobody gives you the set-up.'
+          ? `${builderModel.title}: a real problem and a lab. Build your own investigation, run it in a simulation, and explain what your results show. Nobody gives you the set-up.`
           : 'Plan an experiment like a scientist. Ask a question, choose the equipment, plan a fair test, predict the result and say what you would conclude.',
         points: builderModel
-          ? ['Choose your own equipment and variables', 'Run your own trials and read your own results', 'Get a report on how you applied the concepts']
+          ? ['Sort your own variables', 'Run your own trials and read your own results', 'Get a report on how you applied the concepts']
           : ['Choose apparatus with real photos', 'Plan the steps and a fair test', 'Predict, explain and get feedback'],
         status: own,
+        // Said only when true: the same experiment is the 3D mission, because no other approved one matches these concepts yet.
+        note: builderModel ? (selection.shared && mission ? 'This is the same experiment as the 3D mission, in a different way. No other approved experiment matches these concepts yet.' : null) : selection.designNote,
       },
     ];
 
@@ -212,7 +246,7 @@ export function ApplicationLabPanel({
         {missionOpen && mission ? (
           <VirtualLabRunner
             chapterId={chapterId}
-            labId={mission.id}
+            labId={mission.key}
             onClose={() => {
               setMissionOpen(false);
               refresh(scope);
@@ -228,6 +262,7 @@ export function ApplicationLabPanel({
             Change scope
           </Button>
         </div>
+        {selectionError ? <p role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">{selectionError} The guided activities are shown instead.</p> : null}
         <div>
           <h3 className="text-sm font-bold text-slate-900">Choose how you want to show it</h3>
           <p className="text-xs text-slate-600">Each has its own workspace, progress and feedback.</p>
@@ -248,6 +283,7 @@ export function ApplicationLabPanel({
                   <li key={p}>{p}</li>
                 ))}
               </ul>
+              {card.note ? <p className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-600" data-testid={`note-${card.id}`}>{card.note}</p> : null}
               <Button
                 size="sm"
                 onClick={() => (card.id === 'ai' && mission ? setMissionOpen(true) : setActive(card.id))}
@@ -258,6 +294,19 @@ export function ApplicationLabPanel({
             </section>
           ))}
         </div>
+        {selection.history.length > 0 ? (
+          <section className="rounded-xl border border-slate-200 bg-white p-4" aria-label="Experiments you have completed" data-testid="history">
+            <h4 className="text-sm font-bold text-slate-900">Experiments you have completed</h4>
+            <ul className="mt-2 divide-y divide-slate-100">
+              {selection.history.map((h, i) => (
+                <li key={`${h.format}-${h.key}-${i}`} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-xs">
+                  <span className="font-semibold text-slate-800">{h.title} <span className="font-normal text-slate-500">· {h.format === 'mission' ? '3D mission' : 'Design your own'}{h.scopeLabel ? ` · ${h.scopeLabel}` : ''}</span></span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800">{h.score !== null ? `Marked: ${h.score}%` : 'Submitted'}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </div>
     );
   }

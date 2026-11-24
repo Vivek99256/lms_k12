@@ -126,6 +126,9 @@ export function LabStudio({ initialChapter }: { initialChapter: string }) {
   const [detail, setDetail] = useState<LabDetail | null>(null);
   const [tab, setTab] = useState<Tab>('preview');
   const [note, setNote] = useState('');
+  // What the lab to generate is for: the concepts it assesses, or the whole chapter (offered only once every concept is studied).
+  const [level, setLevel] = useState<'concepts' | 'chapter'>('concepts');
+  const [forConcepts, setForConcepts] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [text, setText] = useState('');
@@ -176,7 +179,7 @@ export function LabStudio({ initialChapter }: { initialChapter: string }) {
     if (!index) return;
     setBusy('generate');
     setMessage(null);
-    generateLab(index.chapter.id, note)
+    generateLab(index.chapter.id, note, level === 'chapter' ? [] : forConcepts, level)
       .then((d) => {
         adopt(d);
         setTab('checks');
@@ -276,10 +279,27 @@ export function LabStudio({ initialChapter }: { initialChapter: string }) {
 
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="flex items-center gap-1.5 text-sm font-bold text-slate-900"><Sparkles className="h-4 w-4 text-violet-600" aria-hidden /> Generate a lab with AI</h2>
-            <p className="text-xs text-slate-600">The AI drafts the equipment, settings, result model and your key from this chapter’s concepts. It is saved as a draft and students cannot see it until you approve it.</p>
+            <p className="text-xs text-slate-600">The AI drafts the equipment, settings, result model and your key from the concepts you choose. It is saved as a draft and students cannot see it until you approve it. A chapter can have several labs; the Application Lab picks the one that fits what a student has studied.</p>
+            <fieldset className="mt-2 space-y-2">
+              <legend className="text-xs font-semibold text-slate-700">This lab is for</legend>
+              <div className="flex flex-wrap gap-3 text-xs">
+                <label className="flex items-center gap-1.5"><input type="radio" name="lab-level" checked={level === 'concepts'} onChange={() => setLevel('concepts')} /> Specific concepts (offered when a student has studied them)</label>
+                <label className="flex items-center gap-1.5"><input type="radio" name="lab-level" checked={level === 'chapter'} onChange={() => setLevel('chapter')} /> The whole chapter (only once every concept is studied)</label>
+              </div>
+              {level === 'concepts' ? (
+                <div role="group" aria-label="Concepts for this lab" className="flex flex-wrap gap-1.5" data-testid="concept-picker">
+                  {index.chapter.concepts.map((c) => (
+                    <label key={c.name} className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${forConcepts.includes(c.name) ? 'border-violet-600 bg-violet-50 text-violet-900' : 'border-slate-300 bg-white text-slate-700'}`}>
+                      <input type="checkbox" className="h-3.5 w-3.5" checked={forConcepts.includes(c.name)} onChange={() => setForConcepts((cur) => (cur.includes(c.name) ? cur.filter((n) => n !== c.name) : [...cur, c.name]))} />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </fieldset>
             <div className="mt-2 flex flex-wrap items-start gap-2">
               <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} className={`${FIELD} sm:max-w-xl`} placeholder="Optional note for the AI, e.g. “focus on conduction through different materials”" aria-label="Note for the AI" />
-              <Button onClick={generate} disabled={busy !== null || !index.storageReady || index.chapter.concepts.length === 0} className="gap-1.5 bg-violet-700 text-sm font-semibold text-white hover:bg-violet-800" data-testid="generate">
+              <Button onClick={generate} disabled={busy !== null || !index.storageReady || index.chapter.concepts.length === 0 || (level === 'concepts' && forConcepts.length === 0)} className="gap-1.5 bg-violet-700 text-sm font-semibold text-white hover:bg-violet-800" data-testid="generate">
                 {busy === 'generate' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
                 {busy === 'generate' ? 'Drafting (up to 2 minutes)…' : 'Generate lab'}
               </Button>
@@ -294,6 +314,7 @@ export function LabStudio({ initialChapter }: { initialChapter: string }) {
                 <li key={`${v.labKey}-${v.version}-${v.id}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">{v.title} <span className="font-normal text-slate-500">· v{v.version} · {v.source === 'builtin' ? 'built-in' : v.source === 'ai' ? 'AI draft' : 'edited'}</span></p>
+                    <p className="truncate text-[11px] text-slate-500" data-testid="mapping">{v.scopeLevel === 'chapter' ? 'Whole chapter' : v.concepts.length > 0 ? v.concepts.join(' · ') : 'Any concept'}</p>
                     <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS[v.status]?.cls ?? ''}`}>{STATUS[v.status]?.label ?? v.status}</span>
                     {v.rejectReason ? <span className="ml-2 text-[11px] text-slate-500">“{v.rejectReason}”</span> : null}
                   </div>

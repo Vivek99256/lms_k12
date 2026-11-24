@@ -31,6 +31,9 @@ export interface LabVersionRow {
   title: string;
   approvedAt: string | null;
   rejectReason: string | null;
+  /** The concepts this lab is mapped to, and whether it opens for a concept scope or only for the whole chapter. */
+  concepts: string[];
+  scopeLevel: 'concepts' | 'chapter';
 }
 
 export interface PreviewSetting {
@@ -176,6 +179,7 @@ export async function fetchStudioIndex(chapterId: string | number): Promise<Stud
       return {
         id: typeof r.id === 'number' ? r.id : null, labKey: readString(r.lab_key), version: readNumber(r.version), status: readString(r.status) as LabStatus,
         source: readString(r.source) as LabVersionRow['source'], title: readString(r.title), approvedAt: readString(r.approved_at) || null, rejectReason: readString(r.reject_reason) || null,
+        concepts: strs(r.concepts), scopeLevel: r.scope_level === 'chapter' ? 'chapter' : 'concepts',
       };
     }),
   };
@@ -191,8 +195,20 @@ export async function checkSpecText(specJson: string): Promise<{ validation: Val
   return { validation: parseValidation(p.validation), preview: parsePreview(p.preview) };
 }
 
-export async function generateLab(chapterId: number, note: string): Promise<LabDetail> {
-  const p = await post('/generate', { chapter_id: String(chapterId), note });
+/** An AI draft for the concepts the teacher chose (or the whole chapter), saved as a DRAFT. */
+export async function generateLab(chapterId: number, note: string, concepts: string[] = [], level: 'concepts' | 'chapter' = 'concepts'): Promise<LabDetail> {
+  const ctx = context();
+  const body = new URLSearchParams();
+  appendCommonParams(body, ctx);
+  if (ctx.userId) body.set('user_id', ctx.userId);
+  body.set('chapter_id', String(chapterId));
+  body.set('note', note);
+  body.set('level', level);
+  concepts.forEach((c) => body.append('concepts[]', c));
+  const response = await fetch(`${base(ctx)}/generate`, { method: 'POST', headers: headers(ctx, 'application/x-www-form-urlencoded'), body: body.toString() });
+  const payload = rec(await response.json().catch(() => ({})));
+  if (!response.ok) throw new Error(readString(payload.message) || 'Something went wrong. Try again.');
+  const p = payload;
   return parseDetail(p.lab);
 }
 
