@@ -506,6 +506,12 @@ export interface UnifiedTeachLearnReport {
     skipped_count?: number;
     failed_count?: number;
     failed_resources?: Array<{ chapter_id: number; resource_type: string; error: string }>;
+    /**
+     * Presentations and study documents started in the background (they take minutes). There is no review step: each stores itself
+     * once it passes validation, and getResourceStatus says when it has.
+     */
+    pending_resources?: PendingResource[];
+    pending_count?: number;
     images_applied?: boolean;
     verified_count?: number;
     duplicates_prevented?: number;
@@ -628,6 +634,49 @@ export async function checkChapterContent(
  *   2. Activity Timeline Agent -> Gate 2
  *   3. Content Model Coverage Agent -> Gate 3 -> Unified Teach/Learn Report
  */
+/** One resource AI Stack started in the background. */
+export interface PendingResource {
+  kind: 'presentation' | 'document';
+  chapter_id: number;
+  chapter_name?: string;
+  standard_id?: number;
+  subject_id?: number;
+  resource_type: string;
+  /** Presentation only: the Course Presentation run to ask about. */
+  run?: string;
+  /** Document only: revision_notes | remedial | activities. */
+  document_kind?: string;
+  format_label?: string;
+  status: 'generating';
+  message?: string;
+}
+
+export interface ResourceStatusItem {
+  kind: string;
+  chapter_id: number;
+  run?: string;
+  document_kind?: string;
+  state: 'running' | 'stored' | 'failed';
+  content_id?: number;
+  url?: string | null;
+  error?: string;
+}
+
+/** Where each background resource has got to: running, stored (with its content id) or failed (with the reason). Read-only. */
+export async function getResourceStatus(
+  context: IntelligenceContext,
+  items: Array<Pick<ResourceStatusItem, 'kind' | 'chapter_id' | 'run' | 'document_kind'>>
+): Promise<ResourceStatusItem[]> {
+  const res = await fetch(resolveEndpoint(context, 'resource-status'), {
+    method: 'POST',
+    headers: buildHeaders(context),
+    body: JSON.stringify({ items }),
+    cache: 'no-store',
+  });
+  const data = await handleResponse<{ items?: ResourceStatusItem[] }>(res);
+  return data?.items ?? [];
+}
+
 export async function runTeachLearnPipeline(
   context: IntelligenceContext,
   options: RunPipelineOptions = {}
