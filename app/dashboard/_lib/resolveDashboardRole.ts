@@ -16,8 +16,10 @@ const STUDENT_PROFILES = new Set(['student']);
 export function resolveDashboardRole(userProfileName: string | null | undefined): DashboardRole {
   const normalized = (userProfileName ?? '').trim().toLowerCase();
 
-  if (TEACHER_PROFILES.has(normalized)) return 'teacher';
-  if (STUDENT_PROFILES.has(normalized)) return 'student';
+  // Teachers and students open the same stakeholder home (the server decides which). To go back to the earlier
+  // dashboards, return 'teacher' / 'student' here.
+  if (TEACHER_PROFILES.has(normalized)) return 'workspace';
+  if (STUDENT_PROFILES.has(normalized)) return 'workspace';
   // The three core admin profiles use the role workspace too (server role "admin"), which carries every
   // figure the old admin dashboard had plus the premium panels. To go back, return 'admin' here.
   if (ADMIN_PROFILES.has(normalized)) return 'workspace';
@@ -25,8 +27,8 @@ export function resolveDashboardRole(userProfileName: string | null | undefined)
   // Profile names are free text per school ("Class Teacher", "Senior Teacher", "HOD").
   // Falling through to the admin dashboard for these gave teachers a dashboard whose
   // summary endpoint refuses them, so match on the role word before giving up.
-  if (/\b(teacher|hod|faculty)\b/.test(normalized)) return 'teacher';
-  if (/\bstudent\b/.test(normalized)) return 'student';
+  if (/\b(teacher|hod|faculty)\b/.test(normalized)) return 'workspace';
+  if (/\bstudent\b/.test(normalized)) return 'workspace';
 
   // Whole-school administrators with a school-specific name ("College Admin", "Collage_Admin",
   // "IT - Administrator", "Director") keep the admin dashboard. "Assistant Admin" does not:

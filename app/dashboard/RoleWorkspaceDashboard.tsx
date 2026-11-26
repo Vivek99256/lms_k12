@@ -2,26 +2,35 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowUpRight, BookOpen, CalendarCheck, CalendarClock, Cake, ClipboardCheck, ClipboardList, DoorOpen, Download, FileText, Filter, GraduationCap,
-  History, Inbox, LineChart, ListChecks, Megaphone, MessageCircleWarning, MessageSquareText, Package, PenLine, Phone, PieChart, Printer,
+  ArrowUpRight, BookOpen, BookOpenCheck, BrainCircuit, Briefcase, CalendarCheck, CalendarClock, Cake, ClipboardCheck, ClipboardList, DoorOpen, Download, FileText, Filter, GraduationCap,
+  Compass, Flame, Gauge, History, Inbox, LineChart, ListChecks, Megaphone, MessageCircleWarning, MessageSquareText, Package, PenLine, Phone, PieChart, Printer,
   ReceiptIndianRupee, RefreshCw, RotateCcw, ShieldCheck, Store, TriangleAlert, Trophy, UserMinus, UserRoundX, UserX, Users, Wallet, Zap, type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  DashboardAuthError, fetchRoleWorkspace, fetchWorkspaceFees, getDashboardSession,
-  type RoleWorkspaceSummary, type RoleWorkspaceWidgets, type WorkspaceFees, type WorkspaceListItem, type WorkspacePeriod,
+  DashboardAuthError, fetchCustomWidgets, fetchRoleWorkspace, fetchWorkspaceFees, getDashboardSession,
+  type CustomWidget, type RoleWorkspaceSummary, type RoleWorkspaceWidgets, type WorkspaceFees, type WorkspaceListItem, type WorkspacePeriod,
 } from '@/app/dashboard/_lib/dashboard-api';
 import {
-  AreaChart, AttentionBar, BarList, Delta, Donut, EmptyNote, Funnel, Hero, HeroStat, Legend, Panel, Pill, PremiumSkeleton, RateBars, RowList,
-  Segmented, StatStrip, SURFACE, type AttentionItem, type Row, type Tone,
+  AreaChart, BarList, Delta, Donut, EmptyNote, Funnel, Hero, HeroStat, Legend, Panel, Pill, PremiumSkeleton, RateBars, RowList,
+  Segmented, StatStrip, SURFACE, type Row, type Tone,
 } from '@/app/dashboard/_components/PremiumKit';
-import { DashboardError } from '@/app/dashboard/_components/DashboardPrimitives';
 import {
-  AlertLimit, HomeworkPanel, HostelPanel, MovablePanel, ParentWaitPanel, StrengthPanel, StudentFinder, TaskAgePanel, TransportPanel, usePanelOrder,
+  AskBar, HistoryEmpty, historyRows, InsightCard, LoopStrip, NextStepCard, PrioritiesCard, ProgressCard, SectionBlock, SignalCard, TopInsightCard, TopSignalCard,
+  type PriorityItem,
+} from '@/app/dashboard/_components/StakeholderHome';
+import { DashboardError } from '@/app/dashboard/_components/DashboardPrimitives';
+import { DecisionsCard, DeliveryCard, HealthCard, PayrollCard, TrustCard } from '@/app/dashboard/_components/TrusteeBoard';
+import {
+  AlertLimit, ClassMasteryPanel, HomeworkPanel, HostelPanel, ImpactPanel, MovablePanel, MyMasteryPanel, ParentWaitPanel, StreakPanel, StrengthPanel, StudentFinder,
+  TaskAgePanel, TransportPanel, usePanelOrder,
 } from '@/app/dashboard/_components/WorkspaceExtras';
 import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 import { RoleQuickActions, type QuickActionId } from '@/app/dashboard/_components/RoleQuickActions';
 import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { CustomWidgetsSection, DashboardAssistant } from '@/app/dashboard/_components/DashboardAssistant';
+import { ExploreSlot, exploreStore, prefetchRelated, topicOfKey } from '@/app/dashboard/_components/ExploreStack';
+import { MasonryColumns } from '@/app/dashboard/_components/MasonryColumns';
 import { useDrill } from '@/app/dashboard/_components/useDrill';
 import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
 import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
@@ -270,6 +279,50 @@ const KPIS = {
     label: 'Upcoming exams', icon: CalendarClock, drill: ['exam schedule'],
     figure: (w) => (w.upcoming_exams == null ? null : { value: num(w.upcoming_exams.count), context: 'Scheduled from today onwards' }),
   },
+  my_students: {
+    label: 'My students', icon: GraduationCap, drill: ['student attendance'],
+    figure: (w) => (w.students_total == null ? null : { value: num(w.students_total), context: 'In the classes I teach' }),
+  },
+  my_classes: {
+    label: 'My classes', icon: Users, drill: ['timetable'],
+    figure: (w) => (w.my_classes == null ? null : { value: num(w.my_classes.classes), context: `${num(w.my_classes.students)} students in total` }),
+  },
+  periods_today: {
+    label: 'Classes today', icon: CalendarClock, drill: ['timetable'],
+    figure: (w) => {
+      const t = w.today_schedule;
+      if (!t) return null;
+      const first = t.items[0];
+      return { value: num(t.total), context: t.total === 0 ? 'No classes on the timetable today' : first ? `First: ${first.title}${first.time ? ` at ${first.time.split('–')[0]}` : ''}` : undefined };
+    },
+  },
+  homework_pending: {
+    label: 'Homework pending', icon: ClipboardList, drill: ['student homework'],
+    figure: (w) => (w.homework_pending == null ? null : { value: num(w.homework_pending.total), context: `${num(w.homework_pending.students)} students` }),
+  },
+  grade_pending: {
+    label: 'Assignments to grade', icon: PenLine, drill: ['assignment submission', 'student homework'],
+    figure: (w) => (w.assignments_to_grade == null ? null : { value: num(w.assignments_to_grade.count), context: 'Submitted by students' }),
+  },
+  pending_work: {
+    label: 'Work due', icon: BookOpenCheck,
+    figure: (w) => {
+      const m = w.my_work;
+      return m ? { value: num(m.total), context: `${num(m.homework)} homework · ${num(m.assignments)} assignments`, delta: m.overdue > 0 ? { direction: 'up' as const, tone: 'act' as Tone, text: `${m.overdue} overdue` } : undefined } : null;
+    },
+  },
+  concepts_mastered: {
+    label: 'Concepts mastered', icon: GraduationCap,
+    figure: (w) => (w.my_mastery == null ? null : { value: num(w.my_mastery.mastered), context: w.my_mastery.total > 0 ? `of ${num(w.my_mastery.total)} you have practised` : 'Practise a concept to begin' }),
+  },
+  streak_days: {
+    label: 'Learning streak', icon: Flame,
+    figure: (w) => (w.my_streak == null ? null : { value: `${num(w.my_streak.current)} day${w.my_streak.current === 1 ? '' : 's'}`, context: `Longest ${num(w.my_streak.longest)} · ${num(w.my_streak.badge_total)} badge${w.my_streak.badge_total === 1 ? '' : 's'}` }),
+  },
+  my_exams_count: {
+    label: 'Exams coming up', icon: CalendarClock,
+    figure: (w) => (w.my_exams == null ? null : { value: num(w.my_exams.count), context: 'For my class, from today' }),
+  },
   exam_evaluation: {
     label: 'Answer sheets evaluated', icon: PenLine, drill: ['mark entry'],
     figure: (w) => {
@@ -283,7 +336,8 @@ type KpiKey = keyof typeof KPIS;
 
 type ChartKey =
   | 'attendance_trend' | 'fee_trend' | 'fees_overview' | 'class_attendance' | 'fees_month' | 'admission_funnel' | 'exam_results' | 'gender_split' | 'students_by_class'
-  | 'parent_msg_age' | 'task_aging' | 'homework_rate' | 'strength_changes' | 'transport_summary' | 'hostel_summary';
+  | 'parent_msg_age' | 'task_aging' | 'homework_rate' | 'strength_changes' | 'transport_summary' | 'hostel_summary'
+  | 'teaching_impact' | 'class_mastery' | 'my_mastery' | 'my_streak';
 
 const CHART_LABEL: Record<ChartKey, string> = {
   attendance_trend: 'Attendance trend',
@@ -301,12 +355,17 @@ const CHART_LABEL: Record<ChartKey, string> = {
   strength_changes: 'Student strength changes',
   transport_summary: 'Transport',
   hostel_summary: 'Hostel',
+  teaching_impact: 'Is my teaching helping?',
+  class_mastery: 'Concepts my students find hard',
+  my_mastery: 'What I have learned',
+  my_streak: 'My streak and badges',
 };
 
 type ListKey =
   | 'recent_circulars' | 'recent_enquiries' | 'recent_parent_messages' | 'my_tasks' | 'upcoming_exams_list' | 'recent_requisitions' | 'recent_fee_receipts'
   | 'pending_approvals' | 'absent_today' | 'staff_on_leave' | 'birthdays' | 'upcoming_events' | 'followups_due' | 'library_overdue' | 'stock_reorder'
-  | 'chronic_absentees' | 'substitutes_needed';
+  | 'chronic_absentees' | 'substitutes_needed'
+  | 'today_schedule' | 'attendance_pending' | 'assignments_list' | 'my_work_list' | 'my_exams_list' | 'class_circulars' | 'my_classes_list';
 
 type ListDef = {
   label: string; title: string; description: string | ((w: RoleWorkspaceWidgets) => string); icon: LucideIcon; empty: string;
@@ -341,10 +400,10 @@ const LISTS: Record<ListKey, ListDef> = {
     }))),
   },
   my_tasks: {
-    label: 'My tasks', title: 'My open tasks', description: 'Pending or in progress, assigned to you', icon: ListChecks,
+    label: 'My tasks', title: 'My open tasks', description: 'Pending or in progress, assigned to you — by due date', icon: ListChecks,
     empty: 'Nothing is assigned to you right now.',
     rows: (w) => (w.tasks_pending_me == null ? null : w.tasks_pending_me.items.map((i) => ({
-      id: i.id, title: i.title, trailing: formatRelativeDay(i.date),
+      id: i.id, title: i.title, trailing: i.date ? `Due ${formatRelativeDay(i.date)}` : 'No due date',
       badge: { tone: (i.detail === 'IN-PROGRESS' ? 'brand' : 'watch') as Tone, text: i.detail === 'IN-PROGRESS' ? 'In progress' : 'Pending' },
     }))),
   },
@@ -382,6 +441,43 @@ const LISTS: Record<ListKey, ListDef> = {
     rows: (w) => (w.absent_today == null ? null : w.absent_today.items.map((i) => ({
       id: i.id, title: i.name, detail: [i.class_name, i.phone].filter(Boolean).join(' · '), trailing: callLink(i.phone),
     }))),
+  },
+  today_schedule: {
+    label: 'Today’s timetable', title: 'Today’s timetable', icon: CalendarClock,
+    description: (w) => (w.today_schedule ? `${num(w.today_schedule.total)} period${w.today_schedule.total === 1 ? '' : 's'}` : 'Periods today'),
+    empty: 'Nothing is on the timetable today.',
+    rows: (w) => (w.today_schedule == null ? null : w.today_schedule.items.map((i) => ({ id: i.id, title: i.title, detail: i.detail, trailing: i.time ?? undefined }))),
+  },
+  attendance_pending: {
+    label: 'Attendance to mark', title: 'Attendance not marked yet', icon: CalendarCheck,
+    description: (w) => (w.attendance_pending ? `${num(w.attendance_pending.total)} of my class${w.attendance_pending.total === 1 ? '' : 'es'} today` : 'My classes today'),
+    empty: 'Attendance is marked for all your classes today.',
+    rows: (w) => (w.attendance_pending == null ? null : w.attendance_pending.items.map((i) => ({ id: i.label, title: `Class ${i.label}`, badge: { tone: 'watch' as Tone, text: 'Not marked' } }))),
+  },
+  assignments_list: {
+    label: 'Assignments to grade', title: 'Assignments to grade', description: 'Submitted by students, newest first', icon: PenLine,
+    empty: 'Nothing is waiting to be graded.', rows: (w) => dated(w.assignments_to_grade?.items),
+  },
+  my_work_list: {
+    label: 'My work', title: 'My homework and assignments', description: 'Nearest due date first', icon: BookOpenCheck,
+    empty: 'You have nothing due. Well done.',
+    rows: (w) => (w.my_work == null ? null : w.my_work.items.map((i) => ({
+      id: i.id, title: i.title, detail: i.detail, trailing: i.date ? `Due ${formatRelativeDay(i.date)}` : 'No due date',
+      badge: i.overdue ? { tone: 'act' as Tone, text: 'Overdue' } : undefined,
+    }))),
+  },
+  my_exams_list: {
+    label: 'My exams', title: 'My exams', description: 'Scheduled for my class', icon: CalendarClock,
+    empty: 'No exam is scheduled from today onwards.', rows: (w) => dated(w.my_exams?.items),
+  },
+  class_circulars: {
+    label: 'Notices for my classes', title: 'Notices for my classes', description: 'Latest circulars', icon: Megaphone,
+    empty: 'No circulars for your classes yet.', rows: (w) => dated(w.class_circulars),
+  },
+  my_classes_list: {
+    label: 'My classes list', title: 'The classes I teach', description: 'Class teacher and timetable classes', icon: Users,
+    empty: 'No class is assigned to you yet.',
+    rows: (w) => (w.my_classes == null ? null : w.my_classes.items.map((i) => ({ id: i.label, title: `Class ${i.label}`, detail: `${num(i.students)} students` }))),
   },
   chronic_absentees: {
     label: 'Repeated absence', title: 'Repeated absence', icon: UserRoundX,
@@ -476,7 +572,7 @@ function attentionFor(w: RoleWorkspaceWidgets, target: number): AttentionDef[] {
   add('chronic', UserRoundX, w.chronic_absentees?.total, 'students keep missing school', 'act', ['student attendance']);
   add('library', BookOpen, w.library_overdue?.total, 'books are overdue', 'act', ['issue/overdue report']);
   add('waiting', MessageCircleWarning, w.parent_msg_age?.gt7, 'parent messages have waited over a week', 'act', ['parent communication']);
-  add('oldtasks', ListChecks, w.task_aging?.gt30, 'tasks have been open over 30 days', 'watch', ['task management']);
+  add('oldtasks', ListChecks, w.task_aging?.late_over, 'tasks are more than 30 days overdue', 'watch', ['task management']);
   add('followups', Phone, w.followups_due?.total, 'enquiry follow-ups are due', 'watch', ['admission inquiry']);
   add('parent', MessageCircleWarning, w.parent_msgs_pending, 'parent messages are waiting for a reply', 'watch', ['parent communication']);
   add('leaves', CalendarClock, w.leaves_pending, 'leave requests need a decision', 'watch', ['leave application']);
@@ -486,6 +582,10 @@ function attentionFor(w: RoleWorkspaceWidgets, target: number): AttentionDef[] {
   add('visitors', DoorOpen, w.visitors_today?.inside, 'visitors have not signed out', 'watch', ['add visitor']);
   add('tasks', ListChecks, w.tasks_pending_me?.count, 'tasks are assigned to you', 'watch', ['task management']);
   if (a && a.present + a.absent > 0) add('attendance', CalendarCheck, a.not_marked, 'students have no attendance marked yet', 'watch', ['student attendance']);
+
+  add('pending-attendance', CalendarCheck, w.attendance_pending?.total, 'of my classes have no attendance marked today', 'watch', ['student attendance']);
+  add('to-grade', PenLine, w.assignments_to_grade?.count, 'submitted assignments are waiting to be graded', 'watch', ['assignment submission']);
+  add('my-overdue', BookOpenCheck, w.my_work?.overdue, 'pieces of my work are past the due date', 'act');
 
   return out.slice(0, 6);
 }
@@ -503,8 +603,30 @@ function insightFor(w: RoleWorkspaceWidgets, fallback: string): string {
   if (w.library_overdue && parts.length < 2) parts.push(`${w.library_overdue.total} book(s) overdue.`);
   if (w.tasks_pending_me && parts.length < 2) parts.push(w.tasks_pending_me.count > 0 ? `You have ${w.tasks_pending_me.count} open task(s).` : 'You have no open tasks.');
 
+  if (w.today_schedule && parts.length < 2) parts.push(w.today_schedule.total > 0 ? `You have ${w.today_schedule.total} period${w.today_schedule.total === 1 ? '' : 's'} on the timetable today.` : 'There are no periods on the timetable today.');
+  if (w.my_work && parts.length < 2) parts.push(w.my_work.total > 0 ? `${w.my_work.total} piece${w.my_work.total === 1 ? '' : 's'} of work to do${w.my_work.overdue > 0 ? `, ${w.my_work.overdue} past the due date` : ''}.` : 'You have no work due.');
+
   return parts.length > 0 ? parts.slice(0, 2).join(' ') : fallback;
 }
+
+/** Questions worth asking first, per role. They are sent to the assistant exactly as typed. */
+const ASK: Record<string, string[]> = {
+  admin: ['What are the three most important things I should do today?', 'Which classes or departments need my attention, and why?', 'What changed since yesterday?'],
+  assistant_admin: ['What are the three most important things I should do today?', 'Which follow-ups should I make first?', 'Who is absent or on leave that affects today?'],
+  principal: ['What are the three most important things I should do today?', 'Which classes need my attention today, and why?', 'Summarise the biggest risks to the school this week.'],
+  vice_principal: ['What are the three most important things I should do today?', 'Which classes need my attention today, and why?', 'Which periods have no substitute?'],
+  trustee: ['What decisions need my approval?', 'Is the school healthy? Where should I intervene?', 'Why is fee collection where it is?'],
+  counsellor: ['Which students need guidance this week?', 'Which students keep missing school?', 'Which parent messages are most overdue?'],
+  clerk: ['Which fee issues should I follow up first?', 'Which enquiries should I call today?', 'What is waiting on me at the desk?'],
+  assistant_clerk: ['Which enquiries should I call today?', 'What is waiting on me at the desk?'],
+  librarian: ['Which overdue books should I chase first?', 'What is waiting on me today?'],
+  store_keeper: ['What needs ordering or approving?', 'Which requisitions are waiting the longest?'],
+  exam_department: ['Which exams need preparation next?', 'Which classes have marks still to enter?'],
+  teacher: ['Which of my students need help this week, and why?', 'What should I teach differently for the concepts my students find hard?', 'What do I need to do today?'],
+  student: ['What should I learn today?', 'Which concepts am I weak at, and how can I improve?', 'Which homework is due first?'],
+  peon: ['What are my tasks today?'],
+  workspace: ['What are my tasks today?'],
+};
 
 /* ---------- role layouts ---------- */
 
@@ -520,6 +642,8 @@ type Layout = {
   actions: QuickActionId[];
   /** Panel fed by an existing module dashboard. */
   module?: 'library';
+  /** Personal dashboards: whose insights these are. */
+  audience?: 'teacher' | 'student' | 'trustee';
 };
 
 const LEADERSHIP: Layout = {
@@ -539,6 +663,24 @@ const ROLE_LAYOUTS: Record<string, Layout> = {
     charts: ['attendance_trend', 'fee_trend', 'fees_overview', 'class_attendance', 'homework_rate', 'fees_month', 'admission_funnel', 'strength_changes', 'exam_results', 'parent_msg_age', 'task_aging', 'transport_summary', 'hostel_summary', 'gender_split', 'students_by_class'],
     lists: ['pending_approvals', 'substitutes_needed', 'absent_today', 'chronic_absentees', 'followups_due', 'staff_on_leave', 'birthdays', 'upcoming_events', 'recent_fee_receipts', 'recent_enquiries', 'upcoming_exams_list', 'recent_circulars'],
     actions: ['add-student', 'search-student', 'collect-fees', 'enquiry', 'circular', 'notify', 'attendance', 'timetable', 'fees-report', 'strength', 'result', 'task'],
+  },
+  teacher: {
+    subtitle: 'Your classes, your students and what they need from you.',
+    primary: ['periods_today', 'my_students', 'attendance_today', 'homework_pending'],
+    glance: ['my_classes', 'grade_pending', 'tasks_pending_me', 'my_leaves_pending'],
+    charts: ['attendance_trend', 'teaching_impact', 'class_mastery'],
+    lists: ['today_schedule', 'attendance_pending', 'assignments_list', 'absent_today', 'chronic_absentees', 'my_tasks', 'my_classes_list', 'class_circulars', 'birthdays', 'upcoming_events'],
+    actions: ['attendance', 'timetable', 'task', 'leave'],
+    audience: 'teacher',
+  },
+  student: {
+    subtitle: 'What to learn today, how you are doing, and what to do next.',
+    primary: ['pending_work', 'concepts_mastered', 'streak_days', 'periods_today'],
+    glance: ['my_exams_count'],
+    charts: ['my_mastery', 'my_streak'],
+    lists: ['today_schedule', 'my_work_list', 'my_exams_list', 'class_circulars', 'upcoming_events'],
+    actions: [],
+    audience: 'student',
   },
   principal: LEADERSHIP,
   vice_principal: LEADERSHIP,
@@ -606,6 +748,7 @@ const ROLE_LAYOUTS: Record<string, Layout> = {
     charts: ['attendance_trend', 'fee_trend', 'fees_overview', 'class_attendance', 'fees_month', 'admission_funnel', 'strength_changes', 'exam_results', 'transport_summary', 'hostel_summary', 'gender_split', 'students_by_class'],
     lists: ['upcoming_events', 'recent_circulars'],
     actions: ['fees-report', 'strength', 'result', 'circular'],
+    audience: 'trustee',
   },
   peon: {
     subtitle: "Your tasks and today's notices.",
@@ -626,8 +769,10 @@ const ROLE_LAYOUTS: Record<string, Layout> = {
 };
 
 /** Ids a user can hide, per layout. Ids are stored per user — don't rename them. */
-function widgetsFor(layout: Layout): DashboardWidget[] {
-  const out: DashboardWidget[] = [];
+function widgetsFor(layout: Layout, w?: RoleWorkspaceWidgets): DashboardWidget[] {
+  const out: DashboardWidget[] = [{ id: 'panel.focus', label: 'Today’s focus: priorities, progress, top signal', group: 'panel' }];
+  if (w?.signals || w?.support_students || w?.my_insights) out.push({ id: 'panel.signals', label: 'My intelligence', group: 'panel' });
+  if (w?.history) out.push({ id: 'panel.history', label: 'My history (decisions and results)', group: 'panel' });
   for (const k of [...layout.primary, ...layout.glance]) out.push({ id: `kpi.${k}`, label: KPIS[k].label, group: 'kpi' });
   for (const c of layout.charts) out.push({ id: `chart.${c}`, label: CHART_LABEL[c], group: 'chart' });
   for (const l of layout.lists) out.push({ id: `panel.${l}`, label: LISTS[l].label, group: 'panel' });
@@ -978,15 +1123,33 @@ const PERIOD_OPTIONS: Array<{ id: WorkspacePeriod; label: string }> = [
  * under the right key (`home.<role>`) — never under a placeholder that would flash hidden widgets.
  */
 function RoleWorkspaceView({
-  data, loadedAt, refreshing, onRefresh, onPeriod, onFilter,
+  data, loadedAt, refreshing, onRefresh, onPeriod, onFilter, extra,
 }: {
-  data: RoleWorkspaceSummary; loadedAt: Date | null; refreshing: boolean; onRefresh: () => void; onPeriod: (p: WorkspacePeriod) => void; onFilter: (standardId: number) => void;
+  data: RoleWorkspaceSummary; loadedAt: Date | null; refreshing: boolean; onRefresh: () => void; onPeriod: (p: WorkspacePeriod) => void; onFilter: (standardId: number) => void; extra?: React.ReactNode;
 }) {
   const { user } = useAuth();
   const drill = useDrill();
   const layout = ROLE_LAYOUTS[data.role] ?? ROLE_LAYOUTS.workspace;
-  const widgets = useMemo(() => widgetsFor(layout), [layout]);
+  const widgets = useMemo(() => widgetsFor(layout, data.widgets), [layout, data.widgets]);
   const prefs = useDashboardPreferences(`home.${data.role}`, widgets);
+  // Widgets this user asked the assistant for. A failure to load them leaves the dashboard as it was.
+  const [custom, setCustom] = useState<CustomWidget[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchCustomWidgets(getDashboardSession(), controller.signal).then((r) => setCustom(r.widgets ?? [])).catch(() => undefined);
+    return () => controller.abort();
+  }, [data.role]);
+  // "More like this": click a figure and the related figures of its subject open underneath, one subject under the other.
+  // Each figure or panel has its own place ("anchor") for its open subjects. They live in a small store outside this component,
+  // so a click re-renders only that place and not the whole dashboard.
+  const toggleExplore = exploreStore.toggle;
+  /** The subject of a figure or panel, but only when this role has something to open for it (otherwise a click does what it always did). */
+  const exploreTopicOf = (key: string) => {
+    const topic = topicOfKey(key);
+    return topic && (data.explore_topics ?? []).includes(topic) ? topic : undefined;
+  };
+  const stackFor = (anchor: string) => <ExploreSlot anchor={anchor} />;
+  useEffect(() => () => exploreStore.clear(), []);
   const w = data.widgets;
   const period = data.period ?? 'today';
   const firstName = (user?.name || '').trim().split(/\s+/)[0];
@@ -1018,14 +1181,50 @@ function RoleWorkspaceView({
   const primaryFigs = figures(layout.primary);
   const glanceFigs = figures(layout.glance);
 
+  // A figure opens its subject's related figures; the full screen it used to open directly stays one click away inside.
+  /** Wrap a card so a click on it (not on a control inside it) opens "more like this" right under it. A tile can name its own subject with data-explore. */
+  const explorable = (anchor: string, defaultTopic: string | undefined, node: React.ReactNode) => (
+    <>
+      <div
+        title="Click for related figures"
+        className="cursor-pointer"
+        onMouseOver={(e) => {
+          const topic = (e.target as HTMLElement).closest('[data-explore]')?.getAttribute('data-explore') || defaultTopic;
+          if (topic) void prefetchRelated(topic).catch(() => undefined);
+        }}
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('button, a, input, select, textarea, summary, label, [role=tab], [role=button]')) return;
+          const topic = target.closest('[data-explore]')?.getAttribute('data-explore') || defaultTopic;
+          if (topic) toggleExplore(anchor, topic);
+        }}
+      >{node}</div>
+      {stackFor(anchor)}
+    </>
+  );
+
+  const figureClick = (anchor: string, key: string, screens: readonly string[] | undefined) => {
+    const open = drill(screens);
+    const topic = exploreTopicOf(key);
+    return topic ? () => toggleExplore(anchor, topic, open) : open;
+  };
+
+  // Warm the related figures of the headline subjects once the page has settled, so a click opens them straight away.
+  const warmTopics = [...new Set([...primaryFigs, ...glanceFigs].map((f) => exploreTopicOf(f.key)).filter((t): t is string => Boolean(t)))].slice(0, 4).join(',');
+  useEffect(() => {
+    if (!warmTopics) return;
+    const timer = setTimeout(() => warmTopics.split(',').forEach((t) => void prefetchRelated(t).catch(() => undefined)), 2500);
+    return () => clearTimeout(timer);
+  }, [warmTopics]);
+
   const hero = primaryFigs.map(({ key, def, fig, label }) => (
     <HeroStat
       key={key} label={label} icon={def.icon} value={fig.value} context={fig.context} spark={fig.spark} sparkLabel={fig.sparkLabel}
       delta={fig.delta ? <Delta direction={fig.delta.direction} tone={fig.delta.tone}>{fig.delta.text}</Delta> : undefined}
-      onClick={drill(def.drill)}
+      onClick={figureClick('hero', key, def.drill)}
     />
   ));
-  const glanceItems = glanceFigs.map(({ key, def, fig, label }) => ({ key, label, value: fig.value, icon: def.icon, onClick: drill(def.drill) }));
+  const glanceItems = glanceFigs.map(({ key, def, fig, label }) => ({ key, label, value: fig.value, icon: def.icon, onClick: figureClick('glance', key, def.drill) }));
 
   const main: React.ReactNode[] = [];
   const mid: React.ReactNode[] = [];
@@ -1068,6 +1267,10 @@ function RoleWorkspaceView({
   if (on('strength_changes') && w.strength_changes) mid.push(<StrengthPanel key="strength" data={w.strength_changes} />);
   if (on('transport_summary') && w.transport_summary) mid.push(<TransportPanel key="transport" data={w.transport_summary} />);
   if (on('hostel_summary') && w.hostel_summary) mid.push(<HostelPanel key="hostel" data={w.hostel_summary} />);
+  if (on('teaching_impact') && w.teaching_impact) mid.push(<ImpactPanel key="impact" data={w.teaching_impact} />);
+  if (on('class_mastery') && w.class_mastery) mid.push(<ClassMasteryPanel key="class-mastery" data={w.class_mastery} />);
+  if (on('my_mastery') && w.my_mastery) mid.push(<MyMasteryPanel key="my-mastery" data={w.my_mastery} />);
+  if (on('my_streak') && w.my_streak) mid.push(<StreakPanel key="streak" data={w.my_streak} />);
 
   if (on('students_by_class') && w.students_by_class) {
     const rows = w.students_by_class;
@@ -1101,15 +1304,61 @@ function RoleWorkspaceView({
       </Panel>,
     );
 
-  const attention: AttentionItem[] = attentionFor(w, target).map((a) => ({ key: a.key, icon: a.icon, count: a.count, display: a.display, text: a.text, tone: a.tone, onClick: drill(a.drill) }));
-  const customize = prefs.ready ? <CustomizeDashboard widgets={widgets} {...prefs.customizeProps} className="!h-9 bg-white shadow-sm" /> : undefined;
-  const isQuick = (n: React.ReactNode) => React.isValidElement(n) && n.key === 'quick';
-  // Lead with the main panels, then shortcuts, then the charts, then the lists.
-  const panels = [...main, ...side.filter(isQuick), ...mid, ...side.filter((n) => !isQuick(n))];
-  const nothing = hero.length === 0 && glanceItems.length === 0 && panels.length === 0;
-  const keyed = panels.map((node, i) => ({ node, key: String((node as React.ReactElement).key ?? i) }));
-  const ordered = order.arrange(keyed);
-  const orderedKeys = ordered.map((x) => x.key);
+  const attentionList = attentionFor(w, target);
+  const signals = w.signals ?? null;
+  const topSignal = signals?.items[0] ?? null;
+  const loop = w.intelligence_loop ?? null;
+  const audience = layout.audience ?? null;
+  const isBoard = audience === 'trustee';
+  const [detailOpen, setDetailOpen] = useState(false);
+  // A printed board pack should carry the detail too, not just the summary.
+  useEffect(() => {
+    const open = () => setDetailOpen(true);
+    window.addEventListener('beforeprint', open);
+    return () => window.removeEventListener('beforeprint', open);
+  }, []);
+  const insights = w.support_students ?? w.my_insights ?? null;
+  const topInsight = insights?.items[0] ?? null;
+  const highInsights = insights?.items.filter((i) => i.severity === 'high').length ?? 0;
+  const openWorkspace = drill(['intelligence workspace', 'signals', 'executive dashboard']);
+  const goIntel = () => document.getElementById('my-intelligence')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const criticalSignals = signals?.by_severity?.critical ?? 0;
+  const highSignals = signals?.by_severity?.high ?? 0;
+
+  // My priorities: what is urgent, then what needs a decision or an action. Built from the same figures as the rest of the page.
+  const toPriority = (a: AttentionDef): PriorityItem => ({ key: a.key, text: a.text, count: a.count, display: a.display, onClick: drill(a.drill) });
+  const urgent: PriorityItem[] = [
+    ...attentionList.filter((a) => a.tone === 'act').map(toPriority),
+    ...(audience === 'teacher' && highInsights > 0 ? [{ key: 'support-high', text: highInsights === 1 ? 'student needs support urgently' : 'students need support urgently', count: highInsights, onClick: goIntel }] : []),
+    ...(criticalSignals > 0 ? [{ key: 'critical-signal', text: criticalSignals === 1 ? 'critical signal needs a decision' : 'critical signals need a decision', count: criticalSignals, onClick: goIntel }] : []),
+  ];
+  const action: PriorityItem[] = [
+    ...attentionList.filter((a) => a.tone !== 'act').map(toPriority),
+    ...(loop && loop.awaiting_decision > 0 ? [{ key: 'recommendations', text: 'recommendations are waiting for a decision', count: loop.awaiting_decision, onClick: openWorkspace }] : []),
+  ];
+
+  const customize = prefs.ready ? (
+    <>
+      <DashboardAssistant panels={widgets} hidden={prefs.hidden} onSetHidden={prefs.save} onWidgets={setCustom} />
+      <CustomizeDashboard widgets={widgets} {...prefs.customizeProps} className="!h-9 bg-white shadow-sm" />
+    </>
+  ) : undefined;
+  const isQuick = (node: React.ReactNode) => React.isValidElement(node) && node.key === 'quick';
+  const keyed = [...main, ...side.filter(isQuick), ...mid, ...side.filter((node) => !isQuick(node))]
+    .map((node, i) => ({ node, key: String((node as React.ReactElement).key ?? i) }));
+  const PERFORMANCE = new Set(['trends', 'fees-overview', 'class-att', 'fees-month', 'funnel', 'exam-results', 'gender', 'by-class', 'homework', 'parent-age', 'task-age', 'strength', 'transport', 'hostel', 'impact', 'class-mastery', 'my-mastery', 'streak']);
+  const forSection = (name: 'work' | 'performance') => order.arrange(keyed.filter((x) => (PERFORMANCE.has(x.key) ? 'performance' : 'work') === name));
+  const workPanels = forSection('work');
+  const performancePanels = forSection('performance');
+
+  const historyNode = w.history && prefs.isVisible('panel.history') ? (
+    <Panel key="history" title="Decisions and results" description="What was decided, and what came of it" icon={History} flush>
+      {w.history.length === 0 ? <HistoryEmpty /> : <RowList rows={historyRows(w.history, formatRelativeDay)} icon={History} />}
+    </Panel>
+  ) : null;
+
+  const showIntel = Boolean(signals || insights) && prefs.isVisible('panel.signals');
+  const nothing = hero.length === 0 && glanceItems.length === 0 && keyed.length === 0 && !showIntel && !historyNode;
 
   // Tell the assistant what is on screen, so "why is attendance low?" can be answered from these figures.
   const selectedClass = data.standards.find((c) => c.id === data.standard_id)?.name;
@@ -1118,13 +1367,18 @@ function RoleWorkspaceView({
     pageType: 'dashboard',
     filters: selectedClass ? { class: selectedClass, period } : { period },
     metrics: [...primaryFigs, ...glanceFigs].slice(0, 12).map((f) => ({ key: f.key, label: f.label, value: f.fig.value, trend: f.fig.delta?.text })),
-    availableActions: ['Change period', 'Filter by class', 'Find a student', 'Download CSV', 'Print', 'Reorder panels'],
+    records: signals?.items.map((x) => ({ signal: x.title, severity: x.severity, topic: x.topic, confidence: x.confidence, evidence: x.evidence }))
+      ?? insights?.items.map((x) => ({ insight: x.title, severity: x.severity, why: x.why })),
+    recordCount: signals?.total ?? insights?.total,
+    availableActions: ['Explain a signal', 'Investigate a signal', 'Decide what to do', 'Draft an instruction', 'Change period', 'Filter by class', 'Download CSV', 'Print'],
   });
 
   const exportCsv = () => {
     const rows: string[][] = [['Section', 'Item', 'Value', 'Detail']];
     for (const f of [...primaryFigs, ...glanceFigs]) rows.push(['Figures', f.label, f.fig.value, [f.fig.delta?.text, f.fig.context].filter(Boolean).join(' — ')]);
-    for (const a of attentionFor(w, target)) rows.push(['Needs attention', a.text, a.display ?? String(a.count), '']);
+    for (const a of attentionList) rows.push(['Needs attention', a.text, a.display ?? String(a.count), '']);
+    for (const x of signals?.items ?? []) rows.push(['Signals', x.title, x.severity, [x.why, x.recommendation?.title].filter(Boolean).join(' — ')]);
+    for (const x of w.progress ?? []) rows.push(['Progress', x.label, `${x.value}%`, x.detail]);
     for (const key of layout.lists) {
       const def = LISTS[key];
       for (const r of def.rows(w) ?? []) rows.push([def.title, r.title, r.badge?.text ?? '', r.detail ?? '']);
@@ -1158,6 +1412,71 @@ function RoleWorkspaceView({
     </>
   );
 
+  // Panels flow into as many columns as the width allows (about 28rem each), so the layout follows the
+  // window, browser zoom and big monitors without any breakpoint to maintain.
+  const columns = (items: Array<{ node: React.ReactNode; key: string }>, movable = true) => {
+    const keys = items.map((x) => x.key);
+    return (
+      <MasonryColumns>
+        {items.map(({ node, key }) => {
+          const topic = exploreTopicOf(key);
+          // Anywhere on the panel that is not itself a control opens more like it, right under the panel.
+          const shown = topic ? explorable(key, topic, node) : node;
+          return movable
+            ? <MovablePanel key={key} id={key} keys={keys} dragging={dragging} setDragging={setDragging} move={order.move} nudge={order.nudge}>{shown}</MovablePanel>
+            : <div key={key} className="mb-4 break-inside-avoid">{shown}</div>;
+        })}
+      </MasonryColumns>
+    );
+  };
+
+  const sections: Record<'intelligence' | 'work' | 'performance' | 'history', React.ReactNode> = {
+    intelligence: showIntel ? (
+      <SectionBlock
+        key="intelligence" id="my-intelligence" icon={BrainCircuit} title="My intelligence"
+        subtitle={audience === 'student'
+          ? 'Things in your own record that are worth acting on, and exactly what to do about each'
+          : audience === 'teacher'
+            ? 'Students who need support, with the reasons and a next step — and what the school’s systems have noticed about teaching'
+            : isBoard
+              ? 'Material risks only — high and critical findings from the school’s own data'
+              : 'What the system noticed that matters to your role — ranked by severity, confidence and whether someone is already acting on it'}
+        badge={signals && criticalSignals + highSignals > 0 ? <Pill tone="act">{num(criticalSignals + highSignals)} critical or high</Pill> : highInsights > 0 ? <Pill tone="act">{num(highInsights)} urgent</Pill> : undefined}
+      >
+        {loop && <LoopStrip loop={loop} />}
+        {insights && (
+          insights.items.length === 0
+            ? <div className={`${SURFACE} mb-4`}><EmptyNote icon={BrainCircuit}>{audience === 'student' ? 'Nothing needs your attention. Keep it up.' : 'None of your students is flagged right now.'}</EmptyNote></div>
+            : (
+              <div className="mb-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,30rem),1fr))]">
+                {insights.items.map((x) => <InsightCard key={x.id} s={x} audience={audience === 'student' ? 'student' : 'teacher'} onCall={x.phone ? <a href={`tel:${x.phone.replace(/[^0-9+]/g, '')}`} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-50"><Phone size={11} aria-hidden /> Call parent</a> : undefined} />)}
+              </div>
+            )
+        )}
+        {insights && insights.total > insights.items.length && <p className="mb-4 -mt-2 text-xs text-slate-500">Showing the {insights.items.length} with the most reasons, of {num(insights.total)}.</p>}
+        {signals && signals.items.length > 0 && (
+          <>
+            {insights && <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-400">Wider school signals</p>}
+            <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,34rem),1fr))]">{signals.items.map((x) => <SignalCard key={x.id} s={x} open={openWorkspace} canAssign={data.can_assign_followup} onAssigned={onRefresh} />)}</div>
+            {signals.total > signals.items.length && <p className="mt-2 text-xs text-slate-500">Showing the {signals.items.length} most important of {num(signals.total)}.</p>}
+          </>
+        )}
+        {signals && signals.items.length === 0 && !insights && <div className={SURFACE}><EmptyNote icon={BrainCircuit}>No signal needs your attention right now.</EmptyNote></div>}
+      </SectionBlock>
+    ) : null,
+    work: workPanels.length > 0 ? (
+      <SectionBlock key="work" id="my-work" icon={Briefcase} title="My work" subtitle="What you need to do, follow up or know today">{columns(workPanels)}</SectionBlock>
+    ) : null,
+    performance: performancePanels.length > 0 ? (
+      <SectionBlock key="performance" id="my-performance" icon={Gauge} title="My performance" subtitle="How things are going, with the trend and the comparison">{columns(performancePanels)}</SectionBlock>
+    ) : null,
+    history: historyNode ? (
+      <SectionBlock key="history" id="my-history" icon={History} title="My history" subtitle="What was decided and what came of it">{columns([{ node: historyNode, key: 'history' }], false)}</SectionBlock>
+    ) : null,
+  };
+  // With something urgent, intelligence leads. Otherwise the day's work and performance come first.
+  const sequence: Array<keyof typeof sections> = urgent.length > 0 ? ['intelligence', 'work', 'performance', 'history'] : ['work', 'performance', 'intelligence', 'history'];
+
   return (
     <div className="mx-auto w-full max-w-[2200px] flex-1 px-1 pb-8 sm:px-2">
       <HeroFrame
@@ -1168,24 +1487,75 @@ function RoleWorkspaceView({
       >
         {prefs.ready ? hero : undefined}
       </HeroFrame>
+      {prefs.ready && stackFor('hero')}
 
       {/* Wait for the user's layout too, so hidden widgets never flash in. */}
       {!prefs.ready && <PremiumSkeleton />}
       {prefs.ready && !prefs.hasVisible() && <AllWidgetsHiddenNotice />}
 
       {prefs.ready && (
-        <div className="space-y-4">
-          <AttentionBar items={attention} />
-          {glanceItems.length > 0 && <StatStrip items={glanceItems} />}
+        <div className="space-y-5">
+          <AskBar
+            suggestions={ASK[data.role] ?? ASK.workspace}
+            placeholder={audience === 'student' ? 'Ask about your learning, homework or progress…' : audience === 'teacher' ? 'Ask about your classes, students or pending work…' : undefined}
+          />
 
-          {panels.length > 0 && (
-            // Panels flow into as many columns as the width allows (about 28rem each), so the layout
-            // follows the window, browser zoom and big monitors without any breakpoint to maintain.
-            <div className="[column-gap:1rem] [column-width:28rem]">
-              {ordered.map(({ node, key }) => (
-                <MovablePanel key={key} id={key} keys={orderedKeys} dragging={dragging} setDragging={setDragging} move={order.move} nudge={order.nudge}>{node}</MovablePanel>
-              ))}
+          {!isBoard && prefs.isVisible('panel.focus') && (
+            <div className="grid items-stretch gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr))]">
+              <PrioritiesCard urgent={urgent} action={action} />
+              {w.progress && <ProgressCard items={w.progress} attendanceTarget={target} />}
+              {audience === 'teacher' && insights && <TopInsightCard s={topInsight} total={insights.total} title="Who needs me first" description="students need support" seeAll={goIntel} />}
+              {audience === 'student' && <NextStepCard next={w.my_next ?? null} />}
+              {!audience && signals && <TopSignalCard s={topSignal} total={signals.total} seeAll={goIntel} />}
             </div>
+          )}
+
+          <CustomWidgetsSection widgets={custom} onChange={setCustom} />
+          {isBoard && w.health && explorable('health', undefined, <HealthCard indicators={w.health} canSet={data.can_set_targets} onSaved={onRefresh} yearCompare={w.year_compare} />)}
+          {isBoard && (w.decisions_for_me || w.management_delivery) && (
+            <div className="grid items-start gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,30rem),1fr))]">
+              {w.decisions_for_me && <div>{explorable('decisions', 'communication', <DecisionsCard data={w.decisions_for_me} open={openWorkspace} canDecide={data.can_decide} onDecided={onRefresh} />)}</div>}
+              {(w.management_delivery || w.payroll) && (
+                <div className="space-y-4">
+                  {w.management_delivery && explorable('delivery', 'communication', <DeliveryCard data={w.management_delivery} />)}
+                  {w.payroll && explorable('payroll', 'staff', <PayrollCard data={w.payroll} />)}
+                </div>
+              )}
+            </div>
+          )}
+          {!isBoard && w.payroll && <PayrollCard data={w.payroll} />}
+          {isBoard && sections.intelligence}
+          {isBoard && w.data_trust && <TrustCard data={w.data_trust} />}
+
+          {isBoard ? (
+            <section aria-label="Operational detail" className="pt-1">
+              <button
+                type="button" onClick={() => setDetailOpen((o) => !o)} aria-expanded={detailOpen}
+                className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-900/[0.08] outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-indigo-500/40 print:hidden"
+              >
+                {detailOpen ? 'Hide' : 'Show'} operational detail
+                <span className="text-xs font-normal text-slate-400">attendance, fees, admissions, results, transport, hostel</span>
+              </button>
+              {detailOpen && (
+                <div className="mt-4 space-y-5">
+                  {glanceItems.length > 0 && <>{<StatStrip items={glanceItems} />}{stackFor('glance')}</>}
+                  {sections.work}
+                  {sections.performance}
+                  {sections.history}
+                </div>
+              )}
+            </section>
+          ) : (
+            <>
+              {glanceItems.length > 0 && <>{<StatStrip items={glanceItems} />}{stackFor('glance')}</>}
+              {sequence.map((name) => sections[name])}
+            </>
+          )}
+
+          {extra && (
+            <SectionBlock id="my-learning" icon={Compass} title="My learning path" subtitle="Your adaptive learning, chapter by chapter">
+              {extra}
+            </SectionBlock>
           )}
 
           {nothing && prefs.hasVisible() && <div className={SURFACE}><EmptyNote icon={History}>There is nothing to show for your role yet.</EmptyNote></div>}
@@ -1195,7 +1565,7 @@ function RoleWorkspaceView({
   );
 }
 
-export default function RoleWorkspaceDashboard() {
+export default function RoleWorkspaceDashboard({ renderExtra }: { renderExtra?: (role: string) => React.ReactNode } = {}) {
   const { user, logout } = useAuth();
   const [data, setData] = useState<RoleWorkspaceSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1251,7 +1621,7 @@ export default function RoleWorkspaceDashboard() {
 
   if (data) {
     // key=role: a different role (e.g. after switching profile) remounts and re-reads its own saved layout.
-    return <RoleWorkspaceView key={data.role} data={data} loadedAt={loadedAt} refreshing={refreshing} onRefresh={() => load('refresh')} onPeriod={changePeriod} onFilter={changeFilter} />;
+    return <RoleWorkspaceView key={data.role} data={data} loadedAt={loadedAt} refreshing={refreshing} onRefresh={() => load('refresh')} onPeriod={changePeriod} onFilter={changeFilter} extra={renderExtra?.(data.role)} />;
   }
 
   const firstName = (user?.name || '').trim().split(/\s+/)[0];

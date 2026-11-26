@@ -51,7 +51,8 @@ export default function Dashboard() {
     );
   }
 
-  if (role === 'workspace') return <RoleWorkspaceDashboard />;
+  // A student's own learning path (the adaptive chapter dashboard) sits under the new home rather than being lost.
+  if (role === 'workspace') return <RoleWorkspaceDashboard renderExtra={(r) => (r === 'student' ? <StudentDashboard /> : null)} />;
 
   return (
     <>
