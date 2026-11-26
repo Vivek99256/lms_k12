@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlaskConical, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { FlaskConical, LayoutGrid, List, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TopicSimulations } from './simulations/SimulationsSection';
 import {
@@ -67,6 +67,7 @@ export function PrayogshalaTopicPanel({ chapterId, canManage, reloadKey, onOpenL
   const [error, setError] = useState('');
   const [busyTopic, setBusyTopic] = useState<number | null>(null);
   const [notice, setNotice] = useState('');
+  const [showList, setShowList] = useState(false);
 
   const load = useCallback(async () => {
     setError('');
@@ -143,17 +144,42 @@ export function PrayogshalaTopicPanel({ chapterId, canManage, reloadKey, onOpenL
 
   const done = topics.filter((t) => t.state === 'published' || t.state === 'ready').length;
 
+  // The list is a generation workbench. By default it holds only the topics that still need work; the
+  // generated labs live in the grid below. "Topic list" shows every topic, "Grid view" goes back.
+  const pending = topics.filter((t) => t.state !== 'published' && t.state !== 'ready');
+  const visible = showList ? topics : [];
+  const toggle = (
+    <Button type="button" variant="outline" onClick={() => setShowList((v) => !v)} className="h-9 rounded-full px-4 text-xs">
+      {showList ? <LayoutGrid size={14} className="mr-1.5" /> : <List size={14} className="mr-1.5" />}
+      {showList ? 'Grid view' : 'Topic list'}
+    </Button>
+  );
+  if (visible.length === 0) {
+    return (
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <span className="text-xs text-slate-500">
+          {done} of {topics.length} topics have an activity
+          {pending.length > 0 ? ` · ${pending.length} not generated yet` : ''}
+        </span>
+        {toggle}
+      </div>
+    );
+  }
+
   return (
     <section className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 via-white to-sky-50/70 p-4 sm:p-5" aria-label="Prayogshala by topic">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-base font-semibold text-slate-900">Prayogshala by topic</h3>
-        {canManage ? (
-          <span className="text-xs text-slate-500">{done} of {topics.length} topics have an activity</span>
-        ) : null}
+        <div className="flex items-center gap-3">
+          {canManage ? (
+            <span className="text-xs text-slate-500">{done} of {topics.length} topics have an activity</span>
+          ) : null}
+          {toggle}
+        </div>
       </div>
       {notice ? <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">{notice}</p> : null}
       <ul className="divide-y divide-indigo-100">
-        {topics.map((entry) => {
+        {visible.map((entry) => {
           const activity = entry.activity;
           const busy = busyTopic === entry.topic_id;
           const hasLab = !!activity?.lab_config;
