@@ -200,7 +200,7 @@ export function Panel({
             </span>
           )}
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-slate-900">{title}</h2>
+            <h3 className="truncate text-sm font-semibold text-slate-900">{title}</h3>
             {description && <p className="truncate text-xs text-slate-500">{description}</p>}
           </div>
         </div>
@@ -337,7 +337,8 @@ export function AreaChart({
         ) : (
           <circle key={`m${k}`} cx={seg[0].x} cy={seg[0].y} r={3.5} fill="#4f46e5" />
         ))}
-        {points.map((p, i) => (i % labelEvery === 0 || i === n - 1) && (
+        {/* The last label is always drawn, so a regular label too close to it is skipped instead of printing on top of it. */}
+        {points.map((p, i) => ((i % labelEvery === 0 && n - 1 - i >= labelEvery * 0.8) || i === n - 1) && (
           <text key={i} x={x(i)} y={height - 7} textAnchor="middle" fontSize={10.5} fill={i === n - 1 ? '#0f172a' : '#94a3b8'} fontWeight={i === n - 1 ? 600 : 400}>{p.label}</text>
         ))}
         {hover != null && (
