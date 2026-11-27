@@ -81,12 +81,112 @@ export interface UnsubmittedWorkItem {
 export interface DraftReviewNote {
   context_type?: string;
   type?: string;
+  category?: string;
   student_id?: number;
   student_name?: string;
+  assessment_title?: string;
+  score?: number;
+  total_marks?: number;
+  percent?: number;
+  work_type?: string;
   subject: string;
   draft_body: string;
   status: string;
   recommended_action?: string;
+}
+
+export interface PublishedExamItem {
+  exam_id: number;
+  paper_name: string;
+  subject_name?: string;
+  standard_name?: string;
+  total_marks: number | null;
+  passing_marks: number | null;
+  exam_type: string;
+  attempt_count: number;
+  avg_percent: number | null;
+}
+
+export interface AllAttemptItem {
+  attempt_id: number;
+  student_id: number;
+  student_name: string;
+  exam_id: number;
+  paper_name: string;
+  subject_name?: string;
+  standard_id?: number | null;
+  obtain_marks: number | null;
+  total_marks: number | null;
+  percent: number | null;
+  is_at_risk: boolean;
+  attempted_at?: string;
+}
+
+export interface CourseworkItem {
+  assignment_id: number;
+  student_id?: number | null;
+  student_name?: string | null;
+  title: string;
+  work_type: string;
+  subject_name?: string | null;
+  standard_name?: string | null;
+  standard_id?: number | null;
+  division_id?: number | null;
+  student_submission_status?: string | null;
+  teacher_submission_status?: string | null;
+  computed_status: 'reviewed' | 'pending_review' | 'overdue' | 'not_submitted';
+  assigned_on?: string | null;
+  due_on?: string | null;
+}
+
+export interface AgentHandoffStage {
+  stage: number;
+  from_agent: string;
+  to_agent: string;
+  handoff_title: string;
+  input_records: number;
+  processed_records: number;
+  passed_records: number;
+  validation_gate: string;
+  validation_status: string;
+  duration_ms: number;
+  summary: string;
+}
+
+export interface DataChangeDiff {
+  previous_run_at: string | null;
+  previous_exams: number;
+  current_exams: number;
+  delta_exams: number;
+  previous_attempts: number;
+  current_attempts: number;
+  delta_attempts: number;
+  previous_at_risk: number;
+  current_at_risk: number;
+  delta_at_risk: number;
+  previous_assignments: number;
+  current_assignments: number;
+  delta_assignments: number;
+  previous_unsubmitted: number;
+  current_unsubmitted: number;
+  delta_unsubmitted: number;
+  status_has_changed: boolean;
+}
+
+export interface ExamAssessmentHistoryItem {
+  id: number | string;
+  run_reference: string;
+  agent_id?: number | string;
+  agent_key?: string;
+  agent_name: string;
+  step_number?: number | null;
+  trigger_type: string;
+  status: string;
+  duration_ms: number;
+  started_at: string;
+  finished_at: string;
+  input?: Record<string, unknown>;
+  output?: Record<string, unknown>;
 }
 
 export interface ExamAssessmentPipelineReport {
@@ -105,6 +205,13 @@ export interface ExamAssessmentPipelineReport {
     average_score: number | string | null;
     needs_attention_count: number;
     benchmark_percent: number;
+    records_fetched?: number;
+    records_processed?: number;
+    records_identified?: number;
+    records_passed?: number;
+    tables_accessed?: string[];
+    published_exams_sample?: PublishedExamItem[];
+    all_attempts_sample?: AllAttemptItem[];
     at_risk_sample: AtRiskStudentItem[];
   };
   assignment_status?: {
@@ -120,17 +227,37 @@ export interface ExamAssessmentPipelineReport {
     submitted: number;
     reviewed: number;
     not_submitted: number;
+    records_fetched?: number;
+    records_processed?: number;
+    records_identified?: number;
+    records_passed?: number;
+    tables_accessed?: string[];
+    all_work_sample?: CourseworkItem[];
     not_submitted_sample: UnsubmittedWorkItem[];
   };
   draft_reviews?: {
     cohort_summary: string;
     student_drafts_count: number;
     student_drafts: DraftReviewNote[];
+    records_received?: number;
+    records_processed?: number;
+    tables_accessed?: string[];
+    storage_location?: Record<string, string>;
+    correlations?: {
+      double_risk_students: Array<{ student_id: number; student_name: string; exam_name: string; exam_percent: number; unsubmitted_count: number }>;
+      double_risk_count: number;
+      exam_only_students: Array<{ student_id: number; student_name: string; exam_name: string; exam_percent: number }>;
+      exam_only_count: number;
+      coursework_only_students: Array<{ student_id: number; student_name: string; unsubmitted_count: number; work_type?: string }>;
+      coursework_only_count: number;
+    };
   };
   pipeline_execution?: {
     steps: PipelineStepExecution[];
     gates: PipelineValidationGate[];
   };
+  handoff_chain?: AgentHandoffStage[];
+  data_changes?: DataChangeDiff;
   summary?: {
     total_standards_scanned: number;
     standards_passed_all_gates: number;
@@ -364,5 +491,21 @@ export async function getExamAssessmentEso(
     cache: 'no-store',
   });
   return handleResponse<{ eso: ExamAssessmentEso; server_time: string }>(res);
+}
+
+/**
+ * Fetch execution history and traceability logs for Exam & Assessment agents.
+ */
+export async function getExamAssessmentHistory(
+  context: IntelligenceContext,
+  limit = 20
+): Promise<{ history: ExamAssessmentHistoryItem[]; total_runs: number; server_time: string }> {
+  const url = `${resolveProxyEndpoint('history')}&limit=${limit}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: buildHeaders(context),
+    cache: 'no-store',
+  });
+  return handleResponse<{ history: ExamAssessmentHistoryItem[]; total_runs: number; server_time: string }>(res);
 }
 
