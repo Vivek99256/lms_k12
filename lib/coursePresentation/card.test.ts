@@ -5,6 +5,9 @@ import { COURSE_PRESENTATION_CARD_ID, isCoursePresentationCard, routeCardOpen, s
 import { coursePresentationEnabledFor } from './scope';
 import { readCpState, withCpState, withoutCpState } from './urlState';
 
+// The tests below describe the listed-chapters behaviour; the open-to-every-chapter default has its own test at the end.
+process.env.NEXT_PUBLIC_COURSE_PRESENTATION_ALL_CHAPTERS = 'false';
+
 const courseCard = { id: COURSE_PRESENTATION_CARD_ID, type: 'Classroom presentation', chapterId: '8592', coursePresentationPilot: true, prayogshala: null };
 const lab = { id: '68', type: 'Prayogshala', chapterId: '8592', prayogshala: { id: 68, status: 'review' } };
 
@@ -74,6 +77,23 @@ test('the card is added only for a chapter in scope, in the Classroom lane, once
   assert.equal(shouldShowCoursePresentationCard({ ...base, items: [{ type: 'Classroom presentation' }, { type: 'Classroom presentation' }] }), true);
   // The list already holding the entry card does not get a second one.
   assert.equal(shouldShowCoursePresentationCard({ ...base, items: [{ type: 'Classroom presentation', coursePresentationPilot: true }] }), false);
+});
+
+test('open to every chapter by default: any real chapter gets the card and the screen, bad ids still do not', () => {
+  const key = 'NEXT_PUBLIC_COURSE_PRESENTATION_ALL_CHAPTERS';
+  try {
+    delete process.env[key];
+    for (const id of [8604, 8605, 8614, 25838, 41679, '8605']) assert.equal(coursePresentationEnabledFor(id), true, String(id));
+    for (const id of [0, -1, '', null, undefined, 'abc', '8592.5']) assert.equal(coursePresentationEnabledFor(id as never), false, String(id));
+    assert.equal(shouldShowCoursePresentationCard({ chapterId: '8605', lane: 'classroom', loaded: true, items: [{ type: 'Prayogshala' }] }), true);
+    assert.equal(shouldShowCoursePresentationCard({ chapterId: '8605', lane: 'teacher', loaded: true, items: [] }), false, 'still the Classroom lane only');
+    assert.equal(routeCardOpen({ ...courseCard, chapterId: '8605' }, 'classroom'), 'course-presentation');
+    // Switched off, it is the list again.
+    process.env[key] = 'false';
+    assert.equal(coursePresentationEnabledFor(8605), false);
+  } finally {
+    process.env[key] = 'false'; // back to the file-level default the other tests rely on
+  }
 });
 
 test('url state round-trips, and the pre-flight needs both choices', () => {

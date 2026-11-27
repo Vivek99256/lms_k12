@@ -857,6 +857,42 @@ function getQuestionBankCategory(course: Course, chapterTitle: string, conceptTi
   return course.subject || 'Concept';
 }
 
+/**
+ * Prayogshala layout: topic bar, then the lab cards (children), then the simulations. The provider has to wrap
+ * the cards as well so the simulations section can sit below them. Outside the Prayogshala tab it renders only the children.
+ */
+function PrayogshalaSimsScope({
+  enabled, chapterKey, chapterId, canManage, canCreate, standardName, subjectName, chapterName, topicPanel, children,
+}: {
+  enabled: boolean;
+  chapterKey: string;
+  chapterId: number;
+  canManage: boolean;
+  canCreate: boolean;
+  standardName?: string | null;
+  subjectName?: string | null;
+  chapterName?: string | null;
+  topicPanel: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  if (!enabled) return <>{children}</>;
+  return (
+    <SimulationsProvider
+      key={chapterKey}
+      chapterId={chapterId}
+      canManage={canManage}
+      canCreate={canCreate}
+      standardName={standardName}
+      subjectName={subjectName}
+      chapterName={chapterName}
+    >
+      {topicPanel}
+      {children}
+      <SimulationsSection />
+    </SimulationsProvider>
+  );
+}
+
 export default function ChapterListPage() {
   const router = useRouter();
   const params = useParams();
@@ -6155,27 +6191,26 @@ export default function ChapterListPage() {
             </div>
           ) : null}
 
-          {activeContentLibraryTab === 'Prayogshala' && activeLibraryChapter && /^\d+$/.test(activeLibraryChapter.id) ? (
-            <SimulationsProvider
-              key={activeLibraryChapter.id}
-              chapterId={Number(activeLibraryChapter.id)}
-              canManage={canCreateContent !== false}
-              canCreate={canCreateContent === true}
-              standardName={subjectData?.subject?.standard_name}
-              subjectName={subjectData?.subject?.subject_name}
-              chapterName={activeLibraryChapter.title}
-            >
+          <PrayogshalaSimsScope
+            enabled={activeContentLibraryTab === 'Prayogshala' && !!activeLibraryChapter && /^\d+$/.test(activeLibraryChapter.id)}
+            chapterKey={activeLibraryChapter?.id ?? ''}
+            chapterId={Number(activeLibraryChapter?.id)}
+            canManage={canCreateContent !== false}
+            canCreate={canCreateContent === true}
+            standardName={subjectData?.subject?.standard_name}
+            subjectName={subjectData?.subject?.subject_name}
+            chapterName={activeLibraryChapter?.title}
+            topicPanel={
               <PrayogshalaTopicPanel
-                key={activeLibraryChapter.id}
-                chapterId={Number(activeLibraryChapter.id)}
+                key={activeLibraryChapter?.id}
+                chapterId={Number(activeLibraryChapter?.id)}
                 canManage={canCreateContent !== false}
                 reloadKey={contentReloadKey}
                 onOpenLab={openPrayogshalaLab}
                 onChanged={reloadChapterContent}
               />
-              <SimulationsSection />
-            </SimulationsProvider>
-          ) : null}
+            }
+          >
 
           {contentError ? (
             <div className="flex flex-col items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
@@ -6291,6 +6326,7 @@ export default function ChapterListPage() {
                 ))}
               </div>
             )}
+          </PrayogshalaSimsScope>
 
           {cpOpen ? (
             <CoursePresentationFlow

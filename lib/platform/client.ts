@@ -15,6 +15,8 @@ import type {
   SchedulerPayload,
   ScheduledTaskChange,
   ScheduledTaskRow,
+  FeesIntelligenceData,
+  WorkflowApproverPreview,
   WorkflowChain,
   WorkflowInput,
   WorkflowPayload,
@@ -174,6 +176,40 @@ export function updateWorkflow(id: number, input: WorkflowInput): Promise<{ work
 
 export function deleteWorkflow(id: number): Promise<{ deleted: number }> {
   return call<{ deleted: number }>(`/workflow/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * Who a graph-resolved approver type (`reporting_manager` | `principal` |
+ * `class_teacher`) actually resolves to right now — read-only, for the step
+ * editor's "Preview" action. `role` and `user` are not accepted; the server
+ * rejects them (see WorkflowController::previewApprover).
+ */
+export function previewWorkflowApprover(input: {
+  approverType: 'reporting_manager' | 'principal' | 'class_teacher';
+  studentId?: number;
+  divisionId?: number;
+}): Promise<WorkflowApproverPreview> {
+  const params = new URLSearchParams({ approver_type: input.approverType });
+  if (input.studentId) params.set('student_id', String(input.studentId));
+  if (input.divisionId) params.set('division_id', String(input.divisionId));
+
+  return call<WorkflowApproverPreview>(`/workflow/preview-approver?${params.toString()}`);
+}
+
+/**
+ * Tenant-wide Fees intelligence banner: sibling families, a bounded defaulter
+ * sample, real channel engagement, TC no-dues clearance, and the concession/
+ * refund queue. There is no selected student on this screen, so this takes
+ * none — see FeesIntelligenceData for why each section may legitimately come
+ * back `available: false` rather than populated.
+ *
+ * The defaulter and TC sections each run several real per-student fee
+ * lookups server-side (~20-30s on a cold cache), so this is cached for 15
+ * minutes per tenant — call it only when the banner is actually opened, not
+ * on every page load.
+ */
+export function fetchFeesIntelligence(): Promise<FeesIntelligenceData> {
+  return call<FeesIntelligenceData>('/workflow/fees-intelligence');
 }
 
 // ── Shared helpers for the endpoints that carry paging metadata ─────────────

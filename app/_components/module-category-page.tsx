@@ -10,6 +10,7 @@ import {
   ChevronRight,
   GitBranch,
   LayoutList,
+  Lightbulb,
   Loader2,
   ScrollText,
   Share2,
@@ -29,6 +30,7 @@ import {
   intelligenceEntryFor,
   ModuleIntelligenceContractScreen,
 } from '@/app/_components/module-intelligence-contract';
+import { PalRecommendationScreen } from '@/app/pal/recommendation/_components/PalRecommendationScreen';
 import { AddProcessPage } from '@/app/general/add_process/AddProcessPage';
 import { ModuleJourney } from '@/app/general/onboarding/_components/ModuleJourney';
 import { SchedulerConsole } from '@/app/platform-services/scheduler/_components/SchedulerConsole';
@@ -166,6 +168,12 @@ const INTELLIGENCE_CATEGORY_KEY = 'intelligence';
  * for this module, resolved at request time rather than at seed time.
  */
 const KNOWLEDGE_GRAPH_CATEGORY_KEY = 'knowledge-graph';
+
+/**
+ * The PAL Recommendation Intelligence tab — Teach/Learn only this phase, see
+ * `recommendationScreens` below.
+ */
+const RECOMMENDATION_CATEGORY_KEY = 'recommendation';
 
 /**
  * The categories that are a console rather than a group of menus.
@@ -775,6 +783,28 @@ export function ModuleCategoryPage({
     ];
   }, [categoryKey, category, moduleName, knowledgeGraphEnabled]);
 
+  const recommendationScreens = useMemo<ModuleStaticScreen[]>(() => {
+    if (categoryKey !== RECOMMENDATION_CATEGORY_KEY && category?.key !== RECOMMENDATION_CATEGORY_KEY) {
+      return [];
+    }
+
+    // Scoped to Teach/Learn only this phase — see the PAL Recommendation
+    // Intelligence plan. Other modules get this tab only once their own
+    // backend capability engines exist.
+    if (moduleName !== 'teach_learn') {
+      return [];
+    }
+
+    return [
+      {
+        id: 'pal-recommendation',
+        label: 'Recommendation',
+        icon: Lightbulb,
+        render: () => <PalRecommendationScreen />,
+      },
+    ];
+  }, [categoryKey, category, moduleName]);
+
   /**
    * The Intelligence tab, for any module that has not brought its own.
    *
@@ -888,6 +918,7 @@ export function ModuleCategoryPage({
       ...consoleScreens,
       ...auditScreens,
       ...graphScreens,
+      ...recommendationScreens,
       ...intelligenceScreens,
       ...dedupedStaticScreens,
     ].map<Tab>((entry) => ({
@@ -902,6 +933,7 @@ export function ModuleCategoryPage({
     consoleScreens,
     auditScreens,
     graphScreens,
+    recommendationScreens,
     intelligenceScreens,
     staticScreens,
     staticScreensPlacement,

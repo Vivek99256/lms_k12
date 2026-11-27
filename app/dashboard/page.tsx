@@ -6,6 +6,7 @@ import { resolveDashboardRole, type DashboardRole } from '@/app/dashboard/_lib/r
 import AdminDashboard from '@/app/dashboard/AdminDashboard';
 import TeacherDashboard from '@/app/dashboard/TeacherDashboard';
 import StudentDashboard from '@/app/dashboard/StudentDashboard';
+import RoleWorkspaceDashboard from '@/app/dashboard/RoleWorkspaceDashboard';
 
 /**
  * Single post-login destination for every role. Detects the signed-in
@@ -16,21 +17,24 @@ import StudentDashboard from '@/app/dashboard/StudentDashboard';
  * independently RBAC-checked server-side, so this branch is UX routing only.
  */import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 
-export default function Dashboard() {
-  /*
-   * Registers the page shape only.
-   *
-   * The stat tiles below are hardcoded placeholders, not retrieved figures. Passing
-   * them as `metrics` would put invented numbers into the assistant's prompt, and the
-   * grounding rules exist precisely to stop that — so they are deliberately withheld.
-   * The moment these tiles read from an API, add them here as `metrics` and the
-   * assistant can be asked about them.
-   */
+/**
+ * Registers the page shape only, for the dashboards whose tiles are not read from an API.
+ *
+ * Those tiles are hardcoded placeholders, not retrieved figures. Passing them as `metrics` would put
+ * invented numbers into the assistant's prompt, and the grounding rules exist precisely to stop that —
+ * so they are deliberately withheld. The role workspace reads real figures and registers them itself,
+ * so this must not be mounted there: a parent's registration would overwrite the child's.
+ */
+function PlaceholderAiContext() {
   useRegisterPageAiContext({
     pageTitle: 'Dashboard',
     pageType: 'dashboard',
   });
 
+  return null;
+}
+
+export default function Dashboard() {
   const [role, setRole] = useState<DashboardRole | null>(null);
 
   useEffect(() => {
@@ -47,7 +51,13 @@ export default function Dashboard() {
     );
   }
 
-  if (role === 'teacher') return <TeacherDashboard />;
-  if (role === 'student') return <StudentDashboard />;
-  return <AdminDashboard />;
+  // A student's own learning path (the adaptive chapter dashboard) sits under the new home rather than being lost.
+  if (role === 'workspace') return <RoleWorkspaceDashboard renderExtra={(r) => (r === 'student' ? <StudentDashboard /> : null)} />;
+
+  return (
+    <>
+      <PlaceholderAiContext />
+      {role === 'teacher' ? <TeacherDashboard /> : role === 'student' ? <StudentDashboard /> : <AdminDashboard />}
+    </>
+  );
 }

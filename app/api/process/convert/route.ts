@@ -96,14 +96,40 @@ Rules:
 - Preserve step order and numbering.`;
 
 /** The model was asked for JSON only, but a stray code fence or sentence around it is tolerated. */
+function tryParse(s: string): unknown {
+  return JSON.parse(s);
+}
+
 function parseJsonObject(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("The AI reply was not a JSON object.");
-    return JSON.parse(match[0]);
+  // Strip markdown code fences the model sometimes wraps around JSON.
+  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+  try { return tryParse(stripped); } catch { /* fall through */ }
+
+  // Extract the outermost {...} block.
+  const match = stripped.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("The AI reply was not a JSON object.");
+  const raw = match[0];
+  try { return tryParse(raw); } catch { /* fall through */ }
+
+  // Apply repairs incrementally, testing after each one.
+  let s = raw;
+  const repairs: Array<(v: string) => string> = [
+    // 1. Escape literal (unescaped) newlines that appear inside string values
+    (v) => v.replace(/"((?:[^"\\]|\\.)*)"/g, (_, inner: string) =>
+      `"${inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`),
+    // 2. Missing comma between consecutive objects in an array: }  {
+    (v) => v.replace(/\}\s*\{/g, '},{'),
+    // 3. Missing comma between consecutive arrays: ]  [
+    (v) => v.replace(/\]\s*\[/g, '],['),
+    // 4. Missing comma between consecutive string items: "a"  "b"
+    (v) => v.replace(/"(\s*)\n(\s*)"/g, '","'),
+  ];
+  for (const repair of repairs) {
+    s = repair(s);
+    try { return tryParse(s); } catch { /* continue */ }
   }
+  // Last attempt after all repairs applied.
+  return tryParse(s);
 }
 
 function getErrorMessage(error: unknown) {

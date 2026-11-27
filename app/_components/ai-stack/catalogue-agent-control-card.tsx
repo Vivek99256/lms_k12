@@ -41,6 +41,9 @@ import {
 } from 'lucide-react';
 
 import { readModuleWorkspaceSession } from '@/lib/module-ai/module-ai-stack';
+import { PendingResourcesPanel } from './pending-resources-panel';
+import { backgroundStatus, type BackgroundStatus, type PendingProgress } from '@/lib/teach-learn/pending-summary';
+import { loadPending, mergePending, removePending, resourceKey, savePending, type SavedPending } from '@/lib/teach-learn/pending-store';
 import { resolveAiBaseUrl } from '@/app/components/utils/api_url';
 import {
   getCatalogueAgentState,
@@ -76,6 +79,7 @@ import {
   type ContentCoverageCheck,
   type ContentResourceStatus,
   type RunPipelineOptions,
+  type PendingResource,
 } from '@/lib/teach-learn/catalogue-agent-client';
 import {
   CONTENT_TEMPLATES,
@@ -948,8 +952,10 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
 
   // Helper to resolve real viewer URLs for generated & audited content
   const resolveContentViewUrl = useCallback((contentId?: number | null, rawUrl?: string | null) => {
-    if (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
-      return rawUrl;
+    if (rawUrl) {
+      if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('/')) {
+        return rawUrl;
+      }
     }
     const base = resolveAiBaseUrl();
     return `${base.replace(/\/+$/, '')}/api/lms-content-view/${contentId || ''}`;
@@ -1158,7 +1164,52 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
 
   // Execute the 3-Agent Sequential Pipeline based strictly on confirmed user selections
   // Execute the 3-Agent Sequential Pipeline strictly one by one (Agent 1 -> Agent 2 -> Agent 3)
+  // What the background resources (presentations, study documents) have really reached, polled from the server. It replaces the
+  // "being generated" sentence of the execution summary as they are stored. No teacher review is involved.
+  const [pendingText, setPendingText] = useState<string | null>(null);
+  const [pendingProgress, setPendingProgress] = useState<PendingProgress | null>(null);
+  const handlePendingSummary = useCallback((text: string, progress: PendingProgress) => {
+    setPendingText(text);
+    setPendingProgress(progress);
+  }, []);
+  // The one status the top badge and the Agent 3 box show: "completed" only once nothing is still generating. Agent 3's own
+  // request stores the chapter assessment itself; that counts as stored.
+  const immediateStored = Number(pipelineResult?.content_generation?.generated_count ?? 0);
+  const backgroundState: BackgroundStatus | null = pendingProgress ? backgroundStatus(pendingProgress, immediateStored) : null;
+  const storedSoFar = pendingProgress ? pendingProgress.stored + immediateStored : immediateStored;
+  const totalToStore = pendingProgress ? pendingProgress.total + immediateStored : immediateStored;
+  // Remembered items that the current run's own panel is not already showing.
+  const currentKeys = new Set((pipelineResult?.content_generation?.pending_resources ?? []).map(resourceKey));
+
+  // What AI Stack started is remembered by this browser, so a refresh (or coming back later) still shows the generations that are
+  // running, asked about live; the server stays the truth about their state.
+  const [savedPending, setSavedPending] = useState<SavedPending[]>([]);
+  const [earlierFinished, setEarlierFinished] = useState<string[]>([]);
+  const earlierResources = savedPending.map((e) => e.resource).filter((r) => !currentKeys.has(resourceKey(r)));
+  const pendingScope = () => String(readModuleWorkspaceSession().instituteId ?? 'default');
+  useEffect(() => {
+    // Reads the browser's store once on mount (it does not exist during the server render).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSavedPending(loadPending(window.localStorage, pendingScope()));
+  }, []);
+  const rememberPending = (started: PendingResource[]) => {
+    const next = mergePending(loadPending(window.localStorage, pendingScope()), started);
+    savePending(window.localStorage, pendingScope(), next);
+    setSavedPending(next);
+  };
+  const clearFinishedEarlier = () => {
+    const next = removePending(loadPending(window.localStorage, pendingScope()), earlierFinished);
+    savePending(window.localStorage, pendingScope(), next);
+    setSavedPending(next);
+    setEarlierFinished([]);
+  };
+  const handleEarlierSummary = useCallback((_text: string, progress: PendingProgress) => {
+    setEarlierFinished(progress.finishedKeys ?? []);
+  }, []);
+
   const executePipeline = async (options: RunPipelineOptions) => {
+    setPendingText(null);
+    setPendingProgress(null);
     setPipelineRunning(true);
     setPipelineError(null);
     setPipelineResult(null);
@@ -1285,6 +1336,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
       }
 
       const finalReport = step3Res.report;
+
       const genCount = Number(finalReport.content_generation?.generated_count ?? 0);
 
       setStep3State({
@@ -1297,6 +1349,9 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
 
       setPipelineResult(finalReport);
       setExecutingStep(0);
+      if (finalReport.content_generation?.pending_resources?.length) {
+        rememberPending(finalReport.content_generation.pending_resources);
+      }
 
       if (onValidatedRef.current) {
         onValidatedRef.current(finalReport);
@@ -3211,8 +3266,11 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                           {STUDENT_EXPERIENCES.find((e) => e.id === selectedStudentExperience)?.label || selectedStudentExperience}
                         </span>
                       </div>
+                      {/* The template only styles the chapter assessment now; presentations and study documents use the Classroom
+                          Resource design. So it is shown only when an assessment is part of the run. */}
+                      {includeAssessment && (
                       <div>
-                        <span className="font-semibold text-slate-500">Design Template: </span>
+                        <span className="font-semibold text-slate-500">Design Template (chapter assessment): </span>
                         {(() => {
                           const tmpl = CONTENT_TEMPLATES.find((t) => t.id === selectedTemplate) || CONTENT_TEMPLATES[0];
                           return (
@@ -3229,6 +3287,12 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                           );
                         })()}
                       </div>
+                      )}
+                      {selectedResourceTypes.some((t) => ['Presentation', 'Revision Notes', 'Classroom Activity', 'Remedial Class'].includes(t)) && (
+                        <p className="text-[11px] leading-4 text-slate-500">
+                          The presentation, revision notes, classroom activity and remedial class are made in the Classroom Resource design, the same as ones created there.
+                        </p>
+                      )}
                       <div>
                         <span className="font-semibold text-slate-500">Classroom Resources: </span>
                         <div className="mt-1 flex flex-wrap gap-1">
@@ -3303,6 +3367,37 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
             )}
           </div>
 
+          {/* Generations started earlier (before a refresh, or in an earlier run) that are still tracked: shown with their real state
+              until they are stored or failed, so leaving or refreshing the page never hides work that is running. */}
+          {earlierResources.length > 0 && (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/40 p-5 shadow-sm space-y-3" data-testid="earlier-generation">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Earlier generation</h3>
+                  <p className="text-xs text-slate-600">
+                    These were started earlier and keep running in the background, even if you refresh or leave this page. Each is stored automatically once it passes validation.
+                  </p>
+                </div>
+                {earlierFinished.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearFinishedEarlier}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
+                  >
+                    Clear finished
+                  </button>
+                )}
+              </div>
+              <PendingResourcesPanel
+                key={earlierResources.map(resourceKey).join('|')}
+                resources={earlierResources}
+                readContext={readModuleWorkspaceSession}
+                onSummary={handleEarlierSummary}
+                title="Status"
+              />
+            </div>
+          )}
+
           {/* LIVE SEQUENTIAL AGENT EXECUTION TIMELINE */}
           {(pipelineRunning || pipelineResult) && (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
@@ -3314,6 +3409,12 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${
                         pipelineRunning
                           ? 'border border-amber-300 bg-amber-50 text-amber-900 animate-pulse'
+                          : backgroundState === 'in_progress'
+                          ? 'border border-sky-300 bg-sky-50 text-sky-900'
+                          : backgroundState === 'issues'
+                          ? 'border border-amber-300 bg-amber-50 text-amber-900'
+                          : backgroundState === 'failed'
+                          ? 'border border-red-200 bg-red-50 text-red-800'
                           : pipelineResult?.success
                           ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
                           : 'border border-red-200 bg-red-50 text-red-800'
@@ -3324,10 +3425,25 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                           <RefreshCw className="size-3 animate-spin" />
                           Live Sequential Execution In Progress
                         </>
+                      ) : backgroundState === 'in_progress' ? (
+                        <>
+                          <RefreshCw className="size-3 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                          Generation in progress
+                        </>
+                      ) : backgroundState === 'issues' ? (
+                        <>
+                          <AlertTriangle className="size-3 text-amber-600" aria-hidden="true" />
+                          Completed with issues
+                        </>
+                      ) : backgroundState === 'failed' ? (
+                        <>
+                          <XCircle className="size-3 text-red-600" aria-hidden="true" />
+                          Failed
+                        </>
                       ) : (
                         <>
                           <CheckCircle2 className="size-3 text-emerald-600" />
-                          Sequential Execution Completed
+                          {backgroundState === 'completed' ? 'Completed' : 'Sequential Execution Completed'}
                         </>
                       )}
                     </span>
@@ -3359,7 +3475,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                     <div className="rounded-xl border border-slate-200 bg-violet-50/60 px-3 py-1.5 text-center">
                       <span className="block text-[10px] font-bold uppercase text-violet-700">Newly Generated</span>
                       <span className="font-mono text-xs font-extrabold text-violet-800">
-                        {pipelineResult.content_generation?.generated_count ?? 0}
+                        {pendingProgress ? storedSoFar : (pipelineResult.content_generation?.generated_count ?? 0)}
                       </span>
                     </div>
                   </div>
@@ -3550,7 +3666,13 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                 >
                   <div className="flex items-center justify-between">
                     <span className={`flex size-6 items-center justify-center rounded-full font-bold text-xs ${
-                      step3State.status === 'completed'
+                      step3State.status === 'completed' && backgroundState === 'in_progress'
+                        ? 'bg-violet-600 text-white animate-pulse motion-reduce:animate-none'
+                        : step3State.status === 'completed' && backgroundState === 'issues'
+                        ? 'bg-amber-100 text-amber-800'
+                        : step3State.status === 'completed' && backgroundState === 'failed'
+                        ? 'bg-red-100 text-red-800'
+                        : step3State.status === 'completed'
                         ? 'bg-emerald-100 text-emerald-800'
                         : step3State.status === 'running'
                         ? 'bg-violet-600 text-white animate-pulse'
@@ -3560,8 +3682,12 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                     </span>
                     <span
                       className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                        step3State.status === 'running'
-                          ? 'bg-violet-100 text-violet-900 border border-violet-300 animate-pulse'
+                        step3State.status === 'running' || (step3State.status === 'completed' && backgroundState === 'in_progress')
+                          ? 'bg-violet-100 text-violet-900 border border-violet-300 animate-pulse motion-reduce:animate-none'
+                          : step3State.status === 'completed' && backgroundState === 'issues'
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                          : step3State.status === 'completed' && backgroundState === 'failed'
+                          ? 'bg-red-100 text-red-800 border border-red-200'
                           : step3State.status === 'completed'
                           ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                           : step3State.status === 'failed'
@@ -3569,11 +3695,18 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                           : 'bg-slate-100 text-slate-500'
                       }`}
                     >
-                      {step3State.status === 'running' && <RefreshCw className="size-2.5 animate-spin text-violet-700" />}
-                      {step3State.status === 'completed' && <CheckCircle2 className="size-2.5 text-emerald-700" />}
-                      {step3State.status === 'failed' && <XCircle className="size-2.5 text-red-700" />}
-                      {step3State.status === 'running'
+                      {(step3State.status === 'running' || (step3State.status === 'completed' && backgroundState === 'in_progress')) && (
+                        <RefreshCw className="size-2.5 animate-spin motion-reduce:animate-none text-violet-700" aria-hidden="true" />
+                      )}
+                      {step3State.status === 'completed' && (backgroundState === null || backgroundState === 'completed') && <CheckCircle2 className="size-2.5 text-emerald-700" />}
+                      {step3State.status === 'completed' && backgroundState === 'issues' && <AlertTriangle className="size-2.5 text-amber-700" aria-hidden="true" />}
+                      {((step3State.status === 'completed' && backgroundState === 'failed') || step3State.status === 'failed') && <XCircle className="size-2.5 text-red-700" />}
+                      {step3State.status === 'running' || (step3State.status === 'completed' && backgroundState === 'in_progress')
                         ? 'Generating…'
+                        : step3State.status === 'completed' && backgroundState === 'issues'
+                        ? 'Completed with issues'
+                        : step3State.status === 'completed' && backgroundState === 'failed'
+                        ? 'Failed'
                         : step3State.status === 'completed'
                         ? 'Gate 3 Completed'
                         : step3State.status === 'failed'
@@ -3600,17 +3733,21 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                         {selectedTeachingApproach}
                       </span>
                     </div>
+                    {includeAssessment && (
                     <div className="flex items-center justify-between text-slate-600">
-                      <span>Template:</span>
+                      <span>Assessment template:</span>
                       <span className="font-bold text-indigo-700 truncate max-w-[130px]" title={CONTENT_TEMPLATES.find(t => t.id === selectedTemplate)?.name}>
                         {CONTENT_TEMPLATES.find(t => t.id === selectedTemplate)?.badge || selectedTemplate}
                       </span>
                     </div>
+                    )}
                     <div className="flex items-center justify-between text-slate-600">
                       <span>Newly Generated:</span>
                       <span className="font-bold text-violet-700">
                         {step3State.status === 'running'
                           ? 'Generating…'
+                          : pendingProgress
+                          ? `${storedSoFar} of ${totalToStore} stored`
                           : step3State.generatedCount !== undefined
                           ? step3State.generatedCount
                           : (pipelineResult?.content_generation?.generated_count ?? 0)}
@@ -3619,12 +3756,20 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                     {step3State.duration_ms !== undefined && (
                       <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
                         <span>Generation Gate 3:</span>
-                        <span className="font-mono font-bold text-emerald-700">Passed ({step3State.duration_ms} ms)</span>
+                        {backgroundState === 'in_progress' ? (
+                          <span className="font-mono font-bold text-violet-700">Generating…</span>
+                        ) : backgroundState === 'issues' ? (
+                          <span className="font-mono font-bold text-amber-700">Completed with issues</span>
+                        ) : backgroundState === 'failed' ? (
+                          <span className="font-mono font-bold text-red-700">Failed</span>
+                        ) : (
+                          <span className="font-mono font-bold text-emerald-700">Passed ({step3State.duration_ms} ms)</span>
+                        )}
                       </div>
                     )}
                     {step3State.summary && (
                       <p className="text-slate-600 border-t border-slate-100 pt-1 text-[11px] leading-relaxed truncate">
-                        {step3State.summary}
+                        {pendingText ?? step3State.summary}
                       </p>
                     )}
                   </div>
@@ -3641,7 +3786,19 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                         Execution Summary &amp; Verification Outcome
                       </h4>
                       <p className="text-xs text-emerald-900 mt-1 leading-relaxed">
-                        {pipelineResult.content_generation?.summary_message ||
+                        {pendingText
+                          ? [
+                              Number(pipelineResult.content_generation?.generated_count ?? 0) > 0
+                                ? `Generated and stored ${pipelineResult.content_generation?.generated_count} resource(s).`
+                                : '',
+                              pendingText,
+                              Number(pipelineResult.content_generation?.verified_count ?? 0) > 0
+                                ? `Verified and reused ${pipelineResult.content_generation?.verified_count} existing resource(s).`
+                                : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')
+                          : pipelineResult.content_generation?.summary_message ||
                           `Validation sweep completed across ${pipelineResult.standard?.name}. Verified ${pipelineResult.content_generation?.verified_count ?? 0} existing resource(s); generated ${pipelineResult.content_generation?.generated_count ?? 0} new resource(s).`}
                       </p>
                     </div>
@@ -4112,7 +4269,7 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                             Experience: {pipelineResult.content_generation.student_experiences.join(', ')}
                           </span>
                         )}
-                        {pipelineResult.content_generation.selected_template && (
+                        {includeAssessment && pipelineResult.content_generation.selected_template && (
                           <span className="rounded-lg bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-xs font-bold text-indigo-900 flex items-center gap-1.5">
                             <Palette className="size-3 text-indigo-600" />
                             Template: {CONTENT_TEMPLATES.find((t) => t.id === pipelineResult.content_generation?.selected_template)?.name || pipelineResult.content_generation.selected_template}
@@ -4197,6 +4354,17 @@ export function CatalogueAgentControlCard({ onValidated }: CatalogueAgentControl
                           ))}
                         </div>
                       </div>
+                    )}
+
+                    {/* Presentations and study documents started in the background. No review step: each is stored by the
+                        server once it passes validation, and this panel reports the real state until it is stored or failed. */}
+                    {pipelineResult.content_generation.pending_resources && pipelineResult.content_generation.pending_resources.length > 0 && (
+                      <PendingResourcesPanel
+                        key={pipelineResult.content_generation.pending_resources.map((r) => r.run ?? r.document_kind ?? r.chapter_id).join('|')}
+                        resources={pipelineResult.content_generation.pending_resources}
+                        readContext={readModuleWorkspaceSession}
+                        onSummary={handlePendingSummary}
+                      />
                     )}
 
                     {/* Verified Existing Resources List */}

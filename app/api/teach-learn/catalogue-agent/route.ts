@@ -140,6 +140,9 @@ export async function POST(request: NextRequest) {
       endpoint = '/api/ai/teach-learn/catalogue-agent/pipeline';
     } else if (action === 'check-content') {
       endpoint = '/api/ai/teach-learn/catalogue-agent/check-content';
+    } else if (action === 'resource-status') {
+      // Read-only: where each resource AI Stack started in the background has got to. Must be named: an unknown action runs the agent.
+      endpoint = '/api/ai/teach-learn/catalogue-agent/resource-status';
     } else if (action === 'subjects') {
       endpoint = '/api/ai/teach-learn/catalogue-agent/subjects';
     } else if (action === 'chapters') {

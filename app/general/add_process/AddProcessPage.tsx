@@ -332,8 +332,20 @@ export function AddProcessPage({
     setError("");
     setNotice("");
 
+    // Auto-prepend the procedure header when the user pasted raw steps without it
+    // but already selected a procedure from the dropdown.
+    let text = from.text;
+    if (from.procedureRef && !/^\s*procedure\s*:/i.test(text)) {
+      const catalogued = findProcedure(target, from.procedureRef);
+      if (catalogued) {
+        const header = `Procedure: ${catalogued.procedure.ref} ${catalogued.procedure.title}\nPrimary actor: ${catalogued.procedure.primaryActor}\n\n`;
+        text = header + text;
+      }
+    }
+    const fromWithHeader = text !== from.text ? { ...from, text } : from;
+
     try {
-      const local = convertSopProcedure(from.text, target, { previousTasks: spec?.tasks });
+      const local = convertSopProcedure(fromWithHeader.text, target, { previousTasks: spec?.tasks });
       const blocked = !local.spec || local.issues.some((issue) => issue.level === "error");
 
       if (!blocked) {
@@ -341,7 +353,7 @@ export function AddProcessPage({
         return;
       }
 
-      if (!from.allowAi) {
+      if (!fromWithHeader.allowAi) {
         setSpec(null);
         setIssues(local.issues);
         setError("Couldn't convert the text. Fix the errors below, or allow AI clean-up.");
@@ -353,9 +365,9 @@ export function AddProcessPage({
         // The route spends a model key, so it only answers signed-in users.
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${buildSessionContext().token}` },
         body: JSON.stringify({
-          text: from.text,
-          moduleKey: from.moduleKey,
-          procedureRef: from.procedureRef || undefined,
+          text: fromWithHeader.text,
+          moduleKey: fromWithHeader.moduleKey,
+          procedureRef: fromWithHeader.procedureRef || undefined,
           allowAi: true,
         }),
       });
