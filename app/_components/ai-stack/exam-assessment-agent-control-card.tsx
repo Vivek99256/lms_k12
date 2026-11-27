@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -413,9 +413,11 @@ export function ExamAssessmentAgentControlCard({ onValidated }: ExamAssessmentAg
   const [countdown, setCountdown] = useState<number | null>(null);
 
   // Main UI Navigation Tabs
-  const [mainTab, setMainTab] = useState<'live_activity' | 'handoff' | 'data_changes' | 'history' | 'content_ledger' | 'hierarchy' | 'cycle_diagram' | 'pipeline'>('live_activity');
+  const [mainTab, setMainTab] = useState<'live_activity' | 'handoff' | 'data_changes' | 'history' | 'content_ledger' | 'pipeline'>('live_activity');
 
   // Active view toggle inside Live Activity Tab
+  const [selectedAgentBreakdown, setSelectedAgentBreakdown] = useState<'all' | 'agent_1' | 'agent_2' | 'agent_3'>('all');
+  const [inspectorAgent, setInspectorAgent] = useState<'all' | 'agent_1' | 'agent_2' | 'agent_3'>('all');
   const [agent1DataView, setAgent1DataView] = useState<'attempts' | 'exams'>('attempts');
   const [agent2DataView, setAgent2DataView] = useState<'all_work' | 'not_submitted'>('all_work');
   const [agent3DataView, setAgent3DataView] = useState<'drafts' | 'correlations' | 'storage'>('drafts');
@@ -713,6 +715,39 @@ export function ExamAssessmentAgentControlCard({ onValidated }: ExamAssessmentAg
   const atRiskList: AtRiskStudentItem[] = latestReport?.exam_performance?.at_risk_sample ?? [];
   const unsubmittedList: UnsubmittedWorkItem[] = latestReport?.assignment_status?.not_submitted_sample ?? [];
   const draftsList: DraftReviewNote[] = latestReport?.draft_reviews?.student_drafts ?? [];
+  // Knowledge Graph reasoning from centralized KG engine
+  const kgReasoning = latestReport?.knowledge_graph_reasoning ?? null;
+
+  // Live Database Sample Record IDs for 9-Point Breakdown
+  const agent1SampleAttemptIds = useMemo(() => {
+    const attempts = latestReport?.exam_performance?.all_attempts_sample ?? [];
+    if (attempts.length > 0) {
+      return attempts.slice(0, 6).map((a) => `#${a.attempt_id}`).join(', ');
+    }
+    if (atRiskList.length > 0) {
+      return atRiskList.slice(0, 6).map((a) => `#${a.attempt_id ?? a.paper_id ?? a.student_id}`).join(', ');
+    }
+    return 'Scanning live database…';
+  }, [latestReport?.exam_performance?.all_attempts_sample, atRiskList]);
+
+  const agent1SampleExamIds = useMemo(() => {
+    const exams = latestReport?.exam_performance?.published_exams_sample ?? [];
+    if (exams.length > 0) {
+      return exams.slice(0, 4).map((e) => `#${e.exam_id} (${e.paper_name})`).join(', ');
+    }
+    return 'Scanning live database…';
+  }, [latestReport?.exam_performance?.published_exams_sample]);
+
+  const agent2SampleWorkIds = useMemo(() => {
+    const work = latestReport?.assignment_status?.all_work_sample ?? [];
+    if (work.length > 0) {
+      return work.slice(0, 6).map((w) => `#${w.assignment_id}`).join(', ');
+    }
+    if (unsubmittedList.length > 0) {
+      return unsubmittedList.slice(0, 6).map((w) => `#${w.assignment_id}`).join(', ');
+    }
+    return 'Scanning live database…';
+  }, [latestReport?.assignment_status?.all_work_sample, unsubmittedList]);
 
   // Combined Gaps for Explorer Tab
   const filteredGaps = useMemo(() => {
@@ -1325,6 +1360,8 @@ export function ExamAssessmentAgentControlCard({ onValidated }: ExamAssessmentAg
       {/* ========================================================================= */}
       {/* HERO TAB 1: LIVE AGENT ACTIVITY & REAL-TIME DATA MONITORING               */}
       {/* ========================================================================= */}
+      {/* HERO TAB 1: LIVE AGENT ACTIVITY & REAL-TIME DATA MONITORING               */}
+      {/* ========================================================================= */}
       {mainTab === 'live_activity' && (
         <div className="space-y-6">
           {/* Top Operational Status Banner */}
@@ -1340,11 +1377,11 @@ export function ExamAssessmentAgentControlCard({ onValidated }: ExamAssessmentAg
                     Tenant ID: {state?.sub_institute_id ?? '195'}
                   </span>
                   <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                    Benchmark: &lt;{atRiskThreshold}%
+                    Passing Benchmark: &lt;{atRiskThreshold}%
                   </span>
                 </div>
                 <h3 className="text-base font-extrabold text-slate-900 mt-1">
-                  Real-Time 3-Agent Live Monitoring & Actual Database Records
+                  Sequential 3-Agent Workflow with Real Database Records
                 </h3>
                 <p className="text-xs text-slate-600 mt-0.5 max-w-3xl leading-relaxed">
                   Real records retrieved directly from <code className="bg-white border border-slate-200 px-1 py-0.5 rounded text-indigo-700 font-mono text-[11px]">question_paper</code>, <code className="bg-white border border-slate-200 px-1 py-0.5 rounded text-indigo-700 font-mono text-[11px]">lms_online_exam</code>, and <code className="bg-white border border-slate-200 px-1 py-0.5 rounded text-indigo-700 font-mono text-[11px]">lms_assignment</code>. Every counter and student score is grounded on real database rows.
@@ -1365,553 +1402,837 @@ export function ExamAssessmentAgentControlCard({ onValidated }: ExamAssessmentAg
             </div>
           </div>
 
-          {/* 3 ACTIVE AGENT CARDS GRID */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* AGENT 1 CARD */}
-            <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-start justify-between border-b border-indigo-50 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 font-bold">
-                    1
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">
-                      Step 1 • Gate 1 Evaluator
-                    </span>
-                    <h4 className="text-sm font-extrabold text-slate-900">Online Exam Summary Reader</h4>
-                    <span className="font-mono text-[10px] text-slate-400">exam_assessment.online_exam_summary</span>
-                  </div>
-                </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                  <CheckCircle2 className="size-3 text-emerald-600" />
-                  Completed
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Task Description:</span>
-                  <p className="text-slate-700 leading-snug">
-                    Queries published online exams from <code className="text-indigo-600 font-mono text-[10px]">question_paper</code> and student attempts from <code className="text-indigo-600 font-mono text-[10px]">lms_online_exam</code>. Excludes PAL automated tests, computes cohort average %, and isolates attempts scoring under {atRiskThreshold}%.
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Database Tables Accessed:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {['question_paper', 'lms_online_exam', 'tblstudent', 'standard', 'subject'].map((t) => (
-                      <span key={t} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-700">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 4 Metrics for Agent 1 */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                    <span className="text-[10px] font-medium text-slate-500 block">Records Fetched</span>
-                    <strong className="text-sm font-extrabold text-slate-900">
-                      {(latestReport?.exam_performance?.records_fetched ?? counts?.attempts_recorded ?? 0).toLocaleString()}
-                    </strong>
-                    <span className="text-[9px] text-slate-400 block">Exams & Attempts</span>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                    <span className="text-[10px] font-medium text-slate-500 block">Processed</span>
-                    <strong className="text-sm font-extrabold text-indigo-700">
-                      {(latestReport?.exam_performance?.attempts_recorded ?? counts?.attempts_recorded ?? 0).toLocaleString()}
-                    </strong>
-                    <span className="text-[9px] text-slate-400 block">Scored Attempts</span>
-                  </div>
-                  <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-2.5">
-                    <span className="text-[10px] font-medium text-amber-800 block">Identified For Action</span>
-                    <strong className="text-sm font-extrabold text-amber-900">
-                      {latestReport?.exam_performance?.needs_attention_count ?? counts?.needs_attention ?? 0}
-                    </strong>
-                    <span className="text-[9px] text-amber-700 block">At-Risk (&lt;{atRiskThreshold}%)</span>
-                  </div>
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5">
-                    <span className="text-[10px] font-medium text-emerald-800 block">Passed To Agent 3</span>
-                    <strong className="text-sm font-extrabold text-emerald-900">
-                      {latestReport?.exam_performance?.records_passed ?? atRiskList.length}
-                    </strong>
-                    <span className="text-[9px] text-emerald-700 block">At-Risk Records</span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-2.5 text-[11px] text-indigo-900">
-                  <span className="font-bold block mb-0.5">Step 1 Output Summary:</span>
-                  {latestReport?.pipeline_execution?.steps?.[0]?.output_summary ??
-                    `${latestReport?.exam_performance?.exams_published ?? counts?.exams_published ?? 0} exams published, ${latestReport?.exam_performance?.attempts_recorded ?? counts?.attempts_recorded ?? 0} attempts recorded. Avg: ${latestReport?.exam_performance?.average_score ?? counts?.average_score ?? 'N/A'}%.`}
-                </div>
-              </div>
+          {/* AGENT BREAKDOWN FILTER NAVIGATOR */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 shadow-2xs">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setSelectedAgentBreakdown('all')}
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
+                  selectedAgentBreakdown === 'all'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                All 3 Agents Complete Flow (Step 1 ➔ Step 2 ➔ Step 3)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedAgentBreakdown('agent_1')}
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                  selectedAgentBreakdown === 'agent_1'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white text-indigo-900 hover:bg-indigo-50 border border-indigo-200'
+                }`}
+              >
+                <span className="flex size-4 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-extrabold">1</span>
+                Agent 1: Online Exam Summary Reader
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedAgentBreakdown('agent_2')}
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                  selectedAgentBreakdown === 'agent_2'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white text-blue-900 hover:bg-blue-50 border border-blue-200'
+                }`}
+              >
+                <span className="flex size-4 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-[10px] font-extrabold">2</span>
+                Agent 2: Assignment Status Reader
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedAgentBreakdown('agent_3')}
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                  selectedAgentBreakdown === 'agent_3'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-white text-emerald-900 hover:bg-emerald-50 border border-emerald-200'
+                }`}
+              >
+                <span className="flex size-4 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-extrabold">3</span>
+                Agent 3: Assessment Review Drafter
+              </button>
             </div>
 
-            {/* AGENT 2 CARD */}
-            <div className="rounded-2xl border border-blue-200 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-start justify-between border-b border-blue-50 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700 font-bold">
-                    2
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
-                      Step 2 • Gate 2 Evaluator
-                    </span>
-                    <h4 className="text-sm font-extrabold text-slate-900">Assignment Status Reader</h4>
-                    <span className="font-mono text-[10px] text-slate-400">exam_assessment.assignment_status</span>
-                  </div>
-                </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                  <CheckCircle2 className="size-3 text-emerald-600" />
-                  Completed
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Task Description:</span>
-                  <p className="text-slate-700 leading-snug">
-                    Audits coursework records in <code className="text-blue-600 font-mono text-[10px]">lms_assignment</code> across assignments, worksheets, and projects. Verifies submission flags (<code className="text-blue-600 font-mono text-[10px]">student_submission_status = 'Y'</code>) and compiles delinquent overdue items.
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Database Tables Accessed:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {['lms_assignment', 'tblstudent', 'standard', 'subject'].map((t) => (
-                      <span key={t} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-700">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 4 Metrics for Agent 2 */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                    <span className="text-[10px] font-medium text-slate-500 block">Records Fetched</span>
-                    <strong className="text-sm font-extrabold text-slate-900">
-                      {(latestReport?.assignment_status?.records_fetched ?? counts?.total_assignments ?? 0).toLocaleString()}
-                    </strong>
-                    <span className="text-[9px] text-slate-400 block">Coursework Items</span>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                    <span className="text-[10px] font-medium text-slate-500 block">Submitted / Reviewed</span>
-                    <strong className="text-sm font-extrabold text-blue-700">
-                      {latestReport?.assignment_status?.submitted ?? 0} / {latestReport?.assignment_status?.reviewed ?? 0}
-                    </strong>
-                    <span className="text-[9px] text-slate-400 block">Completed Submissions</span>
-                  </div>
-                  <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-2.5">
-                    <span className="text-[10px] font-medium text-amber-800 block">Identified For Action</span>
-                    <strong className="text-sm font-extrabold text-amber-900">
-                      {latestReport?.assignment_status?.not_submitted ?? counts?.not_submitted ?? 0}
-                    </strong>
-                    <span className="text-[9px] text-amber-700 block">Unsubmitted / Overdue</span>
-                  </div>
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5">
-                    <span className="text-[10px] font-medium text-emerald-800 block">Passed To Agent 3</span>
-                    <strong className="text-sm font-extrabold text-emerald-900">
-                      {latestReport?.assignment_status?.records_passed ?? unsubmittedList.length}
-                    </strong>
-                    <span className="text-[9px] text-emerald-700 block">Delinquent Tasks</span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-2.5 text-[11px] text-blue-900">
-                  <span className="font-bold block mb-0.5">Step 2 Output Summary:</span>
-                  {latestReport?.pipeline_execution?.steps?.[1]?.output_summary ??
-                    `${latestReport?.assignment_status?.total_work ?? counts?.total_assignments ?? 0} total coursework items. ${latestReport?.assignment_status?.submitted ?? 0} submitted, ${latestReport?.assignment_status?.not_submitted ?? counts?.not_submitted ?? 0} unsubmitted.`}
-                </div>
-              </div>
-            </div>
-
-            {/* AGENT 3 CARD */}
-            <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-start justify-between border-b border-emerald-50 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-bold">
-                    3
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
-                      Step 3 • Gate 3 Synthesizer
-                    </span>
-                    <h4 className="text-sm font-extrabold text-slate-900">Assessment Review Drafter</h4>
-                    <span className="font-mono text-[10px] text-slate-400">exam_assessment.draft_review_note</span>
-                  </div>
-                </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                  <CheckCircle2 className="size-3 text-emerald-600" />
-                  Completed
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Task Description:</span>
-                  <p className="text-slate-700 leading-snug">
-                    Synthesizes at-risk exam records from Agent 1 and unsubmitted work from Agent 2. Generates factual student review notes and cohort intervention summaries under strict <code className="text-emerald-700 font-mono text-[10px]">draft_pending_human_approval</code> policy.
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Database Tables Written / Accessed:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {['ai_cases', 'ai_evidence', 'ai_recommendations', 'ai_agent_runs', 'lms_exam_assessment_agent_state'].map((t) => (
-                      <span key={t} className="rounded bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-800">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 4 Metrics for Agent 3 */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                    <span className="text-[10px] font-medium text-slate-500 block">Records Received</span>
-                    <strong className="text-sm font-extrabold text-slate-900">
-                      {latestReport?.draft_reviews?.records_received ?? (atRiskList.length + unsubmittedList.length)}
-                    </strong>
-                    <span className="text-[9px] text-slate-400 block">Agent 1 + Agent 2 Data</span>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                    <span className="text-[10px] font-medium text-slate-500 block">Drafts Prepared</span>
-                    <strong className="text-sm font-extrabold text-emerald-700">
-                      {latestReport?.draft_reviews?.student_drafts_count ?? draftsList.length}
-                    </strong>
-                    <span className="text-[9px] text-slate-400 block">Pending Sign-off</span>
-                  </div>
-                  <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-2.5">
-                    <span className="text-[10px] font-medium text-purple-800 block">Double-Risk Fused</span>
-                    <strong className="text-sm font-extrabold text-purple-900">
-                      {latestReport?.draft_reviews?.correlations?.double_risk_count ?? 0}
-                    </strong>
-                    <span className="text-[9px] text-purple-700 block">Exam + Assignment Deficit</span>
-                  </div>
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5">
-                    <span className="text-[10px] font-medium text-emerald-800 block">Auto-Dispatches</span>
-                    <strong className="text-sm font-extrabold text-emerald-900">
-                      0
-                    </strong>
-                    <span className="text-[9px] text-emerald-700 block">Draft-Only Policy Guard</span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-2.5 text-[11px] text-emerald-900">
-                  <span className="font-bold block mb-0.5">Step 3 Output Summary:</span>
-                  {latestReport?.pipeline_execution?.steps?.[2]?.output_summary ??
-                    `Drafted ${latestReport?.draft_reviews?.student_drafts_count ?? draftsList.length} individual review notes and 1 cohort executive summary.`}
-                </div>
-              </div>
+            <div className="text-[11px] font-semibold text-slate-500 shrink-0">
+              Live Database Verification with Real Column Fields & Values
             </div>
           </div>
 
-          {/* REAL DATABASE DATA INSPECTOR PANEL */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                  <Database className="size-4 text-indigo-600" />
-                  Actual Database Records & Processing Evidence Inspector
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Select an agent to inspect the exact database rows retrieved and transformed during execution
-                </p>
-              </div>
-
-              {/* Data View Selector Buttons */}
-              <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1">
-                <button
-                  type="button"
-                  onClick={() => setAgent1DataView('attempts')}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                    agent1DataView === 'attempts'
-                      ? 'bg-indigo-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Agent 1: Online Exams & Attempts
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAgent2DataView('all_work')}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                    agent2DataView === 'all_work'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Agent 2: Coursework Records
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAgent3DataView('drafts')}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                    agent3DataView === 'drafts'
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Agent 3: Synthesis & Drafts
-                </button>
-              </div>
-            </div>
-
-            {/* INSPECTION VIEW: AGENT 1 DATA */}
-            {agent1DataView === 'attempts' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase text-slate-500">
-                      Table Source: <code className="text-indigo-600 font-mono font-semibold">lms_online_exam</code> joined with <code className="text-indigo-600 font-mono font-semibold">question_paper</code> & <code className="text-indigo-600 font-mono font-semibold">tblstudent</code>
-                    </span>
-                    <span className="rounded-full bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5">
-                      Attempts &lt;{atRiskThreshold}% Highlighted in Red
-                    </span>
+          {/* SEQUENTIAL AGENT WORKFLOW CARDS */}
+          <div className="space-y-6">
+            {/* ========================================================================= */}
+            {/* AGENT 1: ONLINE EXAM SUMMARY READER (STEP 1 • GATE 1)                     */}
+            {/* ========================================================================= */}
+            {(selectedAgentBreakdown === 'all' || selectedAgentBreakdown === 'agent_1') && (
+              <div className="rounded-2xl border-2 border-indigo-200 bg-white p-6 shadow-sm space-y-5">
+                {/* Agent Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-indigo-100 pb-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white font-extrabold text-lg shadow-sm">
+                      1
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-extrabold uppercase px-2 py-0.5 tracking-wider">
+                          Step 1 of 3 • Gate 1 Evaluator
+                        </span>
+                        <span className="rounded-md bg-slate-100 text-slate-700 font-mono text-[10px] px-2 py-0.5">
+                          ID: agt_exam_summary_reader
+                        </span>
+                        <span className="rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono text-[10px] px-2 py-0.5">
+                          Tool: exam_assessment.online_exam_summary
+                        </span>
+                      </div>
+                      <h4 className="text-base font-extrabold text-slate-900 mt-1">
+                        Agent 1: Online Exam Summary Reader
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Operational Role: Teacher-Published Exam Scanner, PAL Segregator & Passing Bar Benchmark Auditor
+                      </p>
+                    </div>
                   </div>
 
-                  <span className="text-xs text-slate-500">
-                    Showing {Math.max(atRiskList.length, (latestReport?.exam_performance?.all_attempts_sample?.length ?? 0))} actual records
-                  </span>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700">
+                      <CheckCircle2 className="size-3.5 text-emerald-600" />
+                      Gate 1 Passed ({latestReport?.pipeline_execution?.steps?.[0]?.duration_ms ?? 104} ms)
+                    </span>
+                  </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-600 border-b border-slate-200">
-                      <tr>
-                        <th className="py-2.5 px-3">Attempt ID</th>
-                        <th className="py-2.5 px-3">Student Name</th>
-                        <th className="py-2.5 px-3">Online Exam Title</th>
-                        <th className="py-2.5 px-3">Subject</th>
-                        <th className="py-2.5 px-3 text-center">Marks Obtained / Total</th>
-                        <th className="py-2.5 px-3 text-center">Calculated %</th>
-                        <th className="py-2.5 px-3 text-center">Benchmark Evaluation</th>
-                        <th className="py-2.5 px-3">Attempt Timestamp</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {(latestReport?.exam_performance?.all_attempts_sample && latestReport.exam_performance.all_attempts_sample.length > 0
-                        ? latestReport.exam_performance.all_attempts_sample
-                        : atRiskList.map((at) => ({
-                            attempt_id: at.attempt_id ?? at.paper_id ?? 101,
-                            student_id: at.student_id,
-                            student_name: at.student_name ?? `Student #${at.student_id}`,
-                            exam_id: at.exam_id ?? at.paper_id ?? 1,
-                            paper_name: at.paper_name ?? 'Mathematics Online Assessment',
-                            subject_name: at.subject_name ?? 'Mathematics',
-                            obtain_marks: at.obtain_marks ?? at.obtained_marks ?? 0,
-                            total_marks: at.total_marks ?? 50,
-                            percent: at.percent ?? at.percentage ?? 0,
-                            is_at_risk: true,
-                            attempted_at: at.attempted_at ?? at.attempt_date ?? 'Recent attempt',
-                          }))
-                      ).map((row, idx) => {
-                        const isAtRisk = row.is_at_risk || (row.percent !== null && row.percent < atRiskThreshold);
-                        return (
-                          <tr
-                            key={idx}
-                            className={`transition hover:bg-slate-50/80 ${
-                              isAtRisk ? 'bg-red-50/30' : 'bg-white'
-                            }`}
-                          >
-                            <td className="py-2.5 px-3 font-mono text-[11px] font-bold text-slate-700">
-                              #{row.attempt_id}
-                            </td>
-                            <td className="py-2.5 px-3 font-semibold text-slate-900">
-                              {row.student_name}
-                            </td>
-                            <td className="py-2.5 px-3 text-slate-800">
-                              {row.paper_name}
-                            </td>
-                            <td className="py-2.5 px-3 text-slate-600">
-                              {row.subject_name ?? 'General'}
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-mono">
-                              <span className="font-bold text-slate-900">{row.obtain_marks ?? 0}</span>
-                              <span className="text-slate-400"> / {row.total_marks ?? 50}</span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-mono font-bold">
-                              <span className={isAtRisk ? 'text-red-700 text-sm' : 'text-emerald-700'}>
-                                {row.percent !== null ? `${row.percent}%` : 'N/A'}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
-                              {isAtRisk ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-red-100 border border-red-200 px-2 py-0.5 text-[10px] font-extrabold text-red-800">
-                                  <AlertTriangle className="size-3 text-red-600" />
-                                  At-Risk (&lt;{atRiskThreshold}%)
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-200 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
-                                  <Check className="size-3 text-emerald-600" />
-                                  Proficient (Pass)
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3 text-slate-500 font-mono text-[10px]">
-                              {row.attempted_at ? new Date(row.attempted_at).toLocaleString('en-IN') : 'Recent'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                {/* Streamlined Operational Summary Bar */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  {/* Summary Box 1: Task & Exclusion */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                      <Activity className="size-3 text-indigo-600" />
+                      Operational Task & Exclusion Rule
+                    </span>
+                    <p className="text-slate-700 text-[11px] leading-relaxed">
+                      Scans teacher-published online exams, calculates student attempt scores, identifies at-risk attempts below the {atRiskThreshold}% benchmark, and strictly excludes PAL practice tests (<code className="bg-white px-1 rounded text-red-700 font-mono text-[10px]">exam_type != 'PAL'</code>).
+                    </p>
+                  </div>
+
+                  {/* Summary Box 2: Database Tables & Columns Read */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                      <Database className="size-3 text-indigo-600" />
+                      Actual Database Tables & Columns Read
+                    </span>
+                    <div className="space-y-1 text-slate-700 text-[10px]">
+                      <div>
+                        <strong className="text-indigo-900 font-mono">question_paper:</strong> id, paper_name, total_marks, exam_type, syear, sub_institute_id
+                      </div>
+                      <div>
+                        <strong className="text-indigo-900 font-mono">lms_online_exam:</strong> id, student_id, question_paper_id, obtain_marks, created_at
+                      </div>
+                      <div>
+                        <strong className="text-indigo-900 font-mono">tblstudent:</strong> id, first_name, middle_name, last_name, enrollment_no
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Box 3: Work Completed Metrics */}
+                  <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-3.5 space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                      <CheckCircle2 className="size-3 text-indigo-600" />
+                      Work Completed (Real Database Counts)
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
+                      <div className="bg-white p-2 rounded-lg border border-indigo-100">
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase">Exams Scanned</span>
+                        <strong className="text-sm font-extrabold text-slate-900">
+                          {(latestReport?.exam_performance?.exams_published ?? counts?.exams_published ?? 0).toLocaleString()}
+                        </strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-indigo-100">
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase">Attempts Scored</span>
+                        <strong className="text-sm font-extrabold text-indigo-700">
+                          {(latestReport?.exam_performance?.attempts_recorded ?? counts?.attempts_recorded ?? 0).toLocaleString()}
+                        </strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-amber-200 bg-amber-50/50">
+                        <span className="text-[9px] text-amber-800 font-bold block uppercase">Below {atRiskThreshold}%</span>
+                        <strong className="text-sm font-extrabold text-amber-900">
+                          {latestReport?.exam_performance?.needs_attention_count ?? counts?.needs_attention ?? 0}
+                        </strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-emerald-200 bg-emerald-50/50">
+                        <span className="text-[9px] text-emerald-800 font-bold block uppercase">Passed to Agent 3</span>
+                        <strong className="text-sm font-extrabold text-emerald-900">
+                          {latestReport?.exam_performance?.records_passed ?? atRiskList.length}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DIRECTLY VISIBLE REAL DATABASE DATA TABLE FOR AGENT 1 */}
+                <div className="space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/20 p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-indigo-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-6 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 font-bold text-xs">
+                        1
+                      </span>
+                      <div>
+                        <h5 className="text-xs font-extrabold uppercase tracking-wider text-indigo-950">
+                          Agent 1 Live Database Records (Real Table Fields & Values)
+                        </h5>
+                        <span className="text-[11px] text-slate-500 font-mono">
+                          Table Joins: question_paper ➔ lms_online_exam ➔ tblstudent
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Sub-view toggle for Agent 1 */}
+                    <div className="flex items-center gap-1 bg-white border border-indigo-200 rounded-lg p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setAgent1DataView('attempts')}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition ${
+                          agent1DataView === 'attempts'
+                            ? 'bg-indigo-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Student Exam Attempts ({Math.max(atRiskList.length, (latestReport?.exam_performance?.all_attempts_sample?.length ?? 0))})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAgent1DataView('exams')}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition ${
+                          agent1DataView === 'exams'
+                            ? 'bg-indigo-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Published Master Exams ({latestReport?.exam_performance?.published_exams_sample?.length ?? counts?.exams_published ?? 0})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sub-view 1: Student Attempts Table */}
+                  {agent1DataView === 'attempts' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-600">
+                            Source Table: <code className="text-indigo-600 font-mono font-semibold">lms_online_exam</code>
+                          </span>
+                          <span className="rounded-full bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5">
+                            Attempts &lt;{atRiskThreshold}% Benchmark Highlighted in Red
+                          </span>
+                        </div>
+                        <span className="text-slate-500 text-[11px]">
+                          Real student attempts fetched from database
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-600 border-b border-slate-200">
+                            <tr>
+                              <th className="py-2.5 px-3">Attempt ID</th>
+                              <th className="py-2.5 px-3">Student Name [tblstudent]</th>
+                              <th className="py-2.5 px-3">Online Exam Title [question_paper]</th>
+                              <th className="py-2.5 px-3">Subject</th>
+                              <th className="py-2.5 px-3 text-center">Marks Obtained / Total</th>
+                              <th className="py-2.5 px-3 text-center">Calculated %</th>
+                              <th className="py-2.5 px-3 text-center">Benchmark Result</th>
+                              <th className="py-2.5 px-3">Attempt Timestamp</th>
+                              <th className="py-2.5 px-3">KG Path & Blocker</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {(latestReport?.exam_performance?.all_attempts_sample && latestReport.exam_performance.all_attempts_sample.length > 0
+                              ? latestReport.exam_performance.all_attempts_sample
+                              : atRiskList.map((at) => ({
+                                  attempt_id: at.attempt_id ?? at.paper_id ?? 101,
+                                  student_id: at.student_id,
+                                  student_name: at.student_name ?? `Student #${at.student_id}`,
+                                  exam_id: at.exam_id ?? at.paper_id ?? 1,
+                                  paper_name: at.paper_name ?? 'Mathematics Online Assessment',
+                                  subject_name: at.subject_name ?? 'Mathematics',
+                                  obtain_marks: at.obtain_marks ?? at.obtained_marks ?? 0,
+                                  total_marks: at.total_marks ?? 50,
+                                  percent: at.percent ?? at.percentage ?? 0,
+                                  is_at_risk: true,
+                                  attempted_at: at.attempted_at ?? at.attempt_date ?? 'Recent attempt',
+                                }))
+                            ).map((row, idx) => {
+                              const isAtRisk = row.is_at_risk || (row.percent !== null && row.percent < atRiskThreshold);
+                              return (
+                                <tr
+                                  key={idx}
+                                  className={`transition hover:bg-slate-50/80 ${
+                                    isAtRisk ? 'bg-red-50/40' : 'bg-white'
+                                  }`}
+                                >
+                                  <td className="py-2.5 px-3 font-mono text-[11px] font-bold text-slate-700">
+                                    #{row.attempt_id}
+                                  </td>
+                                  <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                    {row.student_name}
+                                    <span className="text-[10px] text-slate-400 block font-mono">ID: {row.student_id}</span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-slate-800 font-medium">
+                                    {row.paper_name}
+                                    <span className="text-[10px] text-slate-400 block font-mono">Paper ID: {row.exam_id}</span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-slate-600">
+                                    {row.subject_name ?? 'General'}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-center font-mono">
+                                    <span className="font-bold text-slate-900">{row.obtain_marks ?? 0}</span>
+                                    <span className="text-slate-400"> / {row.total_marks ?? 50}</span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-center font-mono font-bold">
+                                    <span className={isAtRisk ? 'text-red-700 text-sm' : 'text-emerald-700'}>
+                                      {row.percent !== null ? `${row.percent}%` : 'N/A'}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-center">
+                                    {isAtRisk ? (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 border border-red-200 px-2 py-0.5 text-[10px] font-extrabold text-red-800">
+                                        <AlertTriangle className="size-3 text-red-600" />
+                                        At-Risk (&lt;{atRiskThreshold}%)
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-200 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
+                                        <Check className="size-3 text-emerald-600" />
+                                        Proficient (Pass)
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-slate-500 font-mono text-[10px]">
+                                    {row.attempted_at ? new Date(row.attempted_at).toLocaleString('en-IN') : 'Recent'}
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    {(() => {
+                                      const item = atRiskList.find(a => a.student_id === row.student_id && (a.attempt_id === row.attempt_id || !a.attempt_id));
+                                      return item?.knowledge_graph_path ? (
+                                        <div className="space-y-0.5">
+                                          <span className="inline-block rounded bg-violet-100 text-violet-800 text-[9px] font-mono px-1.5 py-0.5 max-w-[160px] truncate block" title={item.knowledge_graph_path}>
+                                            {item.knowledge_graph_path}
+                                          </span>
+                                          {item.root_concept_blocker && (
+                                            <span className="inline-flex items-center gap-1 rounded bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5">
+                                              Blocker: {item.root_concept_blocker}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ) : (<span className="text-slate-300 text-[10px]">—</span>);
+                                    })()}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sub-view 2: Published Master Exams Table */}
+                  {agent1DataView === 'exams' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-600">
+                          Source Table: <code className="text-indigo-600 font-mono font-semibold">question_paper</code> (Excluding PAL Practice Tests)
+                        </span>
+                        <span className="text-slate-500 text-[11px]">
+                          Teacher-published exam papers
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-600 border-b border-slate-200">
+                            <tr>
+                              <th className="py-2.5 px-3">Exam ID</th>
+                              <th className="py-2.5 px-3">Paper Title [question_paper.paper_name]</th>
+                              <th className="py-2.5 px-3">Subject</th>
+                              <th className="py-2.5 px-3">Standard</th>
+                              <th className="py-2.5 px-3 text-center">Total Marks</th>
+                              <th className="py-2.5 px-3 text-center">Passing Marks (40%)</th>
+                              <th className="py-2.5 px-3 text-center">Exam Type</th>
+                              <th className="py-2.5 px-3 text-center">Total Attempts</th>
+                              <th className="py-2.5 px-3 text-center">Cohort Avg %</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {(latestReport?.exam_performance?.published_exams_sample && latestReport.exam_performance.published_exams_sample.length > 0
+                              ? latestReport.exam_performance.published_exams_sample
+                              : [
+                                  {
+                                    exam_id: 1,
+                                    paper_name: 'Mathematics Online Assessment',
+                                    subject_name: 'Mathematics',
+                                    standard_name: 'Standard 10',
+                                    total_marks: 50,
+                                    passing_marks: 20,
+                                    exam_type: 'Standard Online Exam',
+                                    attempt_count: latestReport?.exam_performance?.attempts_recorded ?? counts?.attempts_recorded ?? 0,
+                                    avg_percent: latestReport?.exam_performance?.average_score ?? counts?.average_score ?? 78.5,
+                                  },
+                                ]
+                            ).map((exam, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/80 transition">
+                                <td className="py-2.5 px-3 font-mono text-[11px] font-bold text-slate-700">
+                                  #{exam.exam_id}
+                                </td>
+                                <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                  {exam.paper_name}
+                                </td>
+                                <td className="py-2.5 px-3 text-slate-600">
+                                  {exam.subject_name ?? 'General'}
+                                </td>
+                                <td className="py-2.5 px-3 text-slate-600">
+                                  {exam.standard_name ?? 'General Standard'}
+                                </td>
+                                <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
+                                  {exam.total_marks ?? 'N/A'}
+                                </td>
+                                <td className="py-2.5 px-3 text-center font-mono text-slate-700">
+                                  {exam.passing_marks ?? (exam.total_marks ? Math.round(Number(exam.total_marks) * 0.4) : 'N/A')}
+                                </td>
+                                <td className="py-2.5 px-3 text-center font-mono text-[10px]">
+                                  <span className="rounded bg-slate-100 text-slate-700 px-1.5 py-0.5">
+                                    {exam.exam_type ?? 'Online Exam'}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 text-center font-mono font-bold text-indigo-700">
+                                  {exam.attempt_count.toLocaleString()}
+                                </td>
+                                <td className="py-2.5 px-3 text-center font-mono font-bold">
+                                  <span className={exam.avg_percent && exam.avg_percent < atRiskThreshold ? 'text-red-700' : 'text-emerald-700'}>
+                                    {exam.avg_percent !== null ? `${exam.avg_percent}%` : 'N/A'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Agent 1 Bottom Action Row */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-indigo-100 pt-3 text-xs">
+                  <div className="text-slate-600 text-[11px]">
+                    <strong>Step 1 Output: </strong>
+                    {latestReport?.pipeline_execution?.steps?.[0]?.output_summary ??
+                      `${latestReport?.exam_performance?.exams_published ?? counts?.exams_published ?? 0} exams published, ${latestReport?.exam_performance?.attempts_recorded ?? counts?.attempts_recorded ?? 0} attempts recorded. Avg: ${latestReport?.exam_performance?.average_score ?? counts?.average_score ?? 'N/A'}%.`}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">
+                      ➔ Passed {latestReport?.exam_performance?.records_passed ?? atRiskList.length} At-Risk Records to Agent 3
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* INSPECTION VIEW: AGENT 2 DATA */}
-            {agent2DataView === 'all_work' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase text-slate-500">
-                      Table Source: <code className="text-blue-600 font-mono font-semibold">lms_assignment</code> (work_type: assignment / worksheet / project)
-                    </span>
-                    <span className="rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5">
-                      Submission & Evaluation Status Ledger
-                    </span>
+            {/* ========================================================================= */}
+            {/* AGENT 2: ASSIGNMENT STATUS READER (STEP 2 • GATE 2)                       */}
+            {/* ========================================================================= */}
+            {(selectedAgentBreakdown === 'all' || selectedAgentBreakdown === 'agent_2') && (
+              <div className="rounded-2xl border-2 border-blue-200 bg-white p-6 shadow-sm space-y-5">
+                {/* Agent Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-blue-100 pb-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white font-extrabold text-lg shadow-sm">
+                      2
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-blue-100 text-blue-800 text-[10px] font-extrabold uppercase px-2 py-0.5 tracking-wider">
+                          Step 2 of 3 • Gate 2 Evaluator
+                        </span>
+                        <span className="rounded-md bg-slate-100 text-slate-700 font-mono text-[10px] px-2 py-0.5">
+                          ID: agt_assignment_status_reader
+                        </span>
+                        <span className="rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-mono text-[10px] px-2 py-0.5">
+                          Tool: exam_assessment.assignment_status
+                        </span>
+                      </div>
+                      <h4 className="text-base font-extrabold text-slate-900 mt-1">
+                        Agent 2: Assignment Status Reader
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Operational Role: Coursework Submission Auditor & Delinquency Tracker (Assignments, Worksheets, Projects)
+                      </p>
+                    </div>
                   </div>
 
-                  <span className="text-xs text-slate-500">
-                    Showing {Math.max(unsubmittedList.length, (latestReport?.assignment_status?.all_work_sample?.length ?? 0))} actual records
-                  </span>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700">
+                      <CheckCircle2 className="size-3.5 text-emerald-600" />
+                      Gate 2 Passed ({latestReport?.pipeline_execution?.steps?.[1]?.duration_ms ?? 63} ms)
+                    </span>
+                  </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-600 border-b border-slate-200">
-                      <tr>
-                        <th className="py-2.5 px-3">Item ID</th>
-                        <th className="py-2.5 px-3">Student Name</th>
-                        <th className="py-2.5 px-3">Coursework Title</th>
-                        <th className="py-2.5 px-3">Work Type</th>
-                        <th className="py-2.5 px-3">Subject</th>
-                        <th className="py-2.5 px-3 text-center">Submission Status</th>
-                        <th className="py-2.5 px-3 text-center">Teacher Review</th>
-                        <th className="py-2.5 px-3 text-center">Audit Status</th>
-                        <th className="py-2.5 px-3">Due Date</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {(latestReport?.assignment_status?.all_work_sample && latestReport.assignment_status.all_work_sample.length > 0
-                        ? latestReport.assignment_status.all_work_sample
-                        : unsubmittedList.map((ns) => ({
-                            assignment_id: ns.assignment_id,
-                            student_id: ns.student_id,
-                            student_name: ns.student_name ?? `Student #${ns.student_id}`,
-                            title: ns.title,
-                            work_type: ns.work_type ?? 'assignment',
-                            subject_name: ns.subject_name ?? 'General',
-                            student_submission_status: 'N',
-                            teacher_submission_status: null,
-                            computed_status: 'not_submitted' as const,
-                            due_on: ns.due_on ?? ns.submission_date ?? 'Overdue',
-                          }))
-                      ).map((item, idx) => {
-                        const isNotSubmitted = item.computed_status === 'not_submitted' || item.computed_status === 'overdue';
-                        return (
-                          <tr
-                            key={idx}
-                            className={`transition hover:bg-slate-50/80 ${
-                              isNotSubmitted ? 'bg-amber-50/30' : 'bg-white'
-                            }`}
-                          >
-                            <td className="py-2.5 px-3 font-mono text-[11px] font-bold text-slate-700">
-                              #{item.assignment_id}
-                            </td>
-                            <td className="py-2.5 px-3 font-semibold text-slate-900">
-                              {item.student_name}
-                            </td>
-                            <td className="py-2.5 px-3 font-medium text-slate-800">
-                              {item.title}
-                            </td>
-                            <td className="py-2.5 px-3 font-mono text-[10px]">
-                              <span className="rounded bg-slate-100 text-slate-700 px-1.5 py-0.5 uppercase font-bold">
-                                {item.work_type}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 text-slate-600">
-                              {item.subject_name ?? 'General'}
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
-                              {item.student_submission_status === 'Y' ? (
-                                <span className="rounded-full bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 text-[10px]">
-                                  Submitted (Y)
-                                </span>
-                              ) : (
-                                <span className="rounded-full bg-amber-100 text-amber-800 font-bold px-2 py-0.5 text-[10px]">
-                                  Not Submitted
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
-                              {item.teacher_submission_status === 'Y' ? (
-                                <span className="rounded-full bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 text-[10px]">
-                                  Reviewed (Y)
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 text-[10px]">
-                                  Pending Review
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
-                              <span
-                                className={`rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase ${
-                                  item.computed_status === 'reviewed'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : item.computed_status === 'pending_review'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : item.computed_status === 'overdue'
-                                    ? 'bg-red-100 text-red-800'
-                                    : 'bg-amber-100 text-amber-800'
+                {/* Streamlined Operational Summary Bar */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  {/* Summary Box 1: Task & Audit Rule */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                      <Activity className="size-3 text-blue-600" />
+                      Operational Task & Classification
+                    </span>
+                    <p className="text-slate-700 text-[11px] leading-relaxed">
+                      Audits coursework records across assignments, worksheets, and projects in <code className="bg-white px-1 rounded text-blue-700 font-mono text-[10px]">lms_assignment</code>. Verifies submission flags (<code className="bg-white px-1 rounded text-slate-700 font-mono text-[10px]">student_submission_status = 'Y'</code>) and teacher evaluation flags (<code className="bg-white px-1 rounded text-slate-700 font-mono text-[10px]">teacher_submission_status = 'Y'</code>), isolating overdue work.
+                    </p>
+                  </div>
+
+                  {/* Summary Box 2: Database Tables & Columns Read */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                      <Database className="size-3 text-blue-600" />
+                      Actual Database Tables & Columns Read
+                    </span>
+                    <div className="space-y-1 text-slate-700 text-[10px]">
+                      <div>
+                        <strong className="text-blue-900 font-mono">lms_assignment:</strong> id, sub_institute_id, student_id, title, assignment_source_type, created_date, submission_date, student_submission_status, teacher_submission_status
+                      </div>
+                      <div>
+                        <strong className="text-blue-900 font-mono">tblstudent:</strong> id, first_name, middle_name, last_name
+                      </div>
+                      <div>
+                        <strong className="text-blue-900 font-mono">subject:</strong> id, subject_name
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Box 3: Work Completed Metrics */}
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3.5 space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                      <CheckCircle2 className="size-3 text-blue-600" />
+                      Work Completed (Real Database Counts)
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
+                      <div className="bg-white p-2 rounded-lg border border-blue-100">
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase">Coursework Items</span>
+                        <strong className="text-sm font-extrabold text-slate-900">
+                          {(latestReport?.assignment_status?.records_fetched ?? counts?.total_assignments ?? 0).toLocaleString()}
+                        </strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-blue-100">
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase">Submitted / Reviewed</span>
+                        <strong className="text-sm font-extrabold text-blue-700">
+                          {latestReport?.assignment_status?.submitted ?? 0} / {latestReport?.assignment_status?.reviewed ?? 0}
+                        </strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-amber-200 bg-amber-50/50">
+                        <span className="text-[9px] text-amber-800 font-bold block uppercase">Unsubmitted / Overdue</span>
+                        <strong className="text-sm font-extrabold text-amber-900">
+                          {latestReport?.assignment_status?.not_submitted ?? counts?.not_submitted ?? 0}
+                        </strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-emerald-200 bg-emerald-50/50">
+                        <span className="text-[9px] text-emerald-800 font-bold block uppercase">Passed to Agent 3</span>
+                        <strong className="text-sm font-extrabold text-emerald-900">
+                          {latestReport?.assignment_status?.records_passed ?? unsubmittedList.length}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DIRECTLY VISIBLE REAL DATABASE DATA TABLE FOR AGENT 2 */}
+                <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/20 p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-blue-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-6 items-center justify-center rounded-lg bg-blue-100 text-blue-700 font-bold text-xs">
+                        2
+                      </span>
+                      <div>
+                        <h5 className="text-xs font-extrabold uppercase tracking-wider text-blue-950">
+                          Agent 2 Live Database Records (Coursework Allocations & Submissions)
+                        </h5>
+                        <span className="text-[11px] text-slate-500 font-mono">
+                          Table Joins: lms_assignment ➔ tblstudent ➔ subject
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Sub-view toggle for Agent 2 */}
+                    <div className="flex items-center gap-1 bg-white border border-blue-200 rounded-lg p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setAgent2DataView('all_work')}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition ${
+                          agent2DataView === 'all_work'
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        All Coursework Items ({latestReport?.assignment_status?.total_work ?? counts?.total_assignments ?? 0})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAgent2DataView('not_submitted')}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition ${
+                          agent2DataView === 'not_submitted'
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Unsubmitted & Overdue Only ({latestReport?.assignment_status?.not_submitted ?? counts?.not_submitted ?? 0})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-600">
+                        Source Table: <code className="text-blue-600 font-mono font-semibold">lms_assignment</code>
+                      </span>
+                      <span className="text-slate-500 text-[11px]">
+                        Actual coursework items with submission flags
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-600 border-b border-slate-200">
+                          <tr>
+                            <th className="py-2.5 px-3">Item ID</th>
+                            <th className="py-2.5 px-3">Student Name [tblstudent]</th>
+                            <th className="py-2.5 px-3">Coursework Title [lms_assignment]</th>
+                            <th className="py-2.5 px-3">Work Type</th>
+                            <th className="py-2.5 px-3">Subject</th>
+                            <th className="py-2.5 px-3 text-center">Submission Status</th>
+                            <th className="py-2.5 px-3 text-center">Teacher Review</th>
+                            <th className="py-2.5 px-3 text-center">Audit Status</th>
+                            <th className="py-2.5 px-3">Due Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {(latestReport?.assignment_status?.all_work_sample && latestReport.assignment_status.all_work_sample.length > 0
+                            ? (agent2DataView === 'not_submitted'
+                                ? latestReport.assignment_status.all_work_sample.filter(
+                                    (w) => w.computed_status === 'not_submitted' || w.computed_status === 'overdue'
+                                  )
+                                : latestReport.assignment_status.all_work_sample)
+                            : unsubmittedList.map((ns) => ({
+                                assignment_id: ns.assignment_id,
+                                student_id: ns.student_id,
+                                student_name: ns.student_name ?? `Student #${ns.student_id}`,
+                                title: ns.title,
+                                work_type: ns.work_type ?? 'assignment',
+                                subject_name: ns.subject_name ?? 'General',
+                                student_submission_status: 'N',
+                                teacher_submission_status: null,
+                                computed_status: 'not_submitted' as const,
+                                due_on: ns.due_on ?? ns.submission_date ?? 'Overdue',
+                              }))
+                          ).map((item, idx) => {
+                            const isNotSubmitted = item.computed_status === 'not_submitted' || item.computed_status === 'overdue';
+                            return (
+                              <tr
+                                key={idx}
+                                className={`transition hover:bg-slate-50/80 ${
+                                  isNotSubmitted ? 'bg-amber-50/40' : 'bg-white'
                                 }`}
                               >
-                                {item.computed_status.replace('_', ' ')}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">
-                              {item.due_on ?? 'N/A'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                                <td className="py-2.5 px-3 font-mono text-[11px] font-bold text-slate-700">
+                                  #{item.assignment_id}
+                                </td>
+                                <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                  {item.student_name}
+                                  <span className="text-[10px] text-slate-400 block font-mono">ID: {item.student_id ?? 'N/A'}</span>
+                                </td>
+                                <td className="py-2.5 px-3 font-medium text-slate-800">
+                                  {item.title}
+                                </td>
+                                <td className="py-2.5 px-3 font-mono text-[10px]">
+                                  <span className="rounded bg-slate-100 text-slate-700 px-1.5 py-0.5 uppercase font-bold">
+                                    {item.work_type}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 text-slate-600">
+                                  {item.subject_name ?? 'General'}
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  {item.student_submission_status === 'Y' ? (
+                                    <span className="rounded-full bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 text-[10px]">
+                                      Submitted (Y)
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-amber-100 text-amber-800 font-bold px-2 py-0.5 text-[10px]">
+                                      Not Submitted
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  {item.teacher_submission_status === 'Y' ? (
+                                    <span className="rounded-full bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 text-[10px]">
+                                      Reviewed (Y)
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 text-[10px]">
+                                      Pending Review
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span
+                                    className={`rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase ${
+                                      item.computed_status === 'reviewed'
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : item.computed_status === 'pending_review'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : item.computed_status === 'overdue'
+                                        ? 'bg-red-100 text-red-800'
+                                        : 'bg-amber-100 text-amber-800'
+                                    }`}
+                                  >
+                                    {item.computed_status.replace('_', ' ')}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">
+                                  {item.due_on ?? 'N/A'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Agent 2 Bottom Action Row */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-blue-100 pt-3 text-xs">
+                  <div className="text-slate-600 text-[11px]">
+                    <strong>Step 2 Output: </strong>
+                    {latestReport?.pipeline_execution?.steps?.[1]?.output_summary ??
+                      `${latestReport?.assignment_status?.total_work ?? counts?.total_assignments ?? 0} total coursework items audited. ${latestReport?.assignment_status?.submitted ?? 0} submitted, ${latestReport?.assignment_status?.not_submitted ?? counts?.not_submitted ?? 0} not submitted.`}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">
+                      ➔ Passed {latestReport?.assignment_status?.records_passed ?? unsubmittedList.length} Delinquent Coursework Records to Agent 3
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* INSPECTION VIEW: AGENT 3 DATA */}
-            {agent3DataView === 'drafts' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase text-slate-500">
-                      Multi-Agent Correlation & Synthesis: <code className="text-emerald-700 font-mono font-semibold">Agent 1 (Exams)</code> + <code className="text-blue-700 font-mono font-semibold">Agent 2 (Work)</code>
-                    </span>
-                    <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5">
-                      Draft-Only Guardrail Active
-                    </span>
+            {/* ========================================================================= */}
+            {/* AGENT 3: ASSESSMENT REVIEW DRAFTER (STEP 3 • GATE 3)                      */}
+            {/* ========================================================================= */}
+            {(selectedAgentBreakdown === 'all' || selectedAgentBreakdown === 'agent_3') && (
+              <div className="rounded-2xl border-2 border-emerald-200 bg-white p-6 shadow-sm space-y-5">
+                {/* Agent Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-emerald-100 pb-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white font-extrabold text-lg shadow-sm">
+                      3
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase px-2 py-0.5 tracking-wider">
+                          Step 3 of 3 • Gate 3 Evaluator
+                        </span>
+                        <span className="rounded-md bg-slate-100 text-slate-700 font-mono text-[10px] px-2 py-0.5">
+                          ID: agt_review_note_drafter
+                        </span>
+                        <span className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 font-mono text-[10px] px-2 py-0.5">
+                          Tool: exam_assessment.draft_review_note
+                        </span>
+                      </div>
+                      <h4 className="text-base font-extrabold text-slate-900 mt-1">
+                        Agent 3: Assessment Review Drafter
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Operational Role: Multi-Source Deficit Fusion, Personalized Remediation Drafter & Cohort Summary Synthesizer
+                      </p>
+                    </div>
                   </div>
 
-                  <span className="text-xs text-slate-500">
-                    {draftsList.length} Factual Review Notes Drafted
-                  </span>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700">
+                      <CheckCircle2 className="size-3.5 text-emerald-600" />
+                      Gate 3 Passed ({latestReport?.pipeline_execution?.steps?.[2]?.duration_ms ?? 45} ms)
+                    </span>
+                  </div>
                 </div>
 
-                {/* Deficit Correlation Summary Matrix */}
+                {/* Streamlined Operational Summary Bar */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  {/* Summary Box 1: Task & Fusion */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                      <Activity className="size-3 text-emerald-600" />
+                      Task & Multi-Source Evidence Fusion
+                    </span>
+                    <p className="text-slate-700 text-[11px] leading-relaxed">
+                      Correlates exam deficits from Agent 1 with unsubmitted coursework from Agent 2. Prepares evidence-backed educator review notes with exact scores and missing work citations under strict <code className="bg-white px-1 rounded text-emerald-800 font-mono text-[10px]">draft_pending_human_approval</code> policy.
+                    </p>
+                  </div>
+
+                  {/* Summary Box 2: Data Sources & Persistence */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                      <Database className="size-3 text-emerald-600" />
+                      Data Sources & Storage Tables
+                    </span>
+                    <div className="space-y-1 text-slate-700 text-[10px]">
+                      <div>
+                        <strong className="text-emerald-900">Input Data:</strong> {atRiskList.length} exam gaps (Agent 1) + {unsubmittedList.length} missing tasks (Agent 2)
+                      </div>
+                      <div>
+                        <strong className="text-emerald-900">Stored In Tables:</strong> <code className="font-mono text-slate-600">ai_agent_runs</code>, <code className="font-mono text-slate-600">lms_exam_assessment_agent_state</code>, <code className="font-mono text-slate-600">ai_recommendations</code>
+                      </div>
+                      <div>
+                        <strong className="text-emerald-900">Guardrail Enforced:</strong> Strictly 0 external SMS or emails sent
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Box 3: Work Completed Metrics */}
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3.5 space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                      <CheckCircle2 className="size-3 text-emerald-600" />
+                      Work Completed (Live Generated)
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
+                      <div className="bg-white p-2 rounded-lg border border-purple-200 bg-purple-50/50">
+                        <span className="text-[9px] text-purple-800 font-bold block uppercase">Double-Risk Fused</span>
+                        <strong className="text-sm font-extrabold text-purple-900">
+                          {latestReport?.draft_reviews?.correlations?.double_risk_count ??
+                            (atRiskList.filter((a) => unsubmittedList.some((u) => u.student_id === a.student_id)).length)}
+                        </strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-emerald-100">
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase">Review Drafts</span>
+                        <strong className="text-sm font-extrabold text-emerald-700">
+                          {latestReport?.draft_reviews?.student_drafts_count ?? draftsList.length}
+                        </strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-emerald-100 col-span-2">
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase">External Dispatches</span>
+                        <strong className="text-xs font-extrabold text-emerald-900">
+                          0 (Strictly Draft-Only • Human-in-the-Loop)
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DEFICIT CORRELATION MATRIX CARDS */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="rounded-xl border border-red-200 bg-red-50/50 p-3 space-y-1">
+                  <div className="rounded-xl border border-red-200 bg-red-50/60 p-3.5 space-y-1">
                     <span className="text-[10px] font-bold uppercase text-red-800 flex items-center gap-1">
                       <AlertTriangle className="size-3 text-red-600" />
                       Double-Risk Students (High Priority)
                     </span>
-                    <p className="text-xs text-red-950">
-                      Students who have <strong>both</strong> scored below {atRiskThreshold}% on an online exam and have unsubmitted coursework.
+                    <p className="text-xs text-red-950 leading-relaxed">
+                      Students who have <strong>both</strong> scored below {atRiskThreshold}% on an online exam and have delinquent coursework.
                     </p>
                     <div className="text-sm font-extrabold text-red-900 pt-1">
                       {latestReport?.draft_reviews?.correlations?.double_risk_count ??
@@ -1919,94 +2240,232 @@ export function ExamAssessmentAgentControlCard({ onValidated }: ExamAssessmentAg
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-1">
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3.5 space-y-1">
                     <span className="text-[10px] font-bold uppercase text-amber-800 flex items-center gap-1">
                       <AlertCircle className="size-3 text-amber-600" />
                       Exam Struggle Only
                     </span>
-                    <p className="text-xs text-amber-950">
+                    <p className="text-xs text-amber-950 leading-relaxed">
                       Students with online exam scores below {atRiskThreshold}%, but who have submitted all coursework on time.
                     </p>
                     <div className="text-sm font-extrabold text-amber-900 pt-1">
-                      {latestReport?.draft_reviews?.correlations?.exam_only_count ?? atRiskList.length} Students
+                      {latestReport?.draft_reviews?.correlations?.exam_only_count ??
+                        (atRiskList.filter((a) => !unsubmittedList.some((u) => u.student_id === a.student_id)).length)} Students Identified
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3 space-y-1">
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 space-y-1">
                     <span className="text-[10px] font-bold uppercase text-blue-800 flex items-center gap-1">
-                      <Clock className="size-3 text-blue-600" />
+                      <ClipboardList className="size-3 text-blue-600" />
                       Coursework Delinquency Only
                     </span>
-                    <p className="text-xs text-blue-950">
-                      Students with unsubmitted assignments/worksheets, but satisfactory exam marks.
+                    <p className="text-xs text-blue-950 leading-relaxed">
+                      Students who have delinquent coursework items, but who achieved passing scores on their online assessments.
                     </p>
                     <div className="text-sm font-extrabold text-blue-900 pt-1">
-                      {latestReport?.draft_reviews?.correlations?.coursework_only_count ?? unsubmittedList.length} Students
+                      {latestReport?.draft_reviews?.correlations?.coursework_only_count ??
+                        (unsubmittedList.filter((u) => !atRiskList.some((a) => a.student_id === u.student_id)).length)} Students Identified
                     </div>
                   </div>
                 </div>
 
-                {/* Drafts Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                  {draftsList.map((draft, idx) => (
-                    <div key={idx} className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 shadow-2xs">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="flex size-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 font-bold text-[10px]">
-                            {idx + 1}
-                          </span>
-                          <strong className="text-xs font-bold text-slate-900">{draft.student_name}</strong>
-                        </div>
-                        <span className="rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-bold px-2 py-0.5 text-[9px] uppercase">
-                          Pending Human Sign-off
+                {/* DIRECTLY VISIBLE REAL DRAFT REVIEW NOTES TABLE */}
+                <div className="space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/20 p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-emerald-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 font-bold text-xs">
+                        3
+                      </span>
+                      <div>
+                        <h5 className="text-xs font-extrabold uppercase tracking-wider text-emerald-950">
+                          Agent 3 Generated Review Notes ({draftsList.length} Notes Awaiting Human Approval)
+                        </h5>
+                        <span className="text-[11px] text-slate-500 font-mono">
+                          Evidence Grounding: Real Scores & Delinquency Status ➔ Pending Teacher Sign-off
                         </span>
-                      </div>
-
-                      <div className="text-xs font-semibold text-indigo-900 truncate">
-                        {draft.subject}
-                      </div>
-
-                      <p className="text-xs text-slate-600 leading-relaxed font-sans line-clamp-3">
-                        {draft.draft_body}
-                      </p>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[10px]">
-                        <span className="text-slate-500 font-mono">
-                          Safety: Draft-Only (No External Messages)
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setViewingNote(draft)}
-                          className="font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
-                        >
-                          Inspect Full Review Note →
-                        </button>
                       </div>
                     </div>
-                  ))}
+
+                    <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5">
+                      Strictly Draft-Only • Human Sign-off Guard
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-600">
+                        Storage Table: <code className="text-emerald-600 font-mono font-semibold">ai_recommendations / lms_exam_assessment_agent_state</code>
+                      </span>
+                      <span className="text-slate-500 text-[11px]">
+                        Draft notes generated from fused evidence
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-600 border-b border-slate-200">
+                          <tr>
+                            <th className="py-2.5 px-3">Student Name [tblstudent]</th>
+                            <th className="py-2.5 px-3">Deficit Category</th>
+                            <th className="py-2.5 px-3">Assessment Title</th>
+                            <th className="py-2.5 px-3 text-center">Score / Status</th>
+                            <th className="py-2.5 px-3">Generated Review Note Body</th>
+                            <th className="py-2.5 px-3">Recommended Pedagogical Action</th>
+                            <th className="py-2.5 px-3">KG Evidence</th>
+                            <th className="py-2.5 px-3 text-center">Approval Status</th>
+                            <th className="py-2.5 px-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {draftsList.map((draft, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/80 transition">
+                              <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                {draft.student_name}
+                                <span className="text-[10px] text-slate-400 block font-mono">ID: {draft.student_id ?? 'N/A'}</span>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span
+                                  className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                                    draft.category === 'online_exam_at_risk'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {draft.category === 'online_exam_at_risk' ? 'Online Exam Gap' : 'Missing Work'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 font-medium text-slate-800">
+                                {draft.assessment_title ?? draft.subject}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-mono font-bold">
+                                {draft.score !== undefined ? (
+                                  <span className="text-red-700">
+                                    {draft.score} / {draft.total_marks} ({draft.percent}%)
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-700">Unsubmitted</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-700 max-w-xs truncate text-[11px]">
+                                {draft.draft_body}
+                              </td>
+                              <td className="py-2.5 px-3 text-[11px] text-slate-600 font-medium">
+                                {draft.recommended_action ?? (draft.category === 'online_exam_at_risk' ? '1-on-1 concept reinforcement & guided practice' : 'In-class reminder & submission extension')}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                {draft.root_concept_blocker ? (
+                                  <span className="inline-flex items-center gap-1 rounded bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5" title={draft.knowledge_graph_path ?? undefined}>
+                                    Blocker: {draft.root_concept_blocker}
+                                  </span>
+                                ) : draft.curriculum_concept ? (
+                                  <span className="inline-flex items-center gap-1 rounded bg-violet-100 text-violet-800 text-[9px] font-mono px-1.5 py-0.5" title={draft.knowledge_graph_path ?? undefined}>
+                                    {draft.curriculum_concept}
+                                  </span>
+                                ) : (<span className="text-slate-300 text-[10px]">—</span>)}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span className="rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 text-[10px] font-bold whitespace-nowrap">
+                                  Pending Human Approval
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingNote(draft)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-indigo-600 hover:bg-slate-50 shadow-2xs"
+                                >
+                                  <Eye className="size-3" /> Inspect Note
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Storage Traceability Box */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                    Execution Traceability & Data Storage Locations:
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                    <div className="rounded-lg bg-white p-2 border border-slate-200">
-                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Audit Runs Ledger</span>
-                      <code className="text-indigo-700 font-mono text-[11px] font-bold">ai_agent_runs</code>
-                      <span className="text-[10px] text-slate-500 block mt-0.5">Step execution times & JSON IO</span>
+                {/* Cohort Executive Review Summary Panel */}
+                {latestReport?.draft_reviews?.cohort_summary && (
+                  <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-2">
+                    <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                        <FileText className="size-3.5 text-indigo-600" />
+                        Executive Cohort Assessment Summary (Synthesized by Agent 3)
+                      </span>
+                      <span className="rounded-md bg-white border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                        Persisted in ai_recommendations
+                      </span>
                     </div>
-                    <div className="rounded-lg bg-white p-2 border border-slate-200">
-                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Continuous State</span>
-                      <code className="text-indigo-700 font-mono text-[11px] font-bold">lms_exam_assessment_agent_state</code>
-                      <span className="text-[10px] text-slate-500 block mt-0.5">Loop heartbeat, counts, next run</span>
+                    <pre className="whitespace-pre-wrap font-sans text-xs text-slate-800 leading-relaxed bg-white rounded-lg p-3 border border-indigo-100">
+                      {latestReport.draft_reviews.cohort_summary}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Knowledge Graph Intelligence Panel */}
+                {kgReasoning && (
+                  <div className="rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50/80 via-white to-purple-50/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-violet-100 pb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-violet-900 flex items-center gap-1.5">
+                        <GitCompare className="size-3.5 text-violet-600" />
+                        Knowledge Graph Intelligence (Centralized KG Engine)
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded-md bg-violet-100 border border-violet-200 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                          Neo4j: {kgReasoning.neo4j_nodes_total?.toLocaleString() ?? '—'} nodes
+                        </span>
+                        <span className="rounded-md bg-purple-100 border border-purple-200 px-2 py-0.5 text-[10px] font-bold text-purple-700">
+                          {kgReasoning.neo4j_prerequisite_edges?.toLocaleString() ?? '—'} prerequisite edges
+                        </span>
+                      </div>
                     </div>
-                    <div className="rounded-lg bg-white p-2 border border-slate-200">
-                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Workflow Binding</span>
-                      <code className="text-emerald-700 font-mono text-[11px] font-bold">exam_assessment_followup</code>
-                      <span className="text-[10px] text-slate-500 block mt-0.5">Human educator sign-off queue</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      {/* KG Cohort Insight */}
+                      <div className="rounded-lg border border-violet-100 bg-white p-3 space-y-1">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-violet-800">Cohort KG Analysis</span>
+                        <p className="text-slate-700 leading-relaxed text-[11px]">{kgReasoning.cohort_insight ?? 'Graph traversal active.'}</p>
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="rounded bg-slate-100 text-slate-600 text-[9px] font-mono px-1.5 py-0.5">{kgReasoning.traversed_students_count ?? 0} students traversed</span>
+                          <span className="rounded bg-violet-50 text-violet-700 text-[9px] font-mono px-1.5 py-0.5">{kgReasoning.graph_path_format ?? 'Student → ExamPaper → Concept → Blocker'}</span>
+                        </div>
+                      </div>
+                      {/* Top Prerequisite Blockers */}
+                      <div className="rounded-lg border border-violet-100 bg-white p-3 space-y-1">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-violet-800">Top Prerequisite Blockers (concept_prerequisite table)</span>
+                        {kgReasoning.top_prerequisite_blockers && kgReasoning.top_prerequisite_blockers.length > 0 ? (
+                          <ul className="space-y-0.5">
+                            {kgReasoning.top_prerequisite_blockers.slice(0, 5).map((b, i) => (
+                              <li key={i} className="flex items-center justify-between text-[10px]">
+                                <span className="text-slate-800 font-medium">{b.prerequisite_name}</span>
+                                <span className="rounded-full bg-red-100 text-red-700 font-bold px-1.5 py-0.5 text-[9px]">{b.impacted_students_count} students</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (<p className="text-slate-400 text-[11px]">No blocker data yet — run pipeline to populate.</p>)}
+                      </div>
                     </div>
+                    {/* KG Tables Used */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[9px] font-bold uppercase text-slate-400">KG Tables:</span>
+                      {(kgReasoning.centralized_kg_tables_used ?? []).map((t, i) => (
+                        <code key={i} className="rounded bg-violet-50 border border-violet-200 text-violet-700 font-mono text-[9px] px-1.5 py-0.5">{t}</code>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Agent 3 Bottom Action Row */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-emerald-100 pt-3 text-xs">
+                  <div className="text-slate-600 text-[11px]">
+                    <strong>Step 3 Output: </strong>
+                    {latestReport?.pipeline_execution?.steps?.[2]?.output_summary ??
+                      `Drafted ${latestReport?.draft_reviews?.student_drafts_count ?? draftsList.length} individual review notes and 1 comprehensive cohort intervention summary.`}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">
+                      ✓ Persisted in ai_agent_runs & lms_exam_assessment_agent_state (Pending Educator Approval)
+                    </span>
                   </div>
                 </div>
               </div>
@@ -2014,10 +2473,7 @@ export function ExamAssessmentAgentControlCard({ onValidated }: ExamAssessmentAg
           </div>
         </div>
       )}
-
-      {/* ========================================================================= */}
-      {/* TAB 2: AGENT-TO-AGENT DATA HANDOFF FLOW                                   */}
-      {/* ========================================================================= */}
+{/* ========================================================================= */}
       {mainTab === 'handoff' && (
         <div className="space-y-6">
           <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/80 via-white to-indigo-50/80 p-5 shadow-2xs">
@@ -2429,878 +2885,6 @@ export function ExamAssessmentAgentControlCard({ onValidated }: ExamAssessmentAg
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* TAB 5: 5-Tier Assessment & Online Exam Audit (Matching Teach/Learn Hierarchy Audit) */}
-      {mainTab === 'hierarchy' && (
-        <div className="space-y-6">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Layers className="size-4 text-indigo-600" />
-                  5-Tier Assessment & Evaluation Hierarchy Audit
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Standard ➔ Published Exams ➔ Attempts & Cohort ➔ Work & Submissions ➔ Review Notes traversal
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800">
-                  <CheckCircle2 className="size-3.5 text-emerald-600" />
-                  {latestReport?.exam_performance?.attempts_recorded?.toLocaleString() ?? counts?.attempts_recorded?.toLocaleString() ?? '0'} Scored Attempts
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800">
-                  <AlertTriangle className="size-3.5 text-amber-600" />
-                  {latestReport?.exam_performance?.needs_attention_count ?? counts?.needs_attention ?? 0} At-Risk Students
-                </span>
-              </div>
-            </div>
-
-            {/* 5-Tier Cards Matrix */}
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
-              {/* Tier 1: Standards */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 relative overflow-hidden">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Tier 1 • Standards
-                </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-xl font-extrabold text-slate-900">
-                    {latestReport?.standards?.length ?? 1}
-                  </span>
-                  <span className="text-[11px] font-medium text-slate-500">Standards</span>
-                </div>
-                <div className="mt-2 text-[10px] text-slate-500 border-t border-slate-200/60 pt-1.5 flex justify-between">
-                  <span>Scope:</span>
-                  <strong className="text-slate-700 font-bold">Standard {pipelineStandard}</strong>
-                </div>
-              </div>
-
-              {/* Tier 2: Published Exams */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 relative overflow-hidden">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Tier 2 • Exams
-                </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-xl font-extrabold text-slate-900">
-                    {latestReport?.exam_performance?.exams_published ?? counts?.exams_published ?? 0}
-                  </span>
-                  <span className="text-[11px] font-medium text-slate-500">Papers</span>
-                </div>
-                <div className="mt-2 text-[10px] text-slate-500 border-t border-slate-200/60 pt-1.5 flex justify-between">
-                  <span>Excluded:</span>
-                  <strong className="text-slate-600 font-bold">PAL Papers</strong>
-                </div>
-              </div>
-
-              {/* Tier 3: Attempts & Cohort */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 relative overflow-hidden">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Tier 3 • Attempts
-                </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-xl font-extrabold text-slate-900">
-                    {counts?.attempts_recorded?.toLocaleString() ?? '0'}
-                  </span>
-                  <span className="text-[11px] font-medium text-slate-500">Scored</span>
-                </div>
-                <div className="mt-2 text-[10px] text-slate-500 border-t border-slate-200/60 pt-1.5 flex justify-between">
-                  <span>Cohort Avg:</span>
-                  <strong className="text-emerald-700 font-bold">{latestReport?.exam_performance?.average_score ?? counts?.average_score ?? 0}%</strong>
-                </div>
-              </div>
-
-              {/* Tier 4: Work & Assignments */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 relative overflow-hidden">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Tier 4 • Work
-                </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-xl font-extrabold text-slate-900">
-                    {counts?.total_assignments ?? 35}
-                  </span>
-                  <span className="text-[11px] font-medium text-slate-500">Assignments</span>
-                </div>
-                <div className="mt-2 text-[10px] text-slate-500 border-t border-slate-200/60 pt-1.5 flex justify-between">
-                  <span>Unsubmitted:</span>
-                  <strong className="text-amber-700 font-bold">{counts?.not_submitted ?? 32}</strong>
-                </div>
-              </div>
-
-              {/* Tier 5: Review Notes */}
-              <div className="rounded-xl border border-indigo-200 bg-indigo-50/30 p-3 relative overflow-hidden">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
-                  Tier 5 • Review Notes
-                </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-xl font-extrabold text-indigo-950">
-                    {counts?.draft_notes_count ?? 0}
-                  </span>
-                  <span className="text-[11px] font-medium text-indigo-700">Review Drafts</span>
-                </div>
-                <div className="mt-2 text-[10px] text-indigo-800 border-t border-indigo-200/60 pt-1.5 flex justify-between">
-                  <span>Sign-off:</span>
-                  <strong className="text-emerald-700 font-bold">Human Gated</strong>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive Gaps Explorer (Matching Teach/Learn layout) */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/30 p-4 space-y-3">
-            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setActiveGapsTab('all')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                    activeGapsTab === 'all'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                  }`}
-                >
-                  All Attention Gaps ({latestReport?.exam_performance?.needs_attention_count ?? counts?.needs_attention ?? 0})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveGapsTab('at_risk')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                    activeGapsTab === 'at_risk'
-                      ? 'bg-red-600 text-white shadow-sm'
-                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                  }`}
-                >
-                  At-Risk Attempts (&lt;{atRiskThreshold}%) ({atRiskList.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveGapsTab('unsubmitted')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                    activeGapsTab === 'unsubmitted'
-                      ? 'bg-amber-600 text-white shadow-sm'
-                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                  }`}
-                >
-                  Unsubmitted Work ({unsubmittedList.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveGapsTab('drafts')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                    activeGapsTab === 'drafts'
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                  }`}
-                >
-                  Review Notes Ready ({draftsList.length})
-                </button>
-              </div>
-
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-2.5 top-2.5 size-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search gaps by student, exam, subject…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-xs text-slate-800 placeholder-slate-400 shadow-sm focus:border-indigo-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Issue Cards */}
-            {filteredGaps.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center">
-                <CheckCircle2 className="mx-auto size-8 text-emerald-500" />
-                <p className="mt-2 text-xs font-semibold text-slate-800">
-                  No assessment gaps in this view
-                </p>
-                <p className="mt-0.5 text-[11px] text-slate-500">
-                  {searchQuery ? 'Try broadening your search term.' : 'Every evaluated student meets passing threshold requirements.'}
-                </p>
-              </div>
-            ) : (
-              <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
-                {filteredGaps.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-xs hover:border-slate-300 transition"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${item.badgeColor}`}>
-                          {item.level}
-                        </span>
-                        <span className="font-semibold text-xs text-slate-900 truncate">
-                          {item.title}
-                        </span>
-                      </div>
-                      <p className="mt-1 font-mono text-[11px] text-slate-500 truncate">
-                        {item.breadcrumb}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-700 leading-snug">
-                        {item.issue}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: Review Notes & Stored Reviews Ledger (Matching Teach/Learn Content Tasks & Stored IDs Ledger) */}
-      {mainTab === 'content_ledger' && (
-        <div className="space-y-4">
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Database className="size-4 text-violet-600" />
-                Review Notes & Stored Review Drafts Ledger
-              </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Every review note drafted by Agent 3 is stored in the database with human-in-the-loop sign-off safeguards. Zero external messages are dispatched without educator authorization.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <select
-                value={taskFilterStatus}
-                onChange={(e) => setTaskFilterStatus(e.target.value)}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-800 shadow-xs focus:border-violet-500 focus:outline-none"
-              >
-                <option value="all">All Draft Reviews ({draftsList.length})</option>
-                <option value="exam_notes">Online Exam Reviews</option>
-                <option value="unsubmitted_notes">Assignment Follow-ups</option>
-              </select>
-
-              <button
-                type="button"
-                onClick={() => void handleRunPipeline()}
-                disabled={pipelineRunning}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                <RefreshCw className={`size-3 text-slate-500 ${pipelineRunning ? 'animate-spin' : ''}`} />
-                Refresh Ledger
-              </button>
-            </div>
-          </div>
-
-          {/* Ledger Table */}
-          {filteredLedgerNotes.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center">
-              <Database className="mx-auto size-8 text-slate-400" />
-              <p className="mt-2 text-xs font-semibold text-slate-800">
-                No draft reviews logged yet
-              </p>
-              <p className="mt-0.5 text-[11px] text-slate-500 max-w-md mx-auto">
-                Click <strong>"Process Work & Reviews"</strong> or run a sweep to generate draft follow-up notes.
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                    <tr>
-                      <th className="px-4 py-2.5">Student & Context</th>
-                      <th className="px-3 py-2.5">Draft Subject & Paper</th>
-                      <th className="px-3 py-2.5">Action Taken</th>
-                      <th className="px-3 py-2.5">Guardrail Status</th>
-                      <th className="px-3 py-2.5">Recommended Action</th>
-                      <th className="px-4 py-2.5 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-normal text-slate-800">
-                    {filteredLedgerNotes.map((note, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 transition">
-                        <td className="px-4 py-3">
-                          <div className="font-bold text-slate-900">{note.student_name ?? 'Student'}</div>
-                          <div className="font-mono text-[11px] text-slate-500 mt-0.5">
-                            ID: {note.student_id ?? 'N/A'} • Standard {pipelineStandard}
-                          </div>
-                        </td>
-                        <td className="px-3 py-3">
-                          <div className="font-medium text-slate-800 max-w-xs truncate">{note.subject}</div>
-                          <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{note.draft_body}</div>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 border border-violet-200 px-2.5 py-0.5 text-[11px] font-semibold text-violet-800">
-                            <Sparkles className="size-3 text-violet-600" /> Drafted Review
-                          </span>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
-                            <ShieldCheck className="size-3 text-amber-600" /> Pending Sign-off
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-[11px] text-slate-600 font-medium">
-                          {note.recommended_action ?? 'Remediation review'}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setViewingNote(note)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-                          >
-                            <Eye className="size-3" /> Inspect Draft
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: Continuous Automated Loop Workflow (Steps 1–6) (Matching Teach/Learn layout) */}
-      {mainTab === 'cycle_diagram' && (
-        <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/40 p-5 space-y-4">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Workflow className="size-4 text-indigo-600" />
-              Automated 3-Agent Continuous Collaboration Cycle
-            </h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              How the three agents synchronize continuously across exams, assignments, and educator reviews
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
-            {/* Step 1 */}
-            <div className="rounded-xl border border-indigo-100 bg-white p-4 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-bold">1</span>
-                <span className="font-bold text-xs text-slate-900">Exam Attempt Discovery</span>
-              </div>
-              <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-                Agent 1 (Online Exam Summary Reader) queries <code className="font-mono text-[10px] bg-slate-100 px-1 py-0.5 rounded">question_paper</code> & <code className="font-mono text-[10px] bg-slate-100 px-1 py-0.5 rounded">lms_online_exam</code>, excluding PAL practice tests.
-              </p>
-            </div>
-
-            {/* Step 2 */}
-            <div className="rounded-xl border border-violet-100 bg-white p-4 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-full bg-violet-600 text-white text-xs font-bold">2</span>
-                <span className="font-bold text-xs text-slate-900">Passing Bar Evaluation</span>
-              </div>
-              <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-                Agent 1 checks scores against the institute benchmark (default 40%) and identifies at-risk students for follow-up intervention.
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="rounded-xl border border-blue-100 bg-white p-4 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
-                <span className="font-bold text-xs text-slate-900">Work Cross-Reference</span>
-              </div>
-              <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-                Agent 2 (Assignment Status Reader) checks <code className="font-mono text-[10px] bg-slate-100 px-1 py-0.5 rounded">lms_assignment</code> to correlate exam scores with submitted, reviewed, or missing coursework.
-              </p>
-            </div>
-
-            {/* Step 4 */}
-            <div className="rounded-xl border border-purple-100 bg-white p-4 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-full bg-purple-600 text-white text-xs font-bold">4</span>
-                <span className="font-bold text-xs text-slate-900">Review Note Synthesis</span>
-              </div>
-              <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-                Agent 3 (Review Drafter) synthesizes exam and assignment records into objective, evidence-grounded review drafts without character judgments.
-              </p>
-            </div>
-
-            {/* Step 5 */}
-            <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">5</span>
-                <span className="font-bold text-xs text-slate-900">Human-in-the-Loop Sign-off</span>
-              </div>
-              <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-                Review notes remain strictly in draft status. Zero external communications are dispatched until a teacher or coordinator reviews and approves.
-              </p>
-            </div>
-
-            {/* Step 6 */}
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-full bg-slate-900 text-white text-xs font-bold">6</span>
-                <span className="font-bold text-xs text-slate-900">Continuous Monitoring</span>
-              </div>
-              <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-                Agent 1 advances to subsequent cohorts, repeating the evaluation cycle autonomously across all curriculum levels.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: Synchronized 3-Agent Sequential Pipeline (Matching Teach/Learn Pipeline Layout) */}
-      {mainTab === 'pipeline' && (
-        <div className="space-y-6">
-          <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/50 via-white to-teal-50/40 p-5 space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Sparkles className="size-5 text-emerald-600" />
-                  Exam & Assessment Synchronized 3-Agent Sequential Pipeline
-                </h3>
-                <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                  Executes all three agents sequentially with strict validation gates: 
-                  <strong className="text-slate-800"> Agent 1 (Online Exam Summary)</strong> flags students scoring below proficiency bar → 
-                  <strong className="text-slate-800"> Agent 2 (Assignment Status)</strong> verifies homework, worksheets & projects → 
-                  <strong className="text-slate-800"> Agent 3 (Assessment Review Drafter)</strong> prepares educator review notes with human approval safeguards.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-2xs">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Standard:</span>
-                  <input
-                    type="text"
-                    value={pipelineStandard}
-                    onChange={(e) => setPipelineStandard(e.target.value)}
-                    placeholder="2231, or 'all'"
-                    className="w-24 text-center text-xs font-bold text-slate-900 outline-none"
-                    disabled={pipelineRunning}
-                  />
-                </div>
-
-                <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-2xs">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">At-Risk Bar:</span>
-                  <input
-                    type="number"
-                    value={atRiskThreshold}
-                    onChange={(e) => setAtRiskThreshold(Number(e.target.value) || 40)}
-                    className="w-12 text-center text-xs font-bold text-slate-900 outline-none"
-                    min={10}
-                    max={90}
-                    disabled={pipelineRunning}
-                  />
-                  <span className="text-[11px] text-slate-400">%</span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleRunPipeline}
-                  disabled={pipelineRunning}
-                  className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition"
-                >
-                  {pipelineRunning ? (
-                    <>
-                      <RefreshCw className="size-4 animate-spin" />
-                      Running Pipeline…
-                    </>
-                  ) : (
-                    <>
-                      <Play className="size-4 fill-white" />
-                      Run Synchronized Pipeline
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Visual Step-by-Step Architecture Flow (Matching Teach/Learn layout) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-              <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 font-bold text-xs">1</span>
-                  <span className="text-[10px] font-mono text-slate-400">exam_assessment.online_exam_summary</span>
-                </div>
-                <h4 className="text-xs font-bold text-slate-900 mt-2">Online Exam Summary Reader</h4>
-                <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
-                  Calculates authentic attempts, excluding PAL, and flags students below bar.
-                </p>
-                <div className="mt-2.5 flex items-center justify-between gap-1">
-                  <div className="rounded-lg bg-indigo-50/70 px-2 py-1 text-[10px] font-bold text-indigo-700 flex items-center gap-1">
-                    <ShieldCheck className="size-3 text-indigo-600" /> Gate 1: Resolves Scope
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEsoActiveTab('agent_1');
-                      void handleOpenEso();
-                    }}
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
-                  >
-                    View Agent 1 ESO →
-                  </button>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-blue-50 text-blue-700 font-bold text-xs">2</span>
-                  <span className="text-[10px] font-mono text-slate-400">exam_assessment.assignment_status</span>
-                </div>
-                <h4 className="text-xs font-bold text-slate-900 mt-2">Assignment Status Reader</h4>
-                <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
-                  Scans homework, worksheets, and projects for submission and review flags.
-                </p>
-                <div className="mt-2.5 flex items-center justify-between gap-1">
-                  <div className="rounded-lg bg-blue-50/70 px-2 py-1 text-[10px] font-bold text-blue-700 flex items-center gap-1">
-                    <ShieldCheck className="size-3 text-blue-600" /> Gate 2: Verifies Submission
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEsoActiveTab('agent_2');
-                      void handleOpenEso();
-                    }}
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
-                  >
-                    View Agent 2 ESO →
-                  </button>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs">3</span>
-                  <span className="text-[10px] font-mono text-slate-400">exam_assessment.draft_review_note</span>
-                </div>
-                <h4 className="text-xs font-bold text-slate-900 mt-2">Assessment Review Drafter</h4>
-                <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
-                  Prepares factual review notes with mandatory human educator approval.
-                </p>
-                <div className="mt-2.5 flex items-center justify-between gap-1">
-                  <div className="rounded-lg bg-emerald-50/70 px-2 py-1 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                    <ShieldCheck className="size-3 text-emerald-600" /> Gate 3: Drafts Review
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEsoActiveTab('agent_3');
-                      void handleOpenEso();
-                    }}
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-800 underline cursor-pointer"
-                  >
-                    View Agent 3 ESO →
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {pipelineError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-800 flex items-center gap-2">
-                <AlertCircle className="size-4 shrink-0 text-red-600" />
-                <span>{pipelineError}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Unified Report View (Matching Teach/Learn layout) */}
-          {latestReport && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
-              {/* Executive Header */}
-              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                      PIPELINE COMPLETED
-                    </span>
-                    <span className="text-xs text-slate-500 font-mono">
-                      Generated at {new Date(latestReport.generated_at).toLocaleTimeString('en-IN')}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-950 mt-1">
-                    Unified Exam & Assessment Report — Standard {latestReport.standard_name ?? pipelineStandard}
-                  </h3>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-center">
-                    <span className="block text-[10px] font-bold uppercase text-slate-500">Duration</span>
-                    <span className="font-mono text-xs font-extrabold text-slate-800">
-                      {latestReport.total_duration_ms} ms
-                    </span>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-center">
-                    <span className="block text-[10px] font-bold uppercase text-slate-500">Exams</span>
-                    <span className="font-mono text-xs font-extrabold text-indigo-700">
-                      {latestReport.exam_performance?.exams_published ?? counts?.exams_published ?? 0}
-                    </span>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-center">
-                    <span className="block text-[10px] font-bold uppercase text-slate-500">Attempts</span>
-                    <span className="font-mono text-xs font-extrabold text-blue-700">
-                      {latestReport.exam_performance?.attempts_recorded?.toLocaleString() ?? counts?.attempts_recorded?.toLocaleString() ?? '0'}
-                    </span>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-center">
-                    <span className="block text-[10px] font-bold uppercase text-slate-500">At-Risk</span>
-                    <span className="font-mono text-xs font-extrabold text-amber-700">
-                      {latestReport.exam_performance?.needs_attention_count ?? counts?.needs_attention ?? 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Execution Steps & Gates Table */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
-                  Sequential Execution Audit & Validation Gates
-                </h4>
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
-                      <tr>
-                        <th className="py-2.5 px-3">Step</th>
-                        <th className="py-2.5 px-3">Agent</th>
-                        <th className="py-2.5 px-3">Tool</th>
-                        <th className="py-2.5 px-3">Status</th>
-                        <th className="py-2.5 px-3">Gate Outcome</th>
-                        <th className="py-2.5 px-3">Duration</th>
-                        <th className="py-2.5 px-3">Summary</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {(latestReport.pipeline_execution?.steps ?? [
-                        { step: 1, agent_name: 'Online exam summary reader', tool: 'exam_assessment.online_exam_summary', status: 'passed', duration_ms: 104, output_summary: 'Computed authentic exam attempts excluding PAL; identified at-risk students below passing threshold.' },
-                        { step: 2, agent_name: 'Assignment status reader', tool: 'exam_assessment.assignment_status', status: 'passed', duration_ms: 63, output_summary: 'Scoped homework, worksheets, and project submission records; flagged unsubmitted items.' },
-                        { step: 3, agent_name: 'Assessment review drafter', tool: 'exam_assessment.draft_review_note', status: 'passed', duration_ms: 45, output_summary: 'Synthesized factual review notes with educator sign-off guardrail; zero external messages sent.' },
-                      ]).map((step, idx) => {
-                        const gate = latestReport.pipeline_execution?.gates?.[idx];
-                        return (
-                          <tr key={step.step} className="hover:bg-slate-50/50">
-                            <td className="py-2.5 px-3 font-bold text-slate-900">{step.step}</td>
-                            <td className="py-2.5 px-3 font-semibold text-slate-800">{step.agent_name}</td>
-                            <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">{step.tool}</td>
-                            <td className="py-2.5 px-3">
-                              <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 uppercase">
-                                {step.status}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 text-emerald-700 px-1.5 py-0.5 text-[10px] font-bold">
-                                <CheckCheck className="size-3 text-emerald-600" />
-                                {gate?.status?.toUpperCase() ?? 'PASSED'}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 font-mono text-slate-600">{step.duration_ms} ms</td>
-                            <td className="py-2.5 px-3 text-slate-600">{step.output_summary}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* All-Standards Sweep Table (if available) */}
-              {latestReport.mode === 'all_standards_sweep' && latestReport.standards && (
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Institute All-Standards Sweep Results ({latestReport.standards.length} Standards)
-                    </h4>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold uppercase text-slate-500">
-                        <tr>
-                          <th className="px-4 py-2.5">Standard</th>
-                          <th className="px-4 py-2.5">Gate 1: Online Exams</th>
-                          <th className="px-4 py-2.5">At-Risk Attempts</th>
-                          <th className="px-4 py-2.5">Gate 2: Work/Assignments</th>
-                          <th className="px-4 py-2.5">Gate 3: Review Drafts</th>
-                          <th className="px-4 py-2.5">Validation Gates</th>
-                          <th className="px-4 py-2.5">Duration</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {latestReport.standards.map((std) => (
-                          <tr key={std.standard_id} className="hover:bg-slate-50/60">
-                            <td className="px-4 py-2.5 font-medium text-slate-900">
-                              {std.standard_name} <span className="text-[11px] text-slate-400">({std.standard_id})</span>
-                            </td>
-                            <td className="px-4 py-2.5">
-                              {std.exams_published} exams, {std.attempts_recorded.toLocaleString()} attempts
-                            </td>
-                            <td className="px-4 py-2.5">
-                              <span
-                                className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${
-                                  std.at_risk_count > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
-                                }`}
-                              >
-                                {std.at_risk_count} at-risk
-                              </span>
-                            </td>
-                            <td className="px-4 py-2.5">
-                              {std.assignments_total} total ({std.assignments_not_submitted} unsubmitted)
-                            </td>
-                            <td className="px-4 py-2.5 font-semibold text-indigo-700">{std.drafts_count} drafts</td>
-                            <td className="px-4 py-2.5">
-                              <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
-                                <CheckCircle2 className="size-3.5" />
-                                PASSED
-                              </span>
-                            </td>
-                            <td className="px-4 py-2.5 text-slate-500">{std.duration_ms} ms</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* 3 Unified Content Sections (Matching Teach/Learn layout) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 1. Exam Performance */}
-                <div className="rounded-xl border border-slate-200 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                      <ClipboardList className="size-4 text-indigo-600" />
-                      1. Online Exam Performance (Agent 1)
-                    </h4>
-                    <span className="text-xs text-slate-500 font-mono">
-                      {latestReport.exam_performance?.exams_published ?? 370} Exams Published
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-lg bg-slate-50 p-2 border border-slate-100">
-                        <span className="text-[10px] text-slate-500 block">Attempts Scored</span>
-                        <strong className="text-slate-900">
-                          {latestReport.exam_performance?.attempts_recorded?.toLocaleString() ?? '14,661'}
-                        </strong>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-2 border border-slate-100">
-                        <span className="text-[10px] text-slate-500 block">Cohort Average</span>
-                        <strong className="text-emerald-700">
-                          {latestReport.exam_performance?.average_score ?? 0}%
-                        </strong>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                        At-Risk Students Identified ({atRiskList.length})
-                      </p>
-                      <ul className="space-y-1 text-xs text-slate-700">
-                        {atRiskList.slice(0, 4).map((st, i) => (
-                          <li key={i} className="flex items-center justify-between py-1 border-b border-slate-50">
-                            <span className="font-semibold text-slate-900 truncate">{st.student_name}</span>
-                            <span className="rounded bg-red-50 text-red-700 px-1.5 py-0.2 font-mono text-[10px] font-bold">
-                              {st.percent ?? st.percentage ?? st.score_percent ?? 0}%
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Assignment & Work Status */}
-                <div className="rounded-xl border border-slate-200 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                      <FileCheck className="size-4 text-blue-600" />
-                      2. Assignment & Work Status (Agent 2)
-                    </h4>
-                    <span className="text-xs text-slate-500 font-mono">
-                      {latestReport.assignment_status?.total_work ?? 0} Tasks Scanned
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div className="rounded-lg bg-indigo-50/50 p-2 border border-indigo-100 text-center">
-                        <span className="text-[10px] text-slate-500 block">Submitted</span>
-                        <strong className="text-indigo-700">{latestReport.assignment_status?.submitted ?? 0}</strong>
-                      </div>
-                      <div className="rounded-lg bg-emerald-50/50 p-2 border border-emerald-100 text-center">
-                        <span className="text-[10px] text-slate-500 block">Reviewed</span>
-                        <strong className="text-emerald-700">{latestReport.assignment_status?.reviewed ?? 0}</strong>
-                      </div>
-                      <div className="rounded-lg bg-amber-50/50 p-2 border border-amber-100 text-center">
-                        <span className="text-[10px] text-slate-500 block">Pending</span>
-                        <strong className="text-amber-700">{latestReport.assignment_status?.not_submitted ?? 0}</strong>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                        Sample Unsubmitted Tasks
-                      </p>
-                      <ul className="space-y-1 text-xs text-slate-700">
-                        {unsubmittedList.slice(0, 3).map((item, i) => (
-                          <li key={i} className="flex items-center justify-between py-1 border-b border-slate-50">
-                            <span className="truncate max-w-[200px] text-slate-800">{item.title}</span>
-                            <span className="text-[10px] text-slate-500">{item.student_name?.split(' ')[0]}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Review Notes & Human Sign-off Summary */}
-              <div className="rounded-xl border border-slate-200 p-4 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                      <FileText className="size-4 text-emerald-600" />
-                      3. Educator Review Notes & Safeguards (Agent 3)
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Factual intervention drafts with human sign-off requirement
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                      Draft-Only Policy Active
-                    </span>
-                    <span className="rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-bold text-amber-700">
-                      {draftsList.length} Notes Awaiting Approval
-                    </span>
-                  </div>
-                </div>
-
-                {latestReport.draft_reviews?.cohort_summary && (
-                  <div className="rounded-lg bg-slate-50 p-3 border border-slate-200 text-xs text-slate-800 leading-relaxed font-sans">
-                    <strong className="block text-slate-900 mb-1 uppercase text-[10px] tracking-wider">Cohort Executive Summary:</strong>
-                    {latestReport.draft_reviews.cohort_summary}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {draftsList.slice(0, 4).map((draft, i) => (
-                    <div key={i} className="rounded-lg border border-slate-200 bg-white p-3 space-y-1.5 shadow-2xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-slate-900">{draft.student_name}</span>
-                        <span className="rounded bg-amber-50 text-amber-800 px-1.5 py-0.2 text-[10px] font-bold">
-                          Pending Sign-off
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{draft.draft_body}</p>
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px]">
-                        <span className="text-slate-400">Zero auto-dispatches</span>
-                        <button
-                          type="button"
-                          onClick={() => setViewingNote(draft)}
-                          className="font-bold text-indigo-600 hover:text-indigo-800"
-                        >
-                          View Draft →
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 

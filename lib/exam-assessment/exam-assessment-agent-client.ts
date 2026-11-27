@@ -44,6 +44,32 @@ export interface PipelineValidationGate {
   [key: string]: unknown;
 }
 
+export interface KnowledgeGraphReasoningResult {
+  knowledge_graph_active: boolean;
+  engine: string;
+  neo4j_connected: boolean;
+  neo4j_nodes_total: number;
+  neo4j_prerequisite_edges: number;
+  centralized_kg_tables_used: string[];
+  cohort_summary: {
+    knowledge_graph_active: boolean;
+    total_nodes_traversed: number;
+    total_edges_walked: number;
+    top_prerequisite_blockers: Array<{
+      prerequisite_name: string;
+      impacted_students_count: number;
+    }>;
+    cohort_graph_insight: string;
+  };
+  top_prerequisite_blockers: Array<{
+    prerequisite_name: string;
+    impacted_students_count: number;
+  }>;
+  cohort_insight: string;
+  traversed_students_count: number;
+  graph_path_format: string;
+}
+
 export interface AtRiskStudentItem {
   attempt_id?: number;
   exam_id?: number;
@@ -61,6 +87,14 @@ export interface AtRiskStudentItem {
   sub_institute_id?: number;
   attempt_date?: string;
   attempted_at?: string;
+  // Knowledge Graph enrichment fields
+  knowledge_graph_path?: string;
+  root_concept_blocker?: string | null;
+  graph_evidence?: {
+    nodes_traversed: number;
+    edges_walked: number;
+    source: string;
+  };
 }
 
 export interface UnsubmittedWorkItem {
@@ -76,6 +110,9 @@ export interface UnsubmittedWorkItem {
   assigned_on?: string;
   submission_date?: string;
   due_on?: string;
+  // Knowledge Graph enrichment fields
+  knowledge_graph_path?: string;
+  curriculum_concept?: string | null;
 }
 
 export interface DraftReviewNote {
@@ -93,6 +130,10 @@ export interface DraftReviewNote {
   draft_body: string;
   status: string;
   recommended_action?: string;
+  // Knowledge Graph enrichment fields
+  knowledge_graph_path?: string | null;
+  root_concept_blocker?: string | null;
+  curriculum_concept?: string | null;
 }
 
 export interface PublishedExamItem {
@@ -258,6 +299,7 @@ export interface ExamAssessmentPipelineReport {
   };
   handoff_chain?: AgentHandoffStage[];
   data_changes?: DataChangeDiff;
+  knowledge_graph_reasoning?: KnowledgeGraphReasoningResult;
   summary?: {
     total_standards_scanned: number;
     standards_passed_all_gates: number;

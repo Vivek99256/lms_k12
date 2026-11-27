@@ -17,11 +17,18 @@ export const dynamic = 'force-dynamic';
 
 function backendBaseUrl(request: NextRequest): string {
   const reqHost = request.headers.get('x-laravel-base-url') || request.headers.get('x-backend-url');
-  if (reqHost && !reqHost.includes('erp.triz.co.in')) return reqHost.trim().replace(/\/$/, '');
-  if (process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_APP_ENV === 'development') {
-    const dev = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim().replace(/\/$/, '');
-    if (dev) return dev;
+  const devUrl = (process.env.NEXT_PUBLIC_API_BASE_URL_DEV || '').trim().replace(/\/$/, '');
+
+  // In local development, prefer the configured local Laravel API (e.g. http://127.0.0.1:8000)
+  // unless the caller explicitly targets a localhost/127.0.0.1 URL, so a remote login host_name
+  // does not bypass local backend pipeline fixes.
+  if (reqHost && (reqHost.includes('127.0.0.1') || reqHost.includes('localhost'))) {
+    return reqHost.trim().replace(/\/$/, '');
   }
+  if (process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_APP_ENV === 'development') {
+    if (devUrl) return devUrl;
+  }
+  if (reqHost && !reqHost.includes('erp.triz.co.in')) return reqHost.trim().replace(/\/$/, '');
   const env = (process.env.NEXT_PUBLIC_AI_BASE_URL || '').trim().replace(/\/$/, '');
   if (env && !env.includes('localhost') && !env.includes('127.0.0.1') && !env.includes('erp.triz.co.in')) return env;
   return 'https://dev.triz.co.in';
@@ -72,7 +79,7 @@ export async function GET(request: NextRequest) {
     else if (actionParam === 'students') action = 'students';
 
     const qs = new URLSearchParams();
-    for (const key of ['academic_year', 'limit', 'standard_id']) {
+    for (const key of ['academic_year', 'explicit_academic_year', 'include_latest', 'limit', 'standard_id']) {
       const v = request.nextUrl.searchParams.get(key);
       if (v) qs.set(key, v);
     }

@@ -175,67 +175,6 @@ export function FeesApprovalQueue() {
           })}
         </ul>
       )}
-
-      <div id="fees-approval-history" className="mt-6 border-t border-slate-200 pt-4">
-        <h3 className="text-sm font-semibold text-slate-950">Approval history ({history.length})</h3>
-        <p className="mt-0.5 text-xs text-slate-500">
-          Approvals already decided, read from the same approval records. Each row stays linked to its process.
-        </p>
-
-        {historyLoading ? (
-          <p className="mt-2 flex items-center gap-2 text-xs text-slate-500">
-            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-            Loading history…
-          </p>
-        ) : history.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">No Fees approval has been decided yet.</p>
-        ) : (
-          <ul className="mt-2 space-y-2">
-            {history.map((entry) => {
-              const approved = entry.status === 'approved';
-              const rejected = entry.status === 'rejected';
-
-              return (
-                <li
-                  key={entry.approvalId}
-                  className={
-                    approved
-                      ? 'rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-2.5'
-                      : rejected
-                        ? 'rounded-lg border border-red-200 bg-red-50/60 px-4 py-2.5'
-                        : 'rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5'
-                  }
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">
-                      {humanize(entry.workflowKey)}
-                      {entry.stepKey ? ` — ${humanize(entry.stepKey)}` : ''}
-                    </p>
-                    <span
-                      className={
-                        approved
-                          ? 'rounded-full bg-emerald-600 px-2.5 py-0.5 text-[11px] font-semibold text-white'
-                          : rejected
-                            ? 'rounded-full bg-red-600 px-2.5 py-0.5 text-[11px] font-semibold text-white'
-                            : 'rounded-full bg-slate-500 px-2.5 py-0.5 text-[11px] font-semibold text-white'
-                      }
-                    >
-                      {humanize(entry.status)}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-slate-600">
-                    Approval #{entry.approvalId} · {entry.reference || `run #${entry.runId}`} · process{' '}
-                    {humanize(entry.runStatus)}
-                    {entry.subject ? ` · ${humanize(entry.subject)}` : ''}
-                    {entry.decidedAt ? ` · decided ${new Date(entry.decidedAt).toLocaleString()}` : ''}
-                  </p>
-                  {entry.comment ? <p className="mt-0.5 text-xs italic text-slate-600">“{entry.comment}”</p> : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
     </section>
   );
 }

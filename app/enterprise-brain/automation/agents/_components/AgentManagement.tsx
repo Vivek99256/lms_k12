@@ -41,6 +41,7 @@ export function AgentManagement({
   embedded = false,
   initialTab = 'library',
   hideCreate = false,
+  agentNames,
 }: {
   /** Restrict every tab to one module (and lock Create agent to it). */
   moduleFilter?: string;
@@ -49,6 +50,8 @@ export function AgentManagement({
   initialTab?: TabKey;
   /** Hide the Create Agent tab and option. */
   hideCreate?: boolean;
+  /** Show only agents with these names (and their runs). Used when a module has a fixed set of working agents. */
+  agentNames?: string[];
 }) {
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [running, setRunning] = useState<Agent | null>(null);
@@ -70,8 +73,14 @@ export function AgentManagement({
     }
   }, [isCreateDisabled, tab]);
 
-  const agents = useBrainResource(() => fetchAgents({ module: moduleFilter }), [moduleFilter]);
-  const runs = useBrainResource(() => fetchRuns({ module: moduleFilter, limit: 200 }), [moduleFilter]);
+  const agents = useBrainResource(
+    () => fetchAgents({ module: moduleFilter }).then((list) => (agentNames ? list.filter((a) => agentNames.includes(a.name)) : list)),
+    [moduleFilter, agentNames?.join("|")],
+  );
+  const runs = useBrainResource(
+    () => fetchRuns({ module: moduleFilter, limit: 200 }).then((list) => (agentNames ? list.filter((r) => agentNames.includes(r.agent_name)) : list)),
+    [moduleFilter, agentNames?.join("|")],
+  );
 
   const refresh = useCallback(() => {
     agents.refresh();

@@ -170,6 +170,12 @@ export interface AiStackModule {
    */
   presets: CreateAgentInput[];
 
+  /**
+   * When set, the tool-agent grid and Agent Management show only agents with these names.
+   * For a module whose registry holds agents that are not part of its working automation.
+   */
+  agentNames?: string[];
+
   /** The backend domain agent this module is bound to, or null when it has none. */
   boundAgent: AiStackBoundAgent | null;
 
