@@ -197,13 +197,19 @@ export function previewWorkflowApprover(input: {
 }
 
 /**
- * Fetch live Knowledge Graph intelligence for Fees:
- * Sibling detection, defaulter risk scoring, concession eligibility, and TC no-dues status.
+ * Tenant-wide Fees intelligence banner: sibling families, a bounded defaulter
+ * sample, real channel engagement, TC no-dues clearance, and the concession/
+ * refund queue. There is no selected student on this screen, so this takes
+ * none — see FeesIntelligenceData for why each section may legitimately come
+ * back `available: false` rather than populated.
+ *
+ * The defaulter and TC sections each run several real per-student fee
+ * lookups server-side (~20-30s on a cold cache), so this is cached for 15
+ * minutes per tenant — call it only when the banner is actually opened, not
+ * on every page load.
  */
-export function fetchFeesIntelligence(studentId?: number): Promise<FeesIntelligenceData> {
-  const params = new URLSearchParams();
-  if (studentId) params.set('student_id', String(studentId));
-  return call<FeesIntelligenceData>(`/workflow/fees-intelligence?${params.toString()}`);
+export function fetchFeesIntelligence(): Promise<FeesIntelligenceData> {
+  return call<FeesIntelligenceData>('/workflow/fees-intelligence');
 }
 
 // ── Shared helpers for the endpoints that carry paging metadata ─────────────

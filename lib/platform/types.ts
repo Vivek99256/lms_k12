@@ -295,53 +295,75 @@ export interface WorkflowApproverPreview {
   name: string | null;
 }
 
+/**
+ * Tenant-wide Fees "Knowledge Graph Intelligence" banner data. There is no
+ * selected student on this screen, so every section is an aggregate — and an
+ * `available: false` section is a real "nothing to show yet" state (e.g. no
+ * concession requests have been submitted through the workflow engine), not
+ * a loading or error state.
+ */
 export interface FeesIntelligenceData {
-  student_id: number;
-  siblings: Array<{
-    student_id: number;
-    name: string;
-    has_sibling_concession_eligible: boolean;
-    recommended_discount_percent: number;
-  }>;
-  defaulter_risk: {
-    risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
-    score: number;
-    reasons: string[];
-    recommended_action: string;
-  };
-  concession_evaluation: {
-    eligible: boolean;
-    recommended_waiver_percent: number;
-    rationale: string;
-  };
-  no_dues_clearance: {
-    cleared: boolean;
-    pending_amount: number;
-    pending_installments: number;
-  };
-  notification_channel_routing: {
-    recommended_channel: string;
-    confidence: number;
-    stats: {
-      whatsapp_read_rate: number;
-      sms_delivery_rate: number;
-      email_open_rate: number;
-    };
-    rationale: string;
-  };
-  concession_escalation: {
-    amount: number;
-    required_approver_role: string;
-    target_step_name: string;
-    is_escalated_to_trustee: boolean;
-    reason: string;
-  };
-  tc_auto_approval: {
-    cleared: boolean;
-    pending_amount: number;
-    auto_approve_step: boolean;
-    message: string;
-  };
+  sub_institute_id: number;
+  academic_year: number | null;
+  computed_at: string;
+  siblings:
+    | {
+        available: true;
+        family_groups: number;
+        students_in_groups: number;
+        already_applied: number;
+        pending: number;
+      }
+    | { available: false; reason: string };
+  defaulter_risk:
+    | {
+        available: true;
+        defaulter_count: number;
+        total_outstanding: number;
+        cohort_size: number;
+        students_checked: number;
+        truncated: boolean;
+        sample_bias: 'largest_balance_first';
+        top_defaulters: Array<{ student_id: number; student_name: string | null; outstanding: number }>;
+        basis: string | null;
+      }
+    | { available: false; reason: string };
+  notification_channel_routing:
+    | {
+        available: true;
+        recommended_channel: 'whatsapp' | 'direct_message' | null;
+        confidence: number;
+        channels: {
+          whatsapp?: { sent: number; read_rate: number; delivered_rate: number };
+          direct_message?: { sent: number; reply_rate: number };
+        };
+        window_days: number;
+      }
+    | { available: false; reason: string };
+  tc_no_dues:
+    | {
+        available: true;
+        pending_applications: number;
+        clear_for_auto_approval: number;
+        has_dues: number;
+        students_with_dues?: Array<{ student_id: number; student_name: string | null; outstanding: number }>;
+      }
+    | { available: false; reason: string };
+  concession_queue:
+    | {
+        available: true;
+        pending_count: number;
+        escalated_to_trustee: number;
+        items: Array<{
+          entity_id: string;
+          title: string;
+          flow_key: string;
+          amount: number | null;
+          required_approver_role: string | null;
+          created_at: string;
+        }>;
+      }
+    | { available: false; reason: string };
 }
 
 export interface WorkflowInput {
