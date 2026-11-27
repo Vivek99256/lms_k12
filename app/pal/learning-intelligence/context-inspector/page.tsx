@@ -304,7 +304,7 @@ export default function ContextInspectorPage() {
                 <h3 className="font-semibold text-slate-800">Layer C: Knowledge Graph Relationships</h3>
               </div>
               <div className="space-y-3 text-sm">
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="grid grid-cols-4 gap-2 text-center text-xs">
                   <div className="rounded bg-sky-50 p-2">
                     <span className="block font-bold text-sky-900">{kg?.stats?.concepts || kg?.nodes?.length || 0}</span>
                     <span className="text-sky-700">Concepts</span>
@@ -316,6 +316,10 @@ export default function ContextInspectorPage() {
                   <div className="rounded bg-sky-50 p-2">
                     <span className="block font-bold text-sky-900">{kg?.stats?.chapters || kg?.chapters?.length || 0}</span>
                     <span className="text-sky-700">Chapters</span>
+                  </div>
+                  <div className="rounded bg-sky-50 p-2">
+                    <span className="block font-bold text-sky-900">{kg?.stats?.topics || kg?.topics?.length || 0}</span>
+                    <span className="text-sky-700">Topics</span>
                   </div>
                 </div>
 

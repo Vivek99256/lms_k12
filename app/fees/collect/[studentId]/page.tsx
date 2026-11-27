@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Loader2, Printer } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
+import { RequestConcessionDialog } from '@/app/platform-services/workflow/_components/fees-intelligence/RequestConcessionDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,6 +17,8 @@ import {
 } from '@/components/ui/select';
 import { FeesAiAssist } from '@/app/fees/_components/fees-ai-assist';
 import { logFeesOperation } from '@/lib/fees/fees-ai-stack';
+import { fetchConcessionGrant, fetchConcessionRequests, PlatformApiError } from '@/lib/platform/client';
+import type { ConcessionGrant, ConcessionRequestRow } from '@/lib/platform/types';
 import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type SessionContext = {
@@ -113,9 +116,22 @@ type ReceiptResponse = {
 export default function FeesCollectionStudentPage() {
   const router = useRouter();
   const params = useParams<{ studentId: string }>();
+  const searchParams = useSearchParams();
   const studentId = params?.studentId;
+  const grantParam = searchParams?.get('grant') ?? '';
   const [session] = useState(getSessionContext);
   const printCompletionHandledRef = useRef(false);
+
+  // Grant mode: `?grant=<id>` means an already-approved concession is being
+  // applied to this receipt. `activeGrant` is the one actually in effect —
+  // null until the grant is fetched AND confirmed to belong to this student,
+  // so a mismatched or unverified grant can never silently discount someone
+  // else's fees.
+  const [activeGrant, setActiveGrant] = useState<ConcessionGrant | null>(null);
+  const [grantLoading, setGrantLoading] = useState(false);
+  const [grantError, setGrantError] = useState('');
+  const [pendingGrantRequests, setPendingGrantRequests] = useState<ConcessionRequestRow[]>([]);
+  const [concessionDialogOpen, setConcessionDialogOpen] = useState(false);
 
   const [student, setStudent] = useState<StudentInfo | null>(null);
   const [summaryRows, setSummaryRows] = useState<SummaryRow[]>([]);
@@ -306,6 +322,69 @@ export default function FeesCollectionStudentPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadFees();
   }, [loadFees]);
+
+  // Grant mode: `?grant=<id>` names an already-approved concession. Fetched
+  // and VERIFIED against this page's own student before it is trusted — a
+  // grant for a different student is reported and otherwise ignored, never
+  // silently applied.
+  useEffect(() => {
+    if (!grantParam || !studentId) {
+      setActiveGrant(null);
+      setGrantError('');
+      return;
+    }
+
+    const grantId = Number(grantParam);
+    if (!Number.isFinite(grantId) || grantId <= 0) {
+      setActiveGrant(null);
+      setGrantError('The concession link is not valid.');
+      return;
+    }
+
+    let cancelled = false;
+    setGrantLoading(true);
+    setGrantError('');
+
+    fetchConcessionGrant(grantId)
+      .then((grant) => {
+        if (cancelled) return;
+        if (String(grant.student_id) !== String(studentId)) {
+          setActiveGrant(null);
+          setGrantError("This approved concession belongs to a different student and was not applied.");
+          return;
+        }
+        setActiveGrant(grant);
+      })
+      .catch((cause) => {
+        if (cancelled) return;
+        setActiveGrant(null);
+        setGrantError(cause instanceof PlatformApiError ? cause.message : "Couldn't load the approved concession. Try again.");
+      })
+      .finally(() => {
+        if (!cancelled) setGrantLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [grantParam, studentId]);
+
+  // The discount field is locked to the grant's remaining amount while a
+  // grant is active (see the read-only `Input` below) — set once the grant
+  // loads, not continuously, so an operator's own edits never fight it.
+  useEffect(() => {
+    if (activeGrant) setDiscount(activeGrant.remaining);
+  }, [activeGrant]);
+
+  // Approved concessions this student has not yet had applied to a receipt —
+  // surfaced as a notice with an "Apply" link outside of grant mode, so an
+  // operator is not left to discover them by accident.
+  useEffect(() => {
+    if (!studentId) return;
+    fetchConcessionRequests({ kind: 'concession', state: 'approved_pending_application', student_id: Number(studentId) })
+      .then(setPendingGrantRequests)
+      .catch(() => setPendingGrantRequests([]));
+  }, [studentId, activeGrant]);
 
   const selectedParticulars = useMemo(() => {
     return months
@@ -500,6 +579,25 @@ export default function FeesCollectionStudentPage() {
         form.append(`hid_fees_data[${particularId}]`, String(particular.amount));
       });
 
+      // Grant mode: the backend's discount-application logic only honours a
+      // discount when `discount_data[]` is sent per head alongside `totalDis`
+      // — `totalDis` alone is silently dropped. The grant's amount (already
+      // sitting in `discount`, locked) is split across the heads actually
+      // being collected on this receipt, capped per head at that head's own
+      // collection amount so no head is discounted past what it is collecting.
+      if (activeGrant) {
+        form.append('concession_grant_id', String(activeGrant.id));
+        let remainingDiscount = discount;
+        for (const [particularId, particular] of particularTotals) {
+          if (remainingDiscount <= 0) break;
+          const applied = Math.min(remainingDiscount, particular.collectionAmount);
+          if (applied > 0) {
+            form.append(`discount_data[${particularId}]`, String(applied));
+            remainingDiscount -= applied;
+          }
+        }
+      }
+
       form.append('total', String(totalAmount));
       form.append('totalFin', String(fine));
       form.append('remarks', remarks);
@@ -613,14 +711,60 @@ export default function FeesCollectionStudentPage() {
   return (
     <div className="min-h-screen ">
       <div data-print-exclude="true" className="mx-auto max-w-[1500px] space-y-4 p-3 sm:p-4 md:p-6">
-        <div className="flex items-center gap-3">
-          <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-md bg-white" onClick={() => router.push('/fees/collect')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-xl font-semibold text-slate-900">Fees Collect</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-md bg-white" onClick={() => router.push('/fees/collect')}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-xl font-semibold text-slate-900">Fees Collect</h1>
+          </div>
+          {!activeGrant && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setConcessionDialogOpen(true)}>
+              Request concession
+            </Button>
+          )}
         </div>
 
         {error && <div className="rounded-md border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
+
+        {grantError && <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{grantError}</div>}
+
+        {grantLoading && (
+          <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading the approved concession…
+          </div>
+        )}
+
+        {activeGrant && (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            Applying approved concession (request #{activeGrant.run_id}): ₹{activeGrant.remaining.toLocaleString('en-IN')} of ₹
+            {activeGrant.amount.toLocaleString('en-IN')}
+          </div>
+        )}
+
+        {!activeGrant && pendingGrantRequests.some((row) => row.grant_id != null) && (
+          <div className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+            <p className="font-medium">Approved concessions not yet applied to a receipt</p>
+            <ul className="mt-1 space-y-1">
+              {pendingGrantRequests
+                .filter((row) => row.grant_id != null)
+                .map((row) => (
+                  <li key={row.run_id} className="flex items-center justify-between gap-2">
+                    <span>
+                      #{row.run_id} {row.amount != null ? `· ₹${row.amount.toLocaleString('en-IN')}` : ''}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/fees/collect/${studentId}?grant=${row.grant_id}`)}
+                      className="text-xs font-medium text-indigo-700 underline hover:text-indigo-900"
+                    >
+                      Apply
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
 
         {printableReceiptHtml && !printViewOpen && (
           <div className="rounded-md border border-emerald-200 bg-white">
@@ -771,7 +915,18 @@ export default function FeesCollectionStudentPage() {
               </div>
 
               <span>Discount</span>
-              <Input type="number" min="0" value={discount} onChange={(event) => setDiscount(readNumber(event.target.value))} className="h-9 rounded-md border-slate-300 bg-white text-sm md:col-span-3 md:max-w-[240px]" />
+              <div className="md:col-span-3 md:max-w-[240px]">
+                <Input
+                  type="number"
+                  min="0"
+                  value={discount}
+                  onChange={(event) => !activeGrant && setDiscount(readNumber(event.target.value))}
+                  readOnly={Boolean(activeGrant)}
+                  disabled={Boolean(activeGrant)}
+                  className="h-9 w-full rounded-md border-slate-300 bg-white text-sm"
+                />
+                {activeGrant && <p className="mt-1 text-xs text-slate-500">Locked to the approved concession (request #{activeGrant.run_id}).</p>}
+              </div>
 
               <span>Fine (Include Cheque return charges)</span>
               <Input type="number" min="0" value={fine} onChange={(event) => setFine(readNumber(event.target.value))} className="h-9 rounded-md border-slate-300 bg-white text-sm md:col-span-3 md:max-w-[240px]" />
@@ -841,6 +996,24 @@ export default function FeesCollectionStudentPage() {
           </div>
         </div>
       ) : null}
+
+      <RequestConcessionDialog
+        open={concessionDialogOpen}
+        onClose={() => setConcessionDialogOpen(false)}
+        onSuccess={() => {
+          setConcessionDialogOpen(false);
+          if (studentId) {
+            fetchConcessionRequests({ kind: 'concession', state: 'approved_pending_application', student_id: Number(studentId) })
+              .then(setPendingGrantRequests)
+              .catch(() => {
+                /* the notice simply stays as it was */
+              });
+          }
+        }}
+        studentId={Number(studentId) || 0}
+        studentName={student?.studentName}
+        kind="concession"
+      />
 
       <style jsx global>{`
         @media print {
