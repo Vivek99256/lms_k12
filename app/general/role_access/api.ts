@@ -419,6 +419,41 @@ export async function saveRoleCategories(roleId: number, changes: CategoryChange
   return message;
 }
 
+export type MobileModule = { key: string; title: string; enabled: boolean };
+export type MobileGroup = { title: string; modules: MobileModule[] };
+export type MobileModules = {
+  audience: "student" | "staff";
+  enabled: number;
+  total: number;
+  version: string;
+  groups: MobileGroup[];
+};
+
+/** The native app screens this role may open (the app's own catalogue), and which are switched on. */
+export async function loadMobileModules(roleId: number): Promise<MobileModules> {
+  const { data } = await request(`role-access/roles/${roleId}/mobile-modules`);
+  const role = (data.role ?? {}) as Record<string, unknown>;
+  return {
+    audience: readString(role.audience) === "student" ? "student" : "staff",
+    enabled: readNumber(data.enabled),
+    total: readNumber(data.total),
+    version: readString(data.version),
+    groups: records(data.groups).map((group) => ({
+      title: readString(group.title),
+      modules: records(group.modules).map((row) => ({
+        key: readString(row.key),
+        title: readString(row.title).trim(),
+        enabled: Boolean(row.enabled),
+      })),
+    })),
+  };
+}
+
+export async function saveMobileModules(roleId: number, moduleKeys: string[], confirmAdmin = false): Promise<string> {
+  const { message } = await post(`role-access/roles/${roleId}/mobile-modules`, { module_keys: moduleKeys, confirm_admin: confirmAdmin });
+  return message;
+}
+
 export async function undoBatch(batchId: string, confirmAdmin = false): Promise<UndoResult> {
   const { data, message } = await post(`role-access/history/${encodeURIComponent(batchId)}/undo`, {
     confirm_admin: confirmAdmin,

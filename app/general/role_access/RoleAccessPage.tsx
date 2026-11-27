@@ -9,6 +9,7 @@ import { CategoryTabsTab } from "./CategoryTabsTab";
 import { CopyRightsTab } from "./CopyRightsTab";
 import { EffectiveAccessTab } from "./EffectiveAccessTab";
 import { HistoryTab } from "./HistoryTab";
+import { MobileAppTab } from "./MobileAppTab";
 import { ModuleRightsTab } from "./ModuleRightsTab";
 
 /**
@@ -25,11 +26,12 @@ const PAGE_THEME = {
   "--accent": "hsl(210 20% 96%)",
 } as React.CSSProperties;
 
-type TabKey = "modules" | "tabs" | "copy" | "effective" | "history";
+type TabKey = "modules" | "tabs" | "mobile" | "copy" | "effective" | "history";
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "modules", label: "Module-wise rights" },
   { key: "tabs", label: "Module tabs" },
+  { key: "mobile", label: "Mobile app" },
   { key: "copy", label: "Copy rights" },
   { key: "effective", label: "Who can see what" },
   { key: "history", label: "History" },
@@ -181,6 +183,8 @@ export function RoleAccessPage() {
           <ModuleRightsTab role={activeRole} onSaved={changed} />
         ) : tab === "tabs" ? (
           <CategoryTabsTab role={activeRole} onSaved={changed} />
+        ) : tab === "mobile" ? (
+          <MobileAppTab role={activeRole} onSaved={changed} />
         ) : tab === "copy" ? (
           <CopyRightsTab roles={roles} target={activeRole} onApplied={changed} />
         ) : tab === "effective" ? (
