@@ -18,6 +18,7 @@ import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPrefer
 import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
 import { fetchFeesDashboardSummary, type FeesDashboardPayload } from '@/app/fees/_lib/fees-dashboard-api';
 import { friendlyError } from '@/lib/user-messages';
+import { PipelineOutputsPanel } from '@/app/_components/ai-stack/pipeline-outputs-panel';
 
 /** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
 const ADMIN_WIDGETS = [
@@ -615,6 +616,10 @@ export default function AdminDashboard() {
               )}
             </div>
           )}
+
+          {/* Final drafts and findings from the Attendance and Users agent pipelines, for review. */}
+          <PipelineOutputsPanel module="attendance" title="Attendance agents — follow-up drafts" />
+          <PipelineOutputsPanel module="users" title="Users agents — access review findings" />
         </div>
       )}
     </div>

@@ -78,6 +78,9 @@ import { AiStackCard, AiStackCardHeading, AiStackPill, formatWhen } from './ai-s
 import { aiStackRbacKey, type AiStackBoundAgent, type AiStackModule } from './ai-stack-module';
 import { CatalogueAgentControlCard } from './catalogue-agent-control-card';
 import { ExamAssessmentAgentControlCard } from './exam-assessment-agent-control-card';
+import { ModuleAgentPipelineCard } from './module-agent-pipeline-card';
+import { PipelineOutputsPanel } from './pipeline-outputs-panel';
+
 import { EngagementAgentControlCard } from './engagement-agent-control-card';
 import { CurriculumPlanningAgentControlCard } from './curriculum-planning-agent-control-card';
 import { PalAgentControlCard } from './pal-agent-control-card';
@@ -107,7 +110,35 @@ interface ToolAgentEsoInfo {
   };
 }
 
+function feesEso(
+  name: string,
+  tool: string,
+  what: string,
+  tables: string[],
+  safeguards: string[],
+  flow: string[],
+): ToolAgentEsoInfo {
+  return {
+    name,
+    module: 'Fees',
+    tool,
+    knowledge: { summary: what, items: tables.map((t) => `Records from ${t}`), tables },
+    activities: { summary: what, items: flow },
+    abilities: { summary: 'Read-only access scoped to this institute and academic year.', skills: flow.slice(0, 3), safeguards },
+    usage: { summary: `Runs as part of the Fees pipeline and on its own from this page.`, step_by_step_flow: flow },
+  };
+}
+
+const FEES_READ_SAFEGUARDS = ['Read-only: changes no ledger, receipt or student record', 'Scoped to sub_institute_id and the selected academic year'];
+
+const FEES_TOOL_ESO_MAP: Record<string, ToolAgentEsoInfo> = {
+  'fees.position': feesEso('Fee position reader', 'fees.position', 'Whole-school fee demand, collected, outstanding and overdue from the fee ledger.', ['fees_breackoff', 'fees_collect', 'tblstudent_enrollment'], FEES_READ_SAFEGUARDS, ['Resolve the academic year', 'Sum demand and receipts per fee account', 'Floor outstanding per student and rank classes', 'Return the totals as the pipeline\'s Agent 1 position']),
+  'fees.getPending': feesEso('Pending fee heads reader', 'fees.getPending', 'The fee heads and amounts still pending for one student.', ['fees_breackoff', 'fees_collect', 'fees_title'], FEES_READ_SAFEGUARDS, ['Take a student id', 'Compare scheduled heads with receipts', 'Return pending heads and amounts']),
+  'fees.send_reminders': feesEso('Reminder preview drafter', 'fees.send_reminders', 'Reminder drafts for eligible students, locked under a fingerprint.', ['tblstudent', 'sms_api_details', 'ai_audit_logs'], ['Preview only: sends nothing', 'An administrator must approve the exact fingerprint before any message is sent'], ['Validate each parent contact', 'Draft the personalised message and amount', 'Lock the batch under a SHA-256 fingerprint', 'Wait for administrator approval']),
+};
+
 const TOOL_AGENT_ESO_MAP: Record<string, ToolAgentEsoInfo> = {
+  ...FEES_TOOL_ESO_MAP,
   'exam_assessment.online_exam_summary': {
     name: 'Online exam summary reader',
     module: 'Exam & Assessment',
@@ -1577,6 +1608,7 @@ function ToolAgentEsoModal({
 
 /** The manifest as `/api/ai/agents` returns it. Loosely typed — it is a config row. */
 interface AgentManifestRow {
+  key?: string;
   agent_key?: string;
   name?: string;
   purpose?: string;
@@ -1613,8 +1645,15 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
   const rbacKey = aiStackRbacKey(module);
 
   // Tool agents, on the central Agent Management engine.
-  const agents = useBrainResource(() => fetchAgents({ module: module.key }), [module.key]);
-  const runs = useBrainResource(() => fetchRuns({ module: module.key, limit: 100 }), [module.key]);
+  const only = module.agentNames;
+  const agents = useBrainResource(
+    () => fetchAgents({ module: module.key }).then((list) => (only ? list.filter((a) => only.includes(a.name)) : list)),
+    [module.key, only?.join("|")],
+  );
+  const runs = useBrainResource(
+    () => fetchRuns({ module: module.key, limit: 100 }).then((list) => (only ? list.filter((r) => only.includes(r.agent_name)) : list)),
+    [module.key, only?.join("|")],
+  );
   const canCreate = usePermission(rbacKey, 'create');
   const canRun = usePermission(rbacKey, 'update');
 
@@ -1636,6 +1675,36 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
 
     return map;
   }, [agents.data, module.presets]);
+
+  /**
+   * Every card the section shows: the module's presets (so an agent that is not configured yet
+   * can still be enabled) followed by EVERY other agent the registry holds for this module and
+   * tenant. The grid used to render `module.presets` alone, so a module whose registry held
+   * several agents but whose preset list held one showed one.
+   */
+  const cards = useMemo(() => {
+    const presetNames = new Set(module.presets.map((p) => p.name));
+    const extra: CreateAgentInput[] = (agents.data ?? [])
+      .filter((agent) => agent.status !== 'archived' && !presetNames.has(agent.name))
+      .map((agent) => ({
+        name: agent.name,
+        description: agent.description,
+        module: agent.module,
+        tools_allowed: agent.tools_allowed,
+        instructions: agent.instructions,
+        status: 'active' as const,
+      }));
+
+    return [...module.presets, ...extra];
+  }, [agents.data, module.presets]);
+
+  const configuredAll = useMemo(() => {
+    const map = new Map(configured);
+    for (const agent of agents.data ?? []) {
+      if (agent.status !== 'archived' && !map.has(agent.name)) map.set(agent.name, agent);
+    }
+    return map;
+  }, [agents.data, configured]);
 
   const refreshAll = useCallback(() => {
     agents.refresh();
@@ -1713,7 +1782,7 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
    * ask for a right without saying what it was called.
    */
   const rightsNote =
-    canCreate === false && configured.size === 0
+    canCreate === false && configuredAll.size === 0
       ? `Your role cannot enable tool agents for the ${module.label} module. Ask an administrator for ${rbacKey} create rights — the key is registered and grantable in Group-wise Rights.`
       : canRun === false && configured.size > 0
         ? `Your role can see these agents but cannot run or pause them (${rbacKey} update rights).`
@@ -1735,12 +1804,24 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
         <PalAgentControlCard onValidated={refreshAll} />
       ) : module.boundAgent?.agentKey === 'k12_fees' || module.key === 'fees' ? (
         <FeesAgentControlCard onValidated={refreshAll} />
+      ) : module.key === 'user' ? (
+        <div className="space-y-6">
+          <ModuleAgentPipelineCard
+            module="users"
+            title="Users automation"
+            description="Four agents run in order over this institute's real accounts: read the accounts, map roles and rights against the Knowledge Graph, validate organisation and teaching links, then draft an access review for an administrator. Nothing is changed."
+            onRan={refreshAll}
+          />
+          <PipelineOutputsPanel key={`users-outputs-${consoleKey}`} module="users" title="Final findings, review status and agent history" />
+        </div>
       ) : module.boundAgent ? (
         <BoundAgentPanel module={module} agent={module.boundAgent} />
       ) : (
         <NoBoundAgentPanel module={module} />
       )}
 
+      {/* Every registered agent for this module, not only the presets. */}
+      {(
       <section className="rounded-lg border border-slate-200 bg-white px-5 py-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
@@ -1781,11 +1862,11 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
         )}
 
         <div className="mt-5 grid gap-3 lg:grid-cols-3">
-          {module.presets.map((preset) => (
+          {cards.map((preset) => (
             <PresetCard
               key={preset.name}
               preset={preset}
-              agent={configured.get(preset.name) ?? null}
+              agent={configuredAll.get(preset.name) ?? null}
               runs={runs.data ?? []}
               checking={agents.loading && !agents.data}
               busy={busy === preset.name}
@@ -1802,6 +1883,7 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
           ))}
         </div>
       </section>
+      )}
 
       <div>
         <h3 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">
@@ -1810,6 +1892,7 @@ export function AiStackAutomationsScreen({ module }: { module: AiStackModule }) 
         <AgentManagement
           key={consoleKey}
           moduleFilter={module.key}
+          agentNames={module.agentNames}
           embedded
           hideCreate={false}
         />
@@ -1954,7 +2037,7 @@ function BoundAgentPanel({ module, agent: bound }: { module: AiStackModule; agen
 
       if (agentList.status === 'fulfilled') {
         const found = (agentList.value.agents ?? []).find(
-          (row) => (row as AgentManifestRow).agent_key === bound.agentKey,
+          (row) => ((row as AgentManifestRow).key ?? (row as AgentManifestRow).agent_key) === bound.agentKey,
         ) as AgentManifestRow | undefined;
 
         setManifest(found ?? null);
@@ -2563,5 +2646,182 @@ function PresetCard({
         )}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tools Agents — the same section the module screens show, for a module whose
+// screen is composed by hand (Attendance). Every agent comes from the registry.
+// ---------------------------------------------------------------------------
+
+export function ModuleToolAgentsSection({
+  moduleKey,
+  label,
+  records,
+  onChanged,
+}: {
+  moduleKey: string;
+  label: string;
+  records: string;
+  /** Called after an agent is enabled, paused or run, so a sibling console can reload. */
+  onChanged?: () => void;
+}) {
+  const rbacKey = `agents.${moduleKey}`;
+  const agents = useBrainResource(() => fetchAgents({ module: moduleKey }), [moduleKey]);
+  const runs = useBrainResource(() => fetchRuns({ module: moduleKey, limit: 100 }), [moduleKey]);
+  const canCreate = usePermission(rbacKey, 'create');
+  const canRun = usePermission(rbacKey, 'update');
+
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [running, setRunning] = useState<Agent | null>(null);
+  const [selectedEso, setSelectedEso] = useState<ToolAgentEsoInfo | null>(null);
+
+  const list = useMemo(() => (agents.data ?? []).filter((agent) => agent.status !== 'archived'), [agents.data]);
+  const activeCount = list.filter((agent) => agent.status === 'active').length;
+
+  const refreshAll = useCallback(() => {
+    agents.refresh();
+    runs.refresh();
+    onChanged?.();
+  }, [agents, runs, onChanged]);
+
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const detail = (evt as CustomEvent<{ module?: string }>).detail;
+      if (!detail?.module || detail.module === moduleKey) {
+        agents.refresh();
+        runs.refresh();
+      }
+    };
+    const changed = () => {
+      agents.refresh();
+      runs.refresh();
+    };
+    window.addEventListener('agents:runs-updated', handler);
+    window.addEventListener('agents:changed', changed);
+    return () => {
+      window.removeEventListener('agents:runs-updated', handler);
+      window.removeEventListener('agents:changed', changed);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduleKey, agents.refresh, runs.refresh]);
+
+  const toggle = useCallback(
+    async (agent: Agent) => {
+      setBusy(agent.name);
+      setNote(null);
+      const next = agent.status === 'active' ? 'paused' : 'active';
+      try {
+        await setAgentStatus(agent.id, next);
+        setNote(`${agent.name} is now ${next}.`);
+        refreshAll();
+      } catch (cause) {
+        setNote(cause instanceof Error ? cause.message : 'The status could not be changed.');
+      } finally {
+        setBusy(null);
+      }
+    },
+    [refreshAll],
+  );
+
+  const refreshing = agents.refreshing || runs.refreshing;
+  const rightsNote =
+    canRun === false && list.length > 0
+      ? `Your role can see these agents but cannot run or pause them (${rbacKey} update rights).`
+      : null;
+
+  return (
+    <>
+      <section className="rounded-lg border border-slate-200 bg-white px-5 py-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-slate-950">
+              {label} tool agents
+              {agents.data && (
+                <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                  {list.length} total · {activeCount} active
+                </span>
+              )}
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              Every agent configured for the {label} module on the central Agent Management engine. The read agents
+              answer from this school&apos;s own {records}; a drafter writes text and sends nothing. Every run is
+              recorded against the person who pressed Run.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={refreshAll}
+            disabled={refreshing}
+            className="flex shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 hover:border-gray-300 disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        {agents.error && !agents.data && (
+          <p className="mt-4 rounded-xl border border-red-200 bg-red-50/70 px-3 py-2 text-xs text-red-700">{agents.error}</p>
+        )}
+        {rightsNote && (
+          <p className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+            <Lock size={14} className="mt-0.5 shrink-0" />
+            {rightsNote}
+          </p>
+        )}
+        {note && (
+          <p className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3 py-2 text-xs text-indigo-900">{note}</p>
+        )}
+        {agents.data && list.length === 0 && (
+          <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-3 py-3 text-sm text-slate-500">
+            No agents are configured for {label} in this institute yet.
+          </p>
+        )}
+
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          {list.map((agent) => (
+            <PresetCard
+              key={agent.id}
+              preset={{
+                name: agent.name,
+                description: agent.description,
+                module: agent.module,
+                tools_allowed: agent.tools_allowed,
+                instructions: agent.instructions,
+                status: 'active',
+              }}
+              agent={agent}
+              runs={runs.data ?? []}
+              checking={agents.loading && !agents.data}
+              busy={busy === agent.name}
+              canCreate={canCreate === true}
+              canRun={canRun === true}
+              onEnable={() => undefined}
+              onToggle={(a) => void toggle(a)}
+              onRun={setRunning}
+              onShowEso={() => {
+                const info = TOOL_AGENT_ESO_MAP[agent.tools_allowed[0]];
+                if (info) setSelectedEso(info);
+              }}
+            />
+          ))}
+        </div>
+      </section>
+
+      {running && (
+        <RunAgentDialog
+          agent={running}
+          onClose={() => setRunning(null)}
+          onRan={() => {
+            runs.refresh();
+            onChanged?.();
+          }}
+        />
+      )}
+
+      {selectedEso && <ToolAgentEsoModal eso={selectedEso} onClose={() => setSelectedEso(null)} />}
+    </>
   );
 }

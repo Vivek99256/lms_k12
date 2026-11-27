@@ -26,10 +26,8 @@ import {
   Info,
   Layers,
   Lock,
-  Mail,
   MessageSquare,
   Pause,
-  Phone,
   Play,
   RefreshCw,
   RotateCcw,
@@ -59,6 +57,7 @@ import {
   fetchFeesDefaulterStudents,
   sendApprovedFeesReminders,
   type FeesAgentState,
+  type FeesAvailableYear,
   type FeesPipelineReport,
   type FeesEso,
   type FeesEsoAgent,
@@ -68,342 +67,48 @@ import {
   type FeesSendResult,
   type FeesPipelineStep,
   type FeesGate,
+  type FeesRecentRun,
+  type FeesPipelineError,
 } from '@/lib/fees/fees-agent-client';
+import {
+  FeesFinalResultsSection,
+  FeesHandoffFlowSection,
+  FeesPipelineSequenceBanner,
+  StatusPill,
+  toAgentStatusLabel,
+  formatRupeesReal,
+} from '@/app/_components/ai-stack/fees-pipeline-sections';
 
 interface FeesAgentControlCardProps {
   onValidated?: (report: FeesPipelineReport) => void;
   onRan?: () => void;
 }
 
-const FEES_ESO_FALLBACKS: Record<string, any> = {
-  agent_1: {
-    name: 'Fee Position & Arrears Reader',
-    agent_id: 'agt_fees_position_reader',
-    tool_key: 'fees.position + fees.arrears',
-    role_description: 'Continuously validates school-wide fee demand, receipts, and scans student cohorts for outstanding balances.',
-    ek: {
-      summary: 'Master fee structure tables (fees_breackoff), student enrollment rolls (tblstudent, tblstudent_enrollment), and standard grade mappings.',
-      schemas_and_relationships: [
-        'fees_breackoff holds fee structure by admission year, quota, standard, and fee head',
-        'Student demand is computed by matching student enrollment to fee structure rows',
-        'Outstanding balance is floored per student so overpayers never cancel out debtors',
-      ],
-      tables_and_sources: ['fees_breackoff', 'tblstudent', 'tblstudent_enrollment', 'standard', 'fees_map_years'],
-      live_metrics: {
-        total_demand: 92232477,
-        total_collected: 0,
-        total_outstanding: 92232477,
-        defaulter_accounts: 2856,
-      },
-    },
-    ea: {
-      skills: [
-        'Grouped ledger aggregation without heavy memory footprint',
-        'Floored student arrears calculation guaranteeing true defaulter detection',
-        'Bounded cohort sweep with explicit coverage disclosure',
-      ],
-      capabilities: [
-        {
-          name: 'Ledger Grounding Engine',
-          status: 'fully_implemented',
-          description: 'Reads institute fee demand and collected receipts in one grouped query without sampling.',
-          handler: 'fees.position',
-        },
-        {
-          name: 'Defaulter Cohort Sweeper',
-          status: 'fully_implemented',
-          description: 'Identifies enrolled students with unpaid fee heads across standards with coverage disclosure.',
-          handler: 'fees.arrears',
-        },
-        {
-          name: 'Class Concentration Analyzer',
-          status: 'fully_implemented',
-          description: 'Ranks standards and divisions by pending debt volume for prioritised recovery.',
-          handler: 'fees.position:classes_with_most_pending',
-        },
-      ],
-      constraints_and_safeguards: [
-        'Strictly read-only against all fee ledger tables',
-        'Tenant institute boundary enforcement (sub_institute_id)',
-        'Sample scans must disclose cohort size and truncation status',
-      ],
-    },
-    er: {
-      must_do: [
-        'Resolve active academic year dynamically from database mappings',
-        'Ground all figures in real database records',
-        'Pass candidate defaulters to Gate 1 validation',
-      ],
-      must_not_do: [
-        'Never mutate or write fee records',
-        'Never report a partial sample as a school-wide figure',
-      ],
-      stopping_conditions: [
-        'Halt if tenant or academic year cannot be grounded',
-        'Halt if database connection fails',
-      ],
-      handoff_rules: 'Passes candidate student debtors to Agent 2 via Gate 1.',
-      dependencies: 'Initiates pipeline execution independently.',
-    },
-    eq: {
-      applicable_gates: ['Gate 1 (Position & Arrears Grounding)'],
-      quality_rules: [
-        'Tenant isolation verified',
-        'Academic year resolved',
-        'Ledger position grounded',
-        'Arrears scan completed with coverage disclosed',
-        'Scan findings consistent with ledger totals',
-      ],
-      scoring_formula: 'Binary pass/fail on 6 grounding criteria (100% required to pass).',
-    },
-    eso: {
-      activities: {
-        summary: 'Extracts fee breakoff matrices and audits active student enrollments.',
-        items: [
-          'Scans fees_breackoff for all fee head structures',
-          'Cross-references tblstudent_enrollment for active placements',
-          'Calculates floored outstanding balance per student',
-        ],
-      },
-      usage: {
-        summary: 'Executed on continuous validation loop or triggered manually by administrators.',
-        step_by_step_flow: [
-          '1. Resolve institute ID and active academic year',
-          '2. Sum all fee demand entries across active quotas',
-          '3. Compute collected balance from fees_collect',
-          '4. Package arrears candidates and evaluate Gate 1',
-        ],
-        upstream_dependencies: 'None — entrypoint agent of the Fees pipeline.',
-        downstream_handoff: 'Agent 2 (Evidence & Reminder History Analyst)',
-      },
-    },
-  },
-  agent_2: {
-    name: 'Collection Evidence & Reminder History Analyst',
-    agent_id: 'agt_fees_evidence_analyst',
-    tool_key: 'fees.getPending + fees.collection_report + fees.reminder_history',
-    role_description: 'Audits student line-item dues, recent payments, and enforces cooldown rules to prevent duplicate reminders.',
-    ek: {
-      summary: 'Line-item pending fee heads (fees_breackoff), receipt history (fees_collect), and prior reminder audit logs (ai_audit_logs).',
-      schemas_and_relationships: [
-        'Individual pending fee heads read through getPending',
-        'Receipts verified in fees_collect where is_deleted = "N"',
-        'Prior reminder timestamps and channels audited from ai_audit_logs',
-      ],
-      tables_and_sources: ['fees_collect', 'fees_paid_other', 'ai_audit_logs', 'tblstudent', 'sms_sent_parents'],
-      live_metrics: {
-        recent_receipts_audited: 0,
-        historical_reminders_checked: 24,
-        cooldown_policy_days: 7,
-      },
-    },
-    ea: {
-      skills: [
-        'Line-item fee head reconciliation',
-        'Collection velocity and period verification',
-        'Automated cooldown enforcement (configurable 0–90 days, default 7 days)',
-        'Duplicate notification suppression',
-      ],
-      capabilities: [
-        {
-          name: 'Line-Item Evidence Extractor',
-          status: 'fully_implemented',
-          description: 'Extracts exact fee head arrears (Tuition, Term, Transport) for each candidate.',
-          handler: 'fees.getPending',
-        },
-        {
-          name: 'Cooldown Enforcement Guard',
-          status: 'fully_implemented',
-          description: 'Filters out any candidate who received a reminder within the configured cooldown window.',
-          handler: 'fees.reminder_history',
-        },
-        {
-          name: 'Collection Period Reconciler',
-          status: 'fully_implemented',
-          description: 'Verifies recent receipts in the selected period to avoid reminding students who already paid.',
-          handler: 'fees.collection_report',
-        },
-      ],
-      constraints_and_safeguards: [
-        'Zero message transmission (audit only)',
-        'Tenant boundary enforcement',
-        'No student classified as both eligible and held back',
-      ],
-    },
-    er: {
-      must_do: [
-        'Account for every candidate received from Agent 1',
-        'Verify recent collection receipts in period',
-        'Check reminder history against the cooldown cutoff',
-      ],
-      must_not_do: [
-        'Never allow duplicate reminders within the cooldown window',
-        'Never pass zero or negative dues to Agent 3',
-      ],
-      stopping_conditions: [
-        'Halt if candidates list is missing or corrupted',
-        'Halt if collection report fails to ground',
-      ],
-      handoff_rules: 'Hands cleared eligible recipients and held-back records to Agent 3 via Gate 2.',
-      dependencies: 'Requires validated candidate debtors from Agent 1 (Gate 1).',
-    },
-    eq: {
-      applicable_gates: ['Gate 2 (Evidence & Duplicate Audit)'],
-      quality_rules: [
-        'Candidates received from Agent 1',
-        'Collection report successfully read',
-        'Reminder history audited',
-        'Every candidate accounted for (eligible + held back = candidates)',
-        'No double classification',
-        'All eligible amounts positive',
-      ],
-      scoring_formula: '6-factor reconciliation scoring (100% required to pass Gate 2).',
-    },
-    eso: {
-      activities: {
-        summary: 'Verifies payment evidence and enforces cooldown periods on candidate lists.',
-        items: [
-          'Fetches pending line-item details for candidate accounts',
-          'Queries ai_audit_logs for past reminder timestamps',
-          'Segregates eligible students from held-back candidates',
-        ],
-      },
-      usage: {
-        summary: 'Executes automatically upon Gate 1 completion.',
-        step_by_step_flow: [
-          '1. Consume candidates array from Agent 1',
-          '2. Query historical communications for each candidate',
-          '3. Apply cooldown window filter (e.g. 7 days)',
-          '4. Output eligible cohort and evaluate Gate 2',
-        ],
-        upstream_dependencies: 'Agent 1 (Fee Position & Arrears Reader)',
-        downstream_handoff: 'Agent 3 (Fee Reminder Drafter)',
-      },
-    },
-  },
-  agent_3: {
-    name: 'Fee Reminder Drafter',
-    agent_id: 'agt_fees_reminder_drafter',
-    tool_key: 'fees.send_reminders (preview)',
-    role_description: 'Drafts respectful, non-destructive fee payment reminders with cryptographic approval fingerprints.',
-    ek: {
-      summary: 'Student contact channels (tblstudent.email, tblstudent.mobile), payment deadlines, and institutional tone guidelines.',
-      schemas_and_relationships: [
-        'Contact targets masked for privacy compliance',
-        'Deadline dates computed based on institutional policy',
-        'Cryptographic fingerprint generated for human approval verification',
-      ],
-      tables_and_sources: ['tblstudent', 'sms_sent_parents', 'ai_audit_logs'],
-      live_metrics: {
-        active_channels: 3,
-        privacy_masking_rate: 100,
-        fingerprint_algorithm: 'SHA-256',
-      },
-    },
-    ea: {
-      skills: [
-        'Personalized reminder drafting without threats or aggressive language',
-        'Contact target reachability validation (valid email / mobile checks)',
-        'SHA-256 approval fingerprinting for human sign-off',
-      ],
-      capabilities: [
-        {
-          name: 'Omni-Channel Reminder Composer',
-          status: 'fully_implemented',
-          description: 'Composes polite, personalized reminder messages for Email, SMS, and WhatsApp.',
-          handler: 'fees.send_reminders:preview',
-        },
-        {
-          name: 'Cryptographic Fingerprint Locker',
-          status: 'fully_implemented',
-          description: 'Generates an immutable SHA-256 hash of the exact recipients, amounts, and deadline.',
-          handler: 'fees.send_reminders:fingerprint',
-        },
-        {
-          name: 'Human-in-the-Loop Dispatch Gate',
-          status: 'fully_implemented',
-          description: 'Guarantees that no message is ever sent without explicit administrator review and fingerprint match.',
-          handler: 'fees.send_reminders:dispatch',
-        },
-      ],
-      constraints_and_safeguards: [
-        'Strict preview mode — sends exactly 0 messages without human sign-off',
-        'Requires administrator sign-off through human gate',
-        'Fingerprint mismatch prevents accidental sends',
-      ],
-    },
-    er: {
-      must_do: [
-        'Generate approval fingerprint for the draft batch',
-        'State clearly that no messages were sent',
-        'Provide line-item preview for review',
-      ],
-      must_not_do: [
-        'NEVER send messages autonomously without human sign-off',
-        'Never alter student balances or permanent contact details',
-      ],
-      stopping_conditions: [
-        'Halt if preview generation fails',
-        'Halt if all candidates are uncontactable',
-      ],
-      handoff_rules: 'Hands previewed draft and approval fingerprint to Human Administrator for final sign-off.',
-      dependencies: 'Requires cleared eligible recipients from Agent 2 (Gate 2).',
-    },
-    eq: {
-      applicable_gates: ['Gate 3 (Preview & Human Authorization)'],
-      quality_rules: [
-        'Eligible cohort received from Agent 2',
-        'Zero messages sent in preview mode',
-        'Approval fingerprint generated',
-        'Contact targets masked for privacy',
-        'Explicit administrator approval required to dispatch',
-      ],
-      scoring_formula: 'Binary pass/fail on 5 safety assertions (100% required to pass Gate 3).',
-    },
-    eso: {
-      activities: {
-        summary: 'Composes personalized communication drafts and computes approval fingerprints.',
-        items: [
-          'Resolves masked contact details from student registry',
-          'Formats tailored reminders with outstanding breakdown',
-          'Computes SHA-256 batch fingerprint for administrative review',
-        ],
-      },
-      usage: {
-        summary: 'Executes automatically upon Gate 2 completion, producing a sign-off preview.',
-        step_by_step_flow: [
-          '1. Consume eligible cohort from Agent 2',
-          '2. Validate student contact destinations',
-          '3. Generate personalized draft messages',
-          '4. Generate SHA-256 fingerprint and await administrator approval',
-        ],
-        upstream_dependencies: 'Agent 2 (Evidence & Reminder History Analyst)',
-        downstream_handoff: 'Human Administrator (Sign-off & Dispatch)',
-      },
-    },
-  },
-};
-
 /**
  * Modern 4-Pillar Executive Skill Object (ESO) Viewer Card
- * Identical architecture to Teach/Learn's AgentEsoCard.
+ * Renders strictly live ESO specification returned by `/api/ai/fees/agent/eso`.
  */
 function AgentEsoCard({
-  agentKey,
   agentDetail,
 }: {
-  agentKey: 'agent_1' | 'agent_2' | 'agent_3';
+  agentKey?: 'agent_1' | 'agent_2' | 'agent_3';
   agentDetail?: any;
 }) {
   const [activeTab, setActiveTab] = useState<'ek' | 'ea' | 'er' | 'eq' | 'legacy'>('ek');
 
-  const fallback = FEES_ESO_FALLBACKS[agentKey];
-  const item = agentDetail || fallback;
-  const ek = item?.ek || fallback?.ek;
-  const ea = item?.ea || fallback?.ea;
-  const er = item?.er || fallback?.er;
-  const eq = item?.eq || fallback?.eq;
-  const eso = item?.eso || fallback?.eso;
+  if (!agentDetail) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-xs text-slate-500">
+        Loading live Executive Skill Object (ESO) specification from backend registry…
+      </div>
+    );
+  }
+
+  const ek = agentDetail.ek;
+  const ea = agentDetail.ea;
+  const er = agentDetail.er;
+  const eq = agentDetail.eq;
+  const eso = agentDetail.eso;
 
   return (
     <div className="space-y-3.5 rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-xs">
@@ -426,53 +131,48 @@ function AgentEsoCard({
           <button
             type="button"
             onClick={() => setActiveTab('ek')}
-            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
-              activeTab === 'ek'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
+            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${activeTab === 'ek'
+              ? 'bg-blue-600 text-white shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
           >
             EK · Knowledge
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('ea')}
-            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
-              activeTab === 'ea'
-                ? 'bg-emerald-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
+            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${activeTab === 'ea'
+              ? 'bg-emerald-600 text-white shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
           >
             EA · Abilities
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('er')}
-            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
-              activeTab === 'er'
-                ? 'bg-purple-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
+            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${activeTab === 'er'
+              ? 'bg-purple-600 text-white shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
           >
             ER · Responsibilities
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('eq')}
-            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
-              activeTab === 'eq'
-                ? 'bg-amber-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
+            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${activeTab === 'eq'
+              ? 'bg-amber-600 text-white shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
           >
             EQ · Quality
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('legacy')}
-            className={`px-2 py-1 text-[10px] font-medium rounded-md transition-all ${
-              activeTab === 'legacy' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-700'
-            }`}
+            className={`px-2 py-1 text-[10px] font-medium rounded-md transition-all ${activeTab === 'legacy' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-700'
+              }`}
             title="View Classic Activities & Flow View"
           >
             Classic Flow
@@ -530,8 +230,8 @@ function AgentEsoCard({
                         <span className="font-mono font-bold text-blue-900">
                           {typeof val === 'number'
                             ? (key.includes('demand') || key.includes('collected') || key.includes('outstanding')
-                                ? `₹${val.toLocaleString('en-IN')}`
-                                : String(val))
+                              ? `₹${val.toLocaleString('en-IN')}`
+                              : String(val))
                             : String(val)}
                         </span>
                       </div>
@@ -585,8 +285,11 @@ function AgentEsoCard({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {ea.capabilities.map((cap: any, idx: number) => {
                   const name = typeof cap === 'string' ? cap : cap.name;
-                  const desc = typeof cap === 'object' ? cap.description : 'Production verified domain capability.';
+                  const desc = typeof cap === 'object' ? cap.description : 'Backend verified domain capability.';
                   const handler = typeof cap === 'object' ? cap.handler : null;
+                  const status = typeof cap === 'object' ? cap.status : 'fully_implemented';
+                  const isFull = status === 'fully_implemented';
+                  const isPartial = status === 'partially_implemented';
                   return (
                     <div
                       key={idx}
@@ -595,8 +298,16 @@ function AgentEsoCard({
                       <div>
                         <div className="flex items-center justify-between gap-1 mb-1">
                           <span className="text-[11px] font-bold text-slate-900 leading-tight">{name}</span>
-                          <span className="rounded bg-emerald-100 text-emerald-800 px-1.5 py-0.5 text-[9px] font-extrabold flex items-center gap-1 shrink-0">
-                            <Check className="size-2.5" /> Fully Active
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[9px] font-extrabold flex items-center gap-1 shrink-0 ${isFull
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : isPartial
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-600'
+                              }`}
+                          >
+                            <Check className="size-2.5" />
+                            {isFull ? 'Implemented' : isPartial ? 'Human-Gated' : 'Unavailable'}
                           </span>
                         </div>
                         <p className="text-[10px] text-slate-600 leading-snug">{desc}</p>
@@ -781,22 +492,29 @@ function AgentEsoCard({
 
 export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCardProps) {
   const [state, setState] = useState<FeesAgentState | null>(null);
+  const [recentRuns, setRecentRuns] = useState<FeesRecentRun[]>([]);
+  const [availableYears, setAvailableYears] = useState<FeesAvailableYear[]>([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState<number | null>(null);
+  const [resolvedYear, setResolvedYear] = useState<number | null>(null);
+  const [yearSource, setYearSource] = useState<string | undefined>(undefined);
+  const [instituteIdMeta, setInstituteIdMeta] = useState<number | null>(null);
   const [eso, setEso] = useState<FeesEso | null>(null);
   const [latestReport, setLatestReport] = useState<FeesPipelineReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [runningPipeline, setRunningPipeline] = useState(false);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+  const [expandedTraceAgent, setExpandedTraceAgent] = useState<'agent_1' | 'agent_2' | 'agent_3' | null>(null);
   const [togglingMonitoring, setTogglingMonitoring] = useState(false);
   const [selectedInterval, setSelectedInterval] = useState(60);
 
-  // Main UI Navigation Tabs (Matching Teach/Learn)
-  const [mainTab, setMainTab] = useState<'pipeline' | 'audit' | 'ledger' | 'workflow'>('pipeline');
-  const [esoActiveTab, setEsoActiveTab] = useState<'agent_1' | 'agent_2' | 'agent_3'>('agent_1');
+  // Main UI Navigation Tabs
+  const mainTab = 'pipeline' as const;
   const [inspectingEsoAgent, setInspectingEsoAgent] = useState<'agent_1' | 'agent_2' | 'agent_3' | null>(null);
 
   // Pipeline Filter Options
   const [standards, setStandards] = useState<FeesStandard[]>([]);
   const [pipelineStandard, setPipelineStandard] = useState<string>('all');
-  const [pipelineLimit, setPipelineLimit] = useState<number>(25);
+  const [pipelineLimit, setPipelineLimit] = useState<number>(10);
   const [minAmount, setMinAmount] = useState<string>('');
   const [cooldownDays, setCooldownDays] = useState<number>(7);
   const [reminderChannel, setReminderChannel] = useState<'email' | 'sms' | 'whatsapp'>('email');
@@ -810,12 +528,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
   const [studentSearch, setStudentSearch] = useState('');
   const [studentSelectionExpanded, setStudentSelectionExpanded] = useState(false);
 
-  // Safe Test Recipient Override State
-  const [testModeEnabled, setTestModeEnabled] = useState(false);
-  const [testMobileNumber, setTestMobileNumber] = useState('6353662940');
-  const [testEmailAddress, setTestEmailAddress] = useState('darshnaerrorx@gmail.com');
-
-  // Sequential Step States (Matching Teach/Learn's true sequential progression)
+  // Sequential Step States
   const [pipelineRunningStep, setPipelineRunningStep] = useState<0 | 1 | 2 | 3>(0);
   const [step1State, setStep1State] = useState<{
     status: 'idle' | 'running' | 'completed' | 'failed';
@@ -869,47 +582,140 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
     };
   }, []);
 
-  const loadInitialData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [stateRes, esoRes, standardsRes] = await Promise.allSettled([
-        getFeesAgentState(context),
-        getFeesEso(context),
-        fetchFeesStandards(context),
-      ]);
-
-      if (stateRes.status === 'fulfilled') {
-        const s = stateRes.value;
-        const agentState = s.state || s;
-        setState(agentState || null);
-        if (agentState?.interval_seconds) {
-          setSelectedInterval(agentState.interval_seconds);
-        }
-      }
-
-      if (esoRes.status === 'fulfilled') {
-        const e = esoRes.value as any;
-        setEso((e?.eso || e) as FeesEso);
-      }
-
-      if (standardsRes.status === 'fulfilled') {
-        const val = standardsRes.value as any;
-        const stdList = Array.isArray(val) ? val : val?.standards || [];
-        setStandards(stdList);
-      }
-    } catch (err) {
-      console.error('Failed to load initial Fees Agent data:', err);
-    } finally {
-      setLoading(false);
+  const hydratePipelineFromReport = useCallback((report: FeesPipelineReport | null | undefined) => {
+    if (!report || !report.pipeline_execution?.steps?.length) {
+      return;
     }
-  }, [context]);
+
+    const steps = report.pipeline_execution.steps;
+    const s1 = steps[0];
+    const s2 = steps[1];
+    const s3 = steps[2];
+
+    if (s1) {
+      const candidates = report.arrears_scan?.candidates || s1.output?.candidates || [];
+      const candCount = candidates.length || Number(s1.output_summary?.defaulters_found ?? 0);
+      setStep1State({
+        status: s1.status === 'success' ? 'completed' : 'failed',
+        duration_ms: s1.duration_ms,
+        candidatesCount: candCount,
+        gate: report.quality_scorecard?.gates?.gate_1,
+        summary: String(s1.output?.ledger_headline || `Scanned cohort: identified ${candCount} student(s) with fee arrears.`),
+        step_result: s1,
+        candidates,
+      });
+    }
+
+    if (s2) {
+      const eligibleList = report.evidence_analysis?.eligible || s2.output?.eligible || [];
+      const heldBackList = report.evidence_analysis?.held_back || s2.output?.held_back || [];
+      setStep2State({
+        status: s2.status === 'success' ? 'completed' : 'failed',
+        duration_ms: s2.duration_ms,
+        eligibleCount: eligibleList.length,
+        heldBackCount: heldBackList.length,
+        gate: report.quality_scorecard?.gates?.gate_2,
+        summary: `Validated evidence: ${eligibleList.length} candidate(s) cleared for reminder; ${heldBackList.length} held back by cooldown.`,
+        step_result: s2,
+        eligible: eligibleList,
+        held_back: heldBackList,
+      });
+    } else if (s1 && report.pipeline_status === 'completed_no_action') {
+      setStep2State({ status: 'completed', eligibleCount: 0, heldBackCount: 0, summary: 'Skipped: 0 arrears candidates to evaluate.' });
+    }
+
+    if (s3) {
+      const draft = report.reminder_draft;
+      setStep3State({
+        status: s3.status === 'success' ? 'completed' : 'failed',
+        duration_ms: s3.duration_ms,
+        recipientsCount: draft?.recipient_count ?? draft?.recipients?.length ?? 0,
+        fingerprint: draft?.fingerprint ?? undefined,
+        gate: report.quality_scorecard?.gates?.gate_3,
+        summary: `Drafted preview for ${draft?.recipient_count ?? 0} recipient(s). SHA-256 approval fingerprint generated. Zero messages sent without approval.`,
+        step_result: s3,
+      });
+    } else if (s1 && report.pipeline_status === 'completed_no_action') {
+      setStep3State({ status: 'completed', recipientsCount: 0, summary: 'Skipped: 0 eligible recipients to draft.' });
+    }
+
+    setLatestReport(report);
+  }, []);
+
+  const applyStatePayload = useCallback(
+    (rawState: unknown, hydrateReport = true) => {
+      const s = rawState as {
+        state?: FeesAgentState & { recent_runs?: FeesRecentRun[]; academic_year?: number | null; academic_year_source?: string; sub_institute_id?: number };
+        recent_runs?: FeesRecentRun[];
+        available_years?: FeesAvailableYear[];
+        latest_report?: FeesPipelineReport | null;
+        academic_year?: number | null;
+        academic_year_source?: string;
+        sub_institute_id?: number;
+      } & FeesAgentState;
+      const agentState = s.state || s;
+      setState(agentState || null);
+      setRecentRuns(Array.isArray(s.recent_runs) ? s.recent_runs : Array.isArray(agentState?.recent_runs) ? agentState.recent_runs : []);
+      if (Array.isArray(s.available_years)) {
+        setAvailableYears(s.available_years);
+      }
+      const nextYear = s.academic_year ?? agentState?.academic_year ?? null;
+      setResolvedYear(nextYear);
+      if (nextYear) {
+        setSelectedAcademicYear((prev) => prev ?? nextYear);
+      }
+      setYearSource(s.academic_year_source ?? agentState?.academic_year_source);
+      setInstituteIdMeta(s.sub_institute_id ?? agentState?.sub_institute_id ?? null);
+      if (agentState?.interval_seconds) {
+        setSelectedInterval(agentState.interval_seconds);
+      }
+      if (hydrateReport && s.latest_report) {
+        hydratePipelineFromReport(s.latest_report);
+      }
+    },
+    [hydratePipelineFromReport],
+  );
+
+  const loadInitialData = useCallback(
+    async (explicitYear?: number | null) => {
+      setLoading(true);
+      try {
+        const [stateRes, esoRes, standardsRes] = await Promise.allSettled([
+          getFeesAgentState(context, explicitYear, true),
+          getFeesEso(context, explicitYear),
+          fetchFeesStandards(context),
+        ]);
+
+        if (stateRes.status === 'fulfilled') {
+          applyStatePayload(stateRes.value, true);
+        }
+
+        if (esoRes.status === 'fulfilled') {
+          const e = esoRes.value as { eso?: FeesEso } | FeesEso;
+          setEso('eso' in e && e.eso ? e.eso : (e as FeesEso));
+        }
+
+        if (standardsRes.status === 'fulfilled') {
+          const val = standardsRes.value as FeesStandard[] | { standards?: FeesStandard[] };
+          const stdList = Array.isArray(val) ? val : val?.standards || [];
+          setStandards(stdList);
+        }
+      } catch (err) {
+        console.error('Failed to load initial Fees Agent data:', err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [context, applyStatePayload],
+  );
 
   const loadStudents = useCallback(
-    async (stdIdStr: string) => {
+    async (stdIdStr: string, explicitYear?: number | null) => {
+      setLoadingStudents(true);
       setLoadingStudents(true);
       try {
         const stdId = stdIdStr === 'all' ? undefined : parseInt(stdIdStr, 10);
-        const data = await fetchFeesDefaulterStudents(context, stdId, 50);
+        const data = await fetchFeesDefaulterStudents(context, stdId, 50, explicitYear);
         setStudents(data);
         // By default select all loaded defaulters
         setSelectedStudentIds(new Set(data.map((s) => s.student_id)));
@@ -924,12 +730,39 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
   );
 
   useEffect(() => {
-    void loadInitialData();
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) void loadInitialData(null);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadInitialData]);
 
+  const handleAcademicYearChange = useCallback(
+    (newYear: number) => {
+      setSelectedAcademicYear(newYear);
+      setStep1State({ status: 'idle' });
+      setStep2State({ status: 'idle' });
+      setStep3State({ status: 'idle' });
+      setLatestReport(null);
+      void loadInitialData(newYear);
+      void loadStudents(pipelineStandard, newYear);
+    },
+    [loadInitialData, loadStudents, pipelineStandard],
+  );
+
   useEffect(() => {
-    void loadStudents(pipelineStandard);
-  }, [pipelineStandard, loadStudents]);
+    if (!resolvedYear && !selectedAcademicYear) return;
+    let cancelled = false;
+    const activeYear = selectedAcademicYear ?? resolvedYear;
+    Promise.resolve().then(() => {
+      if (!cancelled) void loadStudents(pipelineStandard, activeYear);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pipelineStandard, selectedAcademicYear, resolvedYear, loadStudents]);
 
   const handleToggleStudent = (studentId: number) => {
     setSelectedStudentIds((prev) => {
@@ -1040,17 +873,24 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
     if (runningPipeline) return;
     setRunningPipeline(true);
     setPipelineRunningStep(1);
+    setPipelineError(null);
+    setLatestReport(null);
+    setDispatchResult(null);
 
     setStep1State({ status: 'running' });
     setStep2State({ status: 'waiting' });
     setStep3State({ status: 'waiting' });
 
+    let activeStep: 1 | 2 | 3 = 1;
+
     try {
+      const activeYear = selectedAcademicYear ?? resolvedYear ?? undefined;
       const baseOptions: any = {
         limit: pipelineLimit,
         cooldown_days: cooldownDays,
         evidence_limit: evidenceLimit,
         channel: reminderChannel,
+        ...(activeYear ? { academic_year: activeYear, explicit_academic_year: true } : {}),
       };
 
       if (pipelineStandard && pipelineStandard !== 'all') {
@@ -1060,7 +900,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
         baseOptions.min_amount = parseFloat(minAmount);
       }
 
-      if (selectedStudentIds.size > 0) {
+      if (students.length > 0 && selectedStudentIds.size > 0 && selectedStudentIds.size < students.length) {
         baseOptions.student_ids = Array.from(selectedStudentIds);
       }
 
@@ -1078,23 +918,13 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
         baseOptions.custom_amounts = validCustomAmounts;
       }
 
-      if (testModeEnabled) {
-        const overrides: Record<number, { email?: string; sms?: string }> = {};
-        for (const sid of selectedStudentIds) {
-          overrides[sid] = {
-            email: testEmailAddress.trim() || undefined,
-            sms: testMobileNumber.trim() || undefined,
-          };
-        }
-        baseOptions.contact_overrides = overrides;
-      }
-
       // ── STEP 1: Agent 1 · Fee Position & Arrears Reader (Gate 1) ──
+      activeStep = 1;
       const step1Res: any = await runFeesPipeline(context, { ...baseOptions, step: 1 });
       const r1 = step1Res.report || step1Res;
 
       if (!r1?.success) {
-        const errMsg = r1?.error || 'Step 1 (Position & Arrears Reader) failed at Gate 1.';
+        const errMsg = r1?.error || 'Step 1 (Fee Position & Arrears Reader) failed at Gate 1.';
         setStep1State({
           status: 'failed',
           gate: r1?.details?.gate_1,
@@ -1104,24 +934,36 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
         });
         setStep2State({ status: 'idle' });
         setStep3State({ status: 'idle' });
+        setPipelineError(errMsg);
         return;
       }
 
       const runId = r1.run_id;
-      const candidates = r1.candidates || r1.step_result?.output?.candidates || [];
+      const candidates = r1.candidates || r1.step_result?.output?.candidates || r1.arrears_scan?.candidates || [];
       const candCount = candidates.length || r1.step_result?.output_summary?.defaulters_found || 0;
 
       setStep1State({
         status: 'completed',
-        duration_ms: r1.step_result?.duration_ms,
+        duration_ms: r1.step_result?.duration_ms ?? r1.pipeline_execution?.steps?.[0]?.duration_ms,
         candidatesCount: candCount,
-        gate: r1.gate,
+        gate: r1.gate ?? r1.quality_scorecard?.gates?.gate_1,
         summary: r1.step_result?.output?.ledger_headline || `Scanned cohort: identified ${candCount} student(s) with fee arrears.`,
-        step_result: r1.step_result,
+        step_result: r1.step_result ?? r1.pipeline_execution?.steps?.[0],
         candidates,
       });
 
+      // Handle clean ledger early exit (0 defaulters)
+      if (r1.report_complete) {
+        setStep2State({ status: 'completed', eligibleCount: 0, heldBackCount: 0, summary: 'Skipped: 0 arrears candidates to evaluate.' });
+        setStep3State({ status: 'completed', recipientsCount: 0, summary: 'Skipped: 0 eligible recipients to draft.' });
+        setLatestReport(r1);
+        onValidated?.(r1);
+        onRan?.();
+        return;
+      }
+
       // ── STEP 2: Agent 2 · Collection Evidence & History Analyst (Gate 2) ──
+      activeStep = 2;
       setPipelineRunningStep(2);
       setStep2State({ status: 'running' });
 
@@ -1138,6 +980,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
           step_result: r2?.details?.step_result,
         });
         setStep3State({ status: 'idle' });
+        setPipelineError(errMsg);
         return;
       }
 
@@ -1157,6 +1000,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
       });
 
       // ── STEP 3: Agent 3 · Fee Reminder Drafter (Gate 3) ──
+      activeStep = 3;
       setPipelineRunningStep(3);
       setStep3State({ status: 'running' });
 
@@ -1172,33 +1016,44 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
           error: errMsg,
           step_result: r3?.details?.step_result,
         });
+        setPipelineError(errMsg);
         return;
       }
 
       const draft = r3.reminder_draft || {};
-      const gate3 = r3.quality_scorecard?.gates?.gate_3;
+      const gate3 = r3.quality_scorecard?.gates?.gate_3 || r3.gate;
 
       setStep3State({
         status: 'completed',
         duration_ms: r3.pipeline_execution?.steps?.[2]?.duration_ms || r3.step_result?.duration_ms,
-        recipientsCount: draft.recipient_count || draft.recipients?.length || 0,
+        recipientsCount: draft.recipient_count ?? draft.recipients?.length ?? 0,
         fingerprint: draft.fingerprint,
         gate: gate3,
         summary: `Drafted preview for ${draft.recipient_count ?? 0} recipient(s). Cryptographic SHA-256 fingerprint generated. Zero messages sent without human approval.`,
-        step_result: r3.step_result,
+        step_result: r3.step_result ?? r3.pipeline_execution?.steps?.[2],
       });
 
       setLatestReport(r3);
       onValidated?.(r3);
       onRan?.();
 
-      const stateRes = await getFeesAgentState(context);
-      const agentState = stateRes.state || stateRes;
-      if (agentState) {
-        setState(agentState);
+      const stateRes = await getFeesAgentState(context, activeYear ?? null, false);
+      applyStatePayload(stateRes, false);
+    } catch (err: unknown) {
+      const pipeErr = err as FeesPipelineError;
+      const msg = pipeErr?.message || 'Pipeline execution failed.';
+      const details = pipeErr?.failure?.details;
+      setPipelineError(msg);
+      if (activeStep === 1) {
+        setStep1State({ status: 'failed', error: msg, summary: msg, gate: details?.gate_1, step_result: details?.step_result });
+        setStep2State({ status: 'idle' });
+        setStep3State({ status: 'idle' });
+      } else if (activeStep === 2) {
+        setStep2State({ status: 'failed', error: msg, summary: msg, gate: details?.gate_2, step_result: details?.step_result });
+        setStep3State({ status: 'idle' });
+      } else {
+        setStep3State({ status: 'failed', error: msg, summary: msg, gate: details?.gate_3, step_result: details?.step_result });
       }
-    } catch (err: any) {
-      console.error('Sequential pipeline execution error:', err);
     } finally {
       setRunningPipeline(false);
       setPipelineRunningStep(0);
@@ -1219,32 +1074,25 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
         }
       }
 
-      let contactOverrides: Record<number, { email?: string; sms?: string }> | undefined = undefined;
-      if (testModeEnabled) {
-        contactOverrides = {};
-        for (const sid of recipientIds) {
-          contactOverrides[sid] = {
-            email: testEmailAddress.trim() || undefined,
-            sms: testMobileNumber.trim() || undefined,
-          };
-        }
-      }
-
-      const res = await sendApprovedFeesReminders(context, {
-        fingerprint: latestReport.reminder_draft.fingerprint,
-        channel: reminderChannel,
-        deadline: latestReport.reminder_draft.deadline || new Date().toISOString().slice(0, 10),
-        student_ids: recipientIds.length > 0 ? recipientIds : undefined,
-        custom_amounts: Object.keys(customMap).length > 0 ? customMap : undefined,
-        contact_overrides: contactOverrides,
-        standard_id: pipelineStandard !== 'all' ? parseInt(pipelineStandard, 10) : undefined,
-      });
+      const activeYear = selectedAcademicYear ?? resolvedYear ?? latestReport.academic_year ?? undefined;
+      const res = await sendApprovedFeesReminders(
+        context,
+        {
+          fingerprint: latestReport.reminder_draft.fingerprint,
+          channel: reminderChannel,
+          deadline: latestReport.reminder_draft.deadline || new Date().toISOString().slice(0, 10),
+          student_ids: recipientIds.length > 0 ? recipientIds : undefined,
+          custom_amounts: Object.keys(customMap).length > 0 ? customMap : undefined,
+          standard_id: pipelineStandard !== 'all' ? parseInt(pipelineStandard, 10) : undefined,
+        },
+        activeYear,
+      );
 
       setDispatchResult(res.result);
       onRan?.();
 
-      void loadInitialData();
-      void loadStudents(pipelineStandard);
+      void loadInitialData(activeYear ?? null);
+      void loadStudents(pipelineStandard, activeYear ?? null);
     } catch (err: any) {
       console.error('Dispatch error:', err);
       setDispatchError(err.message || 'Failed to dispatch reminders.');
@@ -1254,7 +1102,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
   };
 
   const formatRupees = (amount?: number | null) => {
-    if (amount === undefined || amount === null) return '₹0';
+    if (amount === undefined || amount === null || Number.isNaN(amount)) return loading ? 'Loading…' : '—';
     return `₹${amount.toLocaleString('en-IN')}`;
   };
 
@@ -1263,10 +1111,24 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
   const arrears = latestReport?.arrears_scan;
   const reminder = latestReport?.reminder_draft;
 
-  const displayDemand = ledger?.total_demand ?? summary?.total_demand ?? 92232477;
-  const displayCollected = ledger?.total_collected ?? summary?.total_collected ?? 0;
-  const displayOutstanding = ledger?.total_outstanding ?? summary?.total_outstanding ?? 92232477;
-  const displayDefaulters = arrears?.defaulter_count ?? summary?.defaulters_count ?? 2856;
+  const displayDemand = ledger?.total_demand ?? summary?.total_demand ?? null;
+  const displayCollected = ledger?.total_collected ?? summary?.total_collected ?? null;
+  const displayOutstanding = ledger?.total_outstanding ?? summary?.total_outstanding ?? null;
+  const displayDefaulters = summary?.defaulters_count ?? arrears?.defaulter_count ?? null;
+  const displayCollectionRate =
+    ledger?.collection_rate ??
+    (summary?.collection_rate !== undefined && summary?.collection_rate !== null
+      ? `${summary.collection_rate}%`
+      : displayDemand && displayDemand > 0 && displayCollected !== null
+        ? `${((displayCollected / displayDemand) * 100).toFixed(1)}%`
+        : null);
+  const displayOutstandingShare =
+    displayDemand && displayDemand > 0 && displayOutstanding !== null
+      ? `${((displayOutstanding / displayDemand) * 100).toFixed(1)}% of Demand Pending`
+      : null;
+  const displayAcademicYear = latestReport?.academic_year ?? resolvedYear ?? state?.academic_year ?? null;
+  const displayYearSource = latestReport?.academic_year_source ?? yearSource ?? state?.academic_year_source;
+  const displayInstituteId = latestReport?.sub_institute_id ?? instituteIdMeta ?? state?.sub_institute_id ?? null;
 
   return (
     <div className="space-y-6">
@@ -1278,22 +1140,42 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
               <Bot className="size-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-bold tracking-tight text-white">
                   Fees Master Autonomous Agent
                 </h2>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 ring-1 ring-emerald-500/30">
-                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  1 Sub-institute Active
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${state?.is_active
+                    ? 'bg-emerald-500/20 text-emerald-300 ring-emerald-500/30'
+                    : 'bg-slate-500/20 text-slate-300 ring-slate-400/30'
+                    }`}
+                >
+                  <span className={`size-1.5 rounded-full ${state?.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+                  {state?.is_active ? 'Monitoring Active' : 'Paused / On-Demand'}
                 </span>
+                {displayInstituteId ? (
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-indigo-200">
+                    Institute #{displayInstituteId}
+                  </span>
+                ) : null}
               </div>
               <p className="mt-0.5 text-xs text-slate-300">
-                Continuous 3-agent pipeline for fee audits, cooldown verification, and human-governed reminders.
+                Sequential 3-agent pipeline for live fee ledger audits, cooldown verification, and human-approved reminders.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => void loadInitialData(selectedAcademicYear ?? resolvedYear)}
+              disabled={loading}
+              className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20 disabled:opacity-50"
+            >
+              <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+
             <div className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-xs text-slate-200 backdrop-blur-xs">
               <Clock className="size-3.5 text-indigo-300" />
               <span>Interval:</span>
@@ -1313,11 +1195,10 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
               type="button"
               onClick={handleToggleMonitoring}
               disabled={togglingMonitoring}
-              className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition shadow-xs ${
-                state?.is_active
-                  ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                  : 'bg-emerald-600 text-white hover:bg-emerald-500'
-              }`}
+              className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition shadow-xs ${state?.is_active
+                ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                }`}
             >
               {state?.is_active ? (
                 <>
@@ -1333,7 +1214,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
         </div>
       </div>
 
-      {/* ── 4 KEY METRIC CARDS ── */}
+      {/* ── 4 KEY METRIC CARDS (Strictly Real Database Data) ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
           <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
@@ -1341,7 +1222,9 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
             <DollarSign className="size-4 text-indigo-500" />
           </div>
           <div className="mt-2 text-2xl font-black text-slate-900">{formatRupees(displayDemand)}</div>
-          <div className="mt-1 text-[11px] font-semibold text-slate-400">Academic Year {state?.academic_year || 2026}</div>
+          <div className="mt-1 text-[11px] font-semibold text-slate-500">
+            {displayAcademicYear ? `Academic Year ${displayAcademicYear}` : loading ? 'Resolving year…' : 'Year unresolved'}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
@@ -1350,7 +1233,9 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
             <CreditCard className="size-4 text-emerald-500" />
           </div>
           <div className="mt-2 text-2xl font-black text-emerald-600">{formatRupees(displayCollected)}</div>
-          <div className="mt-1 text-[11px] font-semibold text-emerald-600">Collection Rate: 0%</div>
+          <div className="mt-1 text-[11px] font-semibold text-emerald-700">
+            {displayCollectionRate ? `Collection Rate: ${displayCollectionRate}` : '—'}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
@@ -1359,7 +1244,9 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
             <AlertCircle className="size-4 text-rose-500" />
           </div>
           <div className="mt-2 text-2xl font-black text-rose-600">{formatRupees(displayOutstanding)}</div>
-          <div className="mt-1 text-[11px] font-semibold text-rose-600 font-bold">100% Student Arrears</div>
+          <div className="mt-1 text-[11px] font-bold text-rose-600">
+            {displayOutstandingShare ?? '—'}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
@@ -1367,77 +1254,13 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
             <span>Defaulters Count</span>
             <Users className="size-4 text-amber-500" />
           </div>
-          <div className="mt-2 text-2xl font-black text-indigo-600">{displayDefaulters.toLocaleString()}</div>
-          <div className="mt-1 text-[11px] font-semibold text-slate-400">Target for AI Sweep & Reminders</div>
+          <div className="mt-2 text-2xl font-black text-indigo-600">
+            {displayDefaulters !== null ? displayDefaulters.toLocaleString('en-IN') : loading ? 'Loading…' : '—'}
+          </div>
+          <div className="mt-1 text-[11px] font-semibold text-slate-500">
+            {summary?.fee_accounts !== undefined ? `Across ${summary.fee_accounts.toLocaleString('en-IN')} fee accounts` : 'Live ledger accounts'}
+          </div>
         </div>
-      </div>
-
-      {/* ── MAIN TAB SWITCHER (Teach/Learn Design) ── */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
-        <button
-          type="button"
-          onClick={() => setMainTab('pipeline')}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shrink-0 ${
-            mainTab === 'pipeline'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Sparkles className="size-3.5" />
-          Sequential 3-Agent Pipeline
-          <span
-            className={`rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
-              mainTab === 'pipeline' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'
-            }`}
-          >
-            Step 1 ➔ 2 ➔ 3
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMainTab('audit')}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shrink-0 ${
-            mainTab === 'audit'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Layers className="size-3.5" />
-          Fee Structure & Arrears Audit
-          <span className="rounded-full bg-slate-200 px-1.5 py-0.2 text-[10px] font-extrabold text-slate-700">
-            {displayDefaulters} Accounts
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMainTab('ledger')}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shrink-0 ${
-            mainTab === 'ledger'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Database className="size-3.5" />
-          Defaulters & Evidence Ledger
-          <span className="rounded-full bg-rose-100 px-1.5 py-0.2 text-[10px] font-extrabold text-rose-800">
-            {displayDefaulters} Candidates
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMainTab('workflow')}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shrink-0 ${
-            mainTab === 'workflow'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Workflow className="size-3.5" />
-          Executive Skill Objects (ESO) & Architecture
-        </button>
       </div>
 
       {/* ── TAB 1: SEQUENTIAL 3-AGENT PIPELINE (HERO) ── */}
@@ -1452,12 +1275,35 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
                   Pipeline Execution Scope & Filter Parameters
                 </h3>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Configure execution parameters before initiating the sequential agent pipeline.
+                  Configure academic year and execution parameters before initiating the sequential agent pipeline.
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              {/* Academic Year */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 uppercase">Academic Year</label>
+                <select
+                  value={displayAcademicYear ?? ''}
+                  onChange={(e) => {
+                    const yr = parseInt(e.target.value, 10);
+                    if (!Number.isNaN(yr)) handleAcademicYearChange(yr);
+                  }}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                >
+                  {availableYears.length === 0 && displayAcademicYear ? (
+                    <option value={displayAcademicYear}>AY {displayAcademicYear}</option>
+                  ) : (
+                    availableYears.map((y) => (
+                      <option key={y.syear} value={y.syear}>
+                        AY {y.syear} ({y.structure_count} heads · {y.receipts_count} receipts)
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
               {/* Standard Scope */}
               <div>
                 <label className="text-[11px] font-bold text-slate-600 uppercase">Standard Scope</label>
@@ -1487,7 +1333,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
                   min={1}
                   max={40}
                   value={pipelineLimit}
-                  onChange={(e) => setPipelineLimit(parseInt(e.target.value, 10) || 25)}
+                  onChange={(e) => setPipelineLimit(parseInt(e.target.value, 10) || 10)}
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
@@ -1534,85 +1380,6 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
                   {runningPipeline ? `Running Step ${pipelineRunningStep}…` : 'Execute Steps'}
                 </button>
               </div>
-            </div>
-          </div>
-
-          {/* SAFE TEST RECIPIENT OVERRIDE CARD */}
-          <div className={`rounded-2xl border transition-all ${testModeEnabled ? 'border-purple-300 bg-linear-to-r from-purple-50/70 via-white to-purple-50/70 shadow-sm' : 'border-slate-200/90 bg-white shadow-2xs'}`}>
-            <div className="p-4 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className={`flex size-9 items-center justify-center rounded-xl font-bold text-xs ${testModeEnabled ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                    🧪
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-bold text-slate-900">
-                        Notification Delivery Test Mode (Safe Recipient Override)
-                      </h4>
-                      {testModeEnabled && (
-                        <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-purple-700 animate-pulse">
-                          Active: Safe Test Mode
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Direct test emails and SMS messages strictly to your personal test contacts. Zero database changes are made to student records or fee ledgers.
-                    </p>
-                  </div>
-                </div>
-
-                <label className="relative inline-flex items-center cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={testModeEnabled}
-                    onChange={(e) => setTestModeEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                  <span className="ml-2.5 text-xs font-bold text-slate-700">
-                    {testModeEnabled ? 'Test Mode Enabled' : 'Enable Safe Test Override'}
-                  </span>
-                </label>
-              </div>
-
-              {testModeEnabled && (
-                <div className="mt-4 pt-4 border-t border-purple-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 uppercase">
-                      <Phone className="size-3 text-purple-600" />
-                      Test Mobile Number (SMS)
-                    </label>
-                    <input
-                      type="text"
-                      value={testMobileNumber}
-                      onChange={(e) => setTestMobileNumber(e.target.value)}
-                      placeholder="e.g. 6353662940"
-                      className="mt-1 w-full rounded-xl border border-purple-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-purple-500 font-mono"
-                    />
-                    <span className="text-[10px] text-slate-500 mt-1 block">
-                      SMS reminders will be delivered to this number via SMSFORYOU gateway.
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 uppercase">
-                      <Mail className="size-3 text-purple-600" />
-                      Test Email Address (Email)
-                    </label>
-                    <input
-                      type="email"
-                      value={testEmailAddress}
-                      onChange={(e) => setTestEmailAddress(e.target.value)}
-                      placeholder="e.g. darshnaerrorx@gmail.com"
-                      className="mt-1 w-full rounded-xl border border-purple-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-purple-500 font-mono"
-                    />
-                    <span className="text-[10px] text-slate-500 mt-1 block">
-                      Email reminders will be sent to this inbox via Gmail SMTP.
-                    </span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1757,13 +1524,12 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
                                   value={customVal === undefined ? '' : customVal}
                                   disabled={!isSelected}
                                   onChange={(e) => handleCustomAmountChange(s.student_id, e.target.value)}
-                                  className={`w-28 rounded-lg border px-2.5 py-1 text-right text-xs font-mono font-bold transition focus:outline-hidden ${
-                                    isExceeding
-                                      ? 'border-rose-400 bg-rose-50 text-rose-700 focus:ring-rose-500'
-                                      : isCustom
+                                  className={`w-28 rounded-lg border px-2.5 py-1 text-right text-xs font-mono font-bold transition focus:outline-hidden ${isExceeding
+                                    ? 'border-rose-400 bg-rose-50 text-rose-700 focus:ring-rose-500'
+                                    : isCustom
                                       ? 'border-indigo-400 bg-indigo-50/50 text-indigo-900 focus:ring-indigo-500'
                                       : 'border-slate-200 bg-white text-slate-800 focus:ring-indigo-500'
-                                  } disabled:opacity-40`}
+                                    } disabled:opacity-40`}
                                 />
                                 {isExceeding && (
                                   <span className="block text-[9px] font-bold text-rose-600 mt-0.5">Exceeds dues</span>
@@ -1784,87 +1550,176 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
             )}
           </div>
 
+          {pipelineError && (
+            <div className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900">
+              <AlertCircle className="mt-0.5 size-4 shrink-0 text-rose-600" />
+              <div className="flex-1">
+                <strong>Pipeline Halted:</strong> {pipelineError}
+              </div>
+              <button type="button" onClick={() => setPipelineError(null)} className="text-rose-600 hover:text-rose-900">
+                <X className="size-4" />
+              </button>
+            </div>
+          )}
+
+          {/* ── 1. AGENT-BY-AGENT WORKFLOW SEQUENCE & REAL PROGRESS ── */}
+          <FeesPipelineSequenceBanner
+            step1={step1State}
+            step2={step2State}
+            step3={step3State}
+            latestReport={latestReport}
+            runningPipeline={runningPipeline}
+            academicYear={displayAcademicYear}
+            academicYearSource={displayYearSource}
+            subInstituteId={displayInstituteId}
+          />
+
           {/* ── SEQUENTIAL 3-AGENT PIPELINE CARDS (HERO) ── */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             {/* STEP 1 · AGENT 1: Fee Position & Arrears Reader */}
-            <div className={`rounded-2xl border bg-white p-5 shadow-xs relative overflow-hidden flex flex-col justify-between transition-all ${
-              step1State.status === 'running'
-                ? 'border-indigo-400 ring-2 ring-indigo-100'
-                : step1State.status === 'completed'
+            <div className={`rounded-2xl border bg-white p-5 shadow-xs relative overflow-hidden flex flex-col justify-between transition-all ${step1State.status === 'running'
+              ? 'border-indigo-400 ring-2 ring-indigo-100'
+              : step1State.status === 'completed'
                 ? 'border-indigo-300'
                 : step1State.status === 'failed'
-                ? 'border-rose-300'
-                : 'border-slate-200/90'
-            }`}>
+                  ? 'border-rose-300'
+                  : 'border-slate-200/90'
+              }`}>
               <div className="absolute top-0 left-0 right-0 h-1.5 bg-indigo-500" />
-              <div>
-                <div className="flex items-center justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700">
                     Step 1 • Agent 1
                   </span>
-                  {step1State.status === 'running' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700 animate-pulse">
-                      <RefreshCw className="size-2.5 animate-spin" /> Scanning…
-                    </span>
-                  ) : step1State.status === 'completed' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">
-                      <CheckCheck className="size-3" /> Gate 1 Passed ({step1State.duration_ms || 708}ms)
-                    </span>
-                  ) : step1State.status === 'failed' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold text-rose-700">
-                      <XCircle className="size-3" /> Gate 1 Failed
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                      Ready to Run
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {step1State.duration_ms !== undefined && (
+                      <span className="font-mono text-[10px] font-bold text-slate-500">{step1State.duration_ms}ms</span>
+                    )}
+                    <StatusPill status={toAgentStatusLabel(step1State.status)} />
+                  </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <div>
                     <h4 className="text-base font-bold text-slate-900">
-                      Fee Position & Arrears Reader
+                      Fee Position &amp; Arrears Reader
                     </h4>
                     <span className="font-mono text-[10px] text-slate-400">agt_fees_position_reader</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setInspectingEsoAgent(inspectingEsoAgent === 'agent_1' ? null : 'agent_1')}
-                    className="rounded-lg bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 transition"
+                    className="rounded-lg bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 transition shrink-0"
                   >
                     ESO Inspect
                   </button>
                 </div>
 
-                <p className="mt-1 text-xs text-slate-500">
-                  Scans school ledger demand, receipts, and extracts debtors floored per student.
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <strong>Responsibility:</strong> Reads the school-wide fee ledger for the active academic year, computes total demand vs collected receipts, and identifies students with unpaid fee balances.
                 </p>
 
-                <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-3 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Ledger Demand:</span>
-                    <strong className="text-slate-800">{formatRupees(displayDemand)}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Collected Receipts:</span>
-                    <strong className="text-emerald-700">{formatRupees(displayCollected)}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Arrears Candidates:</span>
-                    <strong className="text-rose-600 font-extrabold">
-                      {step1State.candidatesCount ?? displayDefaulters}
-                    </strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Grounded Tables:</span>
-                    <strong className="text-slate-700 font-mono text-[10px]">fees_breackoff, tblstudent</strong>
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 text-[11px] text-slate-700">
+                  <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Input Received</span>
+                  AY {displayAcademicYear ?? 'auto'} · Scope: {pipelineStandard === 'all' ? 'All Standards' : `Standard #${pipelineStandard}`} · Scan Limit: {pipelineLimit}
+                </div>
+
+                <div>
+                  <span className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Database Tables Accessed</span>
+                  <div className="flex flex-wrap gap-1">
+                    {(step1State.step_result?.output?.tables_accessed ?? ['fees_breackoff', 'fees_collect', 'fees_paid_other', 'tblstudent', 'tblstudent_enrollment', 'standard']).map((tbl) => (
+                      <span key={tbl} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-700">
+                        {tbl}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
+                {/* Distinct Processing Breakdown */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+                    <span className="text-[10px] text-slate-500 block">Fetched (Checked)</span>
+                    <strong className="text-sm font-extrabold text-slate-900">
+                      {step1State.step_result?.output?.records_fetched !== undefined
+                        ? `${step1State.step_result.output.records_fetched} / ${step1State.step_result.output.cohort_size ?? step1State.step_result.output.records_fetched}`
+                        : '—'}
+                    </strong>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+                    <span className="text-[10px] text-slate-500 block">Processed</span>
+                    <strong className="text-sm font-extrabold text-indigo-700">
+                      {step1State.step_result?.output?.records_processed ?? '—'}
+                    </strong>
+                  </div>
+                  <div className="rounded-xl bg-emerald-50/60 p-2.5 border border-emerald-100">
+                    <span className="text-[10px] text-emerald-800 block">With Arrears (Flagged)</span>
+                    <strong className="text-sm font-extrabold text-emerald-900">
+                      {step1State.status === 'completed' ? (step1State.candidatesCount ?? 0) : '—'}
+                    </strong>
+                  </div>
+                  <div className="rounded-xl bg-amber-50/60 p-2.5 border border-amber-100">
+                    <span className="text-[10px] text-amber-800 block">Held Back / Cleared</span>
+                    <strong className="text-sm font-extrabold text-amber-900">
+                      {step1State.step_result?.output?.held_back_count ?? '—'}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-2.5 text-[11px] text-indigo-950 flex items-center justify-between">
+                  <span className="font-semibold">Passed to Agent 2:</span>
+                  <strong className="font-extrabold">
+                    {step1State.status === 'completed' ? `${step1State.candidatesCount ?? 0} candidate(s)` : '—'}
+                  </strong>
+                </div>
+
+                {step1State.summary && (
+                  <p className="text-[11px] text-slate-600 leading-snug">{step1State.summary}</p>
+                )}
+
                 {step1State.error && (
-                  <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
                     <strong>Halt Error:</strong> {step1State.error}
+                  </div>
+                )}
+
+                {(step1State.step_result?.actions?.length || step1State.gate) && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedTraceAgent(expandedTraceAgent === 'agent_1' ? null : 'agent_1')}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline"
+                    >
+                      {expandedTraceAgent === 'agent_1' ? 'Hide Execution & Gate Checks ▲' : 'View Execution & Gate 1 Checks ▼'}
+                    </button>
+                    {expandedTraceAgent === 'agent_1' && (
+                      <div className="mt-2 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-[11px]">
+                        {step1State.step_result?.actions?.map((act, i) => (
+                          <div key={i} className="flex items-start gap-1.5">
+                            <span className={act.success ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>
+                              {act.success ? '✓' : '✕'}
+                            </span>
+                            <div>
+                              <span className="font-mono font-bold text-slate-800">{act.tool || act.type}</span>
+                              {act.duration_ms !== undefined && <span className="ml-1 text-slate-400">({act.duration_ms}ms)</span>}
+                              <p className="text-slate-600">{act.summary}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {step1State.gate && (
+                          <div className="border-t border-slate-200 pt-1.5 space-y-1">
+                            <span className="font-bold text-slate-700 block">
+                              {step1State.gate.gate} ({step1State.gate.passed_checks}/{step1State.gate.total_checks} checks · {step1State.gate.score}%)
+                            </span>
+                            {Object.entries(step1State.gate.checks || {}).map(([k, v]) => (
+                              <div key={k} className="flex items-start gap-1.5 text-[10px]">
+                                <span className={v.status === 'passed' ? 'text-emerald-600' : 'text-rose-600'}>●</span>
+                                <span className="text-slate-600"><strong>{k.replace(/_/g, ' ')}:</strong> {v.message}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1872,7 +1727,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
                 <span className="text-slate-400">Tool: fees.position + arrears</span>
                 <span className="font-bold text-indigo-600 flex items-center gap-1">
-                  Next: Agent 2 <ArrowRight className="size-3" />
+                  Handoff to Agent 2 <ArrowRight className="size-3" />
                 </span>
               </div>
 
@@ -1884,86 +1739,149 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
             </div>
 
             {/* STEP 2 · AGENT 2: Collection Evidence & History Analyst */}
-            <div className={`rounded-2xl border bg-white p-5 shadow-xs relative overflow-hidden flex flex-col justify-between transition-all ${
-              step2State.status === 'running'
-                ? 'border-violet-400 ring-2 ring-violet-100'
-                : step2State.status === 'completed'
+            <div className={`rounded-2xl border bg-white p-5 shadow-xs relative overflow-hidden flex flex-col justify-between transition-all ${step2State.status === 'running'
+              ? 'border-violet-400 ring-2 ring-violet-100'
+              : step2State.status === 'completed'
                 ? 'border-violet-300'
                 : step2State.status === 'failed'
-                ? 'border-rose-300'
-                : 'border-slate-200/90'
-            }`}>
+                  ? 'border-rose-300'
+                  : 'border-slate-200/90'
+              }`}>
               <div className="absolute top-0 left-0 right-0 h-1.5 bg-violet-500" />
-              <div>
-                <div className="flex items-center justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-0.5 text-[11px] font-bold text-violet-700">
                     Step 2 • Agent 2
                   </span>
-                  {step2State.status === 'running' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-extrabold text-violet-700 animate-pulse">
-                      <RefreshCw className="size-2.5 animate-spin" /> Auditing Evidence…
-                    </span>
-                  ) : step2State.status === 'completed' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">
-                      <CheckCheck className="size-3" /> Gate 2 Passed ({step2State.duration_ms || 1262}ms)
-                    </span>
-                  ) : step2State.status === 'failed' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold text-rose-700">
-                      <XCircle className="size-3" /> Gate 2 Failed
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                      Waiting for Step 1
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {step2State.duration_ms !== undefined && (
+                      <span className="font-mono text-[10px] font-bold text-slate-500">{step2State.duration_ms}ms</span>
+                    )}
+                    <StatusPill status={toAgentStatusLabel(step2State.status)} />
+                  </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <div>
                     <h4 className="text-base font-bold text-slate-900">
-                      Collection Evidence & History Analyst
+                      Collection Evidence &amp; History Analyst
                     </h4>
                     <span className="font-mono text-[10px] text-slate-400">agt_fees_evidence_analyst</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setInspectingEsoAgent(inspectingEsoAgent === 'agent_2' ? null : 'agent_2')}
-                    className="rounded-lg bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700 hover:bg-violet-100 transition"
+                    className="rounded-lg bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700 hover:bg-violet-100 transition shrink-0"
                   >
                     ESO Inspect
                   </button>
                 </div>
 
-                <p className="mt-1 text-xs text-slate-500">
-                  Audits pending line items, receipts, and suppresses duplicate reminders within cooldown.
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <strong>Responsibility:</strong> Checks line-item fee heads, recent payments, and prior reminder logs to separate eligible families from those held back by the {cooldownDays}-day cooldown.
                 </p>
 
-                <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-3 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Candidates Evaluated:</span>
-                    <strong className="text-slate-800">
-                      {(step2State.eligibleCount ?? 0) + (step2State.heldBackCount ?? 0) || displayDefaulters}
-                    </strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Cleared for Reminder:</span>
-                    <strong className="text-emerald-700 font-extrabold">
-                      {step2State.eligibleCount ?? displayDefaulters} Eligible
-                    </strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Held Back (Cooldown):</span>
-                    <strong className="text-amber-700">{step2State.heldBackCount ?? 0} Suppressed</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Cooldown Window:</span>
-                    <strong className="text-slate-800">{cooldownDays} days</strong>
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 text-[11px] text-slate-700">
+                  <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Input Received (from Agent 1)</span>
+                  {step2State.step_result?.output?.records_received !== undefined
+                    ? `${step2State.step_result.output.records_received} candidate(s) · Cooldown: ${cooldownDays}d · Evidence Limit: ${evidenceLimit}`
+                    : `Awaiting candidates from Agent 1 · Cooldown: ${cooldownDays}d`}
+                </div>
+
+                <div>
+                  <span className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Database Tables Accessed</span>
+                  <div className="flex flex-wrap gap-1">
+                    {(step2State.step_result?.output?.tables_accessed ?? ['fees_collect', 'fees_paid_other', 'fees_breackoff', 'fees_title', 'ai_audit_logs', 'tblstudent']).map((tbl) => (
+                      <span key={tbl} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-700">
+                        {tbl}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
+                {/* Distinct Processing Breakdown */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+                    <span className="text-[10px] text-slate-500 block">Fetched (Logs &amp; Heads)</span>
+                    <strong className="text-sm font-extrabold text-slate-900">
+                      {step2State.step_result?.output?.records_fetched ?? '—'}
+                    </strong>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+                    <span className="text-[10px] text-slate-500 block">Processed</span>
+                    <strong className="text-sm font-extrabold text-violet-700">
+                      {step2State.step_result?.output?.records_processed ?? '—'}
+                    </strong>
+                  </div>
+                  <div className="rounded-xl bg-emerald-50/60 p-2.5 border border-emerald-100">
+                    <span className="text-[10px] text-emerald-800 block">Eligible (Cleared)</span>
+                    <strong className="text-sm font-extrabold text-emerald-900">
+                      {step2State.status === 'completed' ? (step2State.eligibleCount ?? 0) : '—'}
+                    </strong>
+                  </div>
+                  <div className="rounded-xl bg-amber-50/60 p-2.5 border border-amber-100">
+                    <span className="text-[10px] text-amber-800 block">Held Back (Cooldown)</span>
+                    <strong className="text-sm font-extrabold text-amber-900">
+                      {step2State.status === 'completed' ? (step2State.heldBackCount ?? 0) : '—'}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-2.5 text-[11px] text-violet-950 flex items-center justify-between">
+                  <span className="font-semibold">Passed to Agent 3:</span>
+                  <strong className="font-extrabold">
+                    {step2State.status === 'completed' ? `${step2State.eligibleCount ?? 0} eligible` : '—'}
+                  </strong>
+                </div>
+
+                {step2State.summary && (
+                  <p className="text-[11px] text-slate-600 leading-snug">{step2State.summary}</p>
+                )}
+
                 {step2State.error && (
-                  <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
                     <strong>Halt Error:</strong> {step2State.error}
+                  </div>
+                )}
+
+                {(step2State.step_result?.actions?.length || step2State.gate) && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedTraceAgent(expandedTraceAgent === 'agent_2' ? null : 'agent_2')}
+                      className="text-[11px] font-bold text-violet-700 hover:text-violet-900 underline"
+                    >
+                      {expandedTraceAgent === 'agent_2' ? 'Hide Execution & Gate Checks ▲' : 'View Execution & Gate 2 Checks ▼'}
+                    </button>
+                    {expandedTraceAgent === 'agent_2' && (
+                      <div className="mt-2 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-[11px]">
+                        {step2State.step_result?.actions?.map((act, i) => (
+                          <div key={i} className="flex items-start gap-1.5">
+                            <span className={act.success ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>
+                              {act.success ? '✓' : '✕'}
+                            </span>
+                            <div>
+                              <span className="font-mono font-bold text-slate-800">{act.tool || act.type}</span>
+                              {act.duration_ms !== undefined && <span className="ml-1 text-slate-400">({act.duration_ms}ms)</span>}
+                              <p className="text-slate-600">{act.summary}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {step2State.gate && (
+                          <div className="border-t border-slate-200 pt-1.5 space-y-1">
+                            <span className="font-bold text-slate-700 block">
+                              {step2State.gate.gate} ({step2State.gate.passed_checks}/{step2State.gate.total_checks} checks · {step2State.gate.score}%)
+                            </span>
+                            {Object.entries(step2State.gate.checks || {}).map(([k, v]) => (
+                              <div key={k} className="flex items-start gap-1.5 text-[10px]">
+                                <span className={v.status === 'passed' ? 'text-emerald-600' : 'text-rose-600'}>●</span>
+                                <span className="text-slate-600"><strong>{k.replace(/_/g, ' ')}:</strong> {v.message}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1971,7 +1889,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
                 <span className="text-slate-400">Tool: fees.getPending + reminder_history</span>
                 <span className="font-bold text-violet-700 flex items-center gap-1">
-                  Next: Agent 3 <ArrowRight className="size-3" />
+                  Handoff to Agent 3 <ArrowRight className="size-3" />
                 </span>
               </div>
 
@@ -1983,41 +1901,29 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
             </div>
 
             {/* STEP 3 · AGENT 3: Fee Reminder Drafter */}
-            <div className={`rounded-2xl border bg-white p-5 shadow-xs relative overflow-hidden flex flex-col justify-between transition-all ${
-              step3State.status === 'running'
-                ? 'border-emerald-400 ring-2 ring-emerald-100'
-                : step3State.status === 'completed'
+            <div className={`rounded-2xl border bg-white p-5 shadow-xs relative overflow-hidden flex flex-col justify-between transition-all ${step3State.status === 'running'
+              ? 'border-emerald-400 ring-2 ring-emerald-100'
+              : step3State.status === 'completed'
                 ? 'border-emerald-300'
                 : step3State.status === 'failed'
-                ? 'border-rose-300'
-                : 'border-slate-200/90'
-            }`}>
+                  ? 'border-rose-300'
+                  : 'border-slate-200/90'
+              }`}>
               <div className="absolute top-0 left-0 right-0 h-1.5 bg-emerald-500" />
-              <div>
-                <div className="flex items-center justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
                     Step 3 • Agent 3
                   </span>
-                  {step3State.status === 'running' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 animate-pulse">
-                      <RefreshCw className="size-2.5 animate-spin" /> Drafting…
-                    </span>
-                  ) : step3State.status === 'completed' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">
-                      <CheckCheck className="size-3" /> Gate 3 Passed ({step3State.duration_ms || 412}ms)
-                    </span>
-                  ) : step3State.status === 'failed' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold text-rose-700">
-                      <XCircle className="size-3" /> Gate 3 Failed
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                      Waiting for Step 2
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {step3State.duration_ms !== undefined && (
+                      <span className="font-mono text-[10px] font-bold text-slate-500">{step3State.duration_ms}ms</span>
+                    )}
+                    <StatusPill status={toAgentStatusLabel(step3State.status)} />
+                  </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <div>
                     <h4 className="text-base font-bold text-slate-900">
                       Fee Reminder Drafter
@@ -2027,44 +1933,117 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
                   <button
                     type="button"
                     onClick={() => setInspectingEsoAgent(inspectingEsoAgent === 'agent_3' ? null : 'agent_3')}
-                    className="rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 transition"
+                    className="rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 transition shrink-0"
                   >
                     ESO Inspect
                   </button>
                 </div>
 
-                <p className="mt-1 text-xs text-slate-500">
-                  Synthesizes non-destructive reminder notices awaiting administrator approval.
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <strong>Responsibility:</strong> Validates parent contacts, drafts personalized reminder previews with a SHA-256 approval lock, and holds all sends until an administrator approves.
                 </p>
 
-                <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-3 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Recipients Drafted:</span>
-                    <strong className="text-slate-800">
-                      {step3State.recipientsCount ?? reminder?.recipient_count ?? displayDefaulters}
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 text-[11px] text-slate-700">
+                  <span className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Input Received (from Agent 2)</span>
+                  {step3State.step_result?.output?.records_received !== undefined
+                    ? `${step3State.step_result.output.records_received} eligible student(s) · Channel: ${reminderChannel.toUpperCase()}`
+                    : `Awaiting eligible students from Agent 2 · Channel: ${reminderChannel.toUpperCase()}`}
+                </div>
+
+                <div>
+                  <span className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Database Tables Accessed / Written</span>
+                  <div className="flex flex-wrap gap-1">
+                    {(step3State.step_result?.output?.tables_accessed ?? ['tblstudent', 'sms_api_details', 'ai_audit_logs', 'ai_agent_runs', 'fees_agent_state']).map((tbl) => (
+                      <span key={tbl} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-700">
+                        {tbl}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Distinct Processing Breakdown */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+                    <span className="text-[10px] text-slate-500 block">Fetched (Contacts)</span>
+                    <strong className="text-sm font-extrabold text-slate-900">
+                      {step3State.step_result?.output?.records_fetched ?? '—'}
                     </strong>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Channel Selected:</span>
-                    <strong className="text-indigo-600 uppercase font-bold">{reminderChannel}</strong>
+                  <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+                    <span className="text-[10px] text-slate-500 block">Processed</span>
+                    <strong className="text-sm font-extrabold text-emerald-700">
+                      {step3State.step_result?.output?.records_processed ?? '—'}
+                    </strong>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Messages Sent:</span>
-                    <strong className="text-emerald-700 font-extrabold">0 (Preview Mode)</strong>
+                  <div className="rounded-xl bg-emerald-50/60 p-2.5 border border-emerald-100">
+                    <span className="text-[10px] text-emerald-800 block">Eligible (Drafted)</span>
+                    <strong className="text-sm font-extrabold text-emerald-900">
+                      {step3State.status === 'completed' ? (step3State.recipientsCount ?? 0) : '—'}
+                    </strong>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">SHA-256 Fingerprint:</span>
-                    <strong className="text-slate-600 font-mono text-[10px]">
-                      {step3State.fingerprint || reminder?.fingerprint
-                        ? `${(step3State.fingerprint || reminder?.fingerprint || '').slice(0, 12)}…`
-                        : 'Generated on run'}
+                  <div className="rounded-xl bg-amber-50/60 p-2.5 border border-amber-100">
+                    <span className="text-[10px] text-amber-800 block">Held Back (Unreachable)</span>
+                    <strong className="text-sm font-extrabold text-amber-900">
+                      {step3State.step_result?.output?.held_back_count ?? '—'}
                     </strong>
                   </div>
                 </div>
 
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-2.5 text-[11px] text-emerald-950 flex items-center justify-between">
+                  <span className="font-semibold">Sent Automatically:</span>
+                  <strong className="font-extrabold">
+                    {dispatchResult ? `${dispatchResult.sent} Dispatched` : '0 (Awaiting Approval)'}
+                  </strong>
+                </div>
+
+                {step3State.summary && (
+                  <p className="text-[11px] text-slate-600 leading-snug">{step3State.summary}</p>
+                )}
+
                 {step3State.error && (
-                  <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
                     <strong>Halt Error:</strong> {step3State.error}
+                  </div>
+                )}
+
+                {(step3State.step_result?.actions?.length || step3State.gate) && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedTraceAgent(expandedTraceAgent === 'agent_3' ? null : 'agent_3')}
+                      className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline"
+                    >
+                      {expandedTraceAgent === 'agent_3' ? 'Hide Execution & Gate Checks ▲' : 'View Execution & Gate 3 Checks ▼'}
+                    </button>
+                    {expandedTraceAgent === 'agent_3' && (
+                      <div className="mt-2 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-[11px]">
+                        {step3State.step_result?.actions?.map((act, i) => (
+                          <div key={i} className="flex items-start gap-1.5">
+                            <span className={act.success ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>
+                              {act.success ? '✓' : '✕'}
+                            </span>
+                            <div>
+                              <span className="font-mono font-bold text-slate-800">{act.tool || act.type}</span>
+                              {act.duration_ms !== undefined && <span className="ml-1 text-slate-400">({act.duration_ms}ms)</span>}
+                              <p className="text-slate-600">{act.summary}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {step3State.gate && (
+                          <div className="border-t border-slate-200 pt-1.5 space-y-1">
+                            <span className="font-bold text-slate-700 block">
+                              {step3State.gate.gate} ({step3State.gate.passed_checks}/{step3State.gate.total_checks} checks · {step3State.gate.score}%)
+                            </span>
+                            {Object.entries(step3State.gate.checks || {}).map(([k, v]) => (
+                              <div key={k} className="flex items-start gap-1.5 text-[10px]">
+                                <span className={v.status === 'passed' ? 'text-emerald-600' : 'text-rose-600'}>●</span>
+                                <span className="text-slate-600"><strong>{k.replace(/_/g, ' ')}:</strong> {v.message}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2072,7 +2051,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
                 <span className="text-slate-400">Tool: fees.send_reminders (preview)</span>
                 <span className="font-bold text-emerald-700 flex items-center gap-1">
-                  Ready for Human Sign-off
+                  Human Sign-off Gate
                 </span>
               </div>
 
@@ -2088,7 +2067,7 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
                   className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-500"
                 >
                   <Send className="size-3.5" />
-                  Review & Approve Reminders
+                  Review &amp; Approve Reminders
                 </button>
               )}
 
@@ -2100,180 +2079,26 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
             </div>
           </div>
 
-          {/* ── UNIFIED QUALITY AUDIT & SAFETY GUARANTEE BOX ── */}
-          <div className="rounded-2xl border border-indigo-100 bg-linear-to-r from-indigo-50/50 via-white to-indigo-50/50 p-6 shadow-xs">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="size-5 text-indigo-600" />
-                  <h4 className="text-sm font-bold text-slate-900">
-                    Unified Multi-Gate Quality Audit & Governance
-                  </h4>
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black uppercase text-emerald-800">
-                    Zero Autonomous Dispatches
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500 max-w-2xl">
-                  Agents 1 and 2 operate in strict read-only mode against student ledgers. Agent 3 drafts personalized previews guarded by a 64-character SHA-256 fingerprint. No email, SMS, or WhatsApp is dispatched without explicit human sign-off.
-                </p>
-              </div>
+          {/* ── 2. AGENT-TO-AGENT HANDOFFS & DATA FLOW ── */}
+          <FeesHandoffFlowSection
+            latestReport={latestReport}
+            step1={step1State}
+            step2={step2State}
+            step3={step3State}
+          />
 
-              {reminder?.fingerprint && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowApprovalModal(true);
-                    setDispatchResult(null);
-                    setDispatchError(null);
-                    setConfirmationChecked(false);
-                  }}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md transition hover:bg-emerald-500 shrink-0"
-                >
-                  <Send className="size-4" />
-                  Review & Authorize Reminders
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 2: FEE STRUCTURE & ARREARS AUDIT ── */}
-      {mainTab === 'audit' && (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="size-4 text-indigo-600" />
-              School-wide Standard & Class Pending Arrears Concentration
-            </h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Verified breakdown of outstanding balances across all standards, identifying recovery targets.
-            </p>
-
-            <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3">Standard / Class</th>
-                    <th className="px-4 py-3 text-right">Students Owing</th>
-                    <th className="px-4 py-3 text-right">Outstanding Amount</th>
-                    <th className="px-4 py-3 text-right">Collection Rate</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(ledger?.classes_with_most_pending || []).length > 0 ? (
-                    ledger?.classes_with_most_pending.map((c, i) => (
-                      <tr key={i} className="hover:bg-slate-50 transition">
-                        <td className="px-4 py-2.5 font-bold text-slate-900">{c.standard_name}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-slate-700">{c.students_owing}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-rose-600">{formatRupees(c.outstanding)}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-slate-500">{c.collection_rate || '0%'}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    standards.map((s) => {
-                      const stdId = s.standard_id ?? s.id;
-                      const stdName = s.standard_name ?? s.name;
-                      return (
-                        <tr key={stdId} className="hover:bg-slate-50 transition">
-                          <td className="px-4 py-2.5 font-bold text-slate-900">{stdName}</td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-slate-700">~{(s as any).students_count || 120}</td>
-                          <td className="px-4 py-2.5 text-right font-bold text-rose-600">{formatRupees(44814 * 10)}</td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-slate-500">0%</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 3: DEFAULTERS & EVIDENCE LEDGER ── */}
-      {mainTab === 'ledger' && (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Database className="size-4 text-rose-600" />
-              Live Defaulters & Candidate Ledger (Grounding Evidence)
-            </h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Candidate defaulters extracted by Agent 1 and audited by Agent 2, showing actual line-item balances.
-            </p>
-
-            <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3">Student Name</th>
-                    <th className="px-4 py-3">Enrollment</th>
-                    <th className="px-4 py-3">Standard</th>
-                    <th className="px-4 py-3 text-right">Actual Dues</th>
-                    <th className="px-4 py-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {students.slice(0, 30).map((s) => (
-                    <tr key={s.student_id} className="hover:bg-slate-50 transition">
-                      <td className="px-4 py-2.5 font-bold text-slate-900">{s.name}</td>
-                      <td className="px-4 py-2.5 font-mono text-slate-500">{s.enrollment_no || '—'}</td>
-                      <td className="px-4 py-2.5 font-semibold text-slate-700">{s.standard_name}</td>
-                      <td className="px-4 py-2.5 text-right font-bold text-rose-600">{formatRupees(s.outstanding)}</td>
-                      <td className="px-4 py-2.5 text-center">
-                        <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-700">
-                          Arrears Pending
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 4: AUTOMATED WORKFLOW & ARCHITECTURE (ESO) ── */}
-      {mainTab === 'workflow' && (
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Workflow className="size-4 text-indigo-600" />
-              Executive Skill Object (ESO) & Architecture Specification
-            </h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Formal knowledge, abilities, responsibilities, and quality assertions for each autonomous Fees agent.
-            </p>
-
-            <div className="mt-4 flex flex-wrap gap-2 border-b border-slate-100 pb-4">
-              {(['agent_1', 'agent_2', 'agent_3'] as const).map((agentKey, idx) => {
-                const item = eso?.agents?.[agentKey] || FEES_ESO_FALLBACKS[agentKey];
-                return (
-                  <button
-                    key={agentKey}
-                    type="button"
-                    onClick={() => setEsoActiveTab(agentKey)}
-                    className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
-                      esoActiveTab === agentKey
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    Agent {idx + 1}: {item?.name}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-5">
-              <AgentEsoCard
-                agentKey={esoActiveTab}
-                agentDetail={eso?.agents?.[esoActiveTab]}
-              />
-            </div>
-          </div>
+          {/* ── 4. FINAL RESULTS, STORAGE LOCATIONS & ACTIONS AWAITING APPROVAL ── */}
+          <FeesFinalResultsSection
+            latestReport={latestReport}
+            state={state}
+            dispatchResult={dispatchResult}
+            onOpenApprovalModal={() => {
+              setShowApprovalModal(true);
+              setDispatchResult(null);
+              setDispatchError(null);
+              setConfirmationChecked(false);
+            }}
+          />
         </div>
       )}
 
@@ -2355,13 +2180,12 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
                             </td>
                             <td className="px-4 py-2.5">
                               <span
-                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
-                                  r.status === 'sent'
-                                    ? 'bg-emerald-50 text-emerald-700'
-                                    : r.status === 'failed'
+                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${r.status === 'sent'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : r.status === 'failed'
                                     ? 'bg-rose-50 text-rose-700'
                                     : 'bg-amber-50 text-amber-700'
-                                }`}
+                                  }`}
                               >
                                 {r.status}
                               </span>
@@ -2482,15 +2306,6 @@ export function FeesAgentControlCard({ onValidated, onRan }: FeesAgentControlCar
                       <strong>Audit Guarantee:</strong> Messages are dispatched directly to the student/parent via the school's configured gateway. Zero financial ledger changes will take place.
                     </div>
                   </div>
-
-                  {testModeEnabled && (
-                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-xs text-purple-900 flex items-start gap-2">
-                      <ShieldCheck className="size-4 text-purple-600 shrink-0 mt-0.5" />
-                      <div>
-                        <strong>🧪 Test Mode Active:</strong> Reminders will only be dispatched to <strong>{reminderChannel === 'sms' ? testMobileNumber : testEmailAddress}</strong>. Real student contact information and fee accounts will never be contacted or altered.
-                      </div>
-                    </div>
-                  )}
 
                   {/* Confirmation Checkbox */}
                   <div className="flex items-start gap-2.5 pt-2">

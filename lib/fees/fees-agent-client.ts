@@ -31,6 +31,86 @@ export interface FeesPipelineStep {
   duration_ms: number;
   input: Record<string, unknown>;
   output_summary: Record<string, unknown>;
+  actions?: FeesAction[];
+  output?: Record<string, unknown> & {
+    records_received?: number;
+    records_fetched?: number;
+    records_processed?: number;
+    eligible_count?: number;
+    held_back_count?: number;
+    records_passed?: number;
+    tables_accessed?: string[];
+    input_received?: Record<string, unknown>;
+    candidates?: FeesCandidate[];
+    eligible?: FeesCandidate[];
+    held_back?: FeesCandidate[];
+    recipients?: Array<Record<string, unknown>>;
+    unreachable?: Array<Record<string, unknown>>;
+    recent_receipts_sample?: Array<Record<string, unknown>>;
+    recent_reminders_sample?: Array<Record<string, unknown>>;
+    classes_with_most_pending?: Array<{ standard_name: string; standard_id?: number; outstanding: number; students_owing: number; collection_rate?: string | null }>;
+  };
+}
+
+export interface FeesAgentWorkValue {
+  label: string;
+  value: string | number | null;
+  kind: 'money' | 'count' | 'percent' | 'text';
+}
+
+export interface FeesAgentWorkTable {
+  title: string;
+  columns: string[];
+  kinds: Array<'money' | 'count' | 'text'>;
+  rows: Array<Array<string | number | null>>;
+}
+
+export interface FeesAgentKnowledgeGraphUse {
+  graph: string;
+  queries: number;
+  edges_returned: number;
+  neo4j_hits: number;
+  sql_ontology_hits: number;
+  errors: number;
+  sample_paths: string[];
+  schedule_integrity?: string;
+  cross_module_insights?: number;
+  insight_titles?: string[];
+}
+
+export interface FeesAgentWork {
+  agent: string;
+  did: string;
+  values: FeesAgentWorkValue[];
+  tables: FeesAgentWorkTable[];
+  handed_over: string;
+  knowledge_graph: FeesAgentKnowledgeGraphUse | null;
+}
+
+export interface FeesHandoffStage {
+  stage: number;
+  from_agent: string;
+  to_agent: string;
+  handoff_title: string;
+  input_records: number;
+  processed_records: number;
+  eligible_records?: number;
+  held_back_records?: number;
+  passed_records: number;
+  validation_gate: string;
+  validation_status: string;
+  duration_ms: number;
+  summary: string;
+  agent_work?: FeesAgentWork;
+}
+
+export interface FeesStorageLocations {
+  state_table: string;
+  audit_runs_table: string;
+  dispatch_audit_table: string;
+  sms_log_table: string;
+  logged_run_references?: string[];
+  approval_status?: string;
 }
 
 export interface FeesCandidate {
@@ -38,6 +118,7 @@ export interface FeesCandidate {
   student_name: string | null;
   enrollment_no: string | null;
   class: string | null;
+  standard_name?: string | null;
   outstanding: number;
   actual_outstanding?: number;
   is_custom_amount?: boolean;
@@ -50,6 +131,80 @@ export interface FeesCandidate {
     channel?: string;
     batch?: string;
   };
+  knowledge_graph_path?: string;
+  knowledge_graph_payment_edge?: string;
+  graph_evidence?: Record<string, unknown>;
+}
+
+export interface FeesStudentCollection {
+  student_id: number;
+  student_name: string;
+  enrollment_no: string | null;
+  standard_name: string | null;
+  receipts_count: number;
+  total_paid: number;
+  latest_payment_date: string | null;
+  payment_mode: string;
+}
+
+export interface FeesPaymentModeSummary {
+  mode: string;
+  total_amount: number;
+  receipt_count: number;
+}
+
+export interface FeesSentReminderRecord {
+  reminder_id: number;
+  student_id: number;
+  student_name: string;
+  class: string | null;
+  channel: string;
+  contact_masked: string | null;
+  outstanding: number;
+  status: string;
+  delivery_status: string;
+  sent_at: string;
+}
+
+export interface FeesFinancialAnalytics {
+  total_demand: number;
+  total_collected: number;
+  total_outstanding: number;
+  collection_rate: number;
+  paying_students_count: number;
+  non_paying_students_count: number;
+  total_enrolled_students: number;
+  total_receipts_count: number;
+  student_wise_collections: FeesStudentCollection[];
+  payment_modes: FeesPaymentModeSummary[];
+  reminders_summary: {
+    total_sent: number;
+    total_email_sent: number;
+    total_sms_sent: number;
+    history: FeesSentReminderRecord[];
+  };
+}
+
+export interface FeesKnowledgeGraphCard {
+  id: string;
+  title: string;
+  category: string;
+  severity: string;
+  available: boolean;
+  reason?: string | null;
+  evidence?: Record<string, unknown>;
+}
+
+export interface FeesKnowledgeGraphReasoning {
+  engine: string;
+  cross_module_engine: string;
+  recommendation_engine: string;
+  knowledge_graph_active: boolean;
+  neo4j_hybrid_active: boolean;
+  centralized_kg_tables_used: string[];
+  reasoning_cards: FeesKnowledgeGraphCard[];
+  cross_module_insights: FeesKnowledgeGraphCard[];
+  graph_path_format: string;
 }
 
 export interface FeesPipelineReport {
@@ -92,7 +247,16 @@ export interface FeesPipelineReport {
   evidence_analysis: {
     eligible: FeesCandidate[];
     held_back: FeesCandidate[];
-    collection_in_period: { period: { label?: string } | null; total_collected: number | null; receipts: number | null };
+    evidence_lookups_count?: number;
+    reminder_history_checked?: number;
+    recent_reminders_sample?: Array<Record<string, unknown>>;
+    recent_receipts_sample?: Array<Record<string, unknown>>;
+    collection_in_period: {
+      period: { label?: string } | null;
+      total_collected: number | null;
+      receipts: number | null;
+      by_payment_mode?: Array<Record<string, unknown>>;
+    };
   };
   reminder_draft: {
     attempted: boolean;
@@ -117,13 +281,18 @@ export interface FeesPipelineReport {
       contact_destination?: string;
     }>;
     unreachable: Array<{ student_id: number; name: string; class: string | null; outstanding: number; reason: string }>;
+    sample_subject?: string | null;
     sample_message: string | null;
     warnings: string[];
     fingerprint: string | null;
     sent: number;
     next_action: string;
   };
-  handoffs?: Record<string, { valid: boolean; message?: string; error?: string }>;
+  handoffs?: Record<string, { valid: boolean; message?: string; error?: string; candidates_count?: number; eligible_count?: number; held_back_count?: number }>;
+  handoff_chain?: FeesHandoffStage[];
+  financial_analytics?: FeesFinancialAnalytics;
+  knowledge_graph_reasoning?: FeesKnowledgeGraphReasoning;
+  storage_locations?: FeesStorageLocations;
   pipeline_execution: { steps: FeesPipelineStep[]; gates: FeesGate[] };
 }
 
@@ -134,8 +303,17 @@ export interface FeesPipelineFailure {
   details?: { run_id?: string; gate_1?: FeesGate; gate_2?: FeesGate; gate_3?: FeesGate; steps?: FeesPipelineStep[]; step_result?: FeesStepResult };
 }
 
+export interface FeesAvailableYear {
+  syear: number;
+  label: string;
+  structure_count: number;
+  receipts_count: number;
+  in_academic_year_table?: boolean;
+}
+
 export interface FeesPipelineOptions {
   academic_year?: number;
+  explicit_academic_year?: boolean;
   standard_id?: number;
   student_ids?: number[];
   custom_amounts?: Record<number, number>;
@@ -158,7 +336,11 @@ export interface FeesRecentRun {
   step: number;
   status: string;
   duration_ms: number | null;
+  input?: Record<string, unknown> | null;
+  output?: Record<string, unknown> | null;
   started_at: string | null;
+  finished_at?: string | null;
+  triggered_by?: number | null;
 }
 
 export interface FeesLiveSummaryCounts {
@@ -168,8 +350,23 @@ export interface FeesLiveSummaryCounts {
   collection_rate?: number;
   students_owing?: number;
   defaulters_count?: number;
+  paying_students_count?: number;
+  non_paying_students_count?: number;
+  total_enrolled_students?: number;
+  total_reminders_sent?: number;
+  email_reminders_sent?: number;
+  sms_reminders_sent?: number;
   fee_accounts?: number;
   receipts_count?: number;
+  pending_approvals_count?: number;
+  classes_with_most_pending?: Array<{
+    standard_name: string;
+    standard_id?: number;
+    outstanding: number;
+    students_owing: number;
+    fee_accounts?: number;
+    collection_rate?: string | null;
+  }>;
 }
 
 export interface FeesAgentState {
@@ -197,8 +394,8 @@ export interface FeesEsoAgent {
   role_description: string;
   validation_rules: { gate: string; name: string; rules: string[] };
   database_resources: { primary_tables: string[]; live_metrics: Record<string, number | null> };
-  ek: { summary: string; schemas_and_relationships: string[]; tables_and_sources: string[] };
-  ea: { skills: string[]; capabilities: string[]; constraints_and_safeguards: string[] };
+  ek: { summary: string; schemas_and_relationships: string[]; tables_and_sources: string[]; live_metrics?: Record<string, string | number | null> };
+  ea: { summary?: string; skills: string[]; capabilities: Array<string | { name: string; status?: string; description?: string; handler?: string }>; constraints_and_safeguards: string[] };
   er: { must_do: string[]; must_not_do: string[]; stopping_conditions: string[]; handoff_rules: string; dependencies: string };
   eq: { applicable_gates: string[]; quality_rules: string[]; scoring_formula: string };
   outputs: string;
@@ -282,11 +479,28 @@ export function sessionAcademicYear(context: IntelligenceContext): number | unde
 export interface FeesAgentStateResponse {
   success?: boolean;
   state?: FeesAgentState;
+  sub_institute_id?: number;
+  academic_year?: number | null;
+  academic_year_source?: string;
+  available_years?: FeesAvailableYear[];
+  recent_runs?: FeesRecentRun[];
+  latest_report?: FeesPipelineReport | null;
 }
 
-export async function getFeesAgentState(context: IntelligenceContext): Promise<FeesAgentStateResponse & FeesAgentState> {
-  const year = sessionAcademicYear(context);
-  const res = await fetch(`/api/fees/agent?action=state${year ? `&academic_year=${year}` : ''}`, {
+export async function getFeesAgentState(
+  context: IntelligenceContext,
+  explicitYear?: number | null,
+  includeLatest = true,
+): Promise<FeesAgentStateResponse & FeesAgentState> {
+  const qs = new URLSearchParams({ action: 'state' });
+  if (explicitYear && explicitYear >= 2000 && explicitYear <= 2100) {
+    qs.set('academic_year', String(explicitYear));
+    qs.set('explicit_academic_year', '1');
+  }
+  if (!includeLatest) {
+    qs.set('include_latest', '0');
+  }
+  const res = await fetch(`/api/fees/agent?${qs.toString()}`, {
     method: 'GET',
     headers: headers(context),
     cache: 'no-store',
@@ -339,15 +553,21 @@ export async function runFeesPipeline(
   const res = await fetch('/api/fees/agent', {
     method: 'POST',
     headers: headers(context),
-    body: JSON.stringify({ academic_year: sessionAcademicYear(context), ...options }),
+    body: JSON.stringify(options),
     cache: 'no-store',
   });
   return read<{ report: FeesPipelineReport; server_time: string }>(res);
 }
 
-export async function getFeesEso(context: IntelligenceContext): Promise<{ eso: FeesEso }> {
-  const year = sessionAcademicYear(context);
-  const res = await fetch(`/api/fees/agent?action=eso${year ? `&academic_year=${year}` : ''}`, {
+export async function getFeesEso(
+  context: IntelligenceContext,
+  explicitYear?: number | null,
+): Promise<{ eso: FeesEso }> {
+  const qs = new URLSearchParams({ action: 'eso' });
+  if (explicitYear && explicitYear >= 2000 && explicitYear <= 2100) {
+    qs.set('academic_year', String(explicitYear));
+  }
+  const res = await fetch(`/api/fees/agent?${qs.toString()}`, {
     method: 'GET',
     headers: headers(context),
     cache: 'no-store',
@@ -388,9 +608,11 @@ export async function fetchFeesDefaulterStudents(
   context: IntelligenceContext,
   standardId?: number | 'all',
   limit = 50,
+  explicitYear?: number | null,
 ): Promise<FeesDefaulterStudent[]> {
   const stdParam = standardId && standardId !== 'all' ? `&standard_id=${standardId}` : '';
-  const res = await fetch(`/api/fees/agent?action=students${stdParam}&limit=${limit}`, {
+  const yearParam = explicitYear && explicitYear >= 2000 && explicitYear <= 2100 ? `&academic_year=${explicitYear}` : '';
+  const res = await fetch(`/api/fees/agent?action=students${stdParam}${yearParam}&limit=${limit}`, {
     method: 'GET',
     headers: headers(context),
     cache: 'no-store',
@@ -438,11 +660,12 @@ export interface FeesSendResult {
 export async function sendApprovedFeesReminders(
   context: IntelligenceContext,
   payload: FeesSendPayload,
+  explicitYear?: number | null,
 ): Promise<{ result: FeesSendResult }> {
   const res = await fetch('/api/fees/agent?action=send', {
     method: 'POST',
     headers: headers(context),
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...(explicitYear ? { academic_year: explicitYear } : {}), ...payload }),
     cache: 'no-store',
   });
   return read<{ result: FeesSendResult }>(res);
@@ -502,7 +725,7 @@ export async function runFeesPipelineStep(
   const res = await fetch('/api/fees/agent?action=pipeline', {
     method: 'POST',
     headers: headers(context),
-    body: JSON.stringify({ academic_year: sessionAcademicYear(context), ...options, step, ...(runId ? { run_id: runId } : {}) }),
+    body: JSON.stringify({ ...options, step, ...(runId ? { run_id: runId } : {}) }),
     cache: 'no-store',
   });
   const data = await read<{ report: FeesStepResponse | FeesFinalStepResponse }>(res);

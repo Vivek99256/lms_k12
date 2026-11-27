@@ -468,6 +468,8 @@ export interface PendingApproval {
   subject_id: number | string | null;
   recommendation_id: number | null;
   case_id: number | null;
+  recommendation_title?: string | null;
+  subject_label?: string | null;
   expires_at: string | null;
   created_at: string | null;
 }

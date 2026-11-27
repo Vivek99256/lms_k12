@@ -100,7 +100,9 @@ export function useModuleApprovals(workflowKey: string, onChanged?: () => void) 
             comment: (approval.comment as string | null) ?? null,
             decidedAt: (approval.decided_at as string | null) ?? null,
             runStatus: String(run.status ?? ''),
-            subject: run.subject_entity_key ? `${run.subject_entity_key} #${run.subject_id}` : null,
+            // Only a subject that actually has an id. An entity with a null id is a run that was started
+            // without a record, and printing it as "student #null" presents a gap as if it were a row.
+            subject: run.subject_entity_key && run.subject_id != null ? `${run.subject_entity_key} #${run.subject_id}` : null,
           });
         }
       }

@@ -122,6 +122,9 @@ export function ModuleApprovalQueue({
                         This is the approval waiting for you
                       </p>
                     ) : null}
+                    {approval.recommendation_title ? (
+                      <p className="mb-0.5 text-sm font-semibold text-slate-900">{approval.recommendation_title}</p>
+                    ) : null}
                     <p className="font-semibold">
                       {humanize(approval.workflow_key)}
                       {approval.step_key ? ` — ${humanize(approval.step_key)}` : ''}
@@ -134,9 +137,11 @@ export function ModuleApprovalQueue({
                       </dd>
                       <dt className="text-slate-500">About</dt>
                       <dd>
-                        {approval.subject_entity_key
-                          ? `${humanize(approval.subject_entity_key)} #${approval.subject_id}`
-                          : `The whole school (no single record selected)`}
+                        {approval.subject_id != null && approval.subject_entity_key
+                          ? approval.subject_label
+                            ? `${approval.subject_label} (${humanize(approval.subject_entity_key)} #${approval.subject_id})`
+                            : `${humanize(approval.subject_entity_key)} #${approval.subject_id}`
+                          : 'No student or record is attached to this approval (it was started without one)'}
                       </dd>
                       <dt className="text-slate-500">Who can approve</dt>
                       <dd>

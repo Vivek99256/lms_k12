@@ -1,40 +1,15 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-
-import { FeesAgentControlCard } from '@/app/fees/ai-stack/_screens/fees-agent-control-card';
-import { AgentManagement } from '@/app/enterprise-brain/automation/agents/_components/AgentManagement';
+import { AiStackAutomationsScreen } from '@/app/_components/ai-stack/automations-screen';
+import { FEES_AI_STACK } from '@/lib/fees/fees-ai-module';
 
 /**
  * Fees → AI Stack → Automations.
  *
- * The same two parts Teach/Learn's Automations screen is made of, and nothing else:
- *
- *   1. The module's sequential agent pipeline (Agent 1 ➔ Agent 2 ➔ Agent 3), each agent behind
- *      its own quality gate, shown agent by agent with what it does, what it ran, how it was
- *      tested, what it produced and what happens next.
- *   2. The shared Agent Management console scoped to `fees` — Agentic library, Agent dashboard,
- *      Create agent, Run log and Analysis — where every pipeline step is recorded.
- *
- * This file owns no agent logic. The pipeline runs on the backend; the console is the central
- * `AgentManagement` component, the same one Teach/Learn and Exam & Assessment mount.
+ * Same layout as the other modules: the live database-grounded Fees pipeline (Agent 1 ➔ 2 ➔ 3),
+ * then "Fees tool agents" and "Fees agent management", both fetched from the central Agent
+ * Management engine scoped to module = fees.
  */
-
-const MODULE = 'fees';
-
 export function FeesAutomationsScreen() {
-  // Remounts the console after a pipeline run so its Run Log and Analysis pick up the new steps.
-  const [consoleKey, setConsoleKey] = useState(0);
-  const refresh = useCallback(() => setConsoleKey((key) => key + 1), []);
-
-  return (
-    <div className="space-y-6">
-      <FeesAgentControlCard onRan={refresh} />
-
-      <div>
-        <h3 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">Fees agent management</h3>
-        <AgentManagement key={consoleKey} moduleFilter={MODULE} embedded />
-      </div>
-    </div>
-  );
+  return <AiStackAutomationsScreen module={FEES_AI_STACK} />;
 }
