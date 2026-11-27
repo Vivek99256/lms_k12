@@ -6,15 +6,13 @@ import {
   ArrowDown,
   ArrowUp,
   Brain,
-  CheckCircle2,
-  DollarSign,
   Eye,
   FileCheck,
+  Loader2,
   Lock,
   MessageSquare,
   Plus,
   Save,
-  Send,
   ShieldAlert,
   Sparkles,
   Trash2,
@@ -612,24 +610,50 @@ function ApproverPreview({ approverType }: { approverType: 'reporting_manager' |
   );
 }
 
+function inr(amount: number): string {
+  return '₹' + Math.round(amount).toLocaleString('en-IN');
+}
+
+/** Every card's content for one of the two states a real signal can be in. */
+function Unavailable({ reason }: { reason: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-500 flex items-center gap-1.5">
+      <AlertTriangle size={13} className="text-slate-400 shrink-0" />
+      <span>{reason}</span>
+    </div>
+  );
+}
+
 /**
- * Knowledge Graph Intelligence Widget for Fees Module:
- * Shows live family/sibling graph insights, risk evaluation, and smart recommendations.
+ * Fees Intelligence Widget for the Fees module:
+ * Tenant-wide signals — sibling families, a bounded defaulter sample, real
+ * channel engagement, TC no-dues clearance and the concession/refund queue.
+ * There is no selected student on this screen, so these are aggregates, not
+ * one learner's figures — see FeesIntelligenceData for what each section
+ * means and why `available: false` is a real answer, not a loading state.
+ *
+ * Fetched lazily on first expand, not on mount: the defaulter and TC sections
+ * each run several real per-student fee lookups server-side (20-30s cold),
+ * so this should only run when someone actually asks to see it. The backend
+ * caches the result for 15 minutes per tenant, so repeat opens are instant.
  */
 function FeesKgIntelligenceWidget() {
   const [data, setData] = useState<FeesIntelligenceData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    if (!expanded || data !== null) return;
     let cancelled = false;
     setLoading(true);
+    setError('');
     fetchFeesIntelligence()
       .then((res) => {
         if (!cancelled) setData(res);
       })
-      .catch(() => {
-        // quiet fallback
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof PlatformApiError ? err.message : 'Could not load fees intelligence.');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -637,7 +661,11 @@ function FeesKgIntelligenceWidget() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // `loading` is deliberately not a dependency: it is only set inside this
+    // effect, so including it would re-run the effect on every loading-state
+    // flip for no reason — exactly the cascading-render pattern this hook
+    // warns about. Re-entry is already prevented by `data !== null`.
+  }, [expanded, data]);
 
   return (
     <div className="mb-4 overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-white p-4 shadow-sm">
@@ -648,11 +676,11 @@ function FeesKgIntelligenceWidget() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h4 className="text-sm font-semibold text-slate-800">Knowledge Graph Intelligence</h4>
-              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700">Live Graph Signals</span>
+              <h4 className="text-sm font-semibold text-slate-800">Fees Intelligence</h4>
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700">Live Signals</span>
             </div>
             <p className="text-xs text-slate-500">
-              Cross-entity family links, automatic sibling concession detection, and defaulter prediction.
+              Sibling families, real fee arrears, channel engagement and the concession/refund queue — computed from this institute&apos;s own records.
             </p>
           </div>
         </div>
@@ -661,96 +689,142 @@ function FeesKgIntelligenceWidget() {
           onClick={() => setExpanded(!expanded)}
           className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 shadow-xs hover:bg-indigo-50"
         >
-          {expanded ? 'Hide Insights' : 'View Graph Insights'}
+          {expanded ? 'Hide Insights' : 'View Insights'}
         </button>
       </div>
 
       {expanded && (
-        <div className="mt-4 grid grid-cols-1 gap-3 pt-3 border-t border-indigo-100/70 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-              <Users size={14} className="text-indigo-600" />
-              <span>Family & Sibling Graph</span>
+        <div className="mt-4 pt-3 border-t border-indigo-100/70">
+          {loading && (
+            <div className="flex items-center gap-2 py-6 justify-center text-xs text-slate-500">
+              <Loader2 size={14} className="animate-spin" />
+              <span>Checking the live fee ledger for every signal below — this can take up to 30 seconds the first time.</span>
             </div>
-            <p className="text-[11px] text-slate-500 mb-2">
-              Automatically discovers siblings via shared Parent nodes to apply multi-child discounts without manual lookup.
-            </p>
-            <div className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 flex items-center gap-1.5">
-              <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-              <span>Sibling Concession Rule: <strong>15% Active</strong></span>
-            </div>
-          </div>
+          )}
 
-          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-              <AlertTriangle size={14} className="text-amber-500" />
-              <span>Defaulter Risk Engine</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mb-2">
-              Correlates attendance, past dues, and parent communication engagement to predict overdue risk 15 days early.
-            </p>
-            <div className="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[11px] text-indigo-800">
-              Risk Level: <strong className="text-emerald-700">Normal (Low Risk)</strong>
-            </div>
-          </div>
+          {!loading && error && (
+            <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>
+          )}
 
-          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-              <Brain size={14} className="text-purple-600" />
-              <span>Smart Approval Scrutiny</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mb-2">
-              Evaluates student academic merit and financial eligibility to auto-recommend approval percentages to Trustees.
-            </p>
-            <div className="rounded-lg bg-purple-50 px-2.5 py-1.5 text-[11px] text-purple-800">
-              Next Step: <strong>Auto-fill in Concession Flow</strong>
-            </div>
-          </div>
+          {!loading && !error && data && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                  <Users size={14} className="text-indigo-600" />
+                  <span>Family & Sibling Groups</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  Students who share a guardian contact number with another enrolled student — the sibling-concession candidates.
+                </p>
+                {data.siblings.available ? (
+                  <div className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 space-y-0.5">
+                    <div><strong>{data.siblings.family_groups}</strong> family groups, <strong>{data.siblings.students_in_groups}</strong> students</div>
+                    <div>{data.siblings.already_applied} already have a discount applied &middot; {data.siblings.pending} do not yet</div>
+                  </div>
+                ) : (
+                  <Unavailable reason={data.siblings.reason} />
+                )}
+              </div>
 
-          {/* New Feature 1: Intelligent Payment Routing */}
-          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-              <MessageSquare size={14} className="text-emerald-600" />
-              <span>Intelligent Channel Routing</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mb-2">
-              Discovers which channel (WhatsApp vs SMS vs Email) parents open fastest to ensure higher fee conversion.
-            </p>
-            <div className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 flex items-center justify-between">
-              <span>Channel: <strong className="uppercase">{data?.notification_channel_routing?.recommended_channel ?? 'WhatsApp'}</strong></span>
-              <span className="font-semibold text-emerald-700">{data?.notification_channel_routing?.confidence ?? 94}% Open Rate</span>
-            </div>
-          </div>
+              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                  <AlertTriangle size={14} className="text-amber-500" />
+                  <span>Largest Fee Arrears</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  The highest-balance accounts right now, read from the same calculation the Fees screen itself uses.
+                </p>
+                {data.defaulter_risk.available ? (
+                  <div className="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[11px] text-indigo-800 space-y-0.5">
+                    <div><strong>{inr(data.defaulter_risk.total_outstanding)}</strong> outstanding across {data.defaulter_risk.defaulter_count} of {data.defaulter_risk.students_checked} checked</div>
+                    <div className="text-indigo-600">
+                      {data.defaulter_risk.truncated
+                        ? `worst-balance sample of ${data.defaulter_risk.cohort_size} enrolled`
+                        : `covers the whole cohort (${data.defaulter_risk.cohort_size})`}
+                    </div>
+                  </div>
+                ) : (
+                  <Unavailable reason={data.defaulter_risk.reason} />
+                )}
+              </div>
 
-          {/* New Feature 2: Value-based Dynamic Escalation */}
-          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-              <ShieldAlert size={14} className="text-amber-600" />
-              <span>Hierarchy-based Escalation</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mb-2">
-              Concessions &le; ₹5,000 clear at Accounts/Clerk level; large waivers &gt; ₹25,000 auto-escalate directly to Trustees.
-            </p>
-            <div className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900 flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-              <span>Threshold: <strong>&gt; ₹25k ➔ Trustee Escalation</strong></span>
-            </div>
-          </div>
+              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                  <Brain size={14} className="text-purple-600" />
+                  <span>Concession / Refund Queue</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  Requests currently awaiting sign-off, classified against the ₹5k / ₹25k escalation rule.
+                </p>
+                {data.concession_queue.available ? (
+                  data.concession_queue.pending_count > 0 ? (
+                    <div className="rounded-lg bg-purple-50 px-2.5 py-1.5 text-[11px] text-purple-800 space-y-0.5">
+                      <div><strong>{data.concession_queue.pending_count}</strong> pending</div>
+                      <div>{data.concession_queue.escalated_to_trustee} need Trustee sign-off</div>
+                    </div>
+                  ) : (
+                    <Unavailable reason="No concession or refund requests are pending right now." />
+                  )
+                ) : (
+                  <Unavailable reason={data.concession_queue.reason} />
+                )}
+              </div>
 
-          {/* New Feature 3: Automated No-Dues Clearance for TC */}
-          <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-              <FileCheck size={14} className="text-blue-600" />
-              <span>Automated "No Dues" for TC</span>
+              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                  <MessageSquare size={14} className="text-emerald-600" />
+                  <span>Channel Engagement</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  Real delivery/read and reply rates from the last 90 days, not a tracked SMS/Email channel (none exists here yet).
+                </p>
+                {data.notification_channel_routing.available ? (
+                  <div className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 space-y-0.5">
+                    {data.notification_channel_routing.channels.whatsapp && (
+                      <div>WhatsApp: <strong>{data.notification_channel_routing.channels.whatsapp.read_rate}%</strong> read of {data.notification_channel_routing.channels.whatsapp.sent} sent</div>
+                    )}
+                    {data.notification_channel_routing.channels.direct_message && (
+                      <div>Direct messages: <strong>{data.notification_channel_routing.channels.direct_message.reply_rate}%</strong> replied of {data.notification_channel_routing.channels.direct_message.sent} sent</div>
+                    )}
+                  </div>
+                ) : (
+                  <Unavailable reason={data.notification_channel_routing.reason} />
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                  <FileCheck size={14} className="text-blue-600" />
+                  <span>TC &quot;No Dues&quot; Clearance</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  Transfer Certificate applications awaiting Accounts sign-off, checked against each student&apos;s real fee balance.
+                </p>
+                {data.tc_no_dues.available ? (
+                  data.tc_no_dues.pending_applications > 0 ? (
+                    <div className="rounded-lg bg-blue-50 px-2.5 py-1.5 text-[11px] text-blue-800 space-y-0.5">
+                      <div><strong>{data.tc_no_dues.clear_for_auto_approval}</strong> of {data.tc_no_dues.pending_applications} can auto-clear (₹0 due)</div>
+                      <div>{data.tc_no_dues.has_dues} still owe money</div>
+                    </div>
+                  ) : (
+                    <Unavailable reason="No TC applications are awaiting clearance right now." />
+                  )
+                ) : (
+                  <Unavailable reason={data.tc_no_dues.reason} />
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs flex flex-col justify-center">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                  <ShieldAlert size={14} className="text-amber-600" />
+                  <span>Escalation Rule</span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Concessions &le; ₹5,000 clear at Accounts; &gt; ₹25,000 require Trustee sign-off. Applied to the queue above — not yet auto-enforced by the approval engine itself.
+                </p>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-500 mb-2">
-              Cross-checks student fee ledger on TC application; if balance is ₹0, Accounts step is instantly AUTO-APPROVED.
-            </p>
-            <div className="rounded-lg bg-blue-50 px-2.5 py-1.5 text-[11px] text-blue-800 flex items-center gap-1.5">
-              <CheckCircle2 size={13} className="text-blue-600 shrink-0" />
-              <span>Auto-Approval: <strong>Active (Zero Dues)</strong></span>
-            </div>
-          </div>
+          )}
         </div>
       )}
     </div>
