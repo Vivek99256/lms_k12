@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
   ArrowUpDown,
@@ -16,6 +17,7 @@ import {
 
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
+import { RequestConcessionDialog } from '@/app/platform-services/workflow/_components/fees-intelligence/RequestConcessionDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +36,8 @@ import {
   type DropdownValue,
   type SearchDropdownValues,
 } from '@/components/search-dropdown';
+import { fetchConcessionGrant, fetchConcessionRequests, PlatformApiError } from '@/lib/platform/client';
+import type { ConcessionGrant, ConcessionRequestRow } from '@/lib/platform/types';
 import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type SessionContext = {
@@ -99,7 +103,11 @@ const currencyFormatter = new Intl.NumberFormat('en-IN', {
 });
 
 export default function FeesCancelRefundPage() {
-  const [activeTab, setActiveTab] = useState<'cancel' | 'refund'>('cancel');
+  const searchParams = useSearchParams();
+  const initialTab = searchParams?.get('tab') === 'refund' ? 'refund' : 'cancel';
+  const initialGrantParam = searchParams?.get('grant') ?? '';
+  const initialGrantId = Number(initialGrantParam) > 0 ? Number(initialGrantParam) : null;
+  const [activeTab, setActiveTab] = useState<'cancel' | 'refund'>(initialTab);
   const [session] = useState(getSessionContext);
   const [academicFilters, setAcademicFilters] = useState<Partial<SearchDropdownValues>>({
     section: '',
@@ -590,7 +598,7 @@ export default function FeesCancelRefundPage() {
               </div>
             </div>
           ) : (
-            <RefundWorkflow session={session} />
+            <RefundWorkflow session={session} initialGrantId={initialGrantId} />
           )}
         </section>
       </div>
@@ -725,7 +733,7 @@ function PaymentModeBadge({ row }: { row: CancelReceiptRow }) {
 
 type RefundHead = { label: string; amount: number };
 
-function RefundWorkflow({ session }: { session: SessionContext }) {
+function RefundWorkflow({ session, initialGrantId }: { session: SessionContext; initialGrantId?: number | null }) {
   const [enrollment, setEnrollment] = useState('');
   const [students, setStudents] = useState<Array<{ student_id: string; student_name: string; enrollment_no: string }>>([]);
   const [student, setStudent] = useState<{ student_id: string; enrollment: string; name: string } | null>(null);
@@ -736,6 +744,18 @@ function RefundWorkflow({ session }: { session: SessionContext }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const baseUrl = getApiBaseUrl(session);
+
+  // Approval plumbing. `appliedGrant` is the grant this receipt's amounts
+  // were drawn from (so `save()` can post `concession_grant_id` alongside
+  // the unchanged save-refund call); `grantToApply` is a grant that has been
+  // fetched but is waiting for its student's fee heads to finish loading
+  // before its amounts can be merged in — `loadDetail` is async and resets
+  // `heads`, so the merge has to happen after that settles, not inline with
+  // the fetch.
+  const [pendingGrants, setPendingGrants] = useState<ConcessionRequestRow[]>([]);
+  const [appliedGrant, setAppliedGrant] = useState<ConcessionGrant | null>(null);
+  const [grantToApply, setGrantToApply] = useState<ConcessionGrant | null>(null);
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
   const headers = () => ({ Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}) });
   const context = () => ({ sub_institute_id: session.subInstituteId, syear: session.academicYearId, user_id: session.userId });
@@ -753,7 +773,7 @@ function RefundWorkflow({ session }: { session: SessionContext }) {
     } catch (error) { setStudents([]); setNotice({ type: 'error', text: error instanceof Error ? error.message : 'Refund search failed.' }); } finally { setBusy(false); }
   };
 
-  const loadDetail = async (id: string) => {
+  const loadDetail = useCallback(async (id: string) => {
     setBusy(true); setNotice(null);
     try {
       const response = await fetch(`${baseUrl}/api/fees-refund/detail/${encodeURIComponent(id)}`, { method: 'POST', headers: headers(), body: new URLSearchParams(context()) });
@@ -763,13 +783,63 @@ function RefundWorkflow({ session }: { session: SessionContext }) {
       const nextStudent = asRecord(payload.student);
       setHeads(nextHeads); setAmounts(Object.fromEntries(Object.entries(nextHeads).map(([key, value]) => [key, String(value.amount)]))); setStudent({ student_id: readString(nextStudent.student_id) || id, enrollment: readString(nextStudent.enrollment), name: readString(nextStudent.name) });
     } catch (error) { setNotice({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load refund detail. Try again." }); } finally { setBusy(false); }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseUrl, session]);
+
+  // `?grant=<id>` on this page: fetch the grant, then load ITS student's
+  // refund detail directly — the operator never has to know the enrollment
+  // number to pick up an approved payout from the queue's "Pay out refund"
+  // link.
+  useEffect(() => {
+    if (!initialGrantId) return;
+    fetchConcessionGrant(initialGrantId)
+      .then((grant) => {
+        setGrantToApply(grant);
+        return loadDetail(String(grant.student_id));
+      })
+      .catch((cause) => {
+        setNotice({ type: 'error', text: cause instanceof PlatformApiError ? cause.message : "Couldn't load the approved refund." });
+      });
+  }, [initialGrantId, loadDetail]);
+
+  // The fee heads only exist once `loadDetail` resolves, so the grant's
+  // amounts are merged in here, after `heads` actually has entries — never
+  // increased past what `heads` says is still refundable for that head.
+  useEffect(() => {
+    if (!grantToApply || !grantToApply.refund_heads || Object.keys(heads).length === 0) return;
+    setAmounts((current) => {
+      const next = { ...current };
+      for (const [key, grantAmount] of Object.entries(grantToApply.refund_heads!)) {
+        const cap = heads[key]?.amount ?? grantAmount;
+        next[key] = String(Math.min(grantAmount, cap));
+      }
+      return next;
+    });
+    setAppliedGrant(grantToApply);
+    setGrantToApply(null);
+  }, [grantToApply, heads]);
+
+  // Approved refunds for the currently loaded student that have not yet been
+  // paid out — so the operator sees them without having to know a grant id.
+  useEffect(() => {
+    if (!student) {
+      setPendingGrants([]);
+      return;
+    }
+    fetchConcessionRequests({ kind: 'refund', state: 'approved_pending_application', student_id: Number(student.student_id) })
+      .then(setPendingGrants)
+      .catch(() => setPendingGrants([]));
+  }, [student]);
 
   const save = async () => {
     if (!student) return;
     const form = new URLSearchParams({ ...context(), student_id: student.student_id, enrollment: student.enrollment, PAYMENT_MODE: paymentMode, receiptdate: new Date().toISOString().slice(0, 10), refund_remark: remark });
     Object.entries(amounts).forEach(([key, value]) => { if (readNumber(value) > 0) form.set(`refund_amount[${key}]`, value); });
     if (![...form.keys()].some((key) => key.startsWith('refund_amount['))) { setNotice({ type: 'error', text: 'Enter at least one refund amount.' }); return; }
+    // Grant mode changes nothing about this call except naming which grant
+    // the payout came from — the save-refund endpoint and its validation are
+    // completely unchanged for the ordinary, no-grant path.
+    if (appliedGrant) form.set('concession_grant_id', String(appliedGrant.id));
     setBusy(true); setNotice(null);
     try {
       const response = await fetch(`${baseUrl}/api/fees-refund/save`, { method: 'POST', headers: headers(), body: form });
@@ -779,12 +849,117 @@ function RefundWorkflow({ session }: { session: SessionContext }) {
     } catch (error) { setNotice({ type: 'error', text: error instanceof Error ? error.message : "Couldn't save refund. Try again." }); } finally { setBusy(false); }
   };
 
+  const refundHeadsForDialog: Record<string, { label: string; amount: number }> = Object.fromEntries(
+    Object.entries(heads).map(([key, head]) => [key, { label: head.label, amount: head.amount }] as const),
+  );
+  const initialAmountsForDialog: Record<string, number> = Object.fromEntries(
+    Object.entries(amounts).map(([key, value]) => [key, readNumber(value)] as const),
+  );
+
   return (
     <div className="space-y-4 p-4">
       <div className="grid gap-3 md:grid-cols-[1fr_auto]"><Input value={enrollment} onChange={(event) => setEnrollment(event.target.value)} placeholder="Enter enrollment number" /><Button type="button" onClick={search} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Search student</Button></div>
       {notice ? <InlineMessage type={notice.type} text={notice.text} /> : null}
       {students.length > 0 ? <div className="flex flex-wrap gap-2">{students.map((row) => <Button key={row.student_id} type="button" variant="outline" onClick={() => loadDetail(row.student_id)} disabled={busy}>{row.enrollment_no} — {row.student_name}</Button>)}</div> : null}
-      {student ? <div className="space-y-4 rounded-lg border border-slate-200 p-4"><div><h2 className="text-sm font-bold text-slate-950">Refund for {student.name}</h2><p className="text-xs text-slate-600">{student.enrollment}</p></div><div className="grid gap-3 md:grid-cols-2">{Object.entries(heads).map(([key, head]) => <Field key={key} label={`${head.label} (paid: ${currencyFormatter.format(head.amount)})`}><Input type="number" min="0" max={head.amount} value={amounts[key] ?? ''} onChange={(event) => setAmounts((current) => ({ ...current, [key]: event.target.value }))} /></Field>)}</div><div className="grid gap-3 md:grid-cols-2"><Field label="Payment mode"><select className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" value={paymentMode} onChange={(event) => setPaymentMode(event.target.value)}><option>Cash</option><option>Cheque</option><option>Bank Transfer</option></select></Field><Field label="Refund remark" assist={<AiFieldAssistant value={remark} onApply={setRemark} fieldType="notes" label="Refund remark" module="fees" page="Fees cancel / refund" entityType="fees_refund" related={{ Student: student.name, Enrollment: student.enrollment, 'Payment mode': paymentMode }} />}><Textarea value={remark} onChange={(event) => setRemark(event.target.value)} /></Field></div><Button type="button" onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />} Save refund</Button></div> : null}
+      {student ? (
+        <div className="space-y-4 rounded-lg border border-slate-200 p-4">
+          <div>
+            <h2 className="text-sm font-bold text-slate-950">Refund for {student.name}</h2>
+            <p className="text-xs text-slate-600">{student.enrollment}</p>
+          </div>
+
+          {appliedGrant && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              Amounts pre-filled from approved refund request #{appliedGrant.run_id} — capped at what that request approved.
+            </div>
+          )}
+
+          {!appliedGrant && pendingGrants.filter((row) => row.grant_id != null).length > 0 && (
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
+              <p className="font-medium">Approved refunds awaiting payout</p>
+              <ul className="mt-1 space-y-1">
+                {pendingGrants.filter((row) => row.grant_id != null).map((row) => (
+                  <li key={row.run_id} className="flex items-center justify-between gap-2">
+                    <span>#{row.run_id} {row.amount != null ? `· ${currencyFormatter.format(row.amount)}` : ''}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fetchConcessionGrant(row.grant_id!).then(setGrantToApply).catch(() => setNotice({ type: 'error', text: "Couldn't load that approved refund." }))}
+                    >
+                      Use this grant
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {Object.entries(heads).map(([key, head]) => (
+              <Field key={key} label={`${head.label} (paid: ${currencyFormatter.format(head.amount)})`}>
+                <Input
+                  type="number"
+                  min="0"
+                  max={head.amount}
+                  value={amounts[key] ?? ''}
+                  onChange={(event) => setAmounts((current) => ({ ...current, [key]: event.target.value }))}
+                />
+              </Field>
+            ))}
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Payment mode">
+              <select className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" value={paymentMode} onChange={(event) => setPaymentMode(event.target.value)}>
+                <option>Cash</option>
+                <option>Cheque</option>
+                <option>Bank Transfer</option>
+              </select>
+            </Field>
+            <Field
+              label="Refund remark"
+              assist={
+                <AiFieldAssistant
+                  value={remark}
+                  onApply={setRemark}
+                  fieldType="notes"
+                  label="Refund remark"
+                  module="fees"
+                  page="Fees cancel / refund"
+                  entityType="fees_refund"
+                  related={{ Student: student.name, Enrollment: student.enrollment, 'Payment mode': paymentMode }}
+                />
+              }
+            >
+              <Textarea value={remark} onChange={(event) => setRemark(event.target.value)} />
+            </Field>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" onClick={save} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />} Save refund
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setSubmitDialogOpen(true)} disabled={busy || Object.keys(heads).length === 0}>
+              Submit for approval
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {student && (
+        <RequestConcessionDialog
+          open={submitDialogOpen}
+          onClose={() => setSubmitDialogOpen(false)}
+          onSuccess={() => {
+            setSubmitDialogOpen(false);
+            setNotice({ type: 'success', text: 'Submitted for approval.' });
+          }}
+          studentId={Number(student.student_id)}
+          studentName={student.name}
+          kind="refund"
+          refundHeads={refundHeadsForDialog}
+          initialAmounts={initialAmountsForDialog}
+        />
+      )}
     </div>
   );
 }

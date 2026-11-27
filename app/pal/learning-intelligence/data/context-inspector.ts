@@ -156,6 +156,7 @@ export interface UnifiedLearnerContextGraph {
     nodes: any[];
     edges: any[];
     chapters?: any[];
+    topics?: any[];
     stats?: any;
     root_blockers: Array<{ id: number; name: string; mastery: number; gate: number; depth: number }>;
   };

@@ -2,10 +2,12 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowDown,
   ArrowUp,
   Brain,
+  CheckCircle2,
   Eye,
   FileCheck,
   Loader2,
@@ -31,6 +33,7 @@ import {
   updateWorkflow,
 } from '@/lib/platform/client';
 import type {
+  ConcessionKind,
   FeesIntelligenceData,
   RegistryOption,
   WorkflowApproverPreview,
@@ -55,6 +58,12 @@ import {
   Switch,
   usePlatformRegistry,
 } from '../../_components/shell';
+import { ArrearsRankedPanel } from './fees-intelligence/ArrearsRankedPanel';
+import { ConcessionQueuePanel } from './fees-intelligence/ConcessionQueuePanel';
+import { EscalationReportPanel } from './fees-intelligence/EscalationReportPanel';
+import { FamilyGroupsPanel } from './fees-intelligence/FamilyGroupsPanel';
+import { RequestConcessionDialog } from './fees-intelligence/RequestConcessionDialog';
+import { StepLadder } from './StepLadder';
 
 /**
  * Workflow — module and component-wise approval configuration.
@@ -520,33 +529,6 @@ function ChainRow({
   );
 }
 
-/** The chain as a readable ladder — the shape somebody checks at a glance. */
-function StepLadder({ steps, approverTypes }: { steps: WorkflowStep[]; approverTypes: RegistryOption[] }) {
-  if (!steps.length) {
-    return <p className="mt-1.5 text-xs text-amber-700">No steps — this chain would approve everything it touched.</p>;
-  }
-
-  const labelFor = (step: WorkflowStep) => {
-    const type = approverTypes.find((option) => option.key === step.approver_type);
-    return step.approver || type?.label || step.approver_type;
-  };
-
-  return (
-    <ol className="mt-2 flex flex-wrap items-center gap-1.5">
-      {steps.map((step, index) => (
-        <li key={step.id} className="flex items-center gap-1.5">
-          {index > 0 && <span className="text-slate-300">→</span>}
-          <span className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-700">
-            <span className="font-medium">{step.name}</span>
-            <span className="text-slate-500"> · {labelFor(step)}</span>
-            {step.sla_hours > 0 && <span className="text-slate-400"> · {step.sla_hours}h</span>}
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 // ── The editor ──────────────────────────────────────────────────────────────
 
 /** A step with everything filled in, so the form never binds to undefined. */
@@ -614,6 +596,43 @@ function inr(amount: number): string {
   return '₹' + Math.round(amount).toLocaleString('en-IN');
 }
 
+/**
+ * Risk tiers for an amount, reusing the SAME ₹5,000 / ₹25,000 boundaries the
+ * Escalation Rule card shows (FeesEscalationReportService::classify()) —
+ * an account above ₹25,000 is already the amount that would need Trustee
+ * sign-off if a concession were requested against it, so calling it "high
+ * risk" here is the same rule, not a second, competing threshold scheme.
+ */
+type RiskTier = 'high' | 'medium' | 'low';
+
+function riskTier(amount: number): RiskTier {
+  if (amount > 25000) return 'high';
+  if (amount > 5000) return 'medium';
+  return 'low';
+}
+
+const RISK_TONE: Record<RiskTier, 'red' | 'amber' | 'green'> = { high: 'red', medium: 'amber', low: 'green' };
+const RISK_LABEL: Record<RiskTier, string> = { high: 'High', medium: 'Medium', low: 'Low' };
+const RISK_ICON: Record<RiskTier, typeof AlertTriangle> = { high: AlertTriangle, medium: AlertCircle, low: CheckCircle2 };
+
+/**
+ * A risk-tier pill with its own icon, not colour alone — a red-green
+ * distinction that relies only on hue is invisible to colour-blind readers,
+ * and the icon shape (triangle / circle-with-dot / check) carries the same
+ * meaning on its own.
+ */
+function RiskBadge({ tier, children }: { tier: RiskTier; children: React.ReactNode }) {
+  const Icon = RISK_ICON[tier];
+  return (
+    <span className="animate-in zoom-in-75 fade-in-0 [--tw-animation-duration:250ms] inline-flex">
+      <Pill tone={RISK_TONE[tier]}>
+        <Icon size={11} className="shrink-0" />
+        {children}
+      </Pill>
+    </span>
+  );
+}
+
 /** Every card's content for one of the two states a real signal can be in. */
 function Unavailable({ reason }: { reason: string }) {
   return (
@@ -637,11 +656,19 @@ function Unavailable({ reason }: { reason: string }) {
  * so this should only run when someone actually asks to see it. The backend
  * caches the result for 15 minutes per tenant, so repeat opens are instant.
  */
+type FeesPanelKey = 'families' | 'arrears' | 'queue' | 'escalation';
+
 function FeesKgIntelligenceWidget() {
   const [data, setData] = useState<FeesIntelligenceData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(false);
+
+  const [activePanel, setActivePanel] = useState<FeesPanelKey | null>(null);
+  const [focusAnchor, setFocusAnchor] = useState<number | null>(null);
+  const [dialogTarget, setDialogTarget] = useState<{ studentId: number; studentName: string; kind: ConcessionKind } | null>(null);
+  /** Bumped after a successful request or decision so the open drill-down (and the tenant summary) refetches. */
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     if (!expanded || data !== null) return;
@@ -667,11 +694,36 @@ function FeesKgIntelligenceWidget() {
     // warns about. Re-entry is already prevented by `data !== null`.
   }, [expanded, data]);
 
+  /**
+   * A quiet background refetch of the tenant summary — used after a request
+   * is submitted or a decision is recorded, so the six cards' own numbers
+   * (pending counts, "already applied", etc.) catch up without flashing the
+   * whole widget back to its loading state the way the first load does.
+   */
+  const reloadSummary = useCallback(() => {
+    fetchFeesIntelligence()
+      .then(setData)
+      .catch(() => {
+        /* keep showing the last good summary rather than blanking it on a transient refresh failure */
+      });
+  }, []);
+
+  const bumpRefresh = useCallback(() => {
+    setRefreshToken((token) => token + 1);
+    reloadSummary();
+  }, [reloadSummary]);
+
+  const openConcessionDialog = useCallback((studentId: number, studentName: string) => {
+    setDialogTarget({ studentId, studentName, kind: 'concession' });
+  }, []);
+
+  const chainActiveConcession = data?.concession_queue.available ? data.concession_queue.chain_active.concession : false;
+
   return (
-    <div className="mb-4 overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-white p-4 shadow-sm">
+    <div className="animate-in fade-in-0 [--tw-animation-duration:400ms] mb-4 overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-white p-4 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm ring-4 ring-indigo-100/70">
             <Sparkles size={16} />
           </div>
           <div>
@@ -687,7 +739,7 @@ function FeesKgIntelligenceWidget() {
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 shadow-xs hover:bg-indigo-50"
+          className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 shadow-xs transition-all hover:bg-indigo-50 hover:shadow-sm active:scale-95"
         >
           {expanded ? 'Hide Insights' : 'View Insights'}
         </button>
@@ -707,126 +759,378 @@ function FeesKgIntelligenceWidget() {
           )}
 
           {!loading && !error && data && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-                  <Users size={14} className="text-indigo-600" />
-                  <span>Family & Sibling Groups</span>
-                </div>
-                <p className="text-[11px] text-slate-500 mb-2">
-                  Students who share a guardian contact number with another enrolled student — the sibling-concession candidates.
-                </p>
-                {data.siblings.available ? (
-                  <div className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 space-y-0.5">
-                    <div><strong>{data.siblings.family_groups}</strong> family groups, <strong>{data.siblings.students_in_groups}</strong> students</div>
-                    <div>{data.siblings.already_applied} already have a discount applied &middot; {data.siblings.pending} do not yet</div>
+            <>
+              {/*
+                Two separate grid rows, each followed immediately by its own
+                drill-down panel(s) — not one grid of all six cards with every
+                panel pooled below it. A panel used to render after the WHOLE
+                grid regardless of which card opened it, so opening row 1's
+                "Family & Sibling Groups" panel appeared below row 2 too,
+                forcing a scroll past cards the operator never touched. Now
+                each row's expand target lands right under that same row.
+              */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="animate-in fade-in-0 slide-in-from-bottom-2 [--tw-animation-duration:350ms] [animation-fill-mode:backwards] rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs transition-all duration-150 hover:shadow-md hover:border-indigo-200/80">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                    <Users size={14} className="text-indigo-600" />
+                    <span>Family & Sibling Groups</span>
                   </div>
-                ) : (
-                  <Unavailable reason={data.siblings.reason} />
-                )}
-              </div>
-
-              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-                  <AlertTriangle size={14} className="text-amber-500" />
-                  <span>Largest Fee Arrears</span>
-                </div>
-                <p className="text-[11px] text-slate-500 mb-2">
-                  The highest-balance accounts right now, read from the same calculation the Fees screen itself uses.
-                </p>
-                {data.defaulter_risk.available ? (
-                  <div className="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[11px] text-indigo-800 space-y-0.5">
-                    <div><strong>{inr(data.defaulter_risk.total_outstanding)}</strong> outstanding across {data.defaulter_risk.defaulter_count} of {data.defaulter_risk.students_checked} checked</div>
-                    <div className="text-indigo-600">
-                      {data.defaulter_risk.truncated
-                        ? `worst-balance sample of ${data.defaulter_risk.cohort_size} enrolled`
-                        : `covers the whole cohort (${data.defaulter_risk.cohort_size})`}
-                    </div>
-                  </div>
-                ) : (
-                  <Unavailable reason={data.defaulter_risk.reason} />
-                )}
-              </div>
-
-              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-                  <Brain size={14} className="text-purple-600" />
-                  <span>Concession / Refund Queue</span>
-                </div>
-                <p className="text-[11px] text-slate-500 mb-2">
-                  Requests currently awaiting sign-off, classified against the ₹5k / ₹25k escalation rule.
-                </p>
-                {data.concession_queue.available ? (
-                  data.concession_queue.pending_count > 0 ? (
-                    <div className="rounded-lg bg-purple-50 px-2.5 py-1.5 text-[11px] text-purple-800 space-y-0.5">
-                      <div><strong>{data.concession_queue.pending_count}</strong> pending</div>
-                      <div>{data.concession_queue.escalated_to_trustee} need Trustee sign-off</div>
-                    </div>
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    Students who share a guardian contact number with another enrolled student — the sibling-concession candidates.
+                  </p>
+                  {data.siblings.available ? (
+                    <FamilySummaryBody
+                      siblings={data.siblings}
+                      open={activePanel === 'families'}
+                      onToggle={() => setActivePanel(activePanel === 'families' ? null : 'families')}
+                    />
                   ) : (
-                    <Unavailable reason="No concession or refund requests are pending right now." />
-                  )
-                ) : (
-                  <Unavailable reason={data.concession_queue.reason} />
-                )}
-              </div>
-
-              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-                  <MessageSquare size={14} className="text-emerald-600" />
-                  <span>Channel Engagement</span>
+                    <Unavailable reason={data.siblings.reason} />
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-500 mb-2">
-                  Real delivery/read and reply rates from the last 90 days, not a tracked SMS/Email channel (none exists here yet).
-                </p>
-                {data.notification_channel_routing.available ? (
-                  <div className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 space-y-0.5">
-                    {data.notification_channel_routing.channels.whatsapp && (
-                      <div>WhatsApp: <strong>{data.notification_channel_routing.channels.whatsapp.read_rate}%</strong> read of {data.notification_channel_routing.channels.whatsapp.sent} sent</div>
-                    )}
-                    {data.notification_channel_routing.channels.direct_message && (
-                      <div>Direct messages: <strong>{data.notification_channel_routing.channels.direct_message.reply_rate}%</strong> replied of {data.notification_channel_routing.channels.direct_message.sent} sent</div>
-                    )}
+
+                <div className="animate-in fade-in-0 slide-in-from-bottom-2 [--tw-animation-duration:350ms] [animation-delay:75ms] [animation-fill-mode:backwards] rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs transition-all duration-150 hover:shadow-md hover:border-indigo-200/80">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                    <AlertTriangle size={14} className="text-amber-500" />
+                    <span>Largest Fee Arrears</span>
                   </div>
-                ) : (
-                  <Unavailable reason={data.notification_channel_routing.reason} />
-                )}
-              </div>
-
-              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-                  <FileCheck size={14} className="text-blue-600" />
-                  <span>TC &quot;No Dues&quot; Clearance</span>
-                </div>
-                <p className="text-[11px] text-slate-500 mb-2">
-                  Transfer Certificate applications awaiting Accounts sign-off, checked against each student&apos;s real fee balance.
-                </p>
-                {data.tc_no_dues.available ? (
-                  data.tc_no_dues.pending_applications > 0 ? (
-                    <div className="rounded-lg bg-blue-50 px-2.5 py-1.5 text-[11px] text-blue-800 space-y-0.5">
-                      <div><strong>{data.tc_no_dues.clear_for_auto_approval}</strong> of {data.tc_no_dues.pending_applications} can auto-clear (₹0 due)</div>
-                      <div>{data.tc_no_dues.has_dues} still owe money</div>
-                    </div>
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    The highest-balance accounts right now, read from the same calculation the Fees screen itself uses.
+                  </p>
+                  {data.defaulter_risk.available ? (
+                    <ArrearsSummaryBody
+                      defaulterRisk={data.defaulter_risk}
+                      open={activePanel === 'arrears'}
+                      onToggle={() => setActivePanel(activePanel === 'arrears' ? null : 'arrears')}
+                    />
                   ) : (
-                    <Unavailable reason="No TC applications are awaiting clearance right now." />
-                  )
-                ) : (
-                  <Unavailable reason={data.tc_no_dues.reason} />
-                )}
+                    <Unavailable reason={data.defaulter_risk.reason} />
+                  )}
+                </div>
+
+                <div className="animate-in fade-in-0 slide-in-from-bottom-2 [--tw-animation-duration:350ms] [animation-delay:150ms] [animation-fill-mode:backwards] rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs transition-all duration-150 hover:shadow-md hover:border-indigo-200/80">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                    <Brain size={14} className="text-purple-600" />
+                    <span>Concession / Refund Queue</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    Requests currently awaiting sign-off, classified against the ₹5k / ₹25k escalation rule.
+                  </p>
+                  {data.concession_queue.available ? (
+                    <QueueSummaryBody
+                      queue={data.concession_queue}
+                      open={activePanel === 'queue'}
+                      onToggle={() => setActivePanel(activePanel === 'queue' ? null : 'queue')}
+                    />
+                  ) : (
+                    <Unavailable reason={data.concession_queue.reason} />
+                  )}
+                </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs flex flex-col justify-center">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
-                  <ShieldAlert size={14} className="text-amber-600" />
-                  <span>Escalation Rule</span>
+              {/* Row 1's drill-downs — right under row 1, never under row 2. */}
+              {activePanel === 'families' && data.siblings.available && (
+                <div className="animate-in fade-in-0 slide-in-from-top-2 [--tw-animation-duration:300ms] mt-3 rounded-xl border border-indigo-100 bg-white p-3">
+                  <FamilyGroupsPanel
+                    ambiguous={data.siblings.ambiguous}
+                    chainActiveConcession={chainActiveConcession}
+                    refreshToken={refreshToken}
+                    onRequestConcession={openConcessionDialog}
+                    focusAnchor={focusAnchor}
+                    onClearFocus={() => setFocusAnchor(null)}
+                  />
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  Concessions &le; ₹5,000 clear at Accounts; &gt; ₹25,000 require Trustee sign-off. Applied to the queue above — not yet auto-enforced by the approval engine itself.
-                </p>
+              )}
+
+              {activePanel === 'arrears' && (
+                <div className="animate-in fade-in-0 slide-in-from-top-2 [--tw-animation-duration:300ms] mt-3 rounded-xl border border-indigo-100 bg-white p-3">
+                  <ArrearsRankedPanel
+                    chainActiveConcession={chainActiveConcession}
+                    refreshToken={refreshToken}
+                    onRequestConcession={openConcessionDialog}
+                    onViewFamily={(anchorId) => {
+                      setFocusAnchor(anchorId);
+                      setActivePanel('families');
+                    }}
+                  />
+                </div>
+              )}
+
+              {activePanel === 'queue' && data.concession_queue.available && (
+                <div className="animate-in fade-in-0 slide-in-from-top-2 [--tw-animation-duration:300ms] mt-3 rounded-xl border border-indigo-100 bg-white p-3">
+                  <ConcessionQueuePanel summary={data.concession_queue} refreshToken={refreshToken} onRefresh={reloadSummary} />
+                </div>
+              )}
+
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="animate-in fade-in-0 slide-in-from-bottom-2 [--tw-animation-duration:350ms] [animation-fill-mode:backwards] rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs transition-all duration-150 hover:shadow-md hover:border-indigo-200/80">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                    <MessageSquare size={14} className="text-emerald-600" />
+                    <span>Channel Engagement</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    Real delivery/read and reply rates from the last {data.notification_channel_routing.available ? data.notification_channel_routing.window_days : 90} days.
+                  </p>
+                  {data.notification_channel_routing.available ? (
+                    <ChannelSummaryBody routing={data.notification_channel_routing} />
+                  ) : (
+                    <Unavailable reason={data.notification_channel_routing.reason} />
+                  )}
+                </div>
+
+                <div className="animate-in fade-in-0 slide-in-from-bottom-2 [--tw-animation-duration:350ms] [animation-delay:75ms] [animation-fill-mode:backwards] rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs transition-all duration-150 hover:shadow-md hover:border-indigo-200/80">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                    <FileCheck size={14} className="text-blue-600" />
+                    <span>TC &quot;No Dues&quot; Clearance</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    Transfer Certificate applications awaiting Accounts sign-off, checked against each student&apos;s real fee balance.
+                  </p>
+                  {data.tc_no_dues.available ? (
+                    <TcSummaryBody tcNoDues={data.tc_no_dues} />
+                  ) : (
+                    <Unavailable reason={data.tc_no_dues.reason} />
+                  )}
+                </div>
+
+                <div className="animate-in fade-in-0 slide-in-from-bottom-2 [--tw-animation-duration:350ms] [animation-delay:150ms] [animation-fill-mode:backwards] rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs transition-all duration-150 hover:shadow-md hover:border-indigo-200/80 flex flex-col">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1">
+                    <ShieldAlert size={14} className="text-amber-600" />
+                    <span>Escalation Rule</span>
+                  </div>
+                  {data.escalation.available ? (
+                    <EscalationSummaryBody
+                      escalation={data.escalation}
+                      open={activePanel === 'escalation'}
+                      onToggle={() => setActivePanel(activePanel === 'escalation' ? null : 'escalation')}
+                    />
+                  ) : (
+                    <Unavailable reason={data.escalation.reason} />
+                  )}
+                </div>
               </div>
-            </div>
+
+              {/* Row 2's only drill-down — right under row 2. */}
+              {activePanel === 'escalation' && data.escalation.available && (
+                <div className="animate-in fade-in-0 slide-in-from-top-2 [--tw-animation-duration:300ms] mt-3 rounded-xl border border-indigo-100 bg-white p-3">
+                  <EscalationReportPanel data={data.escalation} />
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
+
+      {dialogTarget && (
+        <RequestConcessionDialog
+          open
+          onClose={() => setDialogTarget(null)}
+          onSuccess={() => {
+            setDialogTarget(null);
+            bumpRefresh();
+          }}
+          studentId={dialogTarget.studentId}
+          studentName={dialogTarget.studentName}
+          kind={dialogTarget.kind}
+        />
+      )}
+    </div>
+  );
+}
+
+/** `FeesIntelligenceData['siblings']`, narrowed to the populated shape — passed as a typed prop so narrowing survives into JSX without re-reading the discriminated union inline. */
+type SiblingsAvailable = Extract<FeesIntelligenceData['siblings'], { available: true }>;
+type DefaulterRiskAvailable = Extract<FeesIntelligenceData['defaulter_risk'], { available: true }>;
+type ChannelRoutingAvailable = Extract<FeesIntelligenceData['notification_channel_routing'], { available: true }>;
+type TcNoDuesAvailable = Extract<FeesIntelligenceData['tc_no_dues'], { available: true }>;
+type ConcessionQueueAvailable = Extract<FeesIntelligenceData['concession_queue'], { available: true }>;
+type EscalationAvailable = Extract<FeesIntelligenceData['escalation'], { available: true }>;
+
+function FamilySummaryBody({ siblings, open, onToggle }: { siblings: SiblingsAvailable; open: boolean; onToggle: () => void }) {
+  const dupShare = Math.round((siblings.ambiguous.duplicate_name_groups / Math.max(siblings.family_groups, 1)) * 100);
+  return (
+    <div className="space-y-1.5">
+      <div className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 space-y-0.5">
+        <div>
+          <strong>{siblings.family_groups}</strong> family groups, <strong>{siblings.students_in_groups}</strong> students
+        </div>
+        <div>
+          {siblings.families_every_applied} fully applied &middot; {siblings.families_some_applied} partly &middot; {siblings.families_none_applied} none
+        </div>
+      </div>
+      <div className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+        <strong>{siblings.ambiguous.duplicate_name_groups}</strong> of {siblings.family_groups} groups share a guardian name with a different number
+        {siblings.family_groups > 0 && ` (${dupShare}%)`} — these need checking before they count as real siblings.
+      </div>
+      <button type="button" onClick={onToggle} className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
+        {open ? 'Hide families' : 'Review family groups →'}
+      </button>
+    </div>
+  );
+}
+
+function ArrearsSummaryBody({
+  defaulterRisk,
+  open,
+  onToggle,
+}: {
+  defaulterRisk: DefaulterRiskAvailable;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  // Risk tiers of the sample this card already carries (the top-5 worst
+  // balances) — a real breakdown, not a second cohort sweep. The full,
+  // properly-ranked list (every account, not just 5) has its own per-row
+  // tier in the drill-down panel below.
+  const tierCounts = { high: 0, medium: 0, low: 0 } as Record<RiskTier, number>;
+  for (const row of defaulterRisk.top_defaulters) {
+    tierCounts[riskTier(row.outstanding)]++;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[11px] text-indigo-800 space-y-0.5">
+        <div>
+          <strong>{inr(defaulterRisk.total_outstanding)}</strong> outstanding across {defaulterRisk.defaulter_count} of {defaulterRisk.students_checked} checked
+        </div>
+        <div className="text-indigo-600">
+          {defaulterRisk.truncated ? `worst-balance sample of ${defaulterRisk.cohort_size} enrolled` : `covers the whole cohort (${defaulterRisk.cohort_size})`}
+        </div>
+      </div>
+      {defaulterRisk.top_defaulters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(['high', 'medium', 'low'] as const)
+            .filter((tier) => tierCounts[tier] > 0)
+            .map((tier) => (
+              <RiskBadge key={tier} tier={tier}>
+                {tierCounts[tier]} {RISK_LABEL[tier]} risk
+              </RiskBadge>
+            ))}
+        </div>
+      )}
+      <button type="button" onClick={onToggle} className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
+        {open ? 'Hide ranking' : 'View ranked list →'}
+      </button>
+    </div>
+  );
+}
+
+function QueueSummaryBody({ queue, open, onToggle }: { queue: ConcessionQueueAvailable; open: boolean; onToggle: () => void }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="rounded-lg bg-purple-50 px-2.5 py-1.5 text-[11px] text-purple-800 space-y-0.5">
+        <div>
+          <strong>{queue.pending_count}</strong> pending ({queue.pending_by_flow.concession} concession, {queue.pending_by_flow.refund} refund)
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {queue.escalated_to_trustee > 0 && (
+            <RiskBadge tier="high">{queue.escalated_to_trustee} needs Trustee sign-off</RiskBadge>
+          )}
+          <span>{queue.approved_awaiting.count} approved, awaiting application</span>
+        </div>
+      </div>
+      {(!queue.chain_active.concession || !queue.chain_active.refund) && (
+        <div className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800 space-y-0.5">
+          {!queue.chain_active.concession && <div>No active concession chain yet.</div>}
+          {!queue.chain_active.refund && <div>No active refund chain yet.</div>}
+        </div>
+      )}
+      <button type="button" onClick={onToggle} className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
+        {open ? 'Hide queue' : 'Manage the queue →'}
+      </button>
+    </div>
+  );
+}
+
+function ChannelSummaryBody({ routing }: { routing: ChannelRoutingAvailable }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 space-y-0.5">
+        {routing.channels.whatsapp && (
+          <div>
+            WhatsApp: <strong>{routing.channels.whatsapp.read_rate}%</strong> read of {routing.channels.whatsapp.sent} sent
+          </div>
+        )}
+        {routing.channels.direct_message && (
+          <div>
+            Direct messages: <strong>{routing.channels.direct_message.reply_rate}%</strong> replied of {routing.channels.direct_message.sent} sent
+          </div>
+        )}
+        <div>
+          Across {routing.family_reach.family_groups} family groups: {routing.family_reach.reached_90d} reached, {routing.family_reach.read_90d} read,{' '}
+          {routing.family_reach.replied_90d} replied
+        </div>
+      </div>
+      {routing.reminder_followup.available ? (
+        <div className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-700 space-y-0.5">
+          {Object.entries(routing.reminder_followup.by_channel).map(([channel, stats]) => (
+            <div key={channel}>
+              {channel}: {stats.reminders} reminders, {stats.rate}% followed by a payment within {routing.reminder_followup.available ? routing.reminder_followup.window_days : ''}d
+            </div>
+          ))}
+          <p className="text-[10px] italic text-slate-500">{routing.reminder_followup.basis}</p>
+        </div>
+      ) : (
+        <Unavailable reason={routing.reminder_followup.reason} />
+      )}
+    </div>
+  );
+}
+
+function TcStatusPill({ status }: { status: 'zero_due' | 'has_dues' | 'not_checked' }) {
+  if (status === 'zero_due') return <Pill tone="green">₹0 due today</Pill>;
+  if (status === 'has_dues') return <Pill tone="red">has dues</Pill>;
+  return <Pill tone="gray">not checked</Pill>;
+}
+
+function TcSummaryBody({ tcNoDues }: { tcNoDues: TcNoDuesAvailable }) {
+  if (tcNoDues.pending_applications === 0) {
+    return <Unavailable reason="No TC applications are awaiting clearance right now." />;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="rounded-lg bg-blue-50 px-2.5 py-1.5 text-[11px] text-blue-800 space-y-0.5">
+        <div>
+          <strong>{tcNoDues.zero_due}</strong> of {tcNoDues.pending_applications} show ₹0 due today
+        </div>
+        <div>
+          {tcNoDues.has_dues} still owe money &middot; {tcNoDues.not_checked} not checked yet
+        </div>
+      </div>
+      <ul className="max-h-40 space-y-1 overflow-y-auto">
+        {tcNoDues.applicants.slice(0, 15).map((applicant) => (
+          <li key={applicant.student_id} className="rounded-lg border border-slate-100 px-2 py-1.5 text-[11px]">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="font-medium text-slate-800">{applicant.student_name ?? `#${applicant.student_id}`}</span>
+              <TcStatusPill status={applicant.status} />
+            </div>
+            <div className="mt-0.5 text-slate-500">
+              Self-reported paid upto {applicant.self_reported_dues_paid_upto ?? '—'} &middot; real outstanding {inr(applicant.outstanding)}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {tcNoDues.basis && <p className="text-[10px] italic text-slate-500">{tcNoDues.basis}</p>}
+    </div>
+  );
+}
+
+function EscalationSummaryBody({ escalation, open, onToggle }: { escalation: EscalationAvailable; open: boolean; onToggle: () => void }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] text-slate-500">
+        &le; {inr(escalation.rule.accounts_max)} clears at Accounts; &gt; {inr(escalation.rule.principal_max)} needs Trustee.
+        {!escalation.rule.enforced && ' Not yet auto-enforced by the approval engine.'}
+      </p>
+      {escalation.findings.length > 0 && (
+        <div className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+          {escalation.findings.length} finding{escalation.findings.length === 1 ? '' : 's'} to review
+        </div>
+      )}
+      <button type="button" onClick={onToggle} className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
+        {open ? 'Hide report' : 'View full report →'}
+      </button>
     </div>
   );
 }

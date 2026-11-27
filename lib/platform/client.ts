@@ -3,8 +3,16 @@
 import { buildSessionContext, createAuthHeaders } from '@/lib/erp-client';
 
 import type {
+  ArrearsData,
   AuditEntry,
   AuditSummary,
+  ConcessionGrant,
+  ConcessionKind,
+  ConcessionRequestRow,
+  ConcessionState,
+  FamilyDetail,
+  FamilyGroupRow,
+  FeesGraphSignals,
   IntegrationInput,
   IntegrationTestResult,
   PageMeta,
@@ -16,6 +24,7 @@ import type {
   ScheduledTaskChange,
   ScheduledTaskRow,
   FeesIntelligenceData,
+  SubmitConcessionInput,
   WorkflowApproverPreview,
   WorkflowChain,
   WorkflowInput,
@@ -210,6 +219,131 @@ export function previewWorkflowApprover(input: {
  */
 export function fetchFeesIntelligence(): Promise<FeesIntelligenceData> {
   return call<FeesIntelligenceData>('/workflow/fees-intelligence');
+}
+
+/**
+ * Paginated, filterable drill-down behind the "Family & Sibling Groups" card.
+ *
+ * The controller sends `meta` as a SIBLING of `data` (`{data: [...rows],
+ * meta: {...}}`), the same envelope shape `callEnvelope` exists for — `call`
+ * would silently discard `meta` here, since it only ever returns `data`.
+ */
+export async function fetchFeesFamilyGroups(filters: {
+  page?: number;
+  per_page?: number;
+  applied?: 'all' | 'every' | 'some' | 'none';
+  flag?: 'oversized' | 'mixed_guardian' | 'duplicate_name';
+} = {}): Promise<{ rows: FamilyGroupRow[]; meta: PageMeta }> {
+  const { data, meta } = await callEnvelope<FamilyGroupRow[]>(`/workflow/fees-intelligence/families${query({ ...filters })}`);
+
+  return { rows: data ?? [], meta: meta ?? { page: 1, per_page: filters.per_page ?? 20, total: 0, last_page: 1 } };
+}
+
+/**
+ * One family's members, by anchor student id.
+ *
+ * The endpoint answers a real "no such family" with a 404 carrying
+ * `{ data: null }` rather than an error payload — handled here directly
+ * rather than through `call()`, which would otherwise throw on the 404
+ * before this function gets a chance to treat it as "not found" instead of
+ * "request failed".
+ */
+export async function fetchFeesFamilyDetail(anchorStudentId: number): Promise<FamilyDetail | null> {
+  const session = buildSessionContext();
+  if (!session.baseUrl) {
+    throw new PlatformApiError('The ERP host is not configured for this session. Sign in again.', 0);
+  }
+
+  const response = await fetch(`${session.baseUrl}/api/platform/workflow/fees-intelligence/families/${anchorStudentId}`, {
+    headers: createAuthHeaders(session),
+    cache: 'no-store',
+  });
+
+  if (response.status === 404) return null;
+
+  const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!response.ok || (payload && payload.status_code === 0)) {
+    const message =
+      typeof payload?.message === 'string' && payload.message.trim()
+        ? payload.message
+        : `The request failed (${response.status}).`;
+    throw new PlatformApiError(message, response.status);
+  }
+
+  return (payload?.data ?? null) as FamilyDetail | null;
+}
+
+/** Paginated, ranked drill-down behind the "Largest Fee Arrears" card. */
+export function fetchFeesArrears(filters: { page?: number; per_page?: number; standard_id?: number } = {}): Promise<ArrearsData> {
+  return call<ArrearsData>(`/workflow/fees-intelligence/arrears${query({ ...filters })}`);
+}
+
+/** The same cards the Fees Recommendation screen's graph engine computes, standalone. */
+export function fetchFeesGraphSignals(): Promise<FeesGraphSignals> {
+  return call<FeesGraphSignals>('/workflow/fees-intelligence/graph-signals');
+}
+
+// ── Fees concession / refund requests ────────────────────────────────────────
+//
+// These are registered inside routes/platform/fees_intelligence.php, which
+// RouteServiceProvider::mapPlatformRoutes() loads under a blanket
+// `Route::prefix('api/platform')` group shared with every other platform
+// route file — so despite living next to Fees' own concession/refund logic,
+// their real path is `/api/platform/fees/*`, not `/api/fees/*` (confirmed
+// via `route:list`). `callFees` mirrors `call()`'s session lookup and error
+// handling exactly (same `PlatformApiError`, same "status_code: 0 is still a
+// refusal" rule) so a caller cannot tell the two bases apart except by which
+// function it imported.
+
+async function callFees<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  const session = buildSessionContext();
+
+  if (!session.baseUrl) {
+    throw new PlatformApiError('The ERP host is not configured for this session. Sign in again.', 0);
+  }
+
+  const response = await fetch(`${session.baseUrl}/api/platform/fees${path}`, {
+    method: init.method ?? 'GET',
+    headers: createAuthHeaders(session, init.body !== undefined ? 'application/json' : undefined),
+    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+    cache: 'no-store',
+  });
+
+  const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+
+  if (!response.ok || (payload && payload.status_code === 0)) {
+    const message =
+      typeof payload?.message === 'string' && payload.message.trim()
+        ? payload.message
+        : `The request failed (${response.status}).`;
+    throw new PlatformApiError(message, response.status);
+  }
+
+  return (payload?.data ?? payload) as T;
+}
+
+export function fetchConcessionRequests(filters: {
+  kind?: ConcessionKind;
+  state?: ConcessionState;
+  student_id?: number;
+} = {}): Promise<ConcessionRequestRow[]> {
+  return callFees<ConcessionRequestRow[]>(`/concession-requests${query({ ...filters })}`);
+}
+
+export function submitConcessionRequest(input: SubmitConcessionInput): Promise<WorkflowRun> {
+  return callFees<WorkflowRun>('/concession-requests', { method: 'POST', body: input });
+}
+
+export function actOnConcessionRequest(
+  runId: number,
+  action: 'approve' | 'reject' | 'delegate',
+  body: { comment?: string; delegate_to?: number } = {},
+): Promise<{ run: WorkflowRun; grant: ConcessionGrant | null }> {
+  return callFees<{ run: WorkflowRun; grant: ConcessionGrant | null }>(`/concession-requests/${runId}/${action}`, { method: 'POST', body });
+}
+
+export function fetchConcessionGrant(grantId: number): Promise<ConcessionGrant> {
+  return callFees<ConcessionGrant>(`/concession-grants/${grantId}`);
 }
 
 // ── Shared helpers for the endpoints that carry paging metadata ─────────────

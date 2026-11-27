@@ -302,6 +302,138 @@ export interface WorkflowApproverPreview {
  * concession requests have been submitted through the workflow engine), not
  * a loading or error state.
  */
+export interface FeesSiblingAmbiguous {
+  oversized_threshold: number;
+  oversized_groups: number;
+  oversized_students: number;
+  mixed_guardian_groups: number;
+  mixed_guardian_students: number;
+  duplicate_name_groups: number;
+  duplicate_name_students: number;
+}
+
+export interface FeesDefaulterTopRow {
+  student_id: number;
+  student_name: string | null;
+  outstanding: number;
+  family: { anchor_student_id: number; size: number } | null;
+  oldest_pending_month: number | null;
+  months_overdue: number | null;
+}
+
+export interface FeesChannelStats {
+  sent: number;
+  read_rate?: number;
+  delivered_rate?: number;
+  reply_rate?: number;
+}
+
+export interface FeesFamilyReach {
+  family_groups: number;
+  reached_90d: number;
+  read_90d: number;
+  replied_90d: number;
+}
+
+export interface FeesReminderFollowupByChannel {
+  reminders: number;
+  followed_by_payment: number;
+  rate: number;
+}
+
+export type FeesReminderFollowup =
+  | {
+      available: true;
+      window_days: number;
+      lookback_days: number;
+      by_channel: Record<string, FeesReminderFollowupByChannel>;
+      basis: string;
+    }
+  | { available: false; reason: string };
+
+export interface FeesTcApplicant {
+  student_id: number;
+  student_name: string | null;
+  status: 'zero_due' | 'has_dues' | 'not_checked';
+  outstanding: number;
+  date_of_application: string | null;
+  self_reported_dues_paid_upto: string | null;
+  self_reported_any_concession: string | boolean | null;
+}
+
+export interface FeesGraphSignalCard {
+  title: string;
+  severity: string;
+  available: boolean;
+  reason: string | null;
+  description: string | null;
+}
+
+export type FeesGraphSignals =
+  | { available: true; basis: string | null; cards: Record<string, FeesGraphSignalCard> }
+  | { available: false; reason: string };
+
+export interface FeesConcessionQueueItem {
+  run_id: number;
+  flow_key: string;
+  student_id: number;
+  student_name: string | null;
+  amount: number | null;
+  current_step: number;
+  created_at: string;
+}
+
+export interface FeesConcessionQueue {
+  available: true;
+  pending_count: number;
+  pending_by_flow: { concession: number; refund: number };
+  escalated_to_trustee: number;
+  approved_awaiting: { count: number; amount: number };
+  applied_this_year: { count: number; amount: number };
+  closed_30d: number;
+  chain_active: { concession: boolean; refund: boolean };
+  items: FeesConcessionQueueItem[];
+}
+
+export interface FeesEscalationRule {
+  accounts_max: number;
+  principal_max: number;
+  enforced: boolean;
+  basis: string | null;
+}
+
+export interface FeesEscalationChainStep {
+  order: number;
+  name: string;
+  approver_type: string;
+  approver: string;
+  tier: string;
+}
+
+export interface FeesEscalationChain {
+  id: number;
+  name: string;
+  status: string;
+  condition: string;
+  engine_choice: boolean;
+  steps: FeesEscalationChainStep[];
+}
+
+export interface FeesEscalationFinding {
+  code: string;
+  count: number;
+  message: string;
+  run_ids: number[];
+}
+
+export interface FeesEscalation {
+  available: true;
+  rule: FeesEscalationRule;
+  chains: FeesEscalationChain[];
+  matrix: Record<string, Record<string, number>>;
+  findings: FeesEscalationFinding[];
+}
+
 export interface FeesIntelligenceData {
   sub_institute_id: number;
   academic_year: number | null;
@@ -313,6 +445,13 @@ export interface FeesIntelligenceData {
         students_in_groups: number;
         already_applied: number;
         pending: number;
+        ungrouped_students: number;
+        no_contact_students: number;
+        families_every_applied: number;
+        families_some_applied: number;
+        families_none_applied: number;
+        ambiguous: FeesSiblingAmbiguous;
+        applied_scope: string;
       }
     | { available: false; reason: string };
   defaulter_risk:
@@ -323,8 +462,8 @@ export interface FeesIntelligenceData {
         cohort_size: number;
         students_checked: number;
         truncated: boolean;
-        sample_bias: 'largest_balance_first';
-        top_defaulters: Array<{ student_id: number; student_name: string | null; outstanding: number }>;
+        sample_bias: 'largest_balance_first' | string;
+        top_defaulters: FeesDefaulterTopRow[];
         basis: string | null;
       }
     | { available: false; reason: string };
@@ -334,36 +473,138 @@ export interface FeesIntelligenceData {
         recommended_channel: 'whatsapp' | 'direct_message' | null;
         confidence: number;
         channels: {
-          whatsapp?: { sent: number; read_rate: number; delivered_rate: number };
-          direct_message?: { sent: number; reply_rate: number };
+          whatsapp?: FeesChannelStats;
+          direct_message?: FeesChannelStats;
         };
         window_days: number;
+        family_reach: FeesFamilyReach;
+        reminder_followup: FeesReminderFollowup;
       }
     | { available: false; reason: string };
   tc_no_dues:
     | {
         available: true;
         pending_applications: number;
-        clear_for_auto_approval: number;
+        zero_due: number;
         has_dues: number;
-        students_with_dues?: Array<{ student_id: number; student_name: string | null; outstanding: number }>;
+        not_checked: number;
+        applicants: FeesTcApplicant[];
+        basis: string | null;
       }
     | { available: false; reason: string };
-  concession_queue:
-    | {
-        available: true;
-        pending_count: number;
-        escalated_to_trustee: number;
-        items: Array<{
-          entity_id: string;
-          title: string;
-          flow_key: string;
-          amount: number | null;
-          required_approver_role: string | null;
-          created_at: string;
-        }>;
-      }
-    | { available: false; reason: string };
+  graph_signals: FeesGraphSignals;
+  concession_queue: FeesConcessionQueue | { available: false; reason: string };
+  escalation: FeesEscalation | { available: false; reason: string };
+}
+
+// ── Fees Intelligence drill-downs (GET /api/platform/workflow/fees-intelligence/*) ──
+
+export interface FamilyMember {
+  student_id: number;
+  name: string;
+  enrollment_no: string | null;
+  standard: string | null;
+  applied: boolean;
+}
+
+export interface FamilyChannelStats {
+  wa_sent_90d: number;
+  wa_read_90d: number;
+  dm_replied_90d: number;
+}
+
+export interface FamilyGroupRow {
+  anchor_student_id: number;
+  masked_mobile: string;
+  member_count: number;
+  applied_count: number;
+  applied_state: 'none' | 'some' | 'every';
+  flags: string[];
+  members: FamilyMember[];
+  channel: FamilyChannelStats;
+}
+
+export interface FamilyDetailMember {
+  student_id: number;
+  name: string;
+  enrollment_no: string | null;
+  standard: string | null;
+  applied: boolean;
+  outstanding: number | null;
+  open_request: { run_id: number; flow_key: string } | null;
+}
+
+export interface FamilyDetail {
+  anchor_student_id: number;
+  masked_mobile: string;
+  member_ids: number[];
+  members: FamilyDetailMember[];
+  flags: string[];
+}
+
+export interface ArrearsRow {
+  rank: number;
+  student_id: number;
+  student_name: string | null;
+  enrollment_no: string | null;
+  standard_name: string | null;
+  outstanding: number | null;
+  pending_items: number;
+  family: { anchor_student_id: number; size: number } | null;
+  checked: boolean;
+}
+
+export interface ArrearsData {
+  available: boolean;
+  page: number;
+  per_page: number;
+  ranking_total: number;
+  ranking_basis: string | null;
+  rows: ArrearsRow[];
+  not_checked: number[];
+}
+
+// ── Fees concession/refund requests (GET/POST /api/platform/fees/concession-requests, /concession-grants) ──
+
+export type ConcessionKind = 'concession' | 'refund';
+export type ConcessionState = 'pending' | 'approved_pending_application' | 'applied' | 'closed';
+
+export interface ConcessionRequestRow {
+  run_id: number;
+  flow_key: string;
+  kind: ConcessionKind;
+  status: string;
+  title: string | null;
+  current_step: number;
+  created_at: string;
+  student_id: number;
+  student_name: string | null;
+  grant_id: number | null;
+  amount: number | null;
+  applied_amount: number | null;
+}
+
+export interface ConcessionGrant {
+  id: number;
+  run_id: number;
+  kind: ConcessionKind;
+  student_id: number;
+  amount: number;
+  applied_amount: number;
+  remaining: number;
+  refund_heads: Record<string, number> | null;
+  status: 'approved_pending_application' | 'applied';
+  approved_at: string | null;
+}
+
+export interface SubmitConcessionInput {
+  kind: ConcessionKind;
+  student_id: number;
+  reason: string;
+  /** Concession only. */
+  amount?: number;
+  /** Refund only. */
+  refund_heads?: Record<string, number>;
 }
 
 export interface WorkflowInput {
